@@ -1,4 +1,4 @@
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -10,7 +10,7 @@ fn greet(name: &str) -> String {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let toggle_window_shortcut = Shortcut::new(Some(Modifiers::CONTROL), Code::KeyN);
-    let close_window_shortcut = Shortcut::new(None, Code::Escape);
+    // let close_window_shortcut = Shortcut::new(None, Code::Escape);
 
     tauri::Builder::default()
         .plugin(
@@ -25,19 +25,21 @@ pub fn run() {
 
                                 if visible {
                                     window.hide().ok();
+                                    window.emit("window_visibility", false).unwrap();
                                 } else {
                                     window.show().ok();
                                     // window.set_always_on_top(true).ok(); // 置顶
                                     window.set_focus().ok();
+                                    window.emit("window_visibility", true).unwrap();
                                 }
                             }
                         }
 
-                        if shortcut == &close_window_shortcut {
-                            if event.state == ShortcutState::Pressed {
-                                window.hide().ok();
-                            }
-                        }
+                        // if shortcut == &close_window_shortcut {
+                        //     if event.state == ShortcutState::Pressed {
+                        //         window.hide().ok();
+                        //     }
+                        // }
                     }
                 })
                 .build(),
@@ -49,7 +51,7 @@ pub fn run() {
             {
                 println!("Registering Ctrl+N shortcut...");
                 app.global_shortcut().register(toggle_window_shortcut)?;
-                app.global_shortcut().register(close_window_shortcut)?;
+                // app.global_shortcut().register(close_window_shortcut)?;
                 println!("Registered!");
 
                 // 获取主窗口

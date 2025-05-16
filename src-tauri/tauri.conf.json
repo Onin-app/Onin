@@ -12,10 +12,18 @@
   "app": {
     "windows": [
       {
-        "label": "main",
-        "title": "baize",
         "width": 800,
-        "height": 600
+        "height": 200,
+        "alwaysOnTop": true,
+        "center": true,
+        "closable": false,
+        "decorations": false,
+        "focus": true,
+        "hiddenTitle": true,
+        "maximizable": false,
+        "skipTaskbar": true,
+        "transparent": true,
+        "shadow": false
       }
     ],
     "security": {
