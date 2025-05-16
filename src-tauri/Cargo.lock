@@ -257,6 +257,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "baize"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-global-shortcut",
+ "tauri-plugin-opener",
+]
+
+[[package]]
 name = "base64"
 version = "0.21.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5189,18 +5201,6 @@ dependencies = [
  "static_assertions",
  "winnow 0.7.7",
  "zvariant",
-]
-
-[[package]]
-name = "zephyr"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-global-shortcut",
- "tauri-plugin-opener",
 ]
 
 [[package]]
