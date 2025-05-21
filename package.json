@@ -17,6 +17,7 @@
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-global-shortcut": "~2",
     "@tauri-apps/plugin-opener": "^2",
+    "pinyin": "^2.11.2",
     "tailwindcss": "^4.1.7"
   },
   "devDependencies": {
@@ -24,6 +25,7 @@
     "@sveltejs/kit": "^2.9.0",
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
     "@tauri-apps/cli": "^2",
+    "@types/pinyin": "^2.10.2",
     "svelte": "^5.0.0",
     "svelte-check": "^4.0.0",
     "typescript": "~5.6.2",

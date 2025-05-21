@@ -3,6 +3,8 @@
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
 
+  import { fuzzyMatch } from "../utils/fuzzyMatch";
+
   import "../index.css";
 
   let originAppList = $state<string[]>([]);
@@ -26,11 +28,8 @@
   });
 
   const handleInput = (e) => {
-    console.log("e", e.target.value);
-    const value = e.target.value.toLowerCase();
-    const apps = originAppList.filter((app) =>
-      app.toLowerCase().includes(value),
-    );
+    const value = e.target.value;
+    const apps = fuzzyMatch(value, originAppList);
     appList = apps;
   };
 </script>
