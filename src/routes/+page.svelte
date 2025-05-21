@@ -1,10 +1,21 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
+
   import "../index.css";
 
-  onMount(() => {
+  let originAppList = $state<string[]>([]);
+  let appList = $state<string[]>([]);
+
+  onMount(async () => {
     console.log("the component has mounted");
+    const res = await invoke<string[]>("get_installed_apps");
+    console.log("res", res);
+    if (res) {
+      originAppList = res;
+      appList = res;
+    }
   });
 
   listen("window_visibility", (event) => {
@@ -16,14 +27,26 @@
 
   const handleInput = (e) => {
     console.log("e", e.target.value);
+    const value = e.target.value.toLowerCase();
+    const apps = originAppList.filter((app) =>
+      app.toLowerCase().includes(value),
+    );
+    appList = apps;
   };
 </script>
 
-<main class="w-full h-[100vh] p-4 rounded-xl bg-yellow-200">
+<main
+  class="w-full h-[100vh] p-4 rounded-xl bg-[aquamarine] overflow-hidden flex flex-col"
+>
   <input
-    class="w-full h-1/3 p-2 text-2xl"
+    class="w-full p-2 text-2xl h-[60px]"
     type="text"
     placeholder="Hi Baize!"
     oninput={handleInput}
   />
+  <div class="flex-1 py-2 overflow-auto">
+    {#each appList as app}
+      <div class="w-full p-2 text-2xl">{app}</div>
+    {/each}
+  </div>
 </main>

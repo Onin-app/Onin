@@ -1,6 +1,8 @@
 use tauri::{Emitter, Manager};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
+mod installed_apps;
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -46,6 +48,7 @@ pub fn run() {
         )
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![greet])
+        .invoke_handler(tauri::generate_handler![installed_apps::get_installed_apps])
         .setup(move |app| {
             #[cfg(desktop)]
             {
@@ -62,7 +65,7 @@ pub fn run() {
                 window_clone.on_window_event(move |event| {
                     if let tauri::WindowEvent::Focused(false) = event {
                         // 当窗口失去焦点时隐藏
-                        window.hide().ok();
+                        // window.hide().ok();
                     }
                 });
             }

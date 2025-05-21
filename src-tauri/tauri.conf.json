@@ -13,7 +13,7 @@
     "windows": [
       {
         "width": 800,
-        "height": 200,
+        "height": 400,
         "alwaysOnTop": true,
         "center": true,
         "closable": false,
