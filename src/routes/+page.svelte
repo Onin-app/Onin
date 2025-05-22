@@ -2,18 +2,21 @@
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
+  import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 
   import { fuzzyMatch } from "../utils/fuzzyMatch";
+  import type { AppInfo } from "../type";
 
   import "../index.css";
 
-  let originAppList = $state<string[]>([]);
-  let appList = $state<string[]>([]);
+  let inputValue = $state<string>("");
+  let originAppList = $state<AppInfo[]>([]);
+  let appList = $state<AppInfo[]>([]);
   let selectedIndex = $state<number>(0);
 
   onMount(async () => {
     console.log("the component has mounted");
-    const res = await invoke<string[]>("get_installed_apps");
+    const res = await invoke<AppInfo[]>("get_installed_apps");
     console.log("res", res);
     if (res) {
       originAppList = res;
@@ -23,27 +26,49 @@
 
   listen("window_visibility", (event) => {
     console.log("window_visibility", event.payload);
-    // 窗口显示时 input 聚焦
-    const input = document.querySelector("input");
-    input?.focus();
+    if (event.payload) {
+      // 窗口显示时 input 聚焦
+      const input = document.querySelector("input");
+      input?.focus();
+    } else {
+      // selectedIndex = 0;
+    }
   });
 
   const handleInput = (e) => {
     const value = e.target.value;
     const apps = fuzzyMatch(value, originAppList);
+    inputValue = value;
     appList = apps;
     selectedIndex = 0;
   };
 
+  const openApp = async (app: AppInfo) => {
+    try {
+      await invoke("open_app", {
+        path: app.path,
+        window: await WebviewWindow.getCurrent(),
+      });
+      inputValue = "";
+      appList = originAppList;
+      selectedIndex = 0;
+    } catch (error) {
+      console.error("Failed to open app:", error);
+    }
+  };
+
   const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === "ArrowDown") {
+    if (e.key === "ArrowDown" || (e.key === "Tab" && !e.shiftKey)) {
       e.preventDefault();
       selectedIndex =
         selectedIndex === appList.length - 1 ? 0 : selectedIndex + 1;
-    } else if (e.key === "ArrowUp") {
+    } else if (e.key === "ArrowUp" || (e.key === "Tab" && e.shiftKey)) {
       e.preventDefault();
       selectedIndex =
         selectedIndex === 0 ? appList.length - 1 : selectedIndex - 1;
+    } else if (e.key === "Enter" && appList.length > 0) {
+      e.preventDefault();
+      openApp(appList[selectedIndex]);
     }
 
     // 保持选中项在可见范围内
@@ -69,19 +94,21 @@
       class="w-full p-2 text-2xl h-[60px]"
       type="text"
       placeholder="Hi Baize!"
+      bind:value={inputValue}
       oninput={handleInput}
     />
     <div class="app-list flex-1 py-2 overflow-auto">
       {#each appList as app, index}
-        <div
+        <button
           role="option"
           aria-selected={selectedIndex === index}
-          class="w-full p-2 text-2xl {selectedIndex === index
-            ? 'bg-[aqua]'
-            : ''}"
+          class="w-full p-2 text-2xl text-left {selectedIndex !== index
+            ? 'hover:bg-[rgba(0,255,255,0.5)]'
+            : ''} {selectedIndex === index ? 'bg-[aqua]' : ''}"
+          onclick={() => openApp(app)}
         >
-          {app}
-        </div>
+          {app.name}
+        </button>
       {/each}
     </div>
   </div>

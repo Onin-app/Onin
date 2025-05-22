@@ -47,8 +47,11 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet])
-        .invoke_handler(tauri::generate_handler![installed_apps::get_installed_apps])
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            installed_apps::get_installed_apps,
+            installed_apps::open_app
+        ])
         .setup(move |app| {
             #[cfg(desktop)]
             {

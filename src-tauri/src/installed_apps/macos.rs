@@ -1,6 +1,7 @@
 use std::fs;
+use std::process::Command;
 
-pub fn get_apps() -> Result<Vec<String>, String> {
+pub fn get_apps() -> Result<Vec<(String, Option<String>)>, String> {
     let mut apps = vec![];
     if let Ok(entries) = fs::read_dir("/Applications") {
         for entry in entries.flatten() {
@@ -8,11 +9,20 @@ pub fn get_apps() -> Result<Vec<String>, String> {
                 if file_type.is_dir() {
                     let name = entry.file_name().to_string_lossy().to_string();
                     if name.ends_with(".app") {
-                        apps.push(name);
+                        let path = format!("/Applications/{}", name);
+                        apps.push((name, Some(path)));
                     }
                 }
             }
         }
     }
     Ok(apps)
+}
+
+pub fn open_app(path: &str) -> Result<(), String> {
+    Command::new("open")
+        .arg(path)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }

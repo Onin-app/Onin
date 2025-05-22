@@ -7,8 +7,14 @@ mod windows;
 
 use tauri::command;
 
+#[derive(serde::Serialize)]
+pub struct AppInfo {
+    pub name: String,
+    pub path: Option<String>,
+}
+
 #[command]
-pub fn get_installed_apps() -> Result<Vec<String>, String> {
+pub fn get_installed_apps() -> Result<Vec<AppInfo>, String> {
     #[cfg(target_os = "windows")]
     {
         windows::get_apps()
@@ -28,4 +34,28 @@ pub fn get_installed_apps() -> Result<Vec<String>, String> {
     {
         Err("Unsupported platform.".to_string())
     }
+}
+
+#[command]
+pub fn open_app(path: String, window: tauri::WebviewWindow) -> Result<(), String> {
+    println!("Opening app: {path}");
+
+    #[cfg(target_os = "windows")]
+    {
+        windows::open_app(&path)?;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        macos::open_app(&path)?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        linux::open_app(&path)?;
+    }
+
+    window.hide().map_err(|e| e.to_string())?;
+
+    Ok(())
 }

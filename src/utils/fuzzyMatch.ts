@@ -1,4 +1,5 @@
 import pinyin from 'pinyin';
+import type { AppInfo } from '../type';
 
 /**
  * 模糊匹配工具函数
@@ -6,19 +7,21 @@ import pinyin from 'pinyin';
  * @param array 要搜索的数组
  * @returns 匹配的结果数组
  */
-export const fuzzyMatch = (value: string, array: string[]): string[] => {
+export const fuzzyMatch = (value: string, array: AppInfo[]): AppInfo[] => {
   if (!value || !array?.length) return array;
 
   const lowerValue = value.toLowerCase();
 
   return array.filter(item => {
+    const name = item.name.toLowerCase();
+
     // 规则1: 简单模糊匹配(忽略大小写)
-    if (item.toLowerCase().includes(lowerValue)) {
+    if (name.toLowerCase().includes(lowerValue)) {
       return true;
     }
 
     // 规则2: 首字母匹配
-    const initials = item.split(/\s+/)
+    const initials = name.split(/\s+/)
       .map(word => word.charAt(0).toLowerCase())
       .join('');
     if (initials.includes(lowerValue)) {
@@ -26,12 +29,12 @@ export const fuzzyMatch = (value: string, array: string[]): string[] => {
     }
 
     // 规则3: 中文拼音匹配
-    const pinyinResult = pinyin(item, {
+    const pinyinResult = pinyin(name, {
       style: pinyin.STYLE_NORMAL, // 全拼
       heteronym: false
     }).flat().join('');
 
-    const pinyinInitials = pinyin(item, {
+    const pinyinInitials = pinyin(name, {
       style: pinyin.STYLE_FIRST_LETTER // 首字母
     }).flat().join('');
 
