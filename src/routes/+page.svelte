@@ -102,12 +102,24 @@
         <button
           role="option"
           aria-selected={selectedIndex === index}
-          class="w-full p-2 text-2xl text-left {selectedIndex !== index
+          class="flex w-full p-2 text-2xl text-left {selectedIndex !== index
             ? 'hover:bg-[rgba(0,255,255,0.5)]'
             : ''} {selectedIndex === index ? 'bg-[aqua]' : ''}"
           onclick={() => openApp(app)}
         >
-          {app.name}
+          {#if app.icon}
+            <img
+              src={`data:image/png;base64,${app.icon}`}
+              class="w-8 h-8 mr-2 inline-block"
+              alt=""
+            />
+          {/if}
+          <div class="flex flex-col">
+            {app.name}
+            <span class="text-xs text-gray-400">
+              {app.path}
+            </span>
+          </div>
         </button>
       {/each}
     </div>

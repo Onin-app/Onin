@@ -8,9 +8,21 @@ mod windows;
 use tauri::command;
 
 #[derive(serde::Serialize)]
+pub enum AppOrigin {
+    Hkey,
+    Shortcut,
+}
+
+#[derive(serde::Serialize)]
 pub struct AppInfo {
     pub name: String,
     pub path: Option<String>,
+    pub icon: Option<String>,
+    #[cfg(target_os = "windows")]
+    pub origin: Option<AppOrigin>,
+    #[cfg(not(target_os = "windows"))]
+    #[serde(skip_serializing)]
+    pub origin: Option<AppOrigin>,
 }
 
 #[command]
