@@ -29,7 +29,8 @@ const UNINSTALL_PATHS: &[(&str, HKEY)] = &[
 ];
 
 // 从注册表中获取应用列表
-pub fn get_apps_from_hkey() -> Result<Vec<AppInfo>, String> {
+#[tracing::instrument(level = "debug")]
+fn get_apps_from_hkey() -> Result<Vec<AppInfo>, String> {
     let mut apps = vec![];
 
     for (path, hive) in UNINSTALL_PATHS {
@@ -84,6 +85,7 @@ pub fn get_apps_from_hkey() -> Result<Vec<AppInfo>, String> {
     Ok(apps)
 }
 
+#[tracing::instrument]
 fn normalize_app_name(name: &str) -> String {
     // 特殊应用处理
     // if name.contains("Mozilla Firefox") {
@@ -122,6 +124,7 @@ fn normalize_app_name(name: &str) -> String {
     result.trim().to_string()
 }
 
+#[tracing::instrument]
 fn extract_exe_path(
     display_icon: Option<String>,
     install_location: Option<String>,
@@ -186,6 +189,7 @@ fn extract_exe_path(
     None
 }
 
+#[tracing::instrument]
 fn extract_icon_path(display_icon: Option<String>) -> Option<String> {
     if let Some(icon) = display_icon {
         // 处理包含逗号的情况 (如 "path.exe,1")
@@ -215,6 +219,7 @@ fn extract_icon_path(display_icon: Option<String>) -> Option<String> {
     None
 }
 
+#[tracing::instrument]
 fn extract_target_from_lnk(path: &Path) -> Option<String> {
     let shell_link = ShellLink::open(path).ok()?;
     let link_info = shell_link.link_info().as_ref()?;
@@ -228,6 +233,7 @@ fn extract_target_from_lnk(path: &Path) -> Option<String> {
     }
 }
 
+#[tracing::instrument]
 fn get_all_shortcuts() -> Vec<PathBuf> {
     let mut shortcuts = Vec::new();
     let user_profile = std::env::var("USERPROFILE").unwrap();
@@ -265,7 +271,8 @@ fn get_all_shortcuts() -> Vec<PathBuf> {
 }
 
 // 从快捷方式中获取应用列表
-pub fn get_apps_from_shortcuts() -> Result<Vec<AppInfo>, String> {
+#[tracing::instrument]
+fn get_apps_from_shortcuts() -> Result<Vec<AppInfo>, String> {
     let shortcuts = get_all_shortcuts();
     let mut apps = Vec::new();
 
@@ -296,6 +303,7 @@ pub fn get_apps_from_shortcuts() -> Result<Vec<AppInfo>, String> {
 }
 
 // 合并并去重
+#[tracing::instrument]
 pub fn get_apps() -> Result<Vec<AppInfo>, String> {
     let mut hkey_apps = get_apps_from_hkey()?;
     let shortcut_apps = get_apps_from_shortcuts()?;
@@ -320,6 +328,7 @@ pub fn open_app(path: &str) -> Result<(), String> {
     Ok(())
 }
 
+#[tracing::instrument]
 fn is_uninstall_path(link: &ShellLink) -> bool {
     if let Some(link_info) = link.link_info() {
         if let Some(local_path) = link_info.local_base_path() {
@@ -330,6 +339,7 @@ fn is_uninstall_path(link: &ShellLink) -> bool {
     false
 }
 
+#[tracing::instrument]
 fn should_filter_shortcut(shortcut: &Path) -> bool {
     if let Ok(link) = ShellLink::open(shortcut) {
         // 检查路径和参数
@@ -340,6 +350,7 @@ fn should_filter_shortcut(shortcut: &Path) -> bool {
     }
 }
 
+#[tracing::instrument]
 fn extract_icon_from_shortcut(shortcut: &Path) -> Option<String> {
     if let Ok(link) = ShellLink::open(shortcut) {
         // 尝试获取快捷方式的图标路径
@@ -369,6 +380,7 @@ fn extract_icon_from_shortcut(shortcut: &Path) -> Option<String> {
     None
 }
 
+#[tracing::instrument]
 fn convert_image_to_base64(image_path: &str) -> Option<String> {
     let output = Command::new("powershell")
         .args(&[
@@ -389,6 +401,7 @@ fn convert_image_to_base64(image_path: &str) -> Option<String> {
     }
 }
 
+#[tracing::instrument]
 fn extract_icon_from_exe(exe_path: &str) -> Option<String> {
     let output = Command::new("powershell")
         .args(&["-Command", 

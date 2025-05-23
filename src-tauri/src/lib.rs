@@ -1,6 +1,9 @@
 use tauri::{Emitter, Manager};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
+use tracing_subscriber;
+use tracing_subscriber::fmt::format::FmtSpan; // 导入 FmtSpan
+
 mod installed_apps;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -11,6 +14,13 @@ fn greet(name: &str) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    tracing_subscriber::fmt()
+        // .with_env_filter("debug") // 设置日志级别
+        .with_max_level(tracing::Level::DEBUG)
+        .with_span_events(FmtSpan::FULL) //
+        .try_init()
+        .ok();
+
     let toggle_window_shortcut = Shortcut::new(Some(Modifiers::CONTROL), Code::KeyN);
     // let close_window_shortcut = Shortcut::new(None, Code::Escape);
 
