@@ -28,6 +28,17 @@ lnk = "0.5.1"
 walkdir = "2.5.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+windows = { version = "0.57", features = [
+  "Win32_UI_Shell",
+  "Win32_UI_WindowsAndMessaging",
+  "Win32_Graphics_Gdi",
+  "Win32_Foundation",
+] }
+base64 = "0.22"
+futures = "0.3" # 用于并发处理 futures
+image = "0.25"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+num_cpus = "1.13"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-global-shortcut = "2"

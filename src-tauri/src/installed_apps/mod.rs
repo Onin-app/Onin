@@ -1,3 +1,5 @@
+#[cfg(target_os = "windows")]
+mod exe_to_icon;
 #[cfg(target_os = "linux")]
 mod linux;
 #[cfg(target_os = "macos")]
@@ -27,10 +29,10 @@ pub struct AppInfo {
 
 #[command]
 #[tracing::instrument]
-pub fn get_installed_apps() -> Result<Vec<AppInfo>, String> {
+pub async fn get_installed_apps() -> Result<Vec<AppInfo>, String> {
     #[cfg(target_os = "windows")]
     {
-        windows::get_apps()
+        windows::get_apps().await
     }
 
     #[cfg(target_os = "macos")]

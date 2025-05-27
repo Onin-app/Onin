@@ -1,13 +1,20 @@
+use base64;
+use futures::StreamExt;
+use image::{io::Reader, ImageFormat};
 use lnk::ShellLink;
+use num_cpus;
 use regex::Regex;
 use std::{
+    io::Cursor,
     path::{Path, PathBuf},
     process::Command,
 };
+use tokio::task;
 use walkdir::WalkDir;
 use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
 use winreg::{RegKey, HKEY};
 
+use super::exe_to_icon::extract_icon_from_exe;
 use super::AppInfo;
 use super::AppOrigin;
 
@@ -29,70 +36,92 @@ const UNINSTALL_PATHS: &[(&str, HKEY)] = &[
 ];
 
 // 从注册表中获取应用列表
-#[tracing::instrument(level = "debug")]
-fn get_apps_from_hkey() -> Result<Vec<AppInfo>, String> {
-    let mut apps = vec![];
+#[tracing::instrument]
+async fn get_apps_from_hkey() -> Result<Vec<AppInfo>, String> {
+    let mut futures: Vec<tokio::task::JoinHandle<Result<Option<AppInfo>, String>>> = Vec::new(); // 已经有这个类型注解了，保持不变
 
     for (path, hive) in UNINSTALL_PATHS {
         let root = RegKey::predef(*hive);
         if let Ok(uninstall_key) = root.open_subkey(path) {
             for item in uninstall_key.enum_keys().filter_map(Result::ok) {
-                if let Ok(subkey) = uninstall_key.open_subkey(&item) {
-                    // Skip if no DisplayName
-                    let display_name: Result<String, _> = subkey.get_value("DisplayName");
-                    if display_name.is_err() {
-                        continue;
-                    }
+                let subkey = match uninstall_key.open_subkey(&item) {
+                    Ok(sk) => sk,
+                    Err(_) => continue,
+                };
 
-                    // Skip if SystemComponent == 1
-                    let system_component: Result<u32, _> = subkey.get_value("SystemComponent");
-                    if matches!(system_component, Ok(1)) {
-                        continue;
-                    }
+                let display_name: Result<String, _> = subkey.get_value("DisplayName");
+                if display_name.is_err() {
+                    continue;
+                }
+                let system_component: Result<u32, _> = subkey.get_value("SystemComponent");
+                if matches!(system_component, Ok(1)) {
+                    continue;
+                }
+                let has_parent_key = subkey.get_value::<String, _>("ParentKeyName").is_ok();
+                let has_parent_display = subkey.get_value::<String, _>("ParentDisplayName").is_ok();
+                if has_parent_key || has_parent_display {
+                    continue;
+                }
 
-                    // Skip if ParentKeyName or ParentDisplayName exists
-                    let has_parent_key = subkey.get_value::<String, _>("ParentKeyName").is_ok();
-                    let has_parent_display =
-                        subkey.get_value::<String, _>("ParentDisplayName").is_ok();
-                    if has_parent_key || has_parent_display {
-                        continue;
-                    }
+                let display_name_val = display_name.unwrap();
+                let display_icon_val = subkey.get_value::<String, _>("DisplayIcon").ok();
+                let install_location_val = subkey.get_value::<String, _>("InstallLocation").ok();
+                let uninstall_string_val = subkey.get_value::<String, _>("UninstallString").ok();
 
-                    let display_name = display_name.unwrap();
-                    let display_icon = subkey.get_value::<String, _>("DisplayIcon").ok();
-                    let install_location = subkey.get_value::<String, _>("InstallLocation").ok();
-                    let uninstall_string = subkey.get_value::<String, _>("UninstallString").ok();
+                let app_path_candidate = extract_exe_path(
+                    display_icon_val.clone(),
+                    install_location_val.clone(),
+                    uninstall_string_val.clone(),
+                );
 
-                    let path =
-                        extract_exe_path(display_icon.clone(), install_location, uninstall_string);
-                    let icon = extract_icon_path(display_icon);
+                if let Some(ref p) = app_path_candidate {
+                    if !p.to_lowercase().contains("msiexec.exe") {
+                        let name_cloned = display_name_val.clone();
+                        let path_cloned = p.clone();
+                        let icon_path_cloned = display_icon_val.clone();
 
-                    if let Some(ref p) = path {
-                        if !p.to_lowercase().contains("msiexec.exe") {
-                            apps.push(AppInfo {
-                                name: normalize_app_name(&display_name),
-                                path,
-                                icon: icon.or_else(|| Some(DEFAULT_APP_ICON.to_string())),
+                        futures.push(task::spawn_blocking(move || {
+                            let icon_base64 =
+                                extract_icon_from_exe_or_image(&icon_path_cloned, &path_cloned);
+                            // <<-- 修复点：将 Ok(AppInfo { ... }) 改为 Ok(Some(AppInfo { ... }))
+                            Ok(Some(AppInfo {
+                                // <<-- 加上 Some()
+                                name: normalize_app_name(&name_cloned),
+                                path: Some(path_cloned),
+                                icon: icon_base64.or_else(|| Some(DEFAULT_APP_ICON.to_string())),
                                 origin: Some(AppOrigin::Hkey),
-                            });
-                        }
+                            }))
+                        }));
                     }
                 }
             }
         }
     }
 
+    // 这一部分代码不需要修改，它已经正确处理了 Result<Option<AppInfo>, String>
+    let apps: Vec<AppInfo> = futures::stream::iter(futures)
+        .buffer_unordered(num_cpus::get() * 2)
+        .filter_map(|res| async move {
+            match res {
+                Ok(Ok(Some(app))) => Some(app),
+                Ok(Ok(None)) => None,
+                Ok(Err(e)) => {
+                    tracing::error!("get_apps_from_hkey: Blocking task failed: {:?}", e);
+                    None
+                }
+                Err(e) => {
+                    tracing::error!("get_apps_from_hkey: Join error: {:?}", e);
+                    None
+                }
+            }
+        })
+        .collect()
+        .await;
+
     Ok(apps)
 }
 
-#[tracing::instrument]
 fn normalize_app_name(name: &str) -> String {
-    // 特殊应用处理
-    // if name.contains("Mozilla Firefox") {
-    //     return "Firefox".to_string();
-    // }
-
-    // 常见需要移除的模式
     let patterns = [
         " (x86)",
         " (x64)",
@@ -109,28 +138,23 @@ fn normalize_app_name(name: &str) -> String {
         result = result.replace(pattern, "");
     }
 
-    // 移除版本号 (匹配类似 1.06.2412050 的格式)
     let re = Regex::new(r"\s*\d+(\.\d+)+").unwrap();
     result = re.replace_all(&result, "").to_string();
 
-    // 移除括号及其内容
     let re = Regex::new(r"\([^)]*\)").unwrap();
     result = re.replace_all(&result, "").to_string();
 
-    // 移除方括号及其内容
     let re = Regex::new(r"\[[^\]]*\]").unwrap();
     result = re.replace_all(&result, "").to_string();
 
     result.trim().to_string()
 }
 
-#[tracing::instrument]
 fn extract_exe_path(
     display_icon: Option<String>,
     install_location: Option<String>,
     uninstall_string: Option<String>,
 ) -> Option<String> {
-    // 1. 尝试清洗 DisplayIcon
     if let Some(icon) = display_icon {
         let lower_icon = icon.to_lowercase();
         if lower_icon.ends_with(".exe")
@@ -154,9 +178,8 @@ fn extract_exe_path(
         }
     }
 
-    // 2. 从 InstallLocation 猜测路径
     if let Some(loc) = &install_location {
-        let guessed = std::path::Path::new(loc).join("start.exe"); // 默认启动文件名示意
+        let guessed = std::path::Path::new(loc).join("start.exe");
         if guessed.exists() {
             let guessed_str = guessed.to_string_lossy().to_string();
             if guessed_str.to_lowercase().ends_with(".exe")
@@ -168,9 +191,7 @@ fn extract_exe_path(
         }
     }
 
-    // 3. 尝试清洗 UninstallString
     if let Some(uninstall) = uninstall_string {
-        // 抽取包含 .exe/.msi/.bat 的路径（排除带 uninstall 字样的）
         if uninstall.to_lowercase().contains(".exe")
             || uninstall.to_lowercase().contains(".msi")
             || uninstall.to_lowercase().contains(".bat")
@@ -185,56 +206,10 @@ fn extract_exe_path(
         }
     }
 
-    // 4. fallback：返回 None
     None
 }
 
-#[tracing::instrument]
-fn extract_icon_path(display_icon: Option<String>) -> Option<String> {
-    if let Some(icon) = display_icon {
-        // 处理包含逗号的情况 (如 "path.exe,1")
-        let clean_path = if let Some((path, _)) = icon.split_once(',') {
-            path.trim_matches('"').to_string()
-        } else {
-            icon.trim_matches('"').to_string()
-        };
-
-        // 检查是否是有效的图片文件
-        let ext = Path::new(&clean_path)
-            .extension()
-            .and_then(|s| s.to_str())
-            .map(|s| s.to_lowercase());
-
-        if let Some(ext) = ext {
-            if matches!(ext.as_str(), "ico" | "png" | "jpg" | "jpeg" | "bmp") {
-                return convert_image_to_base64(&clean_path);
-            }
-        }
-
-        // 如果是exe文件，尝试提取图标
-        if clean_path.to_lowercase().ends_with(".exe") {
-            return extract_icon_from_exe(&clean_path);
-        }
-    }
-    None
-}
-
-#[tracing::instrument]
-fn extract_target_from_lnk(path: &Path) -> Option<String> {
-    let shell_link = ShellLink::open(path).ok()?;
-    let link_info = shell_link.link_info().as_ref()?;
-    let local_path = link_info.local_base_path().clone()?; // 这里添加.clone()
-
-    // 确保路径存在
-    if Path::new(&local_path).exists() {
-        Some(local_path)
-    } else {
-        None
-    }
-}
-
-#[tracing::instrument]
-fn get_all_shortcuts() -> Vec<PathBuf> {
+fn get_all_shortcuts_sync() -> Vec<PathBuf> {
     let mut shortcuts = Vec::new();
     let user_profile = std::env::var("USERPROFILE").unwrap();
 
@@ -253,16 +228,18 @@ fn get_all_shortcuts() -> Vec<PathBuf> {
         if !Path::new(&base).exists() {
             continue;
         }
-        for entry in WalkDir::new(base).into_iter().filter_map(|e| e.ok()) {
+        for entry in WalkDir::new(base)
+            .max_depth(4)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
             if entry
                 .path()
                 .extension()
                 .map(|s| s == "lnk")
                 .unwrap_or(false)
             {
-                if !should_filter_shortcut(entry.path()) {
-                    shortcuts.push(entry.path().to_path_buf());
-                }
+                shortcuts.push(entry.path().to_path_buf());
             }
         }
     }
@@ -272,48 +249,130 @@ fn get_all_shortcuts() -> Vec<PathBuf> {
 
 // 从快捷方式中获取应用列表
 #[tracing::instrument]
-fn get_apps_from_shortcuts() -> Result<Vec<AppInfo>, String> {
-    let shortcuts = get_all_shortcuts();
-    let mut apps = Vec::new();
+async fn get_apps_from_shortcuts() -> Result<Vec<AppInfo>, String> {
+    let shortcut_paths = get_all_shortcuts_sync();
+    let mut futures: Vec<tokio::task::JoinHandle<Result<Option<AppInfo>, String>>> = Vec::new();
 
-    for shortcut in shortcuts {
-        if let Some(target_path) = extract_target_from_lnk(&shortcut) {
-            let app_name = shortcut
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("")
-                .to_string();
-            let icon = extract_icon_from_shortcut(&shortcut);
+    for shortcut_path in shortcut_paths {
+        // 重命名为 shortcut_path 更清晰
+        // 不需要在这里克隆，因为 PathBuf 会在 move 闭包中被所有权转移
+        futures.push(task::spawn_blocking(move || {
+            // 在这里打开 ShellLink 一次
+            let shell_link = match ShellLink::open(&shortcut_path) {
+                Ok(link) => link,
+                Err(e) => {
+                    // 记录无法打开快捷方式的错误，并跳过
+                    tracing::warn!("Failed to open shortcut {:?}: {:?}", shortcut_path, e);
+                    return Ok(None);
+                }
+            };
 
-            if target_path.to_lowercase().ends_with(".exe")
-                || target_path.to_lowercase().ends_with(".msi")
-                || target_path.to_lowercase().ends_with(".bat")
-            {
-                apps.push(AppInfo {
-                    name: app_name,
-                    path: Some(target_path.clone()),
-                    icon: icon.or_else(|| Some(DEFAULT_APP_ICON.to_string())),
-                    origin: Some(AppOrigin::Shortcut),
-                });
+            // 1. 过滤快捷方式，使用已打开的 shell_link
+            if should_filter_shortcut_with_link(&shell_link) {
+                // <<-- 新增函数，使用已打开的 link
+                return Ok(None);
             }
-        }
+
+            let mut app_info: Option<AppInfo> = None;
+            // 2. 解析快捷方式目标路径，使用已打开的 shell_link
+            if let Some(target_path) = extract_target_from_lnk_with_link(&shell_link) {
+                // <<-- 新增函数，使用已打开的 link
+                let app_name = shortcut_path // 使用原始 shortcut_path 获取文件名
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("")
+                    .to_string();
+
+                // 3. 提取图标，使用已打开的 shell_link
+                let icon = extract_icon_from_shortcut_with_link(&shell_link, &target_path); // <<-- 新增函数，使用已打开的 link 和 target_path
+
+                if target_path.to_lowercase().ends_with(".exe")
+                    || target_path.to_lowercase().ends_with(".msi")
+                    || target_path.to_lowercase().ends_with(".bat")
+                {
+                    app_info = Some(AppInfo {
+                        name: normalize_app_name(&app_name),
+                        path: Some(target_path.clone()),
+                        icon: icon.or_else(|| Some(DEFAULT_APP_ICON.to_string())),
+                        origin: Some(AppOrigin::Shortcut),
+                    });
+                }
+            }
+            Ok(app_info)
+        }));
     }
+
+    let apps: Vec<AppInfo> = futures::stream::iter(futures)
+        .buffer_unordered(num_cpus::get() * 2)
+        .filter_map(|res| async move {
+            match res {
+                Ok(Ok(Some(app))) => Some(app),
+                Ok(Ok(None)) => None,
+                Ok(Err(e)) => {
+                    tracing::error!("get_apps_from_shortcuts: Blocking task failed: {:?}", e);
+                    None
+                }
+                Err(e) => {
+                    tracing::error!("get_apps_from_shortcuts: Join error: {:?}", e);
+                    None
+                }
+            }
+        })
+        .collect()
+        .await;
 
     Ok(apps)
 }
 
-// 合并并去重
-#[tracing::instrument]
-pub fn get_apps() -> Result<Vec<AppInfo>, String> {
-    let mut hkey_apps = get_apps_from_hkey()?;
-    let shortcut_apps = get_apps_from_shortcuts()?;
+// should_filter_shortcut 的新版本，接受 ShellLink 引用
+// 保持同步，因为会在 spawn_blocking 内部调用
+fn should_filter_shortcut_with_link(link: &ShellLink) -> bool {
+    // 逻辑不变，直接使用传入的 link
+    is_uninstall_path(link) // is_uninstall_path 已经接受 ShellLink 引用
+}
 
-    // 合并并去重
-    // for app in shortcut_apps {
-    //     if !hkey_apps.iter().any(|a| a.name == app.name) {
-    //         hkey_apps.push(app);
-    //     }
-    // }
+// extract_target_from_lnk 的新版本，接受 ShellLink 引用
+// 保持同步，因为会在 spawn_blocking 内部调用
+fn extract_target_from_lnk_with_link(link: &ShellLink) -> Option<String> {
+    let link_info = link.link_info().as_ref()?;
+    let local_path = link_info.local_base_path().clone()?;
+
+    if Path::new(&local_path).exists() {
+        Some(local_path)
+    } else {
+        None
+    }
+}
+
+// extract_icon_from_shortcut 的新版本，接受 ShellLink 引用和 target_path
+// 保持同步，因为会在 spawn_blocking 内部调用
+fn extract_icon_from_shortcut_with_link(link: &ShellLink, target_path: &str) -> Option<String> {
+    // 尝试获取快捷方式的图标路径
+    if let Some(icon_location) = link.icon_location() {
+        let path = icon_location.to_string();
+        if Path::new(&path).exists() {
+            if let Some(ext) = Path::new(&path).extension().and_then(|s| s.to_str()) {
+                let ext = ext.to_lowercase();
+                if matches!(ext.as_str(), "ico" | "png" | "jpg" | "jpeg" | "bmp") {
+                    return convert_image_to_base64(&path);
+                }
+            }
+            if path.to_lowercase().ends_with(".exe") {
+                return extract_icon_from_exe(&path);
+            }
+        }
+    }
+    // 从目标EXE提取图标 (如果上面没有成功)
+    if target_path.to_lowercase().ends_with(".exe") {
+        return extract_icon_from_exe(target_path);
+    }
+    None
+}
+
+pub async fn get_apps() -> Result<Vec<AppInfo>, String> {
+    let mut hkey_apps = get_apps_from_hkey().await?;
+    let shortcut_apps = get_apps_from_shortcuts().await?;
+
     for app in shortcut_apps {
         hkey_apps.push(app);
     }
@@ -328,7 +387,6 @@ pub fn open_app(path: &str) -> Result<(), String> {
     Ok(())
 }
 
-#[tracing::instrument]
 fn is_uninstall_path(link: &ShellLink) -> bool {
     if let Some(link_info) = link.link_info() {
         if let Some(local_path) = link_info.local_base_path() {
@@ -339,81 +397,74 @@ fn is_uninstall_path(link: &ShellLink) -> bool {
     false
 }
 
-#[tracing::instrument]
-fn should_filter_shortcut(shortcut: &Path) -> bool {
-    if let Ok(link) = ShellLink::open(shortcut) {
-        // 检查路径和参数
-        let is_uninstall = is_uninstall_path(&link);
-        is_uninstall
-    } else {
-        false
+fn convert_image_to_base64(image_path: &str) -> Option<String> {
+    let path = PathBuf::from(image_path);
+
+    let mut reader = Reader::open(&path).ok()?;
+
+    let format_guess = path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .and_then(|ext_str| match ext_str.to_lowercase().as_str() {
+            "png" => Some(ImageFormat::Png),
+            "jpg" | "jpeg" => Some(ImageFormat::Jpeg),
+            "ico" => Some(ImageFormat::Ico),
+            "bmp" => Some(ImageFormat::Bmp),
+            _ => None,
+        });
+
+    if let Some(fmt) = format_guess {
+        reader.set_format(fmt);
     }
+
+    let img = reader.decode().ok()?;
+
+    let mut buffer = Cursor::new(Vec::new());
+    img.write_to(&mut buffer, ImageFormat::Png).ok()?;
+
+    let encoded_bytes = buffer.into_inner();
+
+    Some(base64::encode(&encoded_bytes))
 }
 
-#[tracing::instrument]
-fn extract_icon_from_shortcut(shortcut: &Path) -> Option<String> {
-    if let Ok(link) = ShellLink::open(shortcut) {
-        // 尝试获取快捷方式的图标路径
-        if let Some(icon_location) = link.icon_location() {
-            let path = icon_location.to_string();
-            if Path::new(&path).exists() {
-                // 如果是图片文件，转换为base64
-                if let Some(ext) = Path::new(&path).extension().and_then(|s| s.to_str()) {
-                    let ext = ext.to_lowercase();
-                    if matches!(ext.as_str(), "ico" | "png" | "jpg" | "jpeg" | "bmp") {
-                        return convert_image_to_base64(&path);
+fn extract_icon_from_exe_or_image(
+    display_icon_path: &Option<String>,
+    exe_path: &String,
+) -> Option<String> {
+    // 1. 尝试从 DisplayIcon 提取
+    if let Some(icon_str) = display_icon_path {
+        let clean_path = if let Some((path, _)) = icon_str.split_once(',') {
+            path.trim_matches('"').to_string()
+        } else {
+            icon_str.trim_matches('"').to_string() // <<-- 修复：移除这里的分号
+        };
+
+        let path = Path::new(&clean_path);
+        if path.exists() {
+            let ext = path
+                .extension()
+                .and_then(|s| s.to_str())
+                .map(|s| s.to_lowercase());
+
+            if let Some(ext) = ext {
+                if matches!(ext.as_str(), "ico" | "png" | "jpg" | "jpeg" | "bmp") {
+                    if let Some(base64_data) = convert_image_to_base64(&clean_path) {
+                        return Some(base64_data);
                     }
                 }
-                // 如果是exe文件则提取图标
-                if path.to_lowercase().ends_with(".exe") {
-                    return extract_icon_from_exe(&path);
+            }
+
+            if clean_path.to_lowercase().ends_with(".exe") {
+                if let Some(base64_data) = extract_icon_from_exe(&clean_path) {
+                    return Some(base64_data);
                 }
             }
         }
-        // 从目标EXE提取图标
-        if let Some(target_path) = extract_target_from_lnk(shortcut) {
-            if target_path.to_lowercase().ends_with(".exe") {
-                return extract_icon_from_exe(&target_path);
-            }
-        }
     }
+
+    if let Some(base64_data) = extract_icon_from_exe(exe_path) {
+        return Some(base64_data);
+    }
+
     None
-}
-
-#[tracing::instrument]
-fn convert_image_to_base64(image_path: &str) -> Option<String> {
-    let output = Command::new("powershell")
-        .args(&[
-            "-Command",
-            &format!(
-                "[Convert]::ToBase64String([System.IO.File]::ReadAllBytes('{}'))",
-                image_path
-            ),
-        ])
-        .output()
-        .ok()?;
-
-    if output.status.success() {
-        let base64 = String::from_utf8(output.stdout).ok()?;
-        Some(base64.trim().to_string())
-    } else {
-        None
-    }
-}
-
-#[tracing::instrument]
-fn extract_icon_from_exe(exe_path: &str) -> Option<String> {
-    let output = Command::new("powershell")
-        .args(&["-Command", 
-               &format!("Add-Type -AssemblyName System.Drawing; $icon = [System.Drawing.Icon]::ExtractAssociatedIcon('{}'); $ms = New-Object System.IO.MemoryStream; $icon.ToBitmap().Save($ms, [System.Drawing.Imaging.ImageFormat]::Png); [Convert]::ToBase64String($ms.ToArray())", 
-               exe_path)])
-        .output()
-        .ok()?;
-
-    if output.status.success() {
-        let base64 = String::from_utf8(output.stdout).ok()?;
-        Some(base64.trim().to_string())
-    } else {
-        None
-    }
 }

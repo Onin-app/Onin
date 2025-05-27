@@ -15,8 +15,7 @@ fn greet(name: &str) -> String {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tracing_subscriber::fmt()
-        // .with_env_filter("debug") // 设置日志级别
-        .with_max_level(tracing::Level::DEBUG)
+        // .with_env_filter("warn") // 设置日志级
         .with_span_events(FmtSpan::FULL) //
         .try_init()
         .ok();
