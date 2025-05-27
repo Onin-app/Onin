@@ -5,6 +5,7 @@ use lnk::ShellLink;
 use num_cpus;
 use regex::Regex;
 use std::{
+    collections::HashMap,
     io::Cursor,
     path::{Path, PathBuf},
     process::Command,
@@ -229,7 +230,7 @@ fn get_all_shortcuts_sync() -> Vec<PathBuf> {
             continue;
         }
         for entry in WalkDir::new(base)
-            .max_depth(4)
+            .max_depth(3)
             .into_iter()
             .filter_map(|e| e.ok())
         {
@@ -370,13 +371,32 @@ fn extract_icon_from_shortcut_with_link(link: &ShellLink, target_path: &str) -> 
 }
 
 pub async fn get_apps() -> Result<Vec<AppInfo>, String> {
-    let mut hkey_apps = get_apps_from_hkey().await?;
+    let hkey_apps = get_apps_from_hkey().await?;
     let shortcut_apps = get_apps_from_shortcuts().await?;
 
-    for app in shortcut_apps {
-        hkey_apps.push(app);
+    // 使用 HashMap 来存储唯一的应用程序信息，键为标准化后的应用程序名称
+    // 这样可以确保去重，并允许我们根据优先级进行选择。
+    // key: String (normalized app name), value: AppInfo
+    let mut unique_apps: HashMap<String, AppInfo> = HashMap::new();
+
+    // 1. 优先添加注册表中的应用程序
+    for app in hkey_apps {
+        // 使用应用程序的标准化名称作为 HashMap 的键
+        unique_apps.insert(app.name.clone(), app); // clone name for key, move app for value
     }
-    Ok(hkey_apps)
+
+    // 2. 添加快捷方式中的应用程序，但只添加 HashMap 中不存在的
+    for app in shortcut_apps {
+        let normalized_name = normalize_app_name(&app.name); // 确保快捷方式的名称也标准化
+
+        // 如果 HashMap 中还没有这个应用程序，或者你想更新它（例如，如果快捷方式提供了更好的图标），
+        // 可以在这里插入。
+        // 这里采用你的优先级策略：如果注册表中已有，则快捷方式的跳过。
+        unique_apps.entry(normalized_name).or_insert(app); // 如果键不存在，则插入 app
+    }
+
+    // 3. 将 HashMap 中的所有值收集到 Vec 中返回
+    Ok(unique_apps.into_values().collect())
 }
 
 pub fn open_app(path: &str) -> Result<(), String> {
