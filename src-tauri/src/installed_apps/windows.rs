@@ -89,7 +89,7 @@ async fn get_apps_from_hkey() -> Result<Vec<AppInfo>, String> {
                                 // <<-- 加上 Some()
                                 name: normalize_app_name(&name_cloned),
                                 path: Some(path_cloned),
-                                icon: icon_base64.or_else(|| Some(DEFAULT_APP_ICON.to_string())),
+                                icon: icon_base64,
                                 origin: Some(AppOrigin::Hkey),
                             }))
                         }));
@@ -294,7 +294,7 @@ async fn get_apps_from_shortcuts() -> Result<Vec<AppInfo>, String> {
                     app_info = Some(AppInfo {
                         name: normalize_app_name(&app_name),
                         path: Some(target_path.clone()),
-                        icon: icon.or_else(|| Some(DEFAULT_APP_ICON.to_string())),
+                        icon: icon,
                         origin: Some(AppOrigin::Shortcut),
                     });
                 }
@@ -395,8 +395,17 @@ pub async fn get_apps() -> Result<Vec<AppInfo>, String> {
         unique_apps.entry(normalized_name).or_insert(app); // 如果键不存在，则插入 app
     }
 
+    let mut final_apps: Vec<AppInfo> = unique_apps.into_values().collect();
+    // 确保所有 icon 都有默认值
+    for app_info in &mut final_apps {
+        // 遍历 final_apps
+        if app_info.icon.is_none() {
+            app_info.icon = Some(DEFAULT_APP_ICON.to_string());
+        }
+    }
+
     // 3. 将 HashMap 中的所有值收集到 Vec 中返回
-    Ok(unique_apps.into_values().collect())
+    Ok(final_apps)
 }
 
 pub fn open_app(path: &str) -> Result<(), String> {
