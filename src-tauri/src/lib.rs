@@ -20,8 +20,8 @@ pub fn run() {
         .try_init()
         .ok();
 
-    let toggle_window_shortcut = Shortcut::new(Some(Modifiers::CONTROL), Code::KeyN);
-    // let close_window_shortcut = Shortcut::new(None, Code::Escape);
+    let toggle_window_shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyN);
+    let close_window_shortcut = Shortcut::new(None, Code::Escape);
 
     tauri::Builder::default()
         .plugin(
@@ -46,11 +46,12 @@ pub fn run() {
                             }
                         }
 
-                        // if shortcut == &close_window_shortcut {
-                        //     if event.state == ShortcutState::Pressed {
-                        //         window.hide().ok();
-                        //     }
-                        // }
+                        if shortcut == &close_window_shortcut {
+                            if event.state == ShortcutState::Pressed {
+                                window.hide().ok();
+                                window.emit("window_visibility", false).unwrap();
+                            }
+                        }
                     }
                 })
                 .build(),
@@ -64,20 +65,35 @@ pub fn run() {
         .setup(move |app| {
             #[cfg(desktop)]
             {
-                println!("Registering Ctrl+N shortcut...");
+                // 切换窗口的快捷键需要一直保持，以便随时可以唤出窗口
+                println!("Registering toggle shortcut (Ctrl+Shift+N)...");
                 app.global_shortcut().register(toggle_window_shortcut)?;
-                // app.global_shortcut().register(close_window_shortcut)?;
                 println!("Registered!");
 
                 // 获取主窗口
                 let window = app.get_webview_window("main").unwrap();
                 let window_clone = window.clone();
+                let app_handle = app.handle().clone();
 
-                // 监听窗口失去焦点事件
+                // 监听窗口焦点事件，动态管理 Esc 快捷键
                 window_clone.on_window_event(move |event| {
-                    if let tauri::WindowEvent::Focused(false) = event {
-                        // 当窗口失去焦点时隐藏
-                        // window.hide().ok();
+                    match event {
+                        tauri::WindowEvent::Focused(true) => {
+                            // 当窗口获得焦点时，注册 "Esc" 快捷键
+                            println!("Window focused, registering Esc shortcut.");
+                            app_handle.global_shortcut().register(close_window_shortcut).unwrap_or_else(|err| {
+                                eprintln!("[ERROR] Failed to register Esc shortcut: {}", err);
+                            });
+                        }
+                        tauri::WindowEvent::Focused(false) => {
+                            // 当窗口失去焦点时，注销 "Esc" 快捷键并隐藏窗口
+                            println!("Window lost focus, unregistering Esc shortcut.");
+                            app_handle.global_shortcut().unregister(close_window_shortcut).unwrap_or_else(|err| {
+                                eprintln!("[ERROR] Failed to unregister Esc shortcut: {}", err);
+                            });
+                            window.hide().ok();
+                        }
+                        _ => {}
                     }
                 });
             }
