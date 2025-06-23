@@ -4,6 +4,8 @@
   import { listen } from "@tauri-apps/api/event";
   import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 
+  import { goto } from "$app/navigation";
+
   import { fuzzyMatch } from "../utils/fuzzyMatch";
   import type { AppInfo } from "../type";
 
@@ -81,6 +83,10 @@
       });
     }
   };
+
+  const handleToSettings = () => {
+    goto("/settings");
+  };
 </script>
 
 <main class="w-full h-[100vh] p-4 rounded-xl bg-[aquamarine] overflow-hidden">
@@ -90,13 +96,18 @@
     tabindex="0"
     onkeydown={handleKeyDown}
   >
-    <input
-      class="w-full p-2 text-2xl h-[60px]"
-      type="text"
-      placeholder="Hi Baize!"
-      bind:value={inputValue}
-      oninput={handleInput}
-    />
+    <div class="flex items-center">
+      <button onclick={handleToSettings}>
+        <img src="/ff_logo.svg" class="w-10 h-10" alt="Tauri logo" />
+      </button>
+      <input
+        class="w-full p-2 text-2xl h-[60px] focus:outline-none focus:ring-0 active:outline-none active:ring-0"
+        type="text"
+        placeholder="Hi Baize!"
+        bind:value={inputValue}
+        oninput={handleInput}
+      />
+    </div>
     <div class="app-list flex-1 py-2 overflow-auto">
       {#each appList as app, index}
         <button
