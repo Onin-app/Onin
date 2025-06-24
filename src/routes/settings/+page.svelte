@@ -1,6 +1,9 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { invoke } from "@tauri-apps/api/core";
+  import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
+  import { goto } from "$app/navigation";
   import GeneralSettings from "$lib/components/settings/GeneralSettings.svelte";
 
   interface SettingItem {
@@ -20,14 +23,29 @@
   ];
 
   let activeSetting = $state<SettingItem>(settings[0]);
+  let ActiveComponent = $derived(activeSetting.component);
+
+  onMount(() => {
+    console.log("the component has mounted");
+
+    let unlistenEsc: UnlistenFn | undefined;
+
+    const setup = async () => {
+      unlistenEsc = await listen("esc_key_pressed", () => {
+        console.log("settings window esc_key_pressed");
+        goto("/");
+      });
+    };
+    setup();
+
+    return () => {
+      unlistenEsc?.();
+    };
+  });
 
   const handleClickSetting = (setting: SettingItem) => {
     activeSetting = setting;
   };
-
-  onMount(async () => {
-    console.log("the component has mounted");
-  });
 </script>
 
 <main class="w-full h-[100vh] bg-[aquamarine] flex">
@@ -48,6 +66,6 @@
     </ul>
   </div>
   <div class="main flex-1 h-full">
-    <activeSetting.component />
+    <ActiveComponent />
   </div>
 </main>

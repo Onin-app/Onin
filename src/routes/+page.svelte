@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import { listen } from "@tauri-apps/api/event";
+  import { listen, type UnlistenFn } from "@tauri-apps/api/event";
   import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 
   import { goto } from "$app/navigation";
@@ -16,25 +16,43 @@
   let appList = $state<AppInfo[]>([]);
   let selectedIndex = $state<number>(0);
 
-  onMount(async () => {
-    console.log("the component has mounted");
-    const res = await invoke<AppInfo[]>("get_installed_apps");
-    console.log("res", res);
-    if (res) {
-      originAppList = res;
-      appList = res;
-    }
-  });
+  onMount(() => {
+    let unlistenVisibility: UnlistenFn | undefined;
+    let unlistenEsc: UnlistenFn | undefined;
 
-  listen("window_visibility", (event) => {
-    console.log("window_visibility", event.payload);
-    if (event.payload) {
-      // 窗口显示时 input 聚焦
-      const input = document.querySelector("input");
-      input?.focus();
-    } else {
-      // selectedIndex = 0;
-    }
+    const setup = async () => {
+      console.log("the component has mounted");
+      const res = await invoke<AppInfo[]>("get_installed_apps");
+      console.log("res", res);
+      if (res) {
+        originAppList = res;
+        appList = res;
+      }
+
+      unlistenVisibility = await listen("window_visibility", (event) => {
+        console.log("+page.svelte: window_visibility", event.payload);
+        if (event.payload) {
+          // 窗口显示时 input 聚焦
+          const input = document.querySelector("input");
+          input?.focus();
+        }
+      });
+
+      unlistenEsc = await listen("esc_key_pressed", () => {
+        console.log("main window esc_key_pressed");
+        inputValue = "";
+        appList = originAppList;
+        selectedIndex = 0;
+        invoke("close_main_window");
+      });
+    };
+
+    setup();
+
+    return () => {
+      unlistenVisibility?.();
+      unlistenEsc?.();
+    };
   });
 
   const handleInput = (e) => {

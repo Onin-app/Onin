@@ -12,6 +12,14 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
+#[tauri::command]
+fn close_main_window(app: tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        window.hide().ok();
+        window.emit("window_visibility", false).unwrap_or_default();
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tracing_subscriber::fmt()
@@ -20,7 +28,8 @@ pub fn run() {
         .try_init()
         .ok();
 
-    let toggle_window_shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyN);
+    let toggle_window_shortcut =
+        Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyN);
     let close_window_shortcut = Shortcut::new(None, Code::Escape);
 
     tauri::Builder::default()
@@ -48,8 +57,7 @@ pub fn run() {
 
                         if shortcut == &close_window_shortcut {
                             if event.state == ShortcutState::Pressed {
-                                window.hide().ok();
-                                window.emit("window_visibility", false).unwrap();
+                                window.emit("esc_key_pressed", ()).unwrap_or_default();
                             }
                         }
                     }
@@ -60,7 +68,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             installed_apps::get_installed_apps,
-            installed_apps::open_app
+            installed_apps::open_app,
+            close_main_window // Register the new command
         ])
         .setup(move |app| {
             #[cfg(desktop)]
@@ -81,17 +90,22 @@ pub fn run() {
                         tauri::WindowEvent::Focused(true) => {
                             // 当窗口获得焦点时，注册 "Esc" 快捷键
                             println!("Window focused, registering Esc shortcut.");
-                            app_handle.global_shortcut().register(close_window_shortcut).unwrap_or_else(|err| {
-                                eprintln!("[ERROR] Failed to register Esc shortcut: {}", err);
-                            });
+                            app_handle
+                                .global_shortcut()
+                                .register(close_window_shortcut)
+                                .unwrap_or_else(|err| {
+                                    eprintln!("[ERROR] Failed to register Esc shortcut: {}", err);
+                                });
                         }
                         tauri::WindowEvent::Focused(false) => {
                             // 当窗口失去焦点时，注销 "Esc" 快捷键并隐藏窗口
                             println!("Window lost focus, unregistering Esc shortcut.");
-                            app_handle.global_shortcut().unregister(close_window_shortcut).unwrap_or_else(|err| {
-                                eprintln!("[ERROR] Failed to unregister Esc shortcut: {}", err);
-                            });
-                            window.hide().ok();
+                            app_handle
+                                .global_shortcut()
+                                .unregister(close_window_shortcut)
+                                .unwrap_or_else(|err| {
+                                    eprintln!("[ERROR] Failed to unregister Esc shortcut: {}", err);
+                                });
                         }
                         _ => {}
                     }
