@@ -1,27 +1,38 @@
 <script lang="ts">
+  import { onDestroy } from "svelte";
   import { Label, RadioGroup } from "bits-ui";
 
+  import { theme, toggleTheme } from "$lib/utils/theme";
+  import { Theme } from "$lib/type";
   import SetItem from "./SetItem.svelte";
 
-  const themeList = [
+  const themeList: { value: Theme; label: string }[] = [
     {
-      value: "system",
+      value: Theme.SYSTEM,
       label: "跟随系统",
     },
     {
-      value: "light",
+      value: Theme.LIGHT,
       label: "明亮",
     },
     {
-      value: "dark",
+      value: Theme.DARK,
       label: "暗黑",
     },
   ];
-  let currentTheme = $state("system");
+  let currentTheme = $state<Theme>(Theme.DARK);
+
   const getTheme = () => currentTheme;
-  const setTheme = (value: string) => {
+  const setTheme = (value: Theme) => {
     currentTheme = value;
+    toggleTheme(value);
   };
+
+  const unsubscribe = theme.subscribe((value) => {
+    currentTheme = value;
+  });
+
+  onDestroy(unsubscribe);
 </script>
 
 <main class="w-full h-full p-4">

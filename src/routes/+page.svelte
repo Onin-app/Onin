@@ -1,13 +1,13 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { listen, type UnlistenFn } from "@tauri-apps/api/event";
   import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 
   import { goto } from "$app/navigation";
-
-  import { fuzzyMatch } from "../utils/fuzzyMatch";
-  import type { AppInfo } from "../type";
+  import { fuzzyMatch } from "$lib/utils/fuzzyMatch";
+  import { Theme, type AppInfo } from "$lib/type";
+  import { theme, getTheme } from "$lib/utils/theme";
 
   import "../index.css";
 
@@ -15,6 +15,7 @@
   let originAppList = $state<AppInfo[]>([]);
   let appList = $state<AppInfo[]>([]);
   let selectedIndex = $state<number>(0);
+  let currentTheme = $state<Theme>(Theme.DARK);
 
   onMount(() => {
     let unlistenVisibility: UnlistenFn | undefined;
@@ -53,6 +54,10 @@
       unlistenVisibility?.();
       unlistenEsc?.();
     };
+  });
+
+  const unsubscribe = theme.subscribe((value) => {
+    currentTheme = value;
   });
 
   const handleInput = (e) => {
@@ -105,9 +110,13 @@
   const handleToSettings = () => {
     goto("/settings");
   };
+
+  onDestroy(unsubscribe);
 </script>
 
-<main class="w-full h-[100vh] p-4 rounded-xl bg-[aquamarine] overflow-hidden">
+<main
+  class="w-full h-[100vh] p-4 rounded-xl text-neutral-900 dark:text-neutral-100 bg-neutral-100 dark:bg-neutral-800 overflow-hidden"
+>
   <div
     class="w-full h-full flex flex-col"
     role="listbox"
@@ -116,7 +125,13 @@
   >
     <div class="flex items-center">
       <button onclick={handleToSettings}>
-        <img src="/ff_logo.svg" class="w-10 h-10" alt="Tauri logo" />
+        <img
+          src="/ff_logo_{getTheme(currentTheme) === Theme.DARK
+            ? Theme.LIGHT
+            : Theme.DARK}.svg"
+          class="w-10 h-10"
+          alt="Tauri logo"
+        />
       </button>
       <input
         class="w-full p-2 text-2xl h-[60px] focus:outline-none focus:ring-0 active:outline-none active:ring-0"
@@ -132,8 +147,10 @@
           role="option"
           aria-selected={selectedIndex === index}
           class="flex w-full p-2 text-2xl text-left {selectedIndex !== index
-            ? 'hover:bg-[rgba(0,255,255,0.5)]'
-            : ''} {selectedIndex === index ? 'bg-[aqua]' : ''}"
+            ? 'hover:bg-neutral-200 dark:hover:bg-neutral-700'
+            : ''} {selectedIndex === index
+            ? 'bg-neutral-300 dark:bg-neutral-600'
+            : ''}"
           onclick={() => openApp(app)}
         >
           {#if app.icon}
@@ -145,7 +162,7 @@
           {/if}
           <div class="flex flex-col">
             {app.name}
-            <span class="text-xs text-gray-400">
+            <span class="text-xs text-neutral-400 dark:text-neutral-500">
               {app.path}
             </span>
           </div>

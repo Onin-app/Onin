@@ -1,5 +1,5 @@
 import pinyin from 'pinyin';
-import type { AppInfo } from '../type';
+import type { AppInfo } from '$lib/type';
 
 /**
  * 模糊匹配工具函数

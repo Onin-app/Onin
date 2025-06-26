@@ -48,8 +48,12 @@
   };
 </script>
 
-<main class="w-full h-[100vh] bg-[aquamarine] flex">
-  <div class="left w-1/5 h-full bg-white p-4">
+<main
+  class="w-full h-[100vh] text-neutral-900 dark:text-neutral-100 bg-neutral-100 dark:bg-neutral-800 flex"
+>
+  <div
+    class="left w-1/5 h-full p-4 border-r border-neutral-200 dark:border-neutral-700"
+  >
     <ul class="w-full h-full flex flex-col justify-center">
       {#each settings as setting}
         <li class="mb-2 mt-2">
