@@ -10,7 +10,11 @@ pub fn get_apps() -> Result<Vec<(String, Option<String>)>, String> {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let apps: Vec<(String, Option<String>)> = stdout
         .lines()
-        .filter_map(|line| line.split_whitespace().next().map(|s| (s.to_string(), None)))
+        .filter_map(|line| {
+            line.split_whitespace()
+                .next()
+                .map(|s| (s.to_string(), None))
+        })
         .collect();
 
     Ok(apps)

@@ -44,6 +44,11 @@ pub fn run() {
     let close_window_shortcut = Shortcut::new(None, Code::Escape);
 
     tauri::Builder::default()
+        .plugin(
+            tauri_plugin_autostart::Builder::new()
+                .args(["--autostarted"]) // 应用自启时接收的参数
+                .build(),
+        )
         .manage(WindowState {
             hiding_initiated_by_command: AtomicBool::new(false),
         })
@@ -129,7 +134,9 @@ pub fn run() {
                                 .hiding_initiated_by_command
                                 .swap(false, Ordering::Relaxed)
                             {
-                                println!("Window focus lost due to command. Skipping redundant hide.");
+                                println!(
+                                    "Window focus lost due to command. Skipping redundant hide."
+                                );
                             } else {
                                 println!("Window lost focus naturally. Hiding window.");
                                 window.hide().ok();

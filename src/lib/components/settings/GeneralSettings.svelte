@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { onDestroy } from "svelte";
-  import { Label, RadioGroup } from "bits-ui";
+  import { onDestroy, onMount } from "svelte";
+  import { invoke } from "@tauri-apps/api/core";
+  import { Label, RadioGroup, Switch } from "bits-ui";
 
   import { theme, toggleTheme } from "$lib/utils/theme";
   import { Theme } from "$lib/type";
@@ -21,6 +22,7 @@
     },
   ];
   let currentTheme = $state<Theme>(Theme.DARK);
+  let autostartEnabled = $state<boolean>(false);
 
   const getTheme = () => currentTheme;
   const setTheme = (value: Theme) => {
@@ -28,6 +30,27 @@
     toggleTheme(value);
   };
 
+  const handleAutostartToggle = async () => {
+    try {
+      // `bind:checked` 会在 onchange 之前更新 autostartEnabled 的值。
+      // 所以，如果 autostartEnabled 为 true，意味着用户刚刚打开了开关，我们应该调用 enable。
+      if (autostartEnabled) {
+        await invoke("plugin:autostart|enable");
+      } else {
+        await invoke("plugin:autostart|disable");
+      }
+      // 从后端重新获取状态以确保UI同步
+      autostartEnabled = await invoke("plugin:autostart|is_enabled");
+    } catch (error) {
+      console.error("Failed to toggle autostart:", error);
+      // 如果设置失败，将UI状态回滚
+      autostartEnabled = !autostartEnabled;
+    }
+  };
+
+  onMount(async () => {
+    autostartEnabled = await invoke("plugin:autostart|is_enabled");
+  });
   const unsubscribe = theme.subscribe((value) => {
     currentTheme = value;
   });
@@ -58,6 +81,22 @@
           </div>
         {/each}
       </RadioGroup.Root>
+    {/snippet}
+  </SetItem>
+
+  <h2 class="text-xl font-bold">系统设置</h2>
+  <SetItem title="开机自启">
+    {#snippet content()}
+      <Switch.Root
+        bind:checked={autostartEnabled}
+        onCheckedChange={handleAutostartToggle}
+        name="autoStart"
+        class="focus-visible:ring-foreground focus-visible:ring-offset-background data-[state=checked]:bg-foreground data-[state=unchecked]:bg-dark-10 data-[state=unchecked]:shadow-mini-inset dark:data-[state=checked]:bg-foreground focus-visible:outline-hidden peer inline-flex h-[24px] min-h-[24px] w-[40px] shrink-0 cursor-pointer items-center rounded-full px-[3px] transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <Switch.Thumb
+          class="bg-background data-[state=unchecked]:shadow-mini dark:border-background/30 dark:bg-foreground dark:shadow-popover pointer-events-none block size-[20px] shrink-0 rounded-full transition-transform data-[state=checked]:translate-x-[14px] data-[state=unchecked]:translate-x-0 dark:border dark:data-[state=unchecked]:border"
+        />
+      </Switch.Root>
     {/snippet}
   </SetItem>
 </main>
