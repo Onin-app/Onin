@@ -1,10 +1,15 @@
-use tauri::{Emitter, Manager};
+use std::sync::atomic::{AtomicBool, Ordering};
+use tauri::{Emitter, Manager, State};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 use tracing_subscriber;
 use tracing_subscriber::fmt::format::FmtSpan; // 导入 FmtSpan
 
 mod installed_apps;
+
+pub struct WindowState {
+    hiding_initiated_by_command: AtomicBool,
+}
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -13,10 +18,16 @@ fn greet(name: &str) -> String {
 }
 
 #[tauri::command]
-fn close_main_window(app: tauri::AppHandle) {
+fn close_main_window(app: tauri::AppHandle, state: State<WindowState>) {
     if let Some(window) = app.get_webview_window("main") {
+        println!("🥳 这是ESC");
+        // 在隐藏窗口前设置标志位为 true
+        // 这表示后续的失焦事件是预期的
+        state
+            .hiding_initiated_by_command
+            .store(true, Ordering::Relaxed);
         window.hide().ok();
-        window.emit("window_visibility", false).unwrap_or_default();
+        window.emit("window_visibility", &false).unwrap_or_default();
     }
 }
 
@@ -33,6 +44,9 @@ pub fn run() {
     let close_window_shortcut = Shortcut::new(None, Code::Escape);
 
     tauri::Builder::default()
+        .manage(WindowState {
+            hiding_initiated_by_command: AtomicBool::new(false),
+        })
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler({
@@ -44,13 +58,14 @@ pub fn run() {
                                 let visible = window.is_visible().unwrap_or(false);
 
                                 if visible {
+                                    println!("🥳 这是快捷键");
                                     window.hide().ok();
-                                    window.emit("window_visibility", false).unwrap();
+                                    window.emit("window_visibility", &false).unwrap();
                                 } else {
                                     window.show().ok();
                                     // window.set_always_on_top(true).ok(); // 置顶
                                     window.set_focus().ok();
-                                    window.emit("window_visibility", true).unwrap();
+                                    window.emit("window_visibility", &true).unwrap();
                                 }
                             }
                         }
@@ -98,14 +113,28 @@ pub fn run() {
                                 });
                         }
                         tauri::WindowEvent::Focused(false) => {
-                            // 当窗口失去焦点时，注销 "Esc" 快捷键并隐藏窗口
-                            println!("Window lost focus, unregistering Esc shortcut.");
+                            let state: State<WindowState> = app_handle.state();
+
+                            // 窗口失焦时总是注销快捷键
                             app_handle
                                 .global_shortcut()
                                 .unregister(close_window_shortcut)
                                 .unwrap_or_else(|err| {
                                     eprintln!("[ERROR] Failed to unregister Esc shortcut: {}", err);
                                 });
+
+                            // 原子地检查并重置标志位
+                            // 如果之前是 true，说明是由 close_main_window 命令触发的
+                            if state
+                                .hiding_initiated_by_command
+                                .swap(false, Ordering::Relaxed)
+                            {
+                                println!("Window focus lost due to command. Skipping redundant hide.");
+                            } else {
+                                println!("Window lost focus naturally. Hiding window.");
+                                window.hide().ok();
+                                window.emit("window_visibility", &false).unwrap();
+                            }
                         }
                         _ => {}
                     }

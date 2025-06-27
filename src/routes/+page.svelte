@@ -1,15 +1,17 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+  import { listen } from "@tauri-apps/api/event";
   import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 
   import { goto } from "$app/navigation";
+  import { get } from "svelte/store";
   import { fuzzyMatch } from "$lib/utils/fuzzyMatch";
   import { Theme, type AppInfo } from "$lib/type";
   import { theme, getTheme } from "$lib/utils/theme";
 
   import "../index.css";
+  import { escapeHandler } from "$lib/stores/escapeHandler";
 
   let inputValue = $state<string>("");
   let originAppList = $state<AppInfo[]>([]);
@@ -17,43 +19,27 @@
   let selectedIndex = $state<number>(0);
   let currentTheme = $state<Theme>(Theme.DARK);
 
-  onMount(() => {
-    let unlistenVisibility: UnlistenFn | undefined;
-    let unlistenEsc: UnlistenFn | undefined;
+  const handleEsc = () => {
+    console.log("Main page ESC handler executing");
+    inputValue = "";
+    appList = originAppList;
+    selectedIndex = 0;
+    invoke("close_main_window");
+  };
 
-    const setup = async () => {
-      console.log("the component has mounted");
+  onMount(() => {
+    console.log("Main page component has mounted");
+    // Register this page's ESC handler with the global store
+    escapeHandler.set(handleEsc);
+
+    // Fetch initial data. The visibility listener is now handled in the layout.
+    (async () => {
       const res = await invoke<AppInfo[]>("get_installed_apps");
-      console.log("res", res);
       if (res) {
         originAppList = res;
         appList = res;
       }
-
-      unlistenVisibility = await listen("window_visibility", (event) => {
-        console.log("+page.svelte: window_visibility", event.payload);
-        if (event.payload) {
-          // 窗口显示时 input 聚焦
-          const input = document.querySelector("input");
-          input?.focus();
-        }
-      });
-
-      unlistenEsc = await listen("esc_key_pressed", () => {
-        console.log("main window esc_key_pressed");
-        inputValue = "";
-        appList = originAppList;
-        selectedIndex = 0;
-        invoke("close_main_window");
-      });
-    };
-
-    setup();
-
-    return () => {
-      unlistenVisibility?.();
-      unlistenEsc?.();
-    };
+    })();
   });
 
   const unsubscribe = theme.subscribe((value) => {
@@ -111,7 +97,14 @@
     goto("/settings");
   };
 
-  onDestroy(unsubscribe);
+  onDestroy(() => {
+    // Clean up the theme subscription
+    unsubscribe && unsubscribe();
+    // As a safeguard, reset the escape handler if it's still ours
+    if (get(escapeHandler) === handleEsc) {
+      escapeHandler.set(() => {});
+    }
+  });
 </script>
 
 <main

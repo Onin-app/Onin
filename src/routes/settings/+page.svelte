@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { invoke } from "@tauri-apps/api/core";
-  import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+  import { onMount, onDestroy } from "svelte";
+  import { get } from "svelte/store";
 
   import { goto } from "$app/navigation";
   import GeneralSettings from "$lib/components/settings/GeneralSettings.svelte";
+  import { escapeHandler } from "$lib/stores/escapeHandler";
 
   interface SettingItem {
     name: string;
@@ -25,22 +25,22 @@
   let activeSetting = $state<SettingItem>(settings[0]);
   let ActiveComponent = $derived(activeSetting.component);
 
+  const handleEsc = () => {
+    console.log("Settings page ESC handler executing");
+    goto("/");
+  };
+
   onMount(() => {
-    console.log("the component has mounted");
+    console.log("Settings component has mounted");
+    // Register this page's ESC handler
+    escapeHandler.set(handleEsc);
+  });
 
-    let unlistenEsc: UnlistenFn | undefined;
-
-    const setup = async () => {
-      unlistenEsc = await listen("esc_key_pressed", () => {
-        console.log("settings window esc_key_pressed");
-        goto("/");
-      });
-    };
-    setup();
-
-    return () => {
-      unlistenEsc?.();
-    };
+  onDestroy(() => {
+    // On destroy, reset the handler if it's still ours
+    if (get(escapeHandler) === handleEsc) {
+      escapeHandler.set(() => {});
+    }
   });
 
   const handleClickSetting = (setting: SettingItem) => {
