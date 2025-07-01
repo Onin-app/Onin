@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
-  import Icon from "$lib/components/Icon.svelte";
   import { Tooltip } from "bits-ui";
+  import Icon from "$lib/components/Icon.svelte";
 
   interface SetItemProps {
     title: string;
@@ -12,7 +12,7 @@
   const { title, description, content }: SetItemProps = $props();
 </script>
 
-<div class="flex items-center justify-between">
+<div class="flex items-center justify-between mt-2">
   <div class="label flex items-center">
     <p class="title mr-2">{title}</p>
     {#if description}

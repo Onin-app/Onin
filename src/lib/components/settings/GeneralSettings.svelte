@@ -23,6 +23,7 @@
   ];
   let currentTheme = $state<Theme>(Theme.DARK);
   let autostartEnabled = $state<boolean>(false);
+  let trayIconEnabled = $state<boolean>(false);
 
   const getTheme = () => currentTheme;
   const setTheme = (value: Theme) => {
@@ -48,11 +49,30 @@
     }
   };
 
-  onMount(async () => {
-    autostartEnabled = await invoke("plugin:autostart|is_enabled");
-  });
+  const handleTrayIconToggle = async () => {
+    try {
+      // `bind:checked` 会提前更新 trayIconEnabled 的值
+      await invoke("set_tray_visibility", { visible: trayIconEnabled });
+      // 从后端重新获取状态以确保UI同步
+      trayIconEnabled = await invoke("is_tray_visible");
+    } catch (error) {
+      console.error("Failed to toggle tray icon visibility:", error);
+      // 如果设置失败，将UI状态回滚
+      trayIconEnabled = !trayIconEnabled;
+    }
+  };
+
   const unsubscribe = theme.subscribe((value) => {
     currentTheme = value;
+  });
+
+  onMount(async () => {
+    autostartEnabled = await invoke("plugin:autostart|is_enabled");
+    try {
+      trayIconEnabled = await invoke("is_tray_visible");
+    } catch (e) {
+      console.error("Failed to get tray visibility state:", e);
+    }
   });
 
   onDestroy(unsubscribe);
@@ -84,13 +104,27 @@
     {/snippet}
   </SetItem>
 
-  <h2 class="text-xl font-bold">系统设置</h2>
+  <h2 class="text-xl font-bold mt-4">系统设置</h2>
   <SetItem title="开机自启">
     {#snippet content()}
       <Switch.Root
         bind:checked={autostartEnabled}
         onCheckedChange={handleAutostartToggle}
         name="autoStart"
+        class="focus-visible:ring-foreground focus-visible:ring-offset-background data-[state=checked]:bg-foreground data-[state=unchecked]:bg-dark-10 data-[state=unchecked]:shadow-mini-inset dark:data-[state=checked]:bg-foreground focus-visible:outline-hidden peer inline-flex h-[24px] min-h-[24px] w-[40px] shrink-0 cursor-pointer items-center rounded-full px-[3px] transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <Switch.Thumb
+          class="bg-background data-[state=unchecked]:shadow-mini dark:border-background/30 dark:bg-foreground dark:shadow-popover pointer-events-none block size-[20px] shrink-0 rounded-full transition-transform data-[state=checked]:translate-x-[14px] data-[state=unchecked]:translate-x-0 dark:border dark:data-[state=unchecked]:border"
+        />
+      </Switch.Root>
+    {/snippet}
+  </SetItem>
+  <SetItem title="任务栏中显示图标">
+    {#snippet content()}
+      <Switch.Root
+        bind:checked={trayIconEnabled}
+        onCheckedChange={handleTrayIconToggle}
+        name="trayIcon"
         class="focus-visible:ring-foreground focus-visible:ring-offset-background data-[state=checked]:bg-foreground data-[state=unchecked]:bg-dark-10 data-[state=unchecked]:shadow-mini-inset dark:data-[state=checked]:bg-foreground focus-visible:outline-hidden peer inline-flex h-[24px] min-h-[24px] w-[40px] shrink-0 cursor-pointer items-center rounded-full px-[3px] transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
       >
         <Switch.Thumb

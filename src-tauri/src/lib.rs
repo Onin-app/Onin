@@ -1,4 +1,5 @@
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -14,6 +15,9 @@ mod installed_apps;
 pub struct WindowState {
     hiding_initiated_by_command: AtomicBool,
 }
+
+// 新增：用于管理托盘图标可见性的状态
+pub struct TrayVisibilityState(pub Mutex<bool>);
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -35,6 +39,33 @@ fn close_main_window(app: tauri::AppHandle, state: State<WindowState>) {
     }
 }
 
+const TRAY_ICON_ID: &str = "main_tray_icon";
+
+// 新增：设置托盘图标可见性的命令
+#[tauri::command]
+fn set_tray_visibility(
+    visible: bool,
+    app: tauri::AppHandle,
+    state: State<'_, TrayVisibilityState>,
+) -> Result<(), String> {
+    // 通过 app_handle 获取托盘图标的引用
+    if let Some(tray) = app.tray_by_id(TRAY_ICON_ID) {
+        // 调用 set_visible 方法来显示或隐藏图标
+        tray.set_visible(visible).map_err(|e| e.to_string())?;
+        // 更新我们自己维护的可见性状态
+        *state.0.lock().unwrap() = visible;
+        Ok(())
+    } else {
+        Err("Tray icon not found.".to_string())
+    }
+}
+
+// 新增：获取托盘图标当前可见性状态的命令
+#[tauri::command]
+fn is_tray_visible(state: State<'_, TrayVisibilityState>) -> bool {
+    *state.0.lock().unwrap()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tracing_subscriber::fmt()
@@ -42,6 +73,9 @@ pub fn run() {
         .with_span_events(FmtSpan::FULL) //
         .try_init()
         .ok();
+
+    // 托盘图标默认是可见的
+    let is_tray_initially_visible = true;
 
     let toggle_window_shortcut =
         Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyN);
@@ -56,6 +90,8 @@ pub fn run() {
         .manage(WindowState {
             hiding_initiated_by_command: AtomicBool::new(false),
         })
+        // 托管托盘图标的可见性状态
+        .manage(TrayVisibilityState(Mutex::new(is_tray_initially_visible)))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler({
@@ -93,7 +129,10 @@ pub fn run() {
             greet,
             installed_apps::get_installed_apps,
             installed_apps::open_app,
-            close_main_window // Register the new command
+            close_main_window, // Register the new command
+            // 注册新的命令
+            set_tray_visibility,
+            is_tray_visible
         ])
         .setup(move |app| {
             #[cfg(desktop)]
@@ -154,7 +193,7 @@ pub fn run() {
                 // 创建托盘图标
                 let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
                 let menu = Menu::with_items(app, &[&quit_i])?;
-                let tray = TrayIconBuilder::new()
+                let _tray = TrayIconBuilder::with_id(TRAY_ICON_ID)
                     .icon(app.default_window_icon().unwrap().clone())
                     .menu(&menu)
                     .show_menu_on_left_click(true)
