@@ -109,6 +109,7 @@
 
 <main
   class="w-full h-[100vh] p-4 rounded-xl text-neutral-900 dark:text-neutral-100 bg-neutral-100 dark:bg-neutral-800 overflow-hidden"
+  data-tauri-drag-region
 >
   <div
     class="w-full h-full flex flex-col"

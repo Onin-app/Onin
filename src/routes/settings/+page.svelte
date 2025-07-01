@@ -49,7 +49,8 @@
 </script>
 
 <main
-  class="w-full h-[100vh] text-neutral-900 dark:text-neutral-100 bg-neutral-100 dark:bg-neutral-800 flex"
+  class="w-full h-[100vh] text-neutral-900 dark:text-neutral-100 bg-neutral-100 dark:bg-neutral-800 flex p-4"
+  data-tauri-drag-region
 >
   <div
     class="left w-1/5 h-full p-4 border-r border-neutral-200 dark:border-neutral-700"
