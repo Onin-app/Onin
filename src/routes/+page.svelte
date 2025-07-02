@@ -117,8 +117,8 @@
     tabindex="0"
     onkeydown={handleKeyDown}
   >
-    <div class="flex items-center">
-      <button onclick={handleToSettings}>
+    <div class="flex items-center pb-2">
+      <button class="cursor-pointer" onclick={handleToSettings}>
         <img
           src="/ff_logo_{getTheme(currentTheme) === Theme.DARK
             ? Theme.LIGHT
@@ -128,14 +128,14 @@
         />
       </button>
       <input
-        class="w-full p-2 text-2xl h-[60px] focus:outline-none focus:ring-0 active:outline-none active:ring-0"
+        class="w-full p-2 ml-2 text-2xl h-[60px] focus:outline-none focus:ring-0 active:outline-none active:ring-0"
         type="text"
         placeholder="Hi Baize!"
         bind:value={inputValue}
         oninput={handleInput}
       />
     </div>
-    <div class="app-list flex-1 py-2 overflow-auto">
+    <div class="custom-scrollbar app-list flex-1 py-2 overflow-auto">
       {#each appList as app, index}
         <button
           role="option"
