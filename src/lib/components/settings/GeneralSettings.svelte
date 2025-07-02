@@ -1,10 +1,11 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import { Label, RadioGroup, Switch } from "bits-ui";
+  import { Label, RadioGroup, Switch, Button, Tooltip } from "bits-ui";
 
   import { theme, toggleTheme } from "$lib/utils/theme";
   import { Theme } from "$lib/type";
+
   import SetItem from "./SetItem.svelte";
 
   const themeList: { value: Theme; label: string }[] = [
@@ -24,6 +25,9 @@
   let currentTheme = $state<Theme>(Theme.DARK);
   let autostartEnabled = $state<boolean>(false);
   let trayIconEnabled = $state<boolean>(false);
+  let shortcut = $state<string>("");
+  let isRecording = $state<boolean>(false);
+  let previousShortcut = "";
 
   const getTheme = () => currentTheme;
   const setTheme = (value: Theme) => {
@@ -62,6 +66,65 @@
     }
   };
 
+  const handleShortcutInputKeydown = (e: KeyboardEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const parts: string[] = [];
+    if (e.ctrlKey) parts.push("Ctrl");
+    if (e.altKey) parts.push("Alt");
+    if (e.shiftKey) parts.push("Shift");
+    if (e.metaKey) parts.push("Super");
+
+    const key = e.key;
+
+    // 如果只是修饰键，则更新UI以显示它们
+    if (["Control", "Alt", "Shift", "Meta"].includes(key)) {
+      shortcut = parts.join("+");
+      return; // 等待一个非修饰键来完成快捷键
+    }
+
+    let finalKey = key;
+    if (key === " ") {
+      finalKey = "Space";
+    } else if (key.length === 1 && /[a-zA-Z]/.test(key)) {
+      finalKey = key.toUpperCase();
+    }
+
+    parts.push(finalKey);
+    shortcut = parts.join("+");
+  };
+
+  const saveShortcut = async () => {
+    const modifiers = ["Ctrl", "Alt", "Shift", "Super"];
+    const parts = shortcut.split("+");
+    const lastPart = parts[parts.length - 1];
+
+    // 验证快捷键是否有效（非空且包含一个非修饰键）
+    if (!shortcut || (parts.length > 0 && modifiers.includes(lastPart))) {
+      // 无效快捷键，恢复到之前的值
+      shortcut = previousShortcut;
+      isRecording = false;
+      return;
+    }
+
+    try {
+      await invoke("set_toggle_shortcut", { shortcutStr: shortcut });
+      isRecording = false;
+    } catch (error) {
+      console.error("Failed to set shortcut:", error);
+      // 如果失败，可以重新获取旧的快捷键以回滚显示
+      shortcut = previousShortcut;
+      isRecording = false;
+    }
+  };
+
+  const cancelShortcutEdit = () => {
+    isRecording = false;
+    // 恢复到修改前保存的快捷键
+    shortcut = previousShortcut;
+  };
+
   const unsubscribe = theme.subscribe((value) => {
     currentTheme = value;
   });
@@ -69,11 +132,22 @@
   onMount(async () => {
     autostartEnabled = await invoke("plugin:autostart|is_enabled");
     try {
+      shortcut = await invoke("get_toggle_shortcut");
+    } catch (e) {
+      console.error("Failed to get shortcut:", e);
+    }
+    try {
       trayIconEnabled = await invoke("is_tray_visible");
     } catch (e) {
       console.error("Failed to get tray visibility state:", e);
     }
   });
+
+  const startRecording = () => {
+    isRecording = true;
+    previousShortcut = shortcut;
+    // shortcut = "";
+  };
 
   onDestroy(unsubscribe);
 </script>
@@ -131,6 +205,68 @@
           class="bg-background data-[state=unchecked]:shadow-mini dark:border-background/30 dark:bg-foreground dark:shadow-popover pointer-events-none block size-[20px] shrink-0 rounded-full transition-transform data-[state=checked]:translate-x-[14px] data-[state=unchecked]:translate-x-0 dark:border dark:data-[state=unchecked]:border"
         />
       </Switch.Root>
+    {/snippet}
+  </SetItem>
+  <SetItem title="快捷键">
+    {#snippet content()}
+      <div class="flex items-center gap-2">
+        {#if isRecording}
+          <div>
+            <Tooltip.Provider>
+              <Tooltip.Root
+                delayDuration={200}
+                bind:open={() => isRecording, () => {}}
+              >
+                <Tooltip.Trigger>
+                  <input
+                    type="text"
+                    readonly
+                    value={shortcut}
+                    onkeydown={handleShortcutInputKeydown}
+                    placeholder={shortcut}
+                    class="w-40 p-1 border rounded bg-background text-foreground"
+                    autofocus
+                  />
+                </Tooltip.Trigger>
+                <Tooltip.Content sideOffset={8}>
+                  <div
+                    class="rounded-input border-dark-10 bg-background shadow-popover outline-hidden z-0 border p-3 text-sm font-medium"
+                  >
+                    <p>
+                      1. 先按功能键（Ctrl、Alt、Windows、Shift），再按其他普通键
+                    </p>
+                    <p>2. 按 F1 ~ F12 单键</p>
+                  </div>
+                </Tooltip.Content>
+              </Tooltip.Root>
+            </Tooltip.Provider>
+          </div>
+          <Button.Root
+            class="rounded-input bg-dark text-background shadow-mini hover:bg-dark/95 inline-flex h-8 items-center justify-center px-[14px] text-[12px] font-semibold active:scale-[0.98] active:transition-all"
+            onclick={saveShortcut}
+          >
+            保存
+          </Button.Root>
+          <Button.Root
+            class="rounded-input bg-dark text-background shadow-mini hover:bg-dark/95 inline-flex h-8 items-center justify-center px-[14px] text-[12px] font-semibold active:scale-[0.98] active:transition-all"
+            onclick={cancelShortcutEdit}
+          >
+            取消
+          </Button.Root>
+        {:else}
+          <div
+            class="w-40 p-1 border rounded bg-muted text-muted-foreground select-none"
+          >
+            {shortcut || "无"}
+          </div>
+          <Button.Root
+            class="rounded-input bg-dark text-background shadow-mini hover:bg-dark/95 inline-flex h-8 items-center justify-center px-[14px] text-[12px] font-semibold active:scale-[0.98] active:transition-all"
+            onclick={startRecording}
+          >
+            修改
+          </Button.Root>
+        {/if}
+      </div>
     {/snippet}
   </SetItem>
 </main>

@@ -1,3 +1,4 @@
+use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::{
@@ -5,12 +6,14 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Emitter, Manager, State,
 };
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::ShortcutEvent;
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Shortcut, ShortcutState};
 
 use tracing_subscriber;
 use tracing_subscriber::fmt::format::FmtSpan; // 导入 FmtSpan
 
 mod installed_apps;
+mod shortcut_manager;
 
 pub struct WindowState {
     hiding_initiated_by_command: AtomicBool,
@@ -77,11 +80,11 @@ pub fn run() {
     // 托盘图标默认是可见的
     let is_tray_initially_visible = true;
 
-    let toggle_window_shortcut =
-        Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyN);
+    // The toggle shortcut is now managed by shortcut_manager.rs
     let close_window_shortcut = Shortcut::new(None, Code::Escape);
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(
             tauri_plugin_autostart::Builder::new()
                 .args(["--autostarted"]) // 应用自启时接收的参数
@@ -92,32 +95,24 @@ pub fn run() {
         })
         // 托管托盘图标的可见性状态
         .manage(TrayVisibilityState(Mutex::new(is_tray_initially_visible)))
+        // Manage the shortcut state
+        .manage(shortcut_manager::ShortcutState {
+            toggle_shortcut: Mutex::new(
+                Shortcut::from_str(shortcut_manager::DEFAULT_TOGGLE_SHORTCUT).unwrap(),
+            ),
+        })
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler({
-                    move |app, shortcut, event| {
-                        let window = app.get_webview_window("main").unwrap();
-
-                        if shortcut == &toggle_window_shortcut {
-                            if event.state == ShortcutState::Pressed {
-                                let visible = window.is_visible().unwrap_or(false);
-
-                                if visible {
-                                    println!("🥳 这是快捷键");
-                                    window.hide().ok();
-                                    window.emit("window_visibility", &false).unwrap();
-                                } else {
-                                    window.show().ok();
-                                    // window.set_always_on_top(true).ok(); // 置顶
-                                    window.set_focus().ok();
-                                    window.emit("window_visibility", &true).unwrap();
-                                }
-                            }
-                        }
+                    move |app: &tauri::AppHandle, shortcut: &Shortcut, event: ShortcutEvent| {
+                        // Let the shortcut manager handle its own shortcut, passing a reference to the event
+                        shortcut_manager::handle_toggle_shortcut(app, shortcut, &event.state);
 
                         if shortcut == &close_window_shortcut {
                             if event.state == ShortcutState::Pressed {
-                                window.emit("esc_key_pressed", ()).unwrap_or_default();
+                                if let Some(window) = app.get_webview_window("main") {
+                                    window.emit("esc_key_pressed", ()).unwrap_or_default();
+                                }
                             }
                         }
                     }
@@ -132,15 +127,18 @@ pub fn run() {
             close_main_window, // Register the new command
             // 注册新的命令
             set_tray_visibility,
-            is_tray_visible
+            is_tray_visible,
+            // Add shortcut manager commands
+            shortcut_manager::get_toggle_shortcut,
+            shortcut_manager::set_toggle_shortcut
         ])
         .setup(move |app| {
             #[cfg(desktop)]
             {
-                // 切换窗口的快捷键需要一直保持，以便随时可以唤出窗口
-                println!("Registering toggle shortcut (Ctrl+Shift+N)...");
-                app.global_shortcut().register(toggle_window_shortcut)?;
-                println!("Registered!");
+                // Load and register the initial toggle shortcut from the store
+                if let Err(e) = shortcut_manager::setup_shortcuts(app) {
+                    eprintln!("[ERROR] Failed to set up shortcuts: {}", e);
+                }
 
                 // 获取主窗口
                 let window = app.get_webview_window("main").unwrap();
