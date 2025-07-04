@@ -12,29 +12,12 @@ mod app_cache_manager;
 mod installed_apps;
 mod shortcut_manager;
 mod tray_manager;
-
-pub struct WindowState {
-    hiding_initiated_by_command: AtomicBool,
-}
+mod window_manager;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
-}
-
-#[tauri::command]
-fn close_main_window(app: tauri::AppHandle, state: State<WindowState>) {
-    if let Some(window) = app.get_webview_window("main") {
-        println!("🥳 这是ESC");
-        // 在隐藏窗口前设置标志位为 true
-        // 这表示后续的失焦事件是预期的
-        state
-            .hiding_initiated_by_command
-            .store(true, Ordering::Relaxed);
-        window.hide().ok();
-        window.emit("window_visibility", &false).unwrap_or_default();
-    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -58,7 +41,7 @@ pub fn run() {
                 .args(["--autostarted"]) // 应用自启时接收的参数
                 .build(),
         )
-        .manage(WindowState {
+        .manage(window_manager::WindowState {
             hiding_initiated_by_command: AtomicBool::new(false),
         })
         // 托管托盘图标的可见性状态
@@ -98,7 +81,7 @@ pub fn run() {
             greet,
             app_cache_manager::get_installed_apps,
             installed_apps::open_app,
-            close_main_window, // Register the new command
+            window_manager::close_main_window, // Register the new command
             // 注册新的命令
             tray_manager::set_tray_visibility,
             tray_manager::is_tray_visible,
@@ -149,7 +132,7 @@ pub fn run() {
                             app_cache_manager::trigger_app_refresh(handle);
                         }
                         tauri::WindowEvent::Focused(false) => {
-                            let state: State<WindowState> = app_handle.state();
+                            let state: State<window_manager::WindowState> = app_handle.state();
 
                             // 窗口失焦时总是注销快捷键
                             app_handle
