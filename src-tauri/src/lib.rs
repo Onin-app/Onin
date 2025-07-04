@@ -1,9 +1,8 @@
 use std::str::FromStr;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
 use std::sync::Mutex;
-use tauri::{Emitter, Manager, State};
-use tauri_plugin_global_shortcut::ShortcutEvent;
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Shortcut, ShortcutState};
+use tauri::{Emitter, Manager};
+use tauri_plugin_global_shortcut::{Shortcut, ShortcutState};
 
 use tracing_subscriber;
 use tracing_subscriber::fmt::format::FmtSpan; // 导入 FmtSpan
@@ -23,16 +22,15 @@ fn greet(name: &str) -> String {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tracing_subscriber::fmt()
-        // .with_env_filter("warn") // 设置日志级
-        .with_span_events(FmtSpan::FULL) //
+        .with_span_events(FmtSpan::FULL)
         .try_init()
         .ok();
 
-    // 托盘图标默认是可见的
     let is_tray_initially_visible = true;
 
-    // The toggle shortcut is now managed by shortcut_manager.rs
-    let close_window_shortcut = Shortcut::new(None, Code::Escape);
+    // Parse the close window shortcut once to be used in the handler
+    let close_window_shortcut =
+        Shortcut::from_str(window_manager::CLOSE_WINDOW_SHORTCUT_STR).unwrap();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build())
@@ -61,11 +59,11 @@ pub fn run() {
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler({
-                    move |app: &tauri::AppHandle, shortcut: &Shortcut, event: ShortcutEvent| {
-                        // Let the shortcut manager handle its own shortcut, passing a reference to the event
+                    let close_window_shortcut_clone = close_window_shortcut.clone();
+                    move |app, shortcut, event| {
                         shortcut_manager::handle_toggle_shortcut(app, shortcut, &event.state);
 
-                        if shortcut == &close_window_shortcut {
+                        if shortcut == &close_window_shortcut_clone {
                             if event.state == ShortcutState::Pressed {
                                 if let Some(window) = app.get_webview_window("main") {
                                     window.emit("esc_key_pressed", ()).unwrap_or_default();
@@ -108,58 +106,10 @@ pub fn run() {
                     eprintln!("[ERROR] Failed to set up tray: {}", e);
                 }
 
-                // 获取主窗口
-                let window = app.get_webview_window("main").unwrap();
-                let window_clone = window.clone();
-                let app_handle = app.handle().clone();
-
-                // 监听窗口焦点事件，动态管理 Esc 快捷键
-                window_clone.on_window_event(move |event| {
-                    match event {
-                        tauri::WindowEvent::Focused(true) => {
-                            // 当窗口获得焦点时，注册 "Esc" 快捷键
-                            println!("Window focused, registering Esc shortcut.");
-                            app_handle
-                                .global_shortcut()
-                                .register(close_window_shortcut)
-                                .unwrap_or_else(|err| {
-                                    eprintln!("[ERROR] Failed to register Esc shortcut: {}", err);
-                                });
-
-                            // 新增：窗口获得焦点时，触发一次静默刷新
-                            println!("Window focused, triggering silent app list refresh.");
-                            let handle = app_handle.clone();
-                            app_cache_manager::trigger_app_refresh(handle);
-                        }
-                        tauri::WindowEvent::Focused(false) => {
-                            let state: State<window_manager::WindowState> = app_handle.state();
-
-                            // 窗口失焦时总是注销快捷键
-                            app_handle
-                                .global_shortcut()
-                                .unregister(close_window_shortcut)
-                                .unwrap_or_else(|err| {
-                                    eprintln!("[ERROR] Failed to unregister Esc shortcut: {}", err);
-                                });
-
-                            // 原子地检查并重置标志位
-                            // 如果之前是 true，说明是由 close_main_window 命令触发的
-                            if state
-                                .hiding_initiated_by_command
-                                .swap(false, Ordering::Relaxed)
-                            {
-                                println!(
-                                    "Window focus lost due to command. Skipping redundant hide."
-                                );
-                            } else {
-                                println!("Window lost focus naturally. Hiding window.");
-                                window.hide().ok();
-                                window.emit("window_visibility", &false).unwrap();
-                            }
-                        }
-                        _ => {}
-                    }
-                });
+                // Set up window-specific event listeners.
+                if let Err(e) = window_manager::setup_window_events(app) {
+                    eprintln!("[ERROR] Failed to set up window events: {}", e);
+                }
             }
             Ok(())
         })
