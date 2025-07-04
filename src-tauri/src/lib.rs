@@ -1,11 +1,7 @@
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
-use tauri::{
-    menu::{Menu, MenuItem},
-    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    Emitter, Manager, State,
-};
+use tauri::{Emitter, Manager, State};
 use tauri_plugin_global_shortcut::ShortcutEvent;
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Shortcut, ShortcutState};
 use tokio::sync::RwLock;
@@ -16,13 +12,11 @@ use tracing_subscriber::fmt::format::FmtSpan; // 导入 FmtSpan
 
 mod installed_apps;
 mod shortcut_manager;
+mod tray_manager;
 
 pub struct WindowState {
     hiding_initiated_by_command: AtomicBool,
 }
-
-// 新增：用于管理托盘图标可见性的状态
-pub struct TrayVisibilityState(pub Mutex<bool>);
 
 // 新增: 用于缓存已安装应用列表的状态
 pub struct AppCache {
@@ -47,33 +41,6 @@ fn close_main_window(app: tauri::AppHandle, state: State<WindowState>) {
         window.hide().ok();
         window.emit("window_visibility", &false).unwrap_or_default();
     }
-}
-
-const TRAY_ICON_ID: &str = "main_tray_icon";
-
-// 新增：设置托盘图标可见性的命令
-#[tauri::command]
-fn set_tray_visibility(
-    visible: bool,
-    app: tauri::AppHandle,
-    state: State<'_, TrayVisibilityState>,
-) -> Result<(), String> {
-    // 通过 app_handle 获取托盘图标的引用
-    if let Some(tray) = app.tray_by_id(TRAY_ICON_ID) {
-        // 调用 set_visible 方法来显示或隐藏图标
-        tray.set_visible(visible).map_err(|e| e.to_string())?;
-        // 更新我们自己维护的可见性状态
-        *state.0.lock().unwrap() = visible;
-        Ok(())
-    } else {
-        Err("Tray icon not found.".to_string())
-    }
-}
-
-// 新增：获取托盘图标当前可见性状态的命令
-#[tauri::command]
-fn is_tray_visible(state: State<'_, TrayVisibilityState>) -> bool {
-    *state.0.lock().unwrap()
 }
 
 // 新增: 从缓存中获取应用列表的命令
@@ -132,7 +99,9 @@ pub fn run() {
             hiding_initiated_by_command: AtomicBool::new(false),
         })
         // 托管托盘图标的可见性状态
-        .manage(TrayVisibilityState(Mutex::new(is_tray_initially_visible)))
+        .manage(tray_manager::TrayVisibilityState(Mutex::new(
+            is_tray_initially_visible,
+        )))
         // 新增：托管应用列表缓存的状态
         .manage(AppCache {
             apps: RwLock::new(None),
@@ -169,8 +138,8 @@ pub fn run() {
             installed_apps::open_app,
             close_main_window, // Register the new command
             // 注册新的命令
-            set_tray_visibility,
-            is_tray_visible,
+            tray_manager::set_tray_visibility,
+            tray_manager::is_tray_visible,
             // Add shortcut manager commands
             shortcut_manager::get_toggle_shortcut,
             shortcut_manager::set_toggle_shortcut
@@ -187,6 +156,11 @@ pub fn run() {
                 // Load and register the initial toggle shortcut from the store
                 if let Err(e) = shortcut_manager::setup_shortcuts(app) {
                     eprintln!("[ERROR] Failed to set up shortcuts: {}", e);
+                }
+
+                // 创建托盘图标
+                if let Err(e) = tray_manager::setup_tray(app) {
+                    eprintln!("[ERROR] Failed to set up tray: {}", e);
                 }
 
                 // 获取主窗口
@@ -241,42 +215,6 @@ pub fn run() {
                         _ => {}
                     }
                 });
-
-                // 创建托盘图标
-                let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-                let menu = Menu::with_items(app, &[&quit_i])?;
-                let _tray = TrayIconBuilder::with_id(TRAY_ICON_ID)
-                    .icon(app.default_window_icon().unwrap().clone())
-                    .menu(&menu)
-                    .show_menu_on_left_click(true)
-                    .on_tray_icon_event(|tray, event| match event {
-                        TrayIconEvent::Click {
-                            button: MouseButton::Left,
-                            button_state: MouseButtonState::Up,
-                            ..
-                        } => {
-                            println!("left click pressed and released");
-                            // in this example, let's show and focus the main window when the tray is clicked
-                            let app = tray.app_handle();
-                            if let Some(window) = app.get_webview_window("main") {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                            }
-                        }
-                        _ => {
-                            println!("unhandled event {event:?}");
-                        }
-                    })
-                    .on_menu_event(|app, event| match event.id.as_ref() {
-                        "quit" => {
-                            println!("quit menu item was clicked");
-                            app.exit(0);
-                        }
-                        _ => {
-                            println!("menu item {:?} not handled", event.id);
-                        }
-                    })
-                    .build(app)?;
             }
             Ok(())
         })
