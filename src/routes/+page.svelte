@@ -18,6 +18,7 @@
   let appList = $state<AppInfo[]>([]);
   let selectedIndex = $state<number>(0);
   let currentTheme = $state<Theme>(Theme.DARK);
+  let unlisten = $state<null | (() => void)>(null);
 
   const handleEsc = () => {
     console.log("Main page ESC handler executing");
@@ -27,20 +28,45 @@
     invoke("close_main_window");
   };
 
-  onMount(() => {
+  onMount(async () => {
     console.log("Main page component has mounted");
     // Register this page's ESC handler with the global store
     escapeHandler.set(handleEsc);
 
+    // 1. 立即获取一次数据
+    await fetchApps();
+
     // Fetch initial data. The visibility listener is now handled in the layout.
-    (async () => {
+    // (async () => {
+    //   const res = await invoke<AppInfo[]>("get_installed_apps");
+    //   if (res) {
+    //     originAppList = res;
+    //     appList = res;
+    //   }
+    // })();
+
+    // 2. 监听后端的更新通知
+    unlisten = await listen("apps_updated", (event) => {
+      console.log(
+        "Received apps_updated event from backend. Refetching list..."
+      );
+      fetchApps();
+    });
+  });
+
+  const fetchApps = async () => {
+    try {
+      console.log("Fetching apps from cache...");
       const res = await invoke<AppInfo[]>("get_installed_apps");
       if (res) {
         originAppList = res;
         appList = res;
       }
-    })();
-  });
+      console.log(`Got ${appList.length} apps.`);
+    } catch (error) {
+      console.error("Failed to get installed apps:", error);
+    }
+  };
 
   const unsubscribe = theme.subscribe((value) => {
     currentTheme = value;
@@ -103,6 +129,10 @@
     // As a safeguard, reset the escape handler if it's still ours
     if (get(escapeHandler) === handleEsc) {
       escapeHandler.set(() => {});
+    }
+    // 组件销毁时，清理监听器
+    if (unlisten) {
+      unlisten();
     }
   });
 </script>

@@ -8,7 +8,9 @@ use tauri::{
 };
 use tauri_plugin_global_shortcut::ShortcutEvent;
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Shortcut, ShortcutState};
+use tokio::sync::RwLock;
 
+use crate::installed_apps::AppInfo;
 use tracing_subscriber;
 use tracing_subscriber::fmt::format::FmtSpan; // 导入 FmtSpan
 
@@ -21,6 +23,11 @@ pub struct WindowState {
 
 // 新增：用于管理托盘图标可见性的状态
 pub struct TrayVisibilityState(pub Mutex<bool>);
+
+// 新增: 用于缓存已安装应用列表的状态
+pub struct AppCache {
+    apps: RwLock<Option<Vec<AppInfo>>>,
+}
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -69,6 +76,37 @@ fn is_tray_visible(state: State<'_, TrayVisibilityState>) -> bool {
     *state.0.lock().unwrap()
 }
 
+// 新增: 从缓存中获取应用列表的命令
+#[tauri::command]
+async fn get_installed_apps(cache: State<'_, AppCache>) -> Result<Vec<AppInfo>, String> {
+    let apps_guard = cache.apps.read().await;
+    // 立即从缓存返回数据，如果缓存为空则返回空列表
+    Ok(apps_guard.clone().unwrap_or_default())
+}
+
+// 新增: 触发应用列表后台刷新的辅助函数
+fn trigger_app_refresh(app: tauri::AppHandle) {
+    // 在后台任务中执行刷新操作，避免阻塞UI
+    tauri::async_runtime::spawn(async move {
+        // 从 AppHandle 获取 State，这样可以确保生命周期正确
+        let cache: State<AppCache> = app.state();
+        println!("Background refreshing installed apps list...");
+        // 调用我们重构的、耗时的函数
+        match installed_apps::fetch_installed_apps().await {
+            Ok(new_apps) => {
+                let mut apps_guard = cache.apps.write().await;
+                *apps_guard = Some(new_apps);
+                println!("App list cache updated successfully.");
+                // 通知前端列表已更新，以便前端可以重新获取
+                if let Err(e) = app.emit("apps_updated", ()) {
+                    eprintln!("[ERROR] Failed to emit apps_updated event: {}", e);
+                }
+            }
+            Err(e) => eprintln!("[ERROR] Failed to refresh app list: {}", e),
+        }
+    });
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tracing_subscriber::fmt()
@@ -95,6 +133,10 @@ pub fn run() {
         })
         // 托管托盘图标的可见性状态
         .manage(TrayVisibilityState(Mutex::new(is_tray_initially_visible)))
+        // 新增：托管应用列表缓存的状态
+        .manage(AppCache {
+            apps: RwLock::new(None),
+        })
         // Manage the shortcut state
         .manage(shortcut_manager::ShortcutState {
             toggle_shortcut: Mutex::new(
@@ -122,7 +164,8 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             greet,
-            installed_apps::get_installed_apps,
+            // 使用新的缓存版本替换旧的命令
+            get_installed_apps,
             installed_apps::open_app,
             close_main_window, // Register the new command
             // 注册新的命令
@@ -133,6 +176,12 @@ pub fn run() {
             shortcut_manager::set_toggle_shortcut
         ])
         .setup(move |app| {
+            // 新增：应用启动时，在后台异步获取一次应用列表
+            {
+                let app_handle = app.handle().clone();
+                trigger_app_refresh(app_handle);
+            }
+
             #[cfg(desktop)]
             {
                 // Load and register the initial toggle shortcut from the store
@@ -157,6 +206,11 @@ pub fn run() {
                                 .unwrap_or_else(|err| {
                                     eprintln!("[ERROR] Failed to register Esc shortcut: {}", err);
                                 });
+
+                            // 新增：窗口获得焦点时，触发一次静默刷新
+                            println!("Window focused, triggering silent app list refresh.");
+                            let handle = app_handle.clone();
+                            trigger_app_refresh(handle);
                         }
                         tauri::WindowEvent::Focused(false) => {
                             let state: State<WindowState> = app_handle.state();

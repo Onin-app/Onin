@@ -9,13 +9,13 @@ mod windows;
 
 use tauri::command;
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Clone, Debug)]
 pub enum AppOrigin {
     Hkey,
     Shortcut,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Clone, Debug)]
 pub struct AppInfo {
     pub name: String,
     pub path: Option<String>,
@@ -27,9 +27,8 @@ pub struct AppInfo {
     pub origin: Option<AppOrigin>,
 }
 
-#[command]
-#[tracing::instrument]
-pub async fn get_installed_apps() -> Result<Vec<AppInfo>, String> {
+// 这不再是一个Tauri命令，而是一个内部调用的、执行耗时操作的函数
+pub async fn fetch_installed_apps() -> Result<Vec<AppInfo>, String> {
     #[cfg(target_os = "windows")]
     {
         windows::get_apps().await
