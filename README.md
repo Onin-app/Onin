@@ -5,3 +5,47 @@ This template should help get you started developing with Tauri, SvelteKit and T
 ## Recommended IDE Setup
 
 [VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer).
+
+---
+
+# Baize
+
+## 项目目标
+
+创建一个快速启动应用程序，类似于 utools、alfred、wox 和 raycast。
+
+## 技术栈
+
+- **Tauri**: 用于构建跨平台桌面应用程序。
+  - 优点：性能好，安全性高，可以使用 Web 技术进行开发。
+  - 缺点：学习曲线较陡峭，生态系统不如 Electron 完善。
+- **Svelte**: 用于构建用户界面。
+  - 优点：性能好，代码量少，易于学习。
+  - 缺点：生态系统不如 React 和 Vue 完善。
+- **Rust**: 用于编写 Tauri 后端代码。
+  - 优点：性能好，安全性高，适合编写系统级代码。
+  - 缺点：学习曲线较陡峭，编译速度较慢。
+
+## 项目进度
+
+- [x] 创建项目基本结构
+- [ ] 实现快速启动功能
+- [ ] 添加插件支持
+- [ ] 优化用户界面
+
+## 难点
+
+- 如何实现快速启动：需要研究 utools、alfred、raycast 等软件的实现方式。
+- 如何添加插件支持：需要设计插件 API 和插件加载机制。
+- 如何优化用户界面：需要考虑用户体验和性能。
+
+## 疑问点
+
+- 是否需要使用其他技术栈：例如，是否需要使用 TypeScript 来编写 Svelte 代码。
+- 如何更好地组织项目结构：需要考虑项目的可维护性和可扩展性。
+
+## CHANGE_LOG
+
+### 2025-05-15
+
+- 新增使用快捷键触发窗口显示与隐藏的功能
