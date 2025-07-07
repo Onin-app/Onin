@@ -37,7 +37,8 @@ windows = { version = "0.57", features = [
 base64 = "0.22"
 futures = "0.3" # 用于并发处理 futures
 image = "0.25"
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+# Add `sync` for Mutex and `fs` for async file operations.
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "fs"] }
 num_cpus = "1.13"
 tauri-plugin-store = "2"
 

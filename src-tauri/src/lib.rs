@@ -8,9 +8,13 @@ use tracing_subscriber;
 use tracing_subscriber::fmt::format::FmtSpan; // 导入 FmtSpan
 
 mod app_cache_manager;
+pub mod icon_utils;
 mod installed_apps;
+pub mod shared_types;
 mod shortcut_manager;
+mod startup_apps_manager;
 mod tray_manager;
+mod unified_launch_manager;
 mod window_manager;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -77,7 +81,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             greet,
-            app_cache_manager::get_installed_apps,
+            unified_launch_manager::get_all_launchable_items,
             installed_apps::open_app,
             window_manager::close_main_window, // Register the new command
             // 注册新的命令
@@ -85,15 +89,17 @@ pub fn run() {
             tray_manager::is_tray_visible,
             // Add shortcut manager commands
             shortcut_manager::get_toggle_shortcut,
-            shortcut_manager::set_toggle_shortcut
+            shortcut_manager::set_toggle_shortcut,
+            // Add startup items manager commands
+            startup_apps_manager::get_startup_items,
+            startup_apps_manager::add_startup_items,
+            startup_apps_manager::remove_startup_item
         ])
         .setup(move |app| {
-            // 新增：应用启动时，在后台异步获取一次应用列表
-            {
-                let app_handle = app.handle().clone();
-                app_cache_manager::trigger_app_refresh(app_handle);
-            }
-
+            // 托管自定义启动项管理器
+            app.manage(startup_apps_manager::StartupAppsManager::new(
+                app.handle().clone(),
+            ));
             #[cfg(desktop)]
             {
                 // Load and register the initial toggle shortcut from the store

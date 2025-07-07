@@ -4,12 +4,13 @@
 
   import { goto } from "$app/navigation";
   import GeneralSettings from "$lib/components/settings/GeneralSettings.svelte";
+  import StartupSettings from "$lib/components/settings/StartupSettings.svelte";
   import { escapeHandler } from "$lib/stores/escapeHandler";
 
   interface SettingItem {
     name: string;
     id: string;
-    component: typeof import("$lib/components/settings/GeneralSettings.svelte").default;
+    component: typeof GeneralSettings | typeof StartupSettings;
     icon: string;
   }
 
@@ -19,6 +20,12 @@
       id: "general",
       component: GeneralSettings,
       icon: "icon-general",
+    },
+    {
+      name: "启动设置",
+      id: "startup",
+      component: StartupSettings,
+      icon: "icon-startup",
     },
   ];
 

@@ -1,8 +1,10 @@
-export interface AppInfo {
+export type ItemType = 'App' | 'Folder' | 'File';
+
+export interface LaunchableItem {
   name: string;
   path: string;
-  icon?: string;
-  origin?: string;
+  icon: string;
+  item_type: ItemType;
 }
 
 export enum Theme {

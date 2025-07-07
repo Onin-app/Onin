@@ -1,3 +1,5 @@
+## 目录结构树
+
 ```
 .
 ├── .gitignore # Git 忽略文件，用于排除不需要版本控制的文件和目录
@@ -22,7 +24,8 @@
 │   │   │   ├── Icon.svelte # 一个通用的 SVG 图标组件
 │   │   │   └── settings/ # 设置页面相关的组件
 │   │   │       ├── GeneralSettings.svelte # “通用设置”页面的 UI 组件
-│   │   │       └── SetItem.svelte # 设置页面中每个设置项的通用布局组件
+│   │   │       ├── SetItem.svelte # 设置页面中每个设置项的通用布局组件
+│   │   │       └── StartupSettings.svelte # “启动设置”页面的 UI 组件，用于管理自定义启动项
 │   │   ├── stores/ # Svelte 的状态管理 stores
 │   │   │   └── escapeHandler.ts # 一个全局 store，用于管理 ESC 键的处理函数
 │   │   └── utils/ # 通用工具函数
@@ -33,7 +36,7 @@
 │       ├── +layout.ts # 全局布局的加载器，配置为客户端渲染
 │       ├── +page.svelte # 主页面（应用搜索界面）的 Svelte 组件
 │       └── settings/ # 设置页面的路由目录
-│           └── +page.svelte # 设置页面的 Svelte 组件
+│           └── +page.svelte # 设置页面的 Svelte 组件，包含通用设置和启动设置等标签页
 ├── src-tauri/ # Tauri 后端 Rust 应用源码
 │   ├── .gitignore # Tauri 项目的 Git 忽略文件
 │   ├── build.rs # Rust 构建脚本，由 tauri-build 使用
@@ -45,11 +48,12 @@
 │   │   ├── lib.rs # Rust 库的根文件，用于组织和初始化后端逻辑
 │   │   ├── main.rs # Rust 应用的入口点
 │   │   ├── shortcut_manager.rs # 管理全局快捷键的注册和处理
+│   │   ├── startup_apps_manager.rs # 管理用户自定义的启动项列表
 │   │   ├── tray_manager.rs # 管理系统托盘图标和菜单
 │   │   ├── window_manager.rs # 管理主窗口的事件和行为（如显示/隐藏）
 │   │   └── installed_apps/ # 用于发现和管理系统上已安装应用的模块
 │   │       ├── exe_to_icon.rs # (Windows) 从 .exe 文件中提取图标
-│   │       ├── linux.rs # (Linux) 获取��安装应用的逻辑
+│   │       ├── linux.rs # (Linux) 获取已安装应用的逻辑
 │   │       ├── macos.rs # (macOS) 获取已安装应用的逻辑
 │   │       ├── mod.rs # `installed_apps` 模块的根文件，定义了公共接口
 │   │       └── windows.rs # (Windows) 获取已安装应用的逻辑
@@ -61,3 +65,9 @@
     ├── tauri.svg # Tauri Logo
     └── vite.svg # Vite Logo
 ```
+
+## 注意项
+
+- 后期要做数据同步
+  - 支持 webdav
+  - 支持 s3

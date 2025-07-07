@@ -1,5 +1,5 @@
 #[cfg(target_os = "windows")]
-mod exe_to_icon;
+pub mod exe_to_icon;
 #[cfg(target_os = "linux")]
 mod linux;
 #[cfg(target_os = "macos")]

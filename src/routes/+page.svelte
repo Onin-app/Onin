@@ -7,15 +7,15 @@
   import { goto } from "$app/navigation";
   import { get } from "svelte/store";
   import { fuzzyMatch } from "$lib/utils/fuzzyMatch";
-  import { Theme, type AppInfo } from "$lib/type";
+  import { Theme, type LaunchableItem } from "$lib/type";
   import { theme, getTheme } from "$lib/utils/theme";
 
   import "../index.css";
   import { escapeHandler } from "$lib/stores/escapeHandler";
 
   let inputValue = $state<string>("");
-  let originAppList = $state<AppInfo[]>([]);
-  let appList = $state<AppInfo[]>([]);
+  let originAppList = $state<LaunchableItem[]>([]);
+  let appList = $state<LaunchableItem[]>([]);
   let selectedIndex = $state<number>(0);
   let currentTheme = $state<Theme>(Theme.DARK);
   let unlisten = $state<null | (() => void)>(null);
@@ -56,15 +56,15 @@
 
   const fetchApps = async () => {
     try {
-      console.log("Fetching apps from cache...");
-      const res = await invoke<AppInfo[]>("get_installed_apps");
+      console.log("Fetching all launchable items...");
+      const res = await invoke<LaunchableItem[]>("get_all_launchable_items");
       if (res) {
         originAppList = res;
         appList = res;
       }
       console.log(`Got ${appList.length} apps.`);
     } catch (error) {
-      console.error("Failed to get installed apps:", error);
+      console.error("Failed to get all launchable items:", error);
     }
   };
 
@@ -80,7 +80,7 @@
     selectedIndex = 0;
   };
 
-  const openApp = async (app: AppInfo) => {
+  const openApp = async (app: LaunchableItem) => {
     try {
       await invoke("open_app", {
         path: app.path,
