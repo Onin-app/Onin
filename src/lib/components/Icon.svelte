@@ -2,19 +2,18 @@
   interface IconProps {
     icon: string;
     size?: number | string;
-    color?: string;
     class?: string;
     style?: string;
   }
 
-  const { icon, size, color = "#666", class: cls, style }: IconProps = $props();
+  const { icon, size, class: cls, style }: IconProps = $props();
 
   const currentSize = typeof size === "number" ? `${size}px` : size;
 </script>
 
 <svg
   class="icon {cls}"
-  style="width: {currentSize}; height: {currentSize}; fill: {color}; {style}"
+  style="width: {currentSize}; height: {currentSize}; {style}"
   aria-hidden="true"
 >
   <use xlink:href="#icon-{icon}"></use>
