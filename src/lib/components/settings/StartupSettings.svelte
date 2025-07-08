@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { Popover, Button } from "bits-ui";
   import { invoke } from "@tauri-apps/api/core";
+  import { open } from "@tauri-apps/plugin-dialog";
   import type { LaunchableItem } from "$lib/type";
   import Icon from "$lib/components/Icon.svelte";
 
@@ -71,6 +72,31 @@
     return "app";
   }
 
+  const handleOpenFolder = async () => {
+    try {
+      const selected = await open({
+        multiple: true,
+        directory: false,
+      });
+
+      if (selected && selected.length > 0) {
+        isProcessing = true;
+        try {
+          const newItems: LaunchableItem[] = await invoke("add_startup_items", {
+            paths: selected,
+          });
+          startupItems = newItems;
+        } catch (e) {
+          console.error("Failed to add startup paths:", e);
+        } finally {
+          isProcessing = false;
+        }
+      }
+    } catch (e) {
+      console.error("Failed to open folder dialog:", e);
+    }
+  };
+
   onMount(() => {
     fetchStartupItems();
   });
@@ -88,7 +114,22 @@
 </script>
 
 <main class="w-full h-full p-4 flex flex-col">
-  <h2 class="text-xl font-bold mb-4">自定义启动项</h2>
+  <h2 class="text-xl font-bold mb-2">自定义启动项</h2>
+  {#if startupItems.length > 0}
+    <div class="mb-2 flex items-center text-neutral-500 text-sm">
+      <!-- <Icon icon="warning-circle" class="mr-2" /> -->
+      可以通过拖放或者粘贴文件/文件夹路径来添加启动项，也可以点击
+      <Button.Root
+        class="rounded-input bg-dark text-background shadow-mini hover:bg-dark/95 inline-flex
+	h-5 items-center justify-center px-[6px] text-[10px]
+	font-semibold active:scale-[0.98] active:transition-all mx-1"
+        onclick={handleOpenFolder}
+      >
+        按钮
+      </Button.Root>
+      添加
+    </div>
+  {/if}
   <div
     bind:this={listContainerEl}
     class="list-container relative flex-1 border-2 border-dashed border-neutral-300 dark:border-neutral-600 rounded-lg p-4 text-center flex items-center justify-center"
@@ -98,9 +139,18 @@
     {#if isLoading}
       <p class="text-neutral-500">正在加载...</p>
     {:else if startupItems.length === 0}
-      <div class="text-neutral-500">
-        <p>可以通过粘贴文件/文件夹路径来添加启动项</p>
-        <p class="text-sm mt-1">也支持拖拽或点击按钮添加</p>
+      <div class="mb-2 flex items-center text-neutral-500 text-sm">
+        <!-- <Icon icon="warning-circle" class="mr-2" /> -->
+        可以通过拖放或者粘贴文件/文件夹路径来添加启动项，也可以点击
+        <Button.Root
+          class="rounded-input bg-dark text-background shadow-mini hover:bg-dark/95 inline-flex
+	h-5 items-center justify-center px-[6px] text-[10px]
+	font-semibold active:scale-[0.98] active:transition-all mx-1"
+          onclick={handleOpenFolder}
+        >
+          按钮
+        </Button.Root>
+        添加
       </div>
     {:else}
       <ul class="text-left w-full h-full overflow-y-auto custom-scrollbar">

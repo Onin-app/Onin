@@ -37,6 +37,7 @@ pub fn run() {
         Shortcut::from_str(window_manager::CLOSE_WINDOW_SHORTCUT_STR).unwrap();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(
             tauri_plugin_autostart::Builder::new()
