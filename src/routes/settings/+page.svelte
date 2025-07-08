@@ -77,7 +77,7 @@
       {/each}
     </ul>
   </div>
-  <div class="main flex-1 h-full">
+  <div class="main flex-1 h-full overflow-auto">
     <ActiveComponent />
   </div>
 </main>

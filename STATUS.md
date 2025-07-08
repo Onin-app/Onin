@@ -17,7 +17,6 @@
 ├── src/                                                     # Svelte 前端应用源码
 │   ├── app.html                                             # SvelteKit 应用的 HTML 入口模板
 │   ├── index.css                                            # 全局 CSS 样式文件，引入了 Tailwind CSS
-│   ├── main.ts                                              # 前端应用的主入口点，用于初始化图标库等
 │   ├── lib/                                                 # SvelteKit 的库目录，存放可重用模块
 │   │   ├── type.ts                                          # 定义了应用中使用的 TypeScript 类型，如 AppInfo 和 Theme
 │   │   ├── components/                                      # Svelte UI 组件

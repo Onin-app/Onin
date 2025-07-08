@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { Popover, Button } from "bits-ui";
   import { invoke } from "@tauri-apps/api/core";
   import type { LaunchableItem } from "$lib/type";
   import Icon from "$lib/components/Icon.svelte";
@@ -103,7 +104,7 @@
       </div>
     {:else}
       <ul class="text-left w-full h-full overflow-y-auto custom-scrollbar">
-        {#each startupItems as item (item.path)}
+        {#each startupItems as item, index (item.path)}
           <li
             class="flex items-center p-2 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded-lg group"
           >
@@ -127,13 +128,49 @@
               <p class="font-semibold truncate">{item.name}</p>
               <p class="text-sm text-neutral-500 truncate">{item.path}</p>
             </div>
-            <button
-              onclick={() => deleteItem(item.path)}
-              class="ml-2 p-1 rounded-full text-neutral-400 hover:text-red-500 hover:bg-neutral-300 dark:hover:bg-neutral-600 opacity-0 group-hover:opacity-100 transition-opacity"
-              aria-label="删除 {item.name}"
-            >
-              <Icon icon="trash" class="w-5 h-5" />
-            </button>
+
+            <Popover.Root>
+              <Popover.Trigger>
+                <button
+                  class="ml-2 p-1 rounded-full text-neutral-400 hover:text-red-500 hover:bg-neutral-300 dark:hover:bg-neutral-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                  aria-label="删除 {item.name}"
+                >
+                  <Icon icon="delete" />
+                </button>
+              </Popover.Trigger>
+              <Popover.Portal>
+                <Popover.Content
+                  class="border-dark-10 bg-background shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-(--bits-popover-content-transform-origin) z-30 w-full max-w-[328px] rounded-[12px] border p-4"
+                  sideOffset={8}
+                >
+                  <Popover.Arrow />
+                  <h3
+                    class="text-[14px] font-semibold leading-5 tracking-[-0.01em] mb-2"
+                  >
+                    确认删除？
+                  </h3>
+                  <div>
+                    <Popover.Close>
+                      <Button.Root
+                        class="rounded-input bg-dark text-background shadow-mini hover:bg-dark/95 inline-flex
+	h-6 items-center justify-center px-[12px] text-[10px]
+	font-semibold active:scale-[0.98] active:transition-all"
+                      >
+                        取消
+                      </Button.Root>
+                    </Popover.Close>
+                    <Button.Root
+                      class="rounded-input bg-dark text-background shadow-mini hover:bg-dark/95 inline-flex
+	h-6 items-center justify-center px-[12px] text-[10px]
+	font-semibold active:scale-[0.98] active:transition-all"
+                      onclick={() => deleteItem(item.path)}
+                    >
+                      确认
+                    </Button.Root>
+                  </div>
+                </Popover.Content>
+              </Popover.Portal>
+            </Popover.Root>
           </li>
         {/each}
       </ul>

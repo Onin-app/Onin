@@ -7,7 +7,7 @@
     style?: string;
   }
 
-  const { icon, size, color, class: cls, style }: IconProps = $props();
+  const { icon, size, color = "#666", class: cls, style }: IconProps = $props();
 
   const currentSize = typeof size === "number" ? `${size}px` : size;
 </script>
