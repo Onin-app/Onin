@@ -1,7 +1,9 @@
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, AtomicU32};
 use std::sync::Mutex;
+use once_cell::sync::Lazy;
 use tauri::{Emitter, Manager};
+use tokio::sync::broadcast;
 use tauri_plugin_global_shortcut::{Shortcut, ShortcutState};
 
 use tracing_subscriber;
@@ -16,6 +18,14 @@ mod startup_apps_manager;
 mod tray_manager;
 mod unified_launch_manager;
 mod window_manager;
+
+// 创建一个全局的、一次性的通道，用于广播 rdev 的输入事件。
+// 这样我们只需要一个系统监听线程，而不是每次失焦都创建一个。
+pub static RDEV_EVENT_CHANNEL: Lazy<(
+    broadcast::Sender<rdev::Event>,
+    broadcast::Receiver<rdev::Event>,
+)> = Lazy::new(|| broadcast::channel(128));
+
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -36,6 +46,17 @@ pub fn run() {
     let close_window_shortcut =
         Shortcut::from_str(window_manager::CLOSE_WINDOW_SHORTCUT_STR).unwrap();
 
+    // 在一个单独的线程中启动全局事件监听器
+    std::thread::spawn(|| {
+        let sender = RDEV_EVENT_CHANNEL.0.clone();
+        if let Err(e) = rdev::listen(move |event| {
+            // 尝试发送事件，如果另一端没有监听者也无所谓
+            let _ = sender.send(event);
+        }) {
+            eprintln!("[ERROR] rdev could not listen for events: {:?}", e);
+        }
+    });
+
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
@@ -51,6 +72,9 @@ pub fn run() {
         .manage(window_manager::WindowCloseLockState(AtomicU32::new(
             0,
         )))
+        .manage(window_manager::HideTaskState {
+            handle: tokio::sync::Mutex::new(None),
+        })
         // 托管托盘图标的可见性状态
         .manage(tray_manager::TrayVisibilityState(Mutex::new(
             is_tray_initially_visible,

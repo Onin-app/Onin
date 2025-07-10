@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::time::Duration;
-use tauri::{App, Emitter, Listener, Manager, State};
+use tauri::{App, AppHandle, Emitter, Listener, Manager, State};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 use tokio::time::sleep;
 use crate::app_cache_manager;
@@ -16,6 +16,11 @@ pub struct WindowState {
 // 使用计数器，以防未来有多个操作需要同时加锁。
 pub struct WindowCloseLockState(pub AtomicU32);
 
+// State to hold the handle of the hide-on-blur task, so it can be cancelled.
+pub struct HideTaskState {
+    pub handle: tokio::sync::Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
+}
+
 #[tauri::command]
 pub fn acquire_window_close_lock(state: State<WindowCloseLockState>) {
     state.0.fetch_add(1, Ordering::Relaxed);
@@ -23,7 +28,10 @@ pub fn acquire_window_close_lock(state: State<WindowCloseLockState>) {
 
 #[tauri::command]
 pub fn release_window_close_lock(state: State<WindowCloseLockState>) {
-    state.0.fetch_sub(1, Ordering::Relaxed);
+    // fetch_sub returns the previous value, ensure we don't underflow.
+    if state.0.load(Ordering::Relaxed) > 0 {
+        state.0.fetch_sub(1, Ordering::Relaxed);
+    }
 }
 
 // The shortcut for closing the main window, used across modules.
@@ -44,6 +52,19 @@ pub fn close_main_window(app: tauri::AppHandle, state: State<WindowState>) {
     }
 }
 
+// Helper to cancel any pending hide task.
+async fn cancel_hide_task(app: &AppHandle) {
+    let state: State<HideTaskState> = app.state();
+    // Lock the mutex and then take the handle. This explicit scoping avoids potential lifetime issues
+    // with the MutexGuard temporary that the compiler was flagging.
+    let mut handle_guard = state.handle.lock().await;
+    if let Some(handle) = handle_guard.take() {
+        println!("Cancelling pending hide task.");
+        handle.abort();
+    }
+}
+
+
 pub fn setup_window_events(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     let window = app
         .get_webview_window("main")
@@ -51,24 +72,37 @@ pub fn setup_window_events(app: &App) -> Result<(), Box<dyn std::error::Error>> 
     let app_handle = app.handle().clone();
     let window_clone = window.clone();
     let app_handle_for_drag = app.handle().clone();
+    let app_handle_for_drop = app.handle().clone();
+    let app_handle_for_cancel = app.handle().clone();
 
     // 自动在文件拖放操作期间锁定窗口，解决问题 #3
+    let app_handle_for_drag_clone = app_handle_for_drag.clone();
     window.listen("tauri://file-drop-hover", move |_event| {
+        println!("File drag hover detected, acquiring window close lock and cancelling hide task.");
         let lock_state: State<WindowCloseLockState> = app_handle_for_drag.state();
-        // 为简化，我们假定同一时间只有一个拖放操作。进入时锁住，结束时释放。
-        lock_state.0.store(1, Ordering::Relaxed);
+        // 使用 fetch_add 以支持多个锁，使其更健壮
+        lock_state.0.fetch_add(1, Ordering::Relaxed);
+
+        let app_handle_clone = app_handle_for_drag_clone.clone();
+        tauri::async_runtime::spawn(async move {
+            cancel_hide_task(&app_handle_clone).await;
+        });
     });
 
-    let app_handle_for_drop = app.handle().clone();
     window.listen("tauri://file-drop", move |_event| {
+        println!("File dropped, releasing window close lock.");
         let lock_state: State<WindowCloseLockState> = app_handle_for_drop.state();
-        lock_state.0.store(0, Ordering::Relaxed); // 释放锁
+        if lock_state.0.load(Ordering::Relaxed) > 0 {
+            lock_state.0.fetch_sub(1, Ordering::Relaxed); // 释放锁
+        }
     });
 
-    let app_handle_for_cancel = app.handle().clone();
     window.listen("tauri://file-drop-cancelled", move |_event| {
+        println!("File drag cancelled, releasing window close lock.");
         let lock_state: State<WindowCloseLockState> = app_handle_for_cancel.state();
-        lock_state.0.store(0, Ordering::Relaxed); // 释放锁
+        if lock_state.0.load(Ordering::Relaxed) > 0 {
+            lock_state.0.fetch_sub(1, Ordering::Relaxed); // 释放锁
+        }
     });
 
     let close_window_shortcut = Shortcut::from_str(CLOSE_WINDOW_SHORTCUT_STR)?;
@@ -76,6 +110,12 @@ pub fn setup_window_events(app: &App) -> Result<(), Box<dyn std::error::Error>> 
     // Listen to window events to manage the Esc shortcut and other behaviors.
     window.on_window_event(move |event| match event {
         tauri::WindowEvent::Focused(true) => {
+            // Cancel any hide task that might be running.
+            let app_handle_clone = app_handle.clone();
+            tauri::async_runtime::spawn(async move {
+                cancel_hide_task(&app_handle_clone).await;
+            });
+
             // Register "Esc" shortcut when the window gains focus.
             println!("Window focused, registering Esc shortcut.");
             app_handle
@@ -115,23 +155,68 @@ pub fn setup_window_events(app: &App) -> Result<(), Box<dyn std::error::Error>> 
                 .swap(false, Ordering::Relaxed)
             {
                 println!("Window focus lost due to command. Skipping redundant hide.");
-            } else {
-                // 解决问题 #1：拖动窗口导致关闭
-                println!("Window lost focus naturally. Scheduling hide.");
-                let window_to_hide = window_clone.clone();
-                let app_handle_for_delay = app_handle.clone();
-                // 启动一个异步任务，在短暂延迟后隐藏窗口
+                // Also cancel any lingering hide task, just in case.
+                let app_handle_clone = app_handle.clone();
                 tauri::async_runtime::spawn(async move {
-                    sleep(Duration::from_millis(10)).await;
-                    let lock_state: State<WindowCloseLockState> = app_handle_for_delay.state();
-                    if !window_to_hide.is_focused().unwrap_or(false)
-                        && lock_state.0.load(Ordering::Relaxed) == 0
-                    {
-                        window_to_hide.hide().ok();
-                        window_to_hide
-                            .emit("window_visibility", &false)
-                            .unwrap_or_default();
+                    cancel_hide_task(&app_handle_clone).await;
+                });
+            } else {
+                // This is the new robust logic for hiding on blur.
+                println!("Window lost focus. Scheduling smart hide task.");
+                let window_to_hide = window_clone.clone();
+                let app_handle_for_task = app_handle.clone();
+
+                let new_handle = tauri::async_runtime::spawn(async move {
+                    let mut rx = crate::RDEV_EVENT_CHANNEL.0.subscribe();
+
+                    let hide_on_mouse_release = async {
+                        loop {
+                            if let Ok(event) = rx.recv().await {
+                                if let rdev::EventType::ButtonRelease(rdev::Button::Left) = event.event_type {
+                                    break;
+                                }
+                            }
+                        }
+                    };
+
+                    tokio::select! {
+                        _ = hide_on_mouse_release => {
+                            // Add a tiny delay to allow a potential focus event to be processed first
+                            // if the user clicks back on the window very quickly.
+                            sleep(Duration::from_millis(50)).await;
+                            println!("Global mouse release detected. Attempting to hide window.");
+                        }
+                        _ = sleep(Duration::from_millis(2000)) => {
+                            // A long timeout for non-mouse events like Alt-Tab,
+                            // or if the rdev listener fails for some reason.
+                            println!("Timeout reached after focus loss. Attempting to hide window.");
+                        }
                     }
+
+                    // Final check before hiding
+                    let lock_state: State<WindowCloseLockState> = app_handle_for_task.state();
+                    if !window_to_hide.is_focused().unwrap_or(false) && lock_state.0.load(Ordering::Relaxed) == 0 {
+                        println!("Hiding window now.");
+                        window_to_hide.hide().ok();
+                        window_to_hide.emit("window_visibility", &false).unwrap_or_default();
+                    } else {
+                        println!("Hide cancelled at the last moment (window re-focused or locked).");
+                    }
+
+                    // Clear the handle from the state after completion
+                    // Bind the state to a variable to extend its lifetime, preventing the temporary value from being dropped while borrowed.
+                    let hide_task_state: State<HideTaskState> = app_handle_for_task.state();
+                    let mut handle_guard = hide_task_state.handle.lock().await;
+                    *handle_guard = None;
+                });
+
+                // Store the new handle
+                let app_handle_clone = app_handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    // Same pattern here: bind the state to a variable to extend its lifetime.
+                    let hide_task_state: State<HideTaskState> = app_handle_clone.state();
+                    let mut handle_guard = hide_task_state.handle.lock().await;
+                    *handle_guard = Some(new_handle);
                 });
             }
         }
