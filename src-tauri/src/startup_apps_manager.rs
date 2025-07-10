@@ -1,7 +1,6 @@
 use crate::icon_utils;
 use crate::shared_types::{ItemType, LaunchableItem};
 use std::collections::HashSet;
-use std::fs;
 use std::path::{Path, PathBuf};
 use tauri::Manager;
 use tokio::sync::Mutex; // Use the async-aware Mutex from Tokio
