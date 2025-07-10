@@ -36,7 +36,7 @@ pub async fn fetch_installed_apps() -> Result<Vec<AppInfo>, String> {
 
     #[cfg(target_os = "macos")]
     {
-        macos::get_apps()
+        macos::get_apps().await
     }
 
     #[cfg(target_os = "linux")]
