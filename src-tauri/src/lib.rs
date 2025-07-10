@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, AtomicU32};
 use std::sync::Mutex;
 use tauri::{Emitter, Manager};
 use tauri_plugin_global_shortcut::{Shortcut, ShortcutState};
@@ -47,6 +47,10 @@ pub fn run() {
         .manage(window_manager::WindowState {
             hiding_initiated_by_command: AtomicBool::new(false),
         })
+        // 新增：托管窗口关闭锁的状态
+        .manage(window_manager::WindowCloseLockState(AtomicU32::new(
+            0,
+        )))
         // 托管托盘图标的可见性状态
         .manage(tray_manager::TrayVisibilityState(Mutex::new(
             is_tray_initially_visible,
@@ -84,6 +88,9 @@ pub fn run() {
             greet,
             unified_launch_manager::get_all_launchable_items,
             installed_apps::open_app,
+            // 注册新的锁命令
+            window_manager::acquire_window_close_lock,
+            window_manager::release_window_close_lock,
             window_manager::close_main_window, // Register the new command
             // 注册新的命令
             tray_manager::set_tray_visibility,

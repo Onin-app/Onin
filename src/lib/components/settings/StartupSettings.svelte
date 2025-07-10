@@ -73,27 +73,30 @@
   }
 
   const handleOpenFolder = async () => {
+    // 解决问题 #2：在打开文件对话框前，请求后端锁定窗口
+    await invoke("acquire_window_close_lock");
+    isProcessing = true;
     try {
       const selected = await open({
         multiple: true,
         directory: false,
       });
 
-      if (selected && selected.length > 0) {
-        isProcessing = true;
-        try {
-          const newItems: LaunchableItem[] = await invoke("add_startup_items", {
-            paths: selected,
-          });
-          startupItems = newItems;
-        } catch (e) {
-          console.error("Failed to add startup paths:", e);
-        } finally {
-          isProcessing = false;
-        }
+      if (!selected || selected.length === 0) {
+        // 用户取消了选择，直接返回。finally 块会确保锁被释放。
+        return;
       }
+
+      const newItems: LaunchableItem[] = await invoke("add_startup_items", {
+        paths: selected,
+      });
+      startupItems = newItems;
     } catch (e) {
-      console.error("Failed to open folder dialog:", e);
+      console.error("Failed to add startup paths:", e);
+    } finally {
+      isProcessing = false;
+      // 确保操作结束后（无论成功、失败还是取消），都释放锁
+      await invoke("release_window_close_lock");
     }
   };
 

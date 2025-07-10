@@ -12,7 +12,7 @@ This template should help get you started developing with Tauri, SvelteKit and T
 
 ## 项目目标
 
-创建一个快速启动应用程序，类似于 utools、alfred、wox 和 raycast。
+创建一个快速启动应用程序，类似于 raycast、utools、alfred、wox。
 
 ## 技术栈
 
@@ -29,7 +29,7 @@ This template should help get you started developing with Tauri, SvelteKit and T
 ## 项目进度
 
 - [x] 创建项目基本结构
-- [ ] 实现快速启动功能
+- [x] 实现快速启动功能
 - [ ] 添加插件支持
 - [ ] 优化用户界面
 
@@ -43,9 +43,3 @@ This template should help get you started developing with Tauri, SvelteKit and T
 
 - 是否需要使用其他技术栈：例如，是否需要使用 TypeScript 来编写 Svelte 代码。
 - 如何更好地组织项目结构：需要考虑项目的可维护性和可扩展性。
-
-## CHANGE_LOG
-
-### 2025-05-15
-
-- 新增使用快捷键触发窗口显示与隐藏的功能
