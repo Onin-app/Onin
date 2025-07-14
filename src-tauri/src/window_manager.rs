@@ -1,10 +1,10 @@
+use crate::app_cache_manager;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::time::Duration;
 use tauri::{App, AppHandle, Emitter, Listener, Manager, State};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 use tokio::time::sleep;
-use crate::app_cache_manager;
 
 // State to track if the window was hidden by a command, to prevent
 // redundant hides on focus loss.
@@ -64,13 +64,13 @@ async fn cancel_hide_task(app: &AppHandle) {
     }
 }
 
-
 pub fn setup_window_events(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     let window = app
         .get_webview_window("main")
         .ok_or("Main window not found")?;
     let app_handle = app.handle().clone();
     let window_clone = window.clone();
+    // TODO：下面这三个事件监听不到，后续考虑删除，目前在前端 webview 监听了
     let app_handle_for_drag = app.handle().clone();
     let app_handle_for_drop = app.handle().clone();
     let app_handle_for_cancel = app.handle().clone();

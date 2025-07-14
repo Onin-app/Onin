@@ -1,15 +1,20 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import { Popover, Button } from "bits-ui";
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
   import type { LaunchableItem } from "$lib/type";
   import Icon from "$lib/components/Icon.svelte";
+  // import { Webview } from "@tauri-apps/api/webview";
+  import { getCurrentWebview } from "@tauri-apps/api/webview";
+  import { TauriEvent } from "@tauri-apps/api/event";
 
   let startupItems = $state<LaunchableItem[]>([]);
   let listContainerEl: HTMLDivElement | undefined = $state();
   let isLoading = $state(true);
   let isProcessing = $state(false);
+  let isDraggingOver = $state(false);
+  let unlistenDragDrop = $state<() => void>();
 
   async function fetchStartupItems() {
     isLoading = true;
@@ -22,29 +27,31 @@
     }
   }
 
+  async function addItems(paths: string[]) {
+    if (paths.length === 0 || isProcessing) return;
+
+    isProcessing = true;
+    try {
+      const newItems: LaunchableItem[] = await invoke("add_startup_items", {
+        paths,
+      });
+      startupItems = newItems;
+    } catch (e) {
+      console.error("Failed to add startup paths:", e);
+    } finally {
+      isProcessing = false;
+    }
+  }
+
   async function handlePaste(event: ClipboardEvent) {
     event.preventDefault();
     const text = event.clipboardData?.getData("text/plain");
-    if (!text || isProcessing) return;
-
+    if (!text) return;
     const paths = text
       .split("\n")
       .map((p) => p.trim())
       .filter(Boolean);
-
-    if (paths.length > 0) {
-      isProcessing = true;
-      try {
-        const newItems: LaunchableItem[] = await invoke("add_startup_items", {
-          paths,
-        });
-        startupItems = newItems;
-      } catch (e) {
-        console.error("Failed to add startup paths:", e);
-      } finally {
-        isProcessing = false;
-      }
-    }
+    await addItems(paths);
   }
 
   async function deleteItem(path: string) {
@@ -100,9 +107,42 @@
     }
   };
 
-  onMount(() => {
-    fetchStartupItems();
-  });
+  // 监听拖放文件到指定区域
+  const listenDragDrop = async () => {
+    // 修复：正确赋值给 state 变量，以便组件销毁时可以注销监听器
+    unlistenDragDrop = await getCurrentWebview().onDragDropEvent(async (e) => {
+      console.log("拖放移动", e);
+      const event = e.event;
+      const payload = e.payload as {
+        paths: string[];
+        position: { type: "Physical"; x: number; y: number };
+        type: "enter" | "over" | "drop" | "leave";
+      };
+      if (!listContainerEl) return;
+      // 获取目标元素的位置和尺寸
+      const rect = listContainerEl.getBoundingClientRect();
+      // 判断鼠标坐标是否在目标元素内部
+      const isOverTarget =
+        payload.position.x >= rect.left &&
+        payload.position.x <= rect.right &&
+        payload.position.y >= rect.top &&
+        payload.position.y <= rect.bottom;
+
+      if (event === TauriEvent.DRAG_OVER && isOverTarget) {
+        // 当拖动文件悬浮在目标区域上时，设置状态以提供视觉反馈
+        isDraggingOver = isOverTarget;
+      } else if (event === TauriEvent.DRAG_DROP && isOverTarget) {
+        if (payload?.paths?.length > 0) {
+          // 如果在目标区域内释放，则添加文件
+          await addItems(payload.paths);
+          isDraggingOver = false;
+        }
+      } else {
+        // 当拖放操作被取消或离开窗口时，重置视觉反馈
+        isDraggingOver = false;
+      }
+    });
+  };
 
   // 使用 $effect 可以安全地在元素绑定后添加/移除事件监听器
   $effect(() => {
@@ -113,6 +153,15 @@
         el.removeEventListener("paste", handlePaste);
       };
     }
+  });
+
+  onMount(() => {
+    fetchStartupItems();
+    listenDragDrop();
+  });
+
+  onDestroy(() => {
+    unlistenDragDrop?.();
   });
 </script>
 
@@ -135,7 +184,9 @@
   {/if}
   <div
     bind:this={listContainerEl}
-    class="list-container relative flex-1 border-2 border-dashed border-neutral-300 dark:border-neutral-600 rounded-lg p-4 text-center flex items-center justify-center"
+    class="list-container relative flex-1 border-2 border-dashed rounded-lg p-4 text-center flex items-center justify-center transition-colors {isDraggingOver
+      ? 'border-blue-500'
+      : 'border-neutral-300 dark:border-neutral-600'}"
     role="group"
     tabindex="-1"
   >

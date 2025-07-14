@@ -14,6 +14,7 @@
       {
         "width": 800,
         "height": 400,
+        "dragDropEnabled": true,
         "alwaysOnTop": true,
         "center": true,
         "closable": false,
