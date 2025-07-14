@@ -1,17 +1,18 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
+  import { get } from "svelte/store";
+  import { ScrollArea } from "bits-ui";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 
   import { goto } from "$app/navigation";
-  import { get } from "svelte/store";
   import { fuzzyMatch } from "$lib/utils/fuzzyMatch";
   import { Theme, type LaunchableItem } from "$lib/type";
   import { theme, getTheme } from "$lib/utils/theme";
+  import { escapeHandler } from "$lib/stores/escapeHandler";
 
   import "../index.css";
-  import { escapeHandler } from "$lib/stores/escapeHandler";
 
   let inputValue = $state<string>("");
   let originAppList = $state<LaunchableItem[]>([]);
@@ -165,33 +166,53 @@
         oninput={handleInput}
       />
     </div>
-    <div class="custom-scrollbar app-list flex-1 py-2 overflow-auto">
-      {#each appList as app, index}
-        <button
-          role="option"
-          aria-selected={selectedIndex === index}
-          class="flex w-full p-2 text-2xl text-left {selectedIndex !== index
-            ? 'hover:bg-neutral-200 dark:hover:bg-neutral-700'
-            : ''} {selectedIndex === index
-            ? 'bg-neutral-300 dark:bg-neutral-600'
-            : ''}"
-          onclick={() => openApp(app)}
-        >
-          {#if app.icon}
-            <img
-              src={`data:image/png;base64,${app.icon}`}
-              class="w-8 h-8 mr-2 inline-block"
-              alt=""
-            />
-          {/if}
-          <div class="flex flex-col">
-            {app.name}
-            <span class="text-xs text-neutral-400 dark:text-neutral-500">
-              {app.path}
-            </span>
-          </div>
-        </button>
-      {/each}
-    </div>
+    <ScrollArea.Root
+      class="relative flex-1 overflow-hidden rounded-[10px] border px-2 py-2"
+    >
+      <ScrollArea.Viewport class="h-full w-full">
+        <div class="app-list overflow-auto">
+          {#each appList as app, index}
+            <button
+              role="option"
+              aria-selected={selectedIndex === index}
+              class="flex w-full p-2 text-2xl rounded text-left {selectedIndex !==
+              index
+                ? 'hover:bg-neutral-200 dark:hover:bg-neutral-700'
+                : ''} {selectedIndex === index
+                ? 'bg-neutral-300 dark:bg-neutral-600'
+                : ''}"
+              onclick={() => openApp(app)}
+            >
+              {#if app.icon}
+                <img
+                  src={`data:image/png;base64,${app.icon}`}
+                  class="w-8 h-8 mr-2 inline-block"
+                  alt=""
+                />
+              {/if}
+              <div class="flex flex-col">
+                {app.name}
+                <span class="text-xs text-neutral-399 dark:text-neutral-500">
+                  {app.path}
+                </span>
+              </div>
+            </button>
+          {/each}
+        </div>
+      </ScrollArea.Viewport>
+      <ScrollArea.Scrollbar
+        orientation="vertical"
+        class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-2.5 touch-none select-none rounded-full border-l border-l-transparent p-px transition-all duration-200 hover:w-3"
+      >
+        <ScrollArea.Thumb class="bg-muted-foreground flex-1 rounded-full" />
+      </ScrollArea.Scrollbar>
+      <ScrollArea.Scrollbar
+        orientation="horizontal"
+        class="bg-muted hover:bg-dark-10 flex h-2.5 touch-none select-none rounded-full border-t border-t-transparent p-px transition-all duration-200 hover:h-3 "
+      >
+        <ScrollArea.Thumb class="bg-muted-foreground rounded-full" />
+      </ScrollArea.Scrollbar>
+      <ScrollArea.Corner />
+    </ScrollArea.Root>
   </div>
 </main>

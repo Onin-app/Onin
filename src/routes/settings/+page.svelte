@@ -60,14 +60,18 @@
   data-tauri-drag-region
 >
   <div
-    class="left w-1/5 h-full p-4 border-r border-neutral-200 dark:border-neutral-700"
+    class="left w-1/5 h-full p-4 pl-0 border-r border-neutral-200 dark:border-neutral-700"
   >
     <ul class="w-full h-full flex flex-col justify-center">
       {#each settings as setting}
-        <li class="mb-2 mt-2">
+        <li
+          class="rounded {activeSetting.id === setting.id
+            ? 'bg-neutral-300 dark:bg-neutral-600'
+            : 'hover:bg-neutral-200 dark:hover:bg-neutral-700'}"
+        >
           <button
             type="button"
-            class="cursor-pointer"
+            class="cursor-pointer w-full p-2 text-left"
             class:active={activeSetting.id === setting.id}
             onclick={() => handleClickSetting(setting)}
           >
