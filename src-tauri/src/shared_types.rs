@@ -1,6 +1,19 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub enum ItemSource {
+    Application, // System-installed applications
+    Custom,      // User-defined items (files, folders, URLs, etc.)
+}
+
+impl Default for ItemSource {
+    fn default() -> Self {
+        // 对于用户手动添加的项目，默认为 Custom
+        ItemSource::Custom
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum ItemType {
     App,
     Folder,
@@ -20,4 +33,5 @@ pub struct LaunchableItem {
     pub path: String,
     pub icon: String,
     pub item_type: ItemType,
+    pub source: ItemSource,
 }

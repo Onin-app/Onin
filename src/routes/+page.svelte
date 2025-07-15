@@ -190,8 +190,17 @@
                   alt=""
                 />
               {/if}
-              <div class="flex flex-col">
-                {app.name}
+              <div class="flex flex-1 flex-col">
+                <div class="flex items-center justify-between">
+                  <span>
+                    {app.name}
+                  </span>
+                  <span
+                    class="rounded-md bg-neutral-200 px-1.5 py-0.5 text-xs text-neutral-700 dark:bg-neutral-700 dark:text-neutral-300"
+                  >
+                    {app.source}
+                  </span>
+                </div>
                 <span class="text-neutral-399 text-xs dark:text-neutral-500">
                   {app.path}
                 </span>

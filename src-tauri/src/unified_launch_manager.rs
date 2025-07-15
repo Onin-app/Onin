@@ -1,6 +1,6 @@
 use crate::app_cache_manager::AppCache;
 use crate::installed_apps;
-use crate::shared_types::{ItemType, LaunchableItem};
+use crate::shared_types::{ItemSource, ItemType, LaunchableItem};
 use crate::startup_apps_manager::StartupAppsManager;
 use tauri::State;
 
@@ -44,6 +44,7 @@ pub async fn get_all_launchable_items(
                 path,
                 icon: app_info.icon.unwrap_or_default(), // Use default icon if None
                 item_type: ItemType::App,
+                source: ItemSource::Application,
             })
         })
         .collect();
