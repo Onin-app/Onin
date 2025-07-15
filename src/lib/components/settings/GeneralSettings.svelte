@@ -152,7 +152,7 @@
   onDestroy(unsubscribe);
 </script>
 
-<main class="w-full h-full p-4">
+<main class="h-full w-full p-4">
   <h2 class="text-xl font-bold">主题设置</h2>
   <SetItem title="主题">
     {#snippet content()}
@@ -162,14 +162,14 @@
       >
         {#each themeList as theme}
           <div
-            class="text-foreground group flex select-none items-center transition-all"
+            class="text-foreground group flex items-center transition-all select-none"
           >
             <RadioGroup.Item
               id={theme.value}
               value={theme.value}
-              class="cursor-pointer border-border-input bg-background hover:border-dark-40 data-[state=checked]:border-foreground data-[state=checked]:border-6 size-5 shrink-0 cursor-default rounded-full border transition-all duration-100 ease-in-out"
+              class="border-border-input bg-background hover:border-dark-40 data-[state=checked]:border-foreground size-5 shrink-0 cursor-default cursor-pointer rounded-full border transition-all duration-100 ease-in-out data-[state=checked]:border-6"
             />
-            <Label.Root for={theme.value} class="pl-3 cursor-pointer">
+            <Label.Root for={theme.value} class="cursor-pointer pl-3">
               {theme.label}
             </Label.Root>
           </div>
@@ -178,14 +178,14 @@
     {/snippet}
   </SetItem>
 
-  <h2 class="text-xl font-bold mt-4">系统设置</h2>
+  <h2 class="mt-4 text-xl font-bold">系统设置</h2>
   <SetItem title="开机自启">
     {#snippet content()}
       <Switch.Root
         bind:checked={autostartEnabled}
         onCheckedChange={handleAutostartToggle}
         name="autoStart"
-        class="focus-visible:ring-foreground focus-visible:ring-offset-background data-[state=checked]:bg-foreground data-[state=unchecked]:bg-dark-10 data-[state=unchecked]:shadow-mini-inset dark:data-[state=checked]:bg-foreground focus-visible:outline-hidden peer inline-flex h-[24px] min-h-[24px] w-[40px] shrink-0 cursor-pointer items-center rounded-full px-[3px] transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        class="focus-visible:ring-foreground focus-visible:ring-offset-background data-[state=checked]:bg-foreground data-[state=unchecked]:bg-dark-10 data-[state=unchecked]:shadow-mini-inset dark:data-[state=checked]:bg-foreground peer inline-flex h-[24px] min-h-[24px] w-[40px] shrink-0 cursor-pointer items-center rounded-full px-[3px] transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50"
       >
         <Switch.Thumb
           class="bg-background data-[state=unchecked]:shadow-mini dark:border-background/30 dark:bg-foreground dark:shadow-popover pointer-events-none block size-[20px] shrink-0 rounded-full transition-transform data-[state=checked]:translate-x-[14px] data-[state=unchecked]:translate-x-0 dark:border dark:data-[state=unchecked]:border"
@@ -199,7 +199,7 @@
         bind:checked={trayIconEnabled}
         onCheckedChange={handleTrayIconToggle}
         name="trayIcon"
-        class="focus-visible:ring-foreground focus-visible:ring-offset-background data-[state=checked]:bg-foreground data-[state=unchecked]:bg-dark-10 data-[state=unchecked]:shadow-mini-inset dark:data-[state=checked]:bg-foreground focus-visible:outline-hidden peer inline-flex h-[24px] min-h-[24px] w-[40px] shrink-0 cursor-pointer items-center rounded-full px-[3px] transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        class="focus-visible:ring-foreground focus-visible:ring-offset-background data-[state=checked]:bg-foreground data-[state=unchecked]:bg-dark-10 data-[state=unchecked]:shadow-mini-inset dark:data-[state=checked]:bg-foreground peer inline-flex h-[24px] min-h-[24px] w-[40px] shrink-0 cursor-pointer items-center rounded-full px-[3px] transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50"
       >
         <Switch.Thumb
           class="bg-background data-[state=unchecked]:shadow-mini dark:border-background/30 dark:bg-foreground dark:shadow-popover pointer-events-none block size-[20px] shrink-0 rounded-full transition-transform data-[state=checked]:translate-x-[14px] data-[state=unchecked]:translate-x-0 dark:border dark:data-[state=unchecked]:border"
@@ -224,13 +224,13 @@
                     value={shortcut}
                     onkeydown={handleShortcutInputKeydown}
                     placeholder={shortcut}
-                    class="w-40 p-1 border rounded bg-background text-foreground"
+                    class="bg-background text-foreground w-40 rounded border p-1"
                     autofocus
                   />
                 </Tooltip.Trigger>
                 <Tooltip.Content sideOffset={8}>
                   <div
-                    class="rounded-input border-dark-10 bg-background shadow-popover outline-hidden z-0 border p-3 text-sm font-medium"
+                    class="rounded-input border-dark-10 bg-background shadow-popover z-0 border p-3 text-sm font-medium outline-hidden"
                   >
                     <p>
                       1. 先按功能键（Ctrl、Alt、Windows、Shift），再按其他普通键
@@ -255,7 +255,7 @@
           </Button.Root>
         {:else}
           <div
-            class="w-40 p-1 border rounded bg-muted text-muted-foreground select-none"
+            class="bg-muted text-muted-foreground w-40 rounded border p-1 select-none"
           >
             {shortcut || "无"}
           </div>

@@ -49,7 +49,7 @@
     // 2. 监听后端的更新通知
     unlisten = await listen("apps_updated", (event) => {
       console.log(
-        "Received apps_updated event from backend. Refetching list..."
+        "Received apps_updated event from backend. Refetching list...",
       );
       fetchApps();
     });
@@ -139,11 +139,11 @@
 </script>
 
 <main
-  class="w-full h-[100vh] p-4 rounded-xl text-neutral-900 dark:text-neutral-100 bg-neutral-100 dark:bg-neutral-800 overflow-hidden"
+  class="h-[100vh] w-full overflow-hidden rounded-xl bg-neutral-100 p-4 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100"
   data-tauri-drag-region
 >
   <div
-    class="w-full h-full flex flex-col"
+    class="flex h-full w-full flex-col"
     role="listbox"
     tabindex="0"
     onkeydown={handleKeyDown}
@@ -154,12 +154,12 @@
           src="/ff_logo_{getTheme(currentTheme) === Theme.DARK
             ? Theme.LIGHT
             : Theme.DARK}.svg"
-          class="w-10 h-10"
+          class="h-10 w-10"
           alt="Tauri logo"
         />
       </button>
       <input
-        class="w-full p-2 ml-2 text-2xl h-[60px] focus:outline-none focus:ring-0 active:outline-none active:ring-0"
+        class="ml-2 h-[60px] w-full p-2 text-2xl focus:ring-0 focus:outline-none active:ring-0 active:outline-none"
         type="text"
         placeholder="Hi Baize!"
         bind:value={inputValue}
@@ -175,7 +175,7 @@
             <button
               role="option"
               aria-selected={selectedIndex === index}
-              class="flex w-full p-2 text-2xl rounded text-left {selectedIndex !==
+              class="flex w-full rounded p-2 text-left text-2xl {selectedIndex !==
               index
                 ? 'hover:bg-neutral-200 dark:hover:bg-neutral-700'
                 : ''} {selectedIndex === index
@@ -186,13 +186,13 @@
               {#if app.icon}
                 <img
                   src={`data:image/png;base64,${app.icon}`}
-                  class="w-8 h-8 mr-2 inline-block"
+                  class="mr-2 inline-block h-8 w-8"
                   alt=""
                 />
               {/if}
               <div class="flex flex-col">
                 {app.name}
-                <span class="text-xs text-neutral-399 dark:text-neutral-500">
+                <span class="text-neutral-399 text-xs dark:text-neutral-500">
                   {app.path}
                 </span>
               </div>
@@ -202,13 +202,13 @@
       </ScrollArea.Viewport>
       <ScrollArea.Scrollbar
         orientation="vertical"
-        class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-2.5 touch-none select-none rounded-full border-l border-l-transparent p-px transition-all duration-200 hover:w-3"
+        class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-2.5 touch-none rounded-full border-l border-l-transparent p-px transition-all duration-200 select-none hover:w-3"
       >
         <ScrollArea.Thumb class="bg-muted-foreground flex-1 rounded-full" />
       </ScrollArea.Scrollbar>
       <ScrollArea.Scrollbar
         orientation="horizontal"
-        class="bg-muted hover:bg-dark-10 flex h-2.5 touch-none select-none rounded-full border-t border-t-transparent p-px transition-all duration-200 hover:h-3 "
+        class="bg-muted hover:bg-dark-10 flex h-2.5 touch-none rounded-full border-t border-t-transparent p-px transition-all duration-200 select-none hover:h-3 "
       >
         <ScrollArea.Thumb class="bg-muted-foreground rounded-full" />
       </ScrollArea.Scrollbar>

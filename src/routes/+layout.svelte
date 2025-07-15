@@ -10,24 +10,29 @@
   onMount(() => {
     const listenersPromise = (async () => {
       const unlisten = await listen("esc_key_pressed", () => {
-        console.log("Layout: esc_key_pressed received. Delegating to current handler.");
+        console.log(
+          "Layout: esc_key_pressed received. Delegating to current handler.",
+        );
         // Get the current handler function from the store and execute it.
         const handler = get(escapeHandler);
         handler();
       });
 
-      const unlistenVisibility = await listen<boolean>("window_visibility", (event) => {
-        // When window becomes visible, check if we are on the main page.
-        if (event.payload && page.route.id === "/") {
-          // Use queueMicrotask to ensure the DOM is ready after a potential navigation.
-          queueMicrotask(() => {
-            const input = document.querySelector<HTMLInputElement>(
-              'input[placeholder="Hi Baize!"]'
-            );
-            input?.focus();
-          });
-        }
-      });
+      const unlistenVisibility = await listen<boolean>(
+        "window_visibility",
+        (event) => {
+          // When window becomes visible, check if we are on the main page.
+          if (event.payload && page.route.id === "/") {
+            // Use queueMicrotask to ensure the DOM is ready after a potential navigation.
+            queueMicrotask(() => {
+              const input = document.querySelector<HTMLInputElement>(
+                'input[placeholder="Hi Baize!"]',
+              );
+              input?.focus();
+            });
+          }
+        },
+      );
 
       return { unlisten, unlistenVisibility };
     })();

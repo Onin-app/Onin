@@ -12,7 +12,7 @@
   const { title, description, content }: SetItemProps = $props();
 </script>
 
-<div class="flex items-center justify-between mt-2">
+<div class="mt-2 flex items-center justify-between">
   <div class="label flex items-center">
     <p class="title mr-2">{title}</p>
     {#if description}

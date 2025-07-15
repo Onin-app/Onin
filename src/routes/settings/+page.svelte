@@ -56,13 +56,13 @@
 </script>
 
 <main
-  class="w-full h-[100vh] text-neutral-900 dark:text-neutral-100 bg-neutral-100 dark:bg-neutral-800 flex p-4"
+  class="flex h-[100vh] w-full bg-neutral-100 p-4 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100"
   data-tauri-drag-region
 >
   <div
-    class="left w-1/5 h-full p-4 pl-0 border-r border-neutral-200 dark:border-neutral-700"
+    class="left h-full w-1/5 border-r border-neutral-200 p-4 pl-0 dark:border-neutral-700"
   >
-    <ul class="w-full h-full flex flex-col justify-center">
+    <ul class="flex h-full w-full flex-col justify-center">
       {#each settings as setting}
         <li
           class="rounded {activeSetting.id === setting.id
@@ -71,7 +71,7 @@
         >
           <button
             type="button"
-            class="cursor-pointer w-full p-2 text-left"
+            class="w-full cursor-pointer p-2 text-left"
             class:active={activeSetting.id === setting.id}
             onclick={() => handleClickSetting(setting)}
           >
@@ -81,7 +81,7 @@
       {/each}
     </ul>
   </div>
-  <div class="main flex-1 h-full overflow-auto">
+  <div class="main h-full flex-1 overflow-auto">
     <ActiveComponent />
   </div>
 </main>

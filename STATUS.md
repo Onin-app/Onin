@@ -4,6 +4,7 @@
 .
 ├── .gitignore                                               # Git 忽略文件，用于排除不需要版本控制的文件和目录
 ├── package.json                                             # Node.js 项目配置文件，定义了项目依赖和脚本
+├── prettier.config.js                                       # Prettier代码格式化配置文件
 ├── pnpm-lock.yaml                                           # pnpm 包管理器的锁定文件，确保依赖版本一致
 ├── README.md                                                # 项目说明文件，介绍了项目目标、技术栈和进度
 ├── STATUS.md                                                # (本文) 项目文件结构和状态的动态文档
