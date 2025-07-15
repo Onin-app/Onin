@@ -2,6 +2,8 @@ use super::AppInfo;
 use base64::{engine::general_purpose, Engine as _};
 use icns::{IconFamily, IconType};
 use plist::Value;
+use std::collections::HashMap;
+use std::env;
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -144,26 +146,44 @@ fn get_app_icon(app_path: &str) -> Option<String> {
 
 pub async fn get_apps() -> Result<Vec<AppInfo>, String> {
     async_runtime::spawn_blocking(|| {
-        let mut apps = vec![];
-        if let Ok(entries) = fs::read_dir("/Applications") {
-            for entry in entries.flatten() {
-                if let Ok(file_type) = entry.file_type() {
-                    if file_type.is_dir() {
-                        let name = entry.file_name().to_string_lossy().to_string();
-                        if name.ends_with(".app") {
-                            let path = format!("/Applications/{}", name);
-                            let icon = get_app_icon(&path);
-                            apps.push(AppInfo {
-                                name,
-                                path: Some(path),
-                                icon,
-                                origin: None,
-                            });
+        let mut app_map = HashMap::new();
+        let mut search_paths = vec![
+            PathBuf::from("/System/Applications"),
+            PathBuf::from("/Applications"),
+        ];
+
+        if let Ok(home_dir) = env::var("HOME") {
+            search_paths.push(PathBuf::from(home_dir).join("Applications"));
+        }
+
+        for path in search_paths {
+            if !path.exists() {
+                continue;
+            }
+            if let Ok(entries) = fs::read_dir(path) {
+                for entry in entries.flatten() {
+                    if let Ok(file_type) = entry.file_type() {
+                        if file_type.is_dir() {
+                            let name = entry.file_name().to_string_lossy().to_string();
+                            if name.ends_with(".app") {
+                                let app_path = entry.path().to_string_lossy().to_string();
+                                let icon = get_app_icon(&app_path);
+                                let app_info = AppInfo {
+                                    name: name.clone(),
+                                    path: Some(app_path),
+                                    icon,
+                                    origin: None,
+                                };
+                                app_map.insert(name, app_info);
+                            }
                         }
                     }
                 }
             }
         }
+
+        let mut apps: Vec<AppInfo> = app_map.into_values().collect();
+        apps.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
         Ok(apps)
     })
     .await
