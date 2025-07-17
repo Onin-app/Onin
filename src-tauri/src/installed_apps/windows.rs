@@ -1,6 +1,6 @@
-use base64;
+use base64::{engine::general_purpose, Engine as _};
 use futures::StreamExt;
-use image::{io::Reader, ImageFormat};
+use image::{ImageEncoder, ImageFormat, ImageReader};
 use lnk::ShellLink;
 use num_cpus;
 use regex::Regex;
@@ -368,42 +368,244 @@ fn extract_icon_from_shortcut_with_link(link: &ShellLink, target_path: &str) -> 
     None
 }
 
-pub async fn get_apps() -> Result<Vec<AppInfo>, String> {
-    let hkey_apps = get_apps_from_hkey().await?;
-    let shortcut_apps = get_apps_from_shortcuts().await?;
+use windows::{
+    core::{Interface, PWSTR},
+    Win32::{
+        Graphics::Gdi::{
+            CreateCompatibleDC, DeleteDC, DeleteObject, GetDIBits, BITMAPINFO, BITMAPINFOHEADER,
+            DIB_RGB_COLORS,
+        },
+        System::Com::{
+            CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE,
+        },
+        UI::Shell::{
+            BHID_EnumItems, FOLDERID_AppsFolder, IEnumShellItems, IShellItem,
+            IShellItemImageFactory, SHGetKnownFolderItem, KF_FLAG_DEFAULT, SIGDN_NORMALDISPLAY,
+            SIGDN_PARENTRELATIVEPARSING, SIIGBF_ICONONLY,
+        },
+    },
+};
 
-    // 使用 HashMap 来存储唯一的应用程序信息，键为标准化后的应用程序名称
-    // 这样可以确保去重，并允许我们根据优先级进行选择。
-    // key: String (normalized app name), value: AppInfo
+fn hbitmap_to_base64_png(hbitmap: windows::Win32::Graphics::Gdi::HBITMAP) -> Option<String> {
+    let mut bmp_info = BITMAPINFO {
+        bmiHeader: BITMAPINFOHEADER {
+            biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let hdc = unsafe { CreateCompatibleDC(None) };
+    if hdc.is_invalid() {
+        return None;
+    }
+
+    // Get bitmap info header
+    if unsafe {
+        GetDIBits(
+            hdc,
+            hbitmap,
+            0,
+            0,
+            None,
+            &mut bmp_info as *mut _ as *mut _,
+            DIB_RGB_COLORS,
+        )
+    } == 0
+    {
+        let _ = unsafe { DeleteDC(hdc) };
+        return None;
+    }
+
+    let width = bmp_info.bmiHeader.biWidth;
+    let height = bmp_info.bmiHeader.biHeight.abs();
+    bmp_info.bmiHeader.biHeight = height; // Ensure height is positive for top-down DIB
+    bmp_info.bmiHeader.biCompression = 0; // BI_RGB
+
+    let mut buffer: Vec<u8> = vec![0; (width * height * 4) as usize];
+
+    // Get bitmap data
+    if unsafe {
+        GetDIBits(
+            hdc,
+            hbitmap,
+            0,
+            height as u32,
+            Some(buffer.as_mut_ptr() as *mut _),
+            &mut bmp_info as *mut _ as *mut _,
+            DIB_RGB_COLORS,
+        )
+    } == 0
+    {
+        unsafe {
+            let _ = DeleteDC(hdc);
+        };
+        return None;
+    }
+
+    unsafe {
+        let _ = DeleteDC(hdc);
+    };
+
+    // Manually convert BGRA to RGBA and flip vertically
+    let mut rgba_buffer = vec![0u8; (width * height * 4) as usize];
+    for y in 0..height {
+        for x in 0..width {
+            let src_idx = ((height - 1 - y) * width + x) as usize * 4;
+            let dest_idx = (y * width + x) as usize * 4;
+            rgba_buffer[dest_idx] = buffer[src_idx + 2]; // R
+            rgba_buffer[dest_idx + 1] = buffer[src_idx + 1]; // G
+            rgba_buffer[dest_idx + 2] = buffer[src_idx]; // B
+            rgba_buffer[dest_idx + 3] = buffer[src_idx + 3]; // A
+        }
+    }
+
+    let mut png_buffer = Vec::new();
+    image::codecs::png::PngEncoder::new(&mut png_buffer)
+        .write_image(
+            &rgba_buffer,
+            width as u32,
+            height as u32,
+            image::ColorType::Rgba8.into(),
+        )
+        .ok()
+        .map(|_| general_purpose::STANDARD.encode(&png_buffer))
+}
+
+fn get_apps_from_apps_folder() -> Result<Vec<AppInfo>, String> {
+    unsafe {
+        if CoInitializeEx(None, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE).is_err() {
+            return Err("Failed to initialize COM".to_string());
+        }
+    }
+
+    let apps_folder: Result<IShellItem, _> =
+        unsafe { SHGetKnownFolderItem(&FOLDERID_AppsFolder, KF_FLAG_DEFAULT, None) };
+
+    let apps_folder = match apps_folder {
+        Ok(folder) => folder,
+        Err(_) => {
+            unsafe { CoUninitialize() };
+            return Err("Failed to get AppsFolder".to_string());
+        }
+    };
+
+    let apps_folder_enum: Result<IEnumShellItems, _> =
+        unsafe { apps_folder.BindToHandler(None, &BHID_EnumItems) };
+    let apps_folder_enum = match apps_folder_enum {
+        Ok(e) => e,
+        Err(_) => {
+            unsafe { CoUninitialize() };
+            return Err("Failed to bind to enum items".to_string());
+        }
+    };
+
+    let mut apps = Vec::new();
+    let mut app_item_raw: [Option<IShellItem>; 1] = [None];
+    while unsafe { apps_folder_enum.Next(&mut app_item_raw, None).is_ok() }
+        && app_item_raw[0].is_some()
+    {
+        if let Some(app) = app_item_raw[0].take() {
+            let name_pwstr: Result<PWSTR, _> = unsafe { app.GetDisplayName(SIGDN_NORMALDISPLAY) };
+            let path_pwstr: Result<PWSTR, _> =
+                unsafe { app.GetDisplayName(SIGDN_PARENTRELATIVEPARSING) };
+
+            if let (Ok(name_pwstr), Ok(path_pwstr)) = (name_pwstr, path_pwstr) {
+                let name = unsafe { name_pwstr.to_string().unwrap_or_default() };
+                let path = unsafe { path_pwstr.to_string().unwrap_or_default() };
+
+                let icon = unsafe {
+                    app.cast::<IShellItemImageFactory>()
+                        .ok()
+                        .and_then(|factory| {
+                            let size = windows::Win32::Foundation::SIZE { cx: 64, cy: 64 };
+                            factory
+                                .GetImage(size, SIIGBF_ICONONLY)
+                                .ok()
+                                .and_then(|hbitmap| {
+                                    let b64 = hbitmap_to_base64_png(hbitmap);
+                                    let _ = DeleteObject(hbitmap);
+                                    b64
+                                })
+                        })
+                };
+
+                if !name.is_empty() && !path.is_empty() {
+                    apps.push(AppInfo {
+                        name: normalize_app_name(&name),
+                        path: Some(format!("shell:AppsFolder\\{}", path)),
+                        icon,
+                        origin: Some(AppOrigin::Uwp),
+                    });
+                }
+            }
+        }
+    }
+
+    unsafe { CoUninitialize() };
+    Ok(apps)
+}
+
+pub async fn get_apps() -> Result<Vec<AppInfo>, String> {
+    let hkey_apps_future = get_apps_from_hkey();
+    let shortcut_apps_future = get_apps_from_shortcuts();
+    let apps_folder_apps = task::spawn_blocking(get_apps_from_apps_folder)
+        .await
+        .unwrap()?;
+
+    let (hkey_apps_result, shortcut_apps_result) =
+        tokio::join!(hkey_apps_future, shortcut_apps_future);
+
+    let hkey_apps = hkey_apps_result?;
+    let shortcut_apps = shortcut_apps_result?;
+
     let mut unique_apps: HashMap<String, AppInfo> = HashMap::new();
 
-    // 1. 优先添加注册表中的应用程序
+    // 1. 优先添加 AppsFolder 中的应用程序
+    for app in apps_folder_apps {
+        unique_apps.insert(app.name.clone(), app);
+    }
+
+    // 2. 添加注册表中的应用程序
     for app in hkey_apps {
-        // 使用应用程序的标准化名称作为 HashMap 的键
-        unique_apps.insert(app.name.clone(), app); // clone name for key, move app for value
+        unique_apps.entry(app.name.clone()).or_insert(app);
     }
 
-    // 2. 添加快捷方式中的应用程序，但只添加 HashMap 中不存在的
+    // 3. 添加快捷方式中的应用程序
     for app in shortcut_apps {
-        let normalized_name = normalize_app_name(&app.name); // 确保快捷方式的名称也标准化
-
-        // 如果 HashMap 中还没有这个应用程序，或者你想更新它（例如，如果快捷方式提供了更好的图标），
-        // 可以在这里插入。
-        // 这里采用你的优先级策略：如果注册表中已有，则快捷方式的跳过。
-        unique_apps.entry(normalized_name).or_insert(app); // 如果键不存在，则插入 app
+        let normalized_name = normalize_app_name(&app.name);
+        unique_apps.entry(normalized_name).or_insert(app);
     }
 
-    let mut final_apps: Vec<AppInfo> = unique_apps.into_values().collect();
+    let final_apps: Vec<AppInfo> = unique_apps.into_values().collect();
 
-    // 3. 将 HashMap 中的所有值收集到 Vec 中返回
     Ok(final_apps)
 }
 
 pub fn open_app(path: &str) -> Result<(), String> {
-    Command::new("cmd")
-        .args(&["/C", "start", "", path])
-        .spawn()
-        .map_err(|e| e.to_string())?;
+    if path.starts_with("shell:AppsFolder\\") {
+        unsafe {
+            use windows::core::PCWSTR;
+            use windows::Win32::UI::Shell::ShellExecuteW;
+            use windows::Win32::UI::WindowsAndMessaging::SW_NORMAL;
+            let operation = widestring::U16CString::from_str("open").unwrap();
+            let file = widestring::U16CString::from_str("explorer.exe").unwrap();
+            let params = widestring::U16CString::from_str(path).unwrap();
+            ShellExecuteW(
+                None,
+                PCWSTR(operation.as_ptr()),
+                PCWSTR(file.as_ptr()),
+                PCWSTR(params.as_ptr()),
+                None,
+                SW_NORMAL,
+            );
+        }
+    } else {
+        Command::new("cmd")
+            .args(&["/C", "start", "", path])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
     Ok(())
 }
 
@@ -420,7 +622,7 @@ fn is_uninstall_path(link: &ShellLink) -> bool {
 fn convert_image_to_base64(image_path: &str) -> Option<String> {
     let path = PathBuf::from(image_path);
 
-    let mut reader = Reader::open(&path).ok()?;
+    let mut reader = ImageReader::open(&path).ok()?;
 
     let format_guess = path
         .extension()
@@ -444,7 +646,7 @@ fn convert_image_to_base64(image_path: &str) -> Option<String> {
 
     let encoded_bytes = buffer.into_inner();
 
-    Some(base64::encode(&encoded_bytes))
+    Some(general_purpose::STANDARD.encode(&encoded_bytes))
 }
 
 fn extract_icon_from_exe_or_image(

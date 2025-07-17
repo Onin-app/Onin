@@ -13,6 +13,7 @@ use tauri::command;
 pub enum AppOrigin {
     Hkey,
     Shortcut,
+    Uwp,
 }
 
 #[derive(serde::Serialize, Clone, Debug)]
