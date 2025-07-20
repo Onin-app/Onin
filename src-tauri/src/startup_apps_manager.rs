@@ -1,5 +1,5 @@
 use crate::icon_utils;
-use crate::shared_types::{ItemType, LaunchableItem};
+use crate::shared_types::{ItemSource, ItemType, LaunchableItem};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use tauri::Manager;
@@ -156,9 +156,11 @@ impl StartupAppsManager {
 
         Some(LaunchableItem {
             name,
+            aliases: vec![],
             path: path_str,
             icon,
             item_type,
+            source: ItemSource::Custom,
         })
     }
 }

@@ -21,6 +21,7 @@
   let currentTheme = $state<Theme>(Theme.DARK);
   let unlisten = $state<null | (() => void)>(null);
 
+
   const handleEsc = () => {
     console.log("Main page ESC handler executing");
     inputValue = "";
@@ -73,8 +74,8 @@
     currentTheme = value;
   });
 
-  const handleInput = (e) => {
-    const value = e.target.value;
+  const handleInput = (e: Event & { currentTarget: EventTarget & HTMLInputElement }) => {
+    const value = e.currentTarget.value;
     const apps = fuzzyMatch(value, originAppList);
     inputValue = value;
     appList = apps;
@@ -170,7 +171,7 @@
       class="relative flex-1 overflow-hidden rounded-[10px] border px-2 py-2"
     >
       <ScrollArea.Viewport class="h-full w-full">
-        <div class="app-list overflow-auto">
+        <div class="ajp-list overflow-auto">
           {#each appList as app, index}
             <button
               role="option"
@@ -190,8 +191,17 @@
                   alt=""
                 />
               {/if}
-              <div class="flex flex-col">
-                {app.name}
+              <div class="flex flex-1 flex-col">
+                <div class="flex items-center justify-between">
+                  <span>
+                    {app.name}
+                  </span>
+                  <span
+                    class="rounded-md bg-neutral-200 px-1.5 py-0.5 text-xs text-neutral-700 dark:bg-neutral-700 dark:text-neutral-300"
+                  >
+                    {app.source}
+                  </span>
+                </div>
                 <span class="text-neutral-399 text-xs dark:text-neutral-500">
                   {app.path}
                 </span>

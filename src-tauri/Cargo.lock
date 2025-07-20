@@ -359,6 +359,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "walkdir",
+ "widestring",
  "windows 0.57.0",
  "winreg 0.55.0",
 ]
@@ -5462,6 +5463,12 @@ name = "weezl"
 version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a751b3277700db47d3e574514de2eced5e54dc8a5436a3bf7a0b248b2cee16f3"
+
+[[package]]
+name = "widestring"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17882f045410753661207383517a6f62ec3dbeb6a4ed2acce01f0728238d1983"
 
 [[package]]
 name = "winapi"

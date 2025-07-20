@@ -1,6 +1,6 @@
-use base64;
+use base64::{engine::general_purpose, Engine as _};
 use futures::StreamExt;
-use image::{io::Reader, ImageFormat};
+use image::{ImageEncoder, ImageFormat, ImageReader};
 use lnk::ShellLink;
 use num_cpus;
 use regex::Regex;
@@ -18,8 +18,6 @@ use winreg::{RegKey, HKEY};
 use super::exe_to_icon::extract_icon_from_exe;
 use super::AppInfo;
 use super::AppOrigin;
-
-const DEFAULT_APP_ICON: &str = "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";
 
 const UNINSTALL_PATHS: &[(&str, HKEY)] = &[
     (
@@ -370,49 +368,244 @@ fn extract_icon_from_shortcut_with_link(link: &ShellLink, target_path: &str) -> 
     None
 }
 
-pub async fn get_apps() -> Result<Vec<AppInfo>, String> {
-    let hkey_apps = get_apps_from_hkey().await?;
-    let shortcut_apps = get_apps_from_shortcuts().await?;
+use windows::{
+    core::{Interface, PWSTR},
+    Win32::{
+        Graphics::Gdi::{
+            CreateCompatibleDC, DeleteDC, DeleteObject, GetDIBits, BITMAPINFO, BITMAPINFOHEADER,
+            DIB_RGB_COLORS,
+        },
+        System::Com::{
+            CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE,
+        },
+        UI::Shell::{
+            BHID_EnumItems, FOLDERID_AppsFolder, IEnumShellItems, IShellItem,
+            IShellItemImageFactory, SHGetKnownFolderItem, KF_FLAG_DEFAULT, SIGDN_NORMALDISPLAY,
+            SIGDN_PARENTRELATIVEPARSING, SIIGBF_ICONONLY,
+        },
+    },
+};
 
-    // 使用 HashMap 来存储唯一的应用程序信息，键为标准化后的应用程序名称
-    // 这样可以确保去重，并允许我们根据优先级进行选择。
-    // key: String (normalized app name), value: AppInfo
-    let mut unique_apps: HashMap<String, AppInfo> = HashMap::new();
+fn hbitmap_to_base64_png(hbitmap: windows::Win32::Graphics::Gdi::HBITMAP) -> Option<String> {
+    let mut bmp_info = BITMAPINFO {
+        bmiHeader: BITMAPINFOHEADER {
+            biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
 
-    // 1. 优先添加注册表中的应用程序
-    for app in hkey_apps {
-        // 使用应用程序的标准化名称作为 HashMap 的键
-        unique_apps.insert(app.name.clone(), app); // clone name for key, move app for value
+    let hdc = unsafe { CreateCompatibleDC(None) };
+    if hdc.is_invalid() {
+        return None;
     }
 
-    // 2. 添加快捷方式中的应用程序，但只添加 HashMap 中不存在的
-    for app in shortcut_apps {
-        let normalized_name = normalize_app_name(&app.name); // 确保快捷方式的名称也标准化
-
-        // 如果 HashMap 中还没有这个应用程序，或者你想更新它（例如，如果快捷方式提供了更好的图标），
-        // 可以在这里插入。
-        // 这里采用你的优先级策略：如果注册表中已有，则快捷方式的跳过。
-        unique_apps.entry(normalized_name).or_insert(app); // 如果键不存在，则插入 app
+    // Get bitmap info header
+    if unsafe {
+        GetDIBits(
+            hdc,
+            hbitmap,
+            0,
+            0,
+            None,
+            &mut bmp_info as *mut _ as *mut _,
+            DIB_RGB_COLORS,
+        )
+    } == 0
+    {
+        let _ = unsafe { DeleteDC(hdc) };
+        return None;
     }
 
-    let mut final_apps: Vec<AppInfo> = unique_apps.into_values().collect();
-    // 确保所有 icon 都有默认值
-    for app_info in &mut final_apps {
-        // 遍历 final_apps
-        if app_info.icon.is_none() {
-            app_info.icon = Some(DEFAULT_APP_ICON.to_string());
+    let width = bmp_info.bmiHeader.biWidth;
+    let height = bmp_info.bmiHeader.biHeight.abs();
+    bmp_info.bmiHeader.biHeight = height; // Ensure height is positive for top-down DIB
+    bmp_info.bmiHeader.biCompression = 0; // BI_RGB
+
+    let mut buffer: Vec<u8> = vec![0; (width * height * 4) as usize];
+
+    // Get bitmap data
+    if unsafe {
+        GetDIBits(
+            hdc,
+            hbitmap,
+            0,
+            height as u32,
+            Some(buffer.as_mut_ptr() as *mut _),
+            &mut bmp_info as *mut _ as *mut _,
+            DIB_RGB_COLORS,
+        )
+    } == 0
+    {
+        unsafe {
+            let _ = DeleteDC(hdc);
+        };
+        return None;
+    }
+
+    unsafe {
+        let _ = DeleteDC(hdc);
+    };
+
+    // Manually convert BGRA to RGBA and flip vertically
+    let mut rgba_buffer = vec![0u8; (width * height * 4) as usize];
+    for y in 0..height {
+        for x in 0..width {
+            let src_idx = ((height - 1 - y) * width + x) as usize * 4;
+            let dest_idx = (y * width + x) as usize * 4;
+            rgba_buffer[dest_idx] = buffer[src_idx + 2]; // R
+            rgba_buffer[dest_idx + 1] = buffer[src_idx + 1]; // G
+            rgba_buffer[dest_idx + 2] = buffer[src_idx]; // B
+            rgba_buffer[dest_idx + 3] = buffer[src_idx + 3]; // A
         }
     }
 
-    // 3. 将 HashMap 中的所有值收集到 Vec 中返回
+    let mut png_buffer = Vec::new();
+    image::codecs::png::PngEncoder::new(&mut png_buffer)
+        .write_image(
+            &rgba_buffer,
+            width as u32,
+            height as u32,
+            image::ColorType::Rgba8.into(),
+        )
+        .ok()
+        .map(|_| general_purpose::STANDARD.encode(&png_buffer))
+}
+
+fn get_apps_from_apps_folder() -> Result<Vec<AppInfo>, String> {
+    unsafe {
+        if CoInitializeEx(None, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE).is_err() {
+            return Err("Failed to initialize COM".to_string());
+        }
+    }
+
+    let apps_folder: Result<IShellItem, _> =
+        unsafe { SHGetKnownFolderItem(&FOLDERID_AppsFolder, KF_FLAG_DEFAULT, None) };
+
+    let apps_folder = match apps_folder {
+        Ok(folder) => folder,
+        Err(_) => {
+            unsafe { CoUninitialize() };
+            return Err("Failed to get AppsFolder".to_string());
+        }
+    };
+
+    let apps_folder_enum: Result<IEnumShellItems, _> =
+        unsafe { apps_folder.BindToHandler(None, &BHID_EnumItems) };
+    let apps_folder_enum = match apps_folder_enum {
+        Ok(e) => e,
+        Err(_) => {
+            unsafe { CoUninitialize() };
+            return Err("Failed to bind to enum items".to_string());
+        }
+    };
+
+    let mut apps = Vec::new();
+    let mut app_item_raw: [Option<IShellItem>; 1] = [None];
+    while unsafe { apps_folder_enum.Next(&mut app_item_raw, None).is_ok() }
+        && app_item_raw[0].is_some()
+    {
+        if let Some(app) = app_item_raw[0].take() {
+            let name_pwstr: Result<PWSTR, _> = unsafe { app.GetDisplayName(SIGDN_NORMALDISPLAY) };
+            let path_pwstr: Result<PWSTR, _> =
+                unsafe { app.GetDisplayName(SIGDN_PARENTRELATIVEPARSING) };
+
+            if let (Ok(name_pwstr), Ok(path_pwstr)) = (name_pwstr, path_pwstr) {
+                let name = unsafe { name_pwstr.to_string().unwrap_or_default() };
+                let path = unsafe { path_pwstr.to_string().unwrap_or_default() };
+
+                let icon = unsafe {
+                    app.cast::<IShellItemImageFactory>()
+                        .ok()
+                        .and_then(|factory| {
+                            let size = windows::Win32::Foundation::SIZE { cx: 64, cy: 64 };
+                            factory
+                                .GetImage(size, SIIGBF_ICONONLY)
+                                .ok()
+                                .and_then(|hbitmap| {
+                                    let b64 = hbitmap_to_base64_png(hbitmap);
+                                    let _ = DeleteObject(hbitmap);
+                                    b64
+                                })
+                        })
+                };
+
+                if !name.is_empty() && !path.is_empty() {
+                    apps.push(AppInfo {
+                        name: normalize_app_name(&name),
+                        path: Some(format!("shell:AppsFolder\\{}", path)),
+                        icon,
+                        origin: Some(AppOrigin::Uwp),
+                    });
+                }
+            }
+        }
+    }
+
+    unsafe { CoUninitialize() };
+    Ok(apps)
+}
+
+pub async fn get_apps() -> Result<Vec<AppInfo>, String> {
+    let hkey_apps_future = get_apps_from_hkey();
+    let shortcut_apps_future = get_apps_from_shortcuts();
+    let apps_folder_apps = task::spawn_blocking(get_apps_from_apps_folder)
+        .await
+        .unwrap()?;
+
+    let (hkey_apps_result, shortcut_apps_result) =
+        tokio::join!(hkey_apps_future, shortcut_apps_future);
+
+    let hkey_apps = hkey_apps_result?;
+    let shortcut_apps = shortcut_apps_result?;
+
+    let mut unique_apps: HashMap<String, AppInfo> = HashMap::new();
+
+    // 1. 优先添加 AppsFolder 中的应用程序
+    for app in apps_folder_apps {
+        unique_apps.insert(app.name.clone(), app);
+    }
+
+    // 2. 添加注册表中的应用程序
+    for app in hkey_apps {
+        unique_apps.entry(app.name.clone()).or_insert(app);
+    }
+
+    // 3. 添加快捷方式中的应用程序
+    for app in shortcut_apps {
+        let normalized_name = normalize_app_name(&app.name);
+        unique_apps.entry(normalized_name).or_insert(app);
+    }
+
+    let final_apps: Vec<AppInfo> = unique_apps.into_values().collect();
+
     Ok(final_apps)
 }
 
 pub fn open_app(path: &str) -> Result<(), String> {
-    Command::new("cmd")
-        .args(&["/C", "start", "", path])
-        .spawn()
-        .map_err(|e| e.to_string())?;
+    if path.starts_with("shell:AppsFolder\\") {
+        unsafe {
+            use windows::core::PCWSTR;
+            use windows::Win32::UI::Shell::ShellExecuteW;
+            use windows::Win32::UI::WindowsAndMessaging::SW_NORMAL;
+            let operation = widestring::U16CString::from_str("open").unwrap();
+            let file = widestring::U16CString::from_str("explorer.exe").unwrap();
+            let params = widestring::U16CString::from_str(path).unwrap();
+            ShellExecuteW(
+                None,
+                PCWSTR(operation.as_ptr()),
+                PCWSTR(file.as_ptr()),
+                PCWSTR(params.as_ptr()),
+                None,
+                SW_NORMAL,
+            );
+        }
+    } else {
+        Command::new("cmd")
+            .args(&["/C", "start", "", path])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
     Ok(())
 }
 
@@ -429,7 +622,7 @@ fn is_uninstall_path(link: &ShellLink) -> bool {
 fn convert_image_to_base64(image_path: &str) -> Option<String> {
     let path = PathBuf::from(image_path);
 
-    let mut reader = Reader::open(&path).ok()?;
+    let mut reader = ImageReader::open(&path).ok()?;
 
     let format_guess = path
         .extension()
@@ -453,7 +646,7 @@ fn convert_image_to_base64(image_path: &str) -> Option<String> {
 
     let encoded_bytes = buffer.into_inner();
 
-    Some(base64::encode(&encoded_bytes))
+    Some(general_purpose::STANDARD.encode(&encoded_bytes))
 }
 
 fn extract_icon_from_exe_or_image(
