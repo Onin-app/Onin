@@ -30,6 +30,7 @@ impl Default for ItemType {
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct LaunchableItem {
     pub name: String,
+    pub aliases: Vec<String>,
     pub path: String,
     pub icon: String,
     pub item_type: ItemType,

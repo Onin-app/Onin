@@ -156,6 +156,7 @@ impl StartupAppsManager {
 
         Some(LaunchableItem {
             name,
+            aliases: vec![],
             path: path_str,
             icon,
             item_type,

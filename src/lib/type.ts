@@ -3,6 +3,7 @@ export type Source = 'Application' | 'Custom'
 
 export interface LaunchableItem {
   name: string;
+  aliases: string[];
   path: string;
   icon: string;
   item_type: ItemType;

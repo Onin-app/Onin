@@ -37,7 +37,10 @@ fn get_app_icon(app_path: &str) -> Option<String> {
     // 2. Check if the path from plist actually exists. If not, reset to None.
     if let Some(path) = &icon_path {
         if !path.exists() {
-            info!("[ICON] Icon from plist does not exist: {:?}. Will search directory.", path);
+            info!(
+                "[ICON] Icon from plist does not exist: {:?}. Will search directory.",
+                path
+            );
             icon_path = None;
         }
     }
@@ -45,7 +48,10 @@ fn get_app_icon(app_path: &str) -> Option<String> {
     // 3. If we still don't have a path, try common names.
     if icon_path.is_none() {
         info!("[ICON] No valid icon from plist, trying common names.");
-        let app_name = Path::new(app_path).file_stem().and_then(|s| s.to_str()).unwrap_or_default();
+        let app_name = Path::new(app_path)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or_default();
         let common_names = [
             format!("{}.icns", app_name),
             "AppIcon.icns".to_string(),
@@ -92,14 +98,20 @@ fn get_app_icon(app_path: &str) -> Option<String> {
     let mut file = match File::open(&final_icon_path) {
         Ok(f) => f,
         Err(e) => {
-            error!("[ICON] Failed to open icon file {:?}: {}", final_icon_path, e);
+            error!(
+                "[ICON] Failed to open icon file {:?}: {}",
+                final_icon_path, e
+            );
             return None;
         }
     };
     let icon_family = match IconFamily::read(&mut file) {
         Ok(family) => family,
         Err(e) => {
-            error!("[ICON] Failed to read icon family from {:?}: {}", final_icon_path, e);
+            error!(
+                "[ICON] Failed to read icon family from {:?}: {}",
+                final_icon_path, e
+            );
             return None;
         }
     };
@@ -129,19 +141,118 @@ fn get_app_icon(app_path: &str) -> Option<String> {
     let image = match icns::Image::read_png(&icon_element.data[..]) {
         Ok(img) => img,
         Err(e) => {
-            error!("[ICON] Failed to read png from icon element for {:?}: {}", final_icon_path, e);
+            error!(
+                "[ICON] Failed to read png from icon element for {:?}: {}",
+                final_icon_path, e
+            );
             return None;
         }
     };
     let mut png_data = Vec::new();
     if let Err(e) = image.write_png(&mut png_data) {
-        error!("[ICON] Failed to write png data for {:?}: {}", final_icon_path, e);
+        error!(
+            "[ICON] Failed to write png data for {:?}: {}",
+            final_icon_path, e
+        );
         return None;
     }
 
     let base64_icon = general_purpose::STANDARD.encode(&png_data);
     info!("[ICON] Successfully processed icon for {}", app_path);
     Some(base64_icon)
+}
+
+fn get_system_localized_name(app_path: &Path) -> Option<String> {
+    let app_path_str = app_path.to_string_lossy();
+
+    // 使用 mdls 命令获取应用的本地化名称
+    let output = Command::new("mdls")
+        .arg("-name")
+        .arg("kMDItemDisplayName")
+        .arg("-raw")
+        .arg(&*app_path_str)
+        .output()
+        .ok()?;
+
+    if output.status.success() {
+        let display_name = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if !display_name.is_empty() && display_name != "(null)" {
+            info!("[SYSTEM] Found system localized name: {}", display_name);
+            return Some(display_name);
+        }
+    }
+
+    None
+}
+
+fn get_localized_name(app_path: &Path, base_name: &str) -> Option<String> {
+    let resources_path = app_path.join("Contents/Resources");
+
+    // 扩展语言目录列表，包括可能的中文本地化
+    let lang_dirs = [
+        "zh_CN.lproj",
+        "zh_Hans.lproj",
+        "zh.lproj",
+        "Chinese.lproj",
+        "en.lproj",
+    ];
+
+    for lang in &lang_dirs {
+        let strings_path = resources_path.join(lang).join("InfoPlist.strings");
+        if strings_path.exists() {
+            info!("[LOCALIZED] Checking: {:?}", strings_path);
+
+            // 方法1: 尝试作为 plist 文件读取
+            if let Ok(localized_plist) = Value::from_file(&strings_path) {
+                if let Some(dict) = localized_plist.as_dictionary() {
+                    if let Some(display_name) = dict
+                        .get("CFBundleDisplayName")
+                        .or_else(|| dict.get("CFBundleName"))
+                        .and_then(|v| v.as_string())
+                    {
+                        info!("[LOCALIZED] Found plist format name: {}", display_name);
+                        return Some(display_name.to_string());
+                    }
+                }
+            }
+
+            // 方法2: 尝试作为 strings 文件读取
+            if let Ok(content) = fs::read_to_string(&strings_path) {
+                info!("[LOCALIZED] Reading strings file content");
+
+                // 解析 strings 文件格式 (key = "value";)
+                for line in content.lines() {
+                    let line = line.trim();
+                    if line.is_empty() || line.starts_with("//") || line.starts_with("/*") {
+                        continue;
+                    }
+
+                    // 查找 CFBundleDisplayName 或 CFBundleName
+                    if line.starts_with("CFBundleDisplayName") || line.starts_with("CFBundleName") {
+                        if let Some(start) = line.find('"') {
+                            if let Some(end) = line.rfind('"') {
+                                if start < end {
+                                    let display_name = &line[start + 1..end];
+                                    info!(
+                                        "[LOCALIZED] Found strings format name: {}",
+                                        display_name
+                                    );
+                                    return Some(display_name.to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 如果没有找到本地化名称，尝试从系统获取
+    if let Some(localized_name) = get_system_localized_name(app_path) {
+        return Some(localized_name);
+    }
+
+    None
 }
 
 pub async fn get_apps() -> Result<Vec<AppInfo>, String> {
@@ -164,13 +275,54 @@ pub async fn get_apps() -> Result<Vec<AppInfo>, String> {
                 for entry in entries.flatten() {
                     if let Ok(file_type) = entry.file_type() {
                         if file_type.is_dir() {
-                            let name = entry.file_name().to_string_lossy().to_string();
-                            if name.ends_with(".app") {
-                                let app_path = entry.path().to_string_lossy().to_string();
-                                let icon = get_app_icon(&app_path);
+                            let file_name = entry.file_name().to_string_lossy().to_string();
+                            if file_name.ends_with(".app") {
+                                let app_path = entry.path();
+                                let app_path_str = app_path.to_string_lossy().to_string();
+                                let mut aliases: Vec<String> = Vec::new();
+
+                                let name = app_path
+                                    .file_stem()
+                                    .and_then(|s| s.to_str())
+                                    .unwrap_or(&file_name)
+                                    .to_string();
+
+                                // 1. 获取本地化名称
+                                if let Some(localized_name) = get_localized_name(&app_path, &name) {
+                                    // 移除了 != name 的条件判断
+                                    if !aliases.contains(&localized_name) {
+                                        aliases.push(localized_name);
+                                    }
+                                }
+
+                                // 2. 从 Info.plist 获取其他名称
+                                if let Ok(plist) =
+                                    Value::from_file(app_path.join("Contents/Info.plist"))
+                                {
+                                    if let Some(dict) = plist.as_dictionary() {
+                                        if let Some(display_name) = dict
+                                            .get("CFBundleDisplayName")
+                                            .and_then(|v| v.as_string())
+                                        {
+                                            if !aliases.contains(&display_name.to_string()) {
+                                                aliases.push(display_name.to_string());
+                                            }
+                                        }
+                                        if let Some(bundle_name) =
+                                            dict.get("CFBundleName").and_then(|v| v.as_string())
+                                        {
+                                            if !aliases.contains(&bundle_name.to_string()) {
+                                                aliases.push(bundle_name.to_string());
+                                            }
+                                        }
+                                    }
+                                }
+
+                                let icon = get_app_icon(&app_path_str);
                                 let app_info = AppInfo {
                                     name: name.clone(),
-                                    path: Some(app_path),
+                                    aliases,
+                                    path: Some(app_path_str),
                                     icon,
                                     origin: None,
                                 };

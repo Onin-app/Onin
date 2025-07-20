@@ -41,6 +41,7 @@ pub async fn get_all_launchable_items(
         .filter_map(|app_info| {
             app_info.path.map(|path| LaunchableItem {
                 name: app_info.name,
+                aliases: app_info.aliases,
                 path,
                 icon: app_info.icon.unwrap_or_default(), // Use default icon if None
                 item_type: ItemType::App,
