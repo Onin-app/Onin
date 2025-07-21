@@ -520,7 +520,10 @@ fn get_apps_from_apps_folder() -> Result<Vec<AppInfo>, String> {
                     app.cast::<IShellItemImageFactory>()
                         .ok()
                         .and_then(|factory| {
-                            let size = windows::Win32::Foundation::SIZE { cx: 64, cy: 64 };
+                            // Per user feedback, requesting 32x32 is crucial.
+                            // It seems to trigger a different Windows API path that returns the icon
+                            // without the tile background, which is exactly what we need.
+                            let size = windows::Win32::Foundation::SIZE { cx: 32, cy: 32 };
                             factory
                                 .GetImage(size, SIIGBF_ICONONLY)
                                 .ok()
