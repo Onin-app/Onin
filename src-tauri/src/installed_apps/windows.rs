@@ -86,6 +86,7 @@ async fn get_apps_from_hkey() -> Result<Vec<AppInfo>, String> {
                             Ok(Some(AppInfo {
                                 // <<-- 加上 Some()
                                 name: normalize_app_name(&name_cloned),
+                                aliases: vec![],
                                 path: Some(path_cloned),
                                 icon: icon_base64,
                                 origin: Some(AppOrigin::Hkey),
@@ -291,6 +292,7 @@ async fn get_apps_from_shortcuts() -> Result<Vec<AppInfo>, String> {
                 {
                     app_info = Some(AppInfo {
                         name: normalize_app_name(&app_name),
+                        aliases: vec![],
                         path: Some(target_path.clone()),
                         icon: icon,
                         origin: Some(AppOrigin::Shortcut),
@@ -531,8 +533,22 @@ fn get_apps_from_apps_folder() -> Result<Vec<AppInfo>, String> {
                 };
 
                 if !name.is_empty() && !path.is_empty() {
+                    let mut aliases = vec![];
+                    // Heuristic to detect UWP apps: their path often contains an underscore
+                    // followed by a publisher hash. This is not foolproof but better than nothing.
+                    if path.contains('_') && path.contains('!') {
+                        if let Some(alias) = path
+                            .split('_')
+                            .next()
+                            .and_then(|s| s.split('.').last())
+                            .map(|s| s.to_lowercase())
+                        {
+                            aliases.push(alias);
+                        }
+                    }
                     apps.push(AppInfo {
                         name: normalize_app_name(&name),
+                        aliases,
                         path: Some(format!("shell:AppsFolder\\{}", path)),
                         icon,
                         origin: Some(AppOrigin::Uwp),

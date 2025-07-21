@@ -21,7 +21,6 @@
   let currentTheme = $state<Theme>(Theme.DARK);
   let unlisten = $state<null | (() => void)>(null);
 
-
   const handleEsc = () => {
     console.log("Main page ESC handler executing");
     inputValue = "";
@@ -60,6 +59,7 @@
     try {
       console.log("Fetching all launchable items...");
       const res = await invoke<LaunchableItem[]>("get_all_launchable_items");
+      console.log("本机软件列表: ", res);
       if (res) {
         originAppList = res;
         appList = res;
@@ -74,7 +74,9 @@
     currentTheme = value;
   });
 
-  const handleInput = (e: Event & { currentTarget: EventTarget & HTMLInputElement }) => {
+  const handleInput = (
+    e: Event & { currentTarget: EventTarget & HTMLInputElement },
+  ) => {
     const value = e.currentTarget.value;
     const apps = fuzzyMatch(value, originAppList);
     inputValue = value;
