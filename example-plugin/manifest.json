@@ -1,0 +1,9 @@
+{
+  "id": "com.example.myplugin",
+  "name": "My Example Plugin",
+  "version": "1.0.0",
+  "description": "A simple plugin that demonstrates the plugin API.",
+  "entry": "index.html",
+  "permissions": ["filesystem:read"],
+  "dependencies": {}
+}

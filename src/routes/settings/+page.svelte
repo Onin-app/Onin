@@ -5,12 +5,13 @@
   import { goto } from "$app/navigation";
   import GeneralSettings from "$lib/components/settings/GeneralSettings.svelte";
   import StartupSettings from "$lib/components/settings/StartupSettings.svelte";
+  import PluginsSettings from "./plugins/+page.svelte";
   import { escapeHandler } from "$lib/stores/escapeHandler";
 
   interface SettingItem {
     name: string;
     id: string;
-    component: typeof GeneralSettings | typeof StartupSettings;
+    component: typeof GeneralSettings | typeof StartupSettings | typeof PluginsSettings;
     icon: string;
   }
 
@@ -26,6 +27,12 @@
       id: "startup",
       component: StartupSettings,
       icon: "icon-startup",
+    },
+    {
+      name: "插件管理",
+      id: "plugins",
+      component: PluginsSettings,
+      icon: "icon-plugins",
     },
   ];
 

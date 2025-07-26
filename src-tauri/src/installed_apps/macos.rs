@@ -11,7 +11,7 @@ use tauri::async_runtime;
 use tracing::{error, info};
 
 fn get_app_icon(app_path: &str) -> Option<String> {
-    info!("[ICON] Processing app: {}", app_path);
+    // info!("[ICON] Processing app: {}", app_path);
     let info_plist_path = Path::new(app_path).join("Contents/Info.plist");
     let info_plist = match Value::from_file(&info_plist_path) {
         Ok(plist) => plist,
@@ -84,7 +84,7 @@ fn get_app_icon(app_path: &str) -> Option<String> {
     // 5. If we have a path, use it. Otherwise, fail.
     let final_icon_path = match &icon_path {
         Some(path) => {
-            info!("[ICON] Using final icon path: {:?}", path);
+            // info!("[ICON] Using final icon path: {:?}", path);
             path.clone()
         }
         None => {
@@ -158,7 +158,7 @@ fn get_app_icon(app_path: &str) -> Option<String> {
     }
 
     let base64_icon = general_purpose::STANDARD.encode(&png_data);
-    info!("[ICON] Successfully processed icon for {}", app_path);
+    // info!("[ICON] Successfully processed icon for {}", app_path);
     Some(base64_icon)
 }
 

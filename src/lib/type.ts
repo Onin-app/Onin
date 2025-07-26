@@ -15,3 +15,13 @@ export enum Theme {
   DARK = "dark",
   SYSTEM = "system",
 }
+
+export interface PluginManifest {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  entry: string;
+  permissions: string[];
+  dependencies: Record<string, string>;
+}

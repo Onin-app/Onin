@@ -53,7 +53,7 @@ pub async fn fetch_installed_apps() -> Result<Vec<AppInfo>, String> {
 }
 
 #[command]
-pub fn open_app(path: String, window: tauri::WebviewWindow) -> Result<(), String> {
+pub fn open_app<R: tauri::Runtime>(path: String, window: tauri::WebviewWindow<R>) -> Result<(), String> {
     println!("Opening app: {path}");
 
     #[cfg(target_os = "windows")]
