@@ -19,7 +19,8 @@
   async function fetchStartupItems() {
     isLoading = true;
     try {
-      startupItems = await invoke("get_startup_items");
+      const items = await invoke<LaunchableItem[]>("get_startup_items");
+      startupItems = items.filter(item => item.source !== 'Command');
     } catch (e) {
       console.error("Failed to get startup items:", e);
     } finally {
@@ -217,7 +218,11 @@
               <li
                 class="group flex items-center rounded-lg p-2 hover:bg-neutral-200 dark:hover:bg-neutral-700"
               >
-                {#if item.icon}
+                {#if item.icon_type === 'Iconfont'}
+                  <div class="mr-4 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-gray-200 dark:bg-gray-700">
+                    <Icon icon={item.icon} class="h-6 w-6" />
+                  </div>
+                {:else if item.icon}
                   <img
                     src={`data:image/png;base64,${item.icon}`}
                     alt="{item.name} icon"

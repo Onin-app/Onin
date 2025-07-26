@@ -44,8 +44,10 @@ pub async fn get_all_launchable_items(
                 aliases: app_info.aliases,
                 path,
                 icon: app_info.icon.unwrap_or_default(), // Use default icon if None
+                icon_type: crate::shared_types::IconType::Base64,
                 item_type: ItemType::App,
                 source: ItemSource::Application,
+                action: None,
             })
         })
         .collect();

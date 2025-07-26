@@ -18,6 +18,7 @@ mod startup_apps_manager;
 mod tray_manager;
 mod unified_launch_manager;
 mod window_manager;
+mod system_commands;
 
 // 创建一个全局的、一次性的通道，用于广播 rdev 的输入事件。
 // 这样我们只需要一个系统监听线程，而不是每次失焦都创建一个。
@@ -125,7 +126,13 @@ pub fn run() {
             // Add startup items manager commands
             startup_apps_manager::get_startup_items,
             startup_apps_manager::add_startup_items,
-            startup_apps_manager::remove_startup_item
+            startup_apps_manager::remove_startup_item,
+            // Add system commands
+            system_commands::shutdown,
+            system_commands::reboot,
+            system_commands::sleep,
+            system_commands::lock_screen,
+            system_commands::logout
         ])
         .setup(move |app| {
             // 托管自定义启动项管理器

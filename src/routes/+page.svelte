@@ -11,6 +11,7 @@
   import { Theme, type LaunchableItem } from "$lib/type";
   import { theme, getTheme } from "$lib/utils/theme";
   import { escapeHandler } from "$lib/stores/escapeHandler";
+  import Icon from "$lib/components/Icon.svelte";
 
   import "../index.css";
 
@@ -60,9 +61,16 @@
       console.log("Fetching all launchable items...");
       const res = await invoke<LaunchableItem[]>("get_all_launchable_items");
       console.log("本机软件列表: ", res);
+      const commands: LaunchableItem[] = [
+          { name: 'Shutdown', aliases: ['shutdown', '关机'], path: '', icon: 'shutdown', icon_type: 'Iconfont', item_type: 'App', source: 'Command', action: 'shutdown' },
+          { name: 'Restart', aliases: ['restart', 'reboot', '重启'], path: '', icon: 'restart', icon_type: 'Iconfont', item_type: 'App', source: 'Command', action: 'reboot' },
+          { name: 'Sleep', aliases: ['sleep', '睡眠'], path: '', icon: 'sleep', icon_type: 'Iconfont', item_type: 'App', source: 'Command', action: 'sleep' },
+          { name: 'Lock Screen', aliases: ['lock', '锁屏'], path: '', icon: 'lock', icon_type: 'Iconfont', item_type: 'App', source: 'Command', action: 'lock_screen' },
+          { name: 'Logout', aliases: ['logout', '注销'], path: '', icon: 'logout', icon_type: 'Iconfont', item_type: 'App', source: 'Command', action: 'logout' },
+      ];
       if (res) {
-        originAppList = res;
-        appList = res;
+        originAppList = [...res, ...commands];
+        appList = [...res, ...commands];
       }
       console.log(`Got ${appList.length} apps.`);
     } catch (error) {
@@ -86,10 +94,14 @@
 
   const openApp = async (app: LaunchableItem) => {
     try {
-      await invoke("open_app", {
-        path: app.path,
-        window: await WebviewWindow.getCurrent(),
-      });
+      if (app.source === 'Command' && app.action) {
+        await invoke(app.action);
+      } else {
+        await invoke("open_app", {
+          path: app.path,
+          window: await WebviewWindow.getCurrent(),
+        });
+      }
       inputValue = "";
       appList = originAppList;
       selectedIndex = 0;
@@ -187,11 +199,17 @@
               onclick={() => openApp(app)}
             >
               {#if app.icon}
-                <img
-                  src={`data:image/png;base64,${app.icon}`}
-                  class="mr-2 inline-block h-8 w-8"
-                  alt=""
-                />
+                {#if app.icon_type === 'Iconfont'}
+                  <div class="mr-2 flex h-8 w-8 items-center justify-center rounded-md bg-gray-200 dark:bg-gray-700">
+                    <Icon icon={app.icon} class="h-6 w-6" />
+                  </div>
+                {:else if app.icon}
+                  <img
+                    src={`data:image/png;base64,${app.icon}`}
+                    class="mr-2 inline-block h-8 w-8"
+                    alt=""
+                  />
+                {/if}
               {/if}
               <div class="flex flex-1 flex-col">
                 <div class="flex items-center justify-between">
@@ -204,9 +222,11 @@
                     {app.source}
                   </span>
                 </div>
+                {#if app.source !== 'Command'}
                 <span class="text-neutral-399 text-xs dark:text-neutral-500">
                   {app.path}
                 </span>
+                {/if}
               </div>
             </button>
           {/each}

@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 pub enum ItemSource {
     Application, // System-installed applications
     Custom,      // User-defined items (files, folders, URLs, etc.)
+    Command,     // System commands
 }
 
 impl Default for ItemSource {
@@ -27,12 +28,26 @@ impl Default for ItemType {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub enum IconType {
+    Base64,
+    Iconfont,
+}
+
+impl Default for IconType {
+    fn default() -> Self {
+        IconType::Base64
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct LaunchableItem {
     pub name: String,
     pub aliases: Vec<String>,
     pub path: String,
     pub icon: String,
+    pub icon_type: IconType,
     pub item_type: ItemType,
     pub source: ItemSource,
+    pub action: Option<String>,
 }
