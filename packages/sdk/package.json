@@ -1,0 +1,31 @@
+{
+  "name": "@baize/plugin-sdk",
+  "version": "0.0.1",
+  "description": "Baize Plugin SDK",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "typedoc && tsup src/index.ts --format esm,cjs --dts",
+    "dev": "tsup src/index.ts --format esm,cjs --dts --watch",
+    "lint": "eslint src --ext ts,tsx",
+    "format": "prettier --write src",
+    "docs": "typedoc"
+  },
+  "keywords": [
+    "baize",
+    "plugin",
+    "sdk"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "tsup": "^8.5.0",
+    "typedoc": "^0.28.9",
+    "typedoc-plugin-markdown": "^4.8.0",
+    "typescript": "^5.8.3"
+  }
+}

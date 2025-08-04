@@ -1,0 +1,14 @@
+:root {
+  --primary-color: #2C3E50;
+  --secondary-color: #3498DB;
+  --accent-color: #E74C3C;
+  --success-color: #2ECC71;
+}
+
+body {
+  font-family: sans-serif;
+}
+
+.tsd-navigation .tsd-kind-icon {
+  display: none;
+}
