@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import { get } from "svelte/store";
+  import { Button } from "bits-ui";
 
   import { goto } from "$app/navigation";
   import GeneralSettings from "$lib/components/settings/GeneralSettings.svelte";
@@ -56,11 +57,11 @@
 </script>
 
 <main
-  class="flex h-[100vh] w-full bg-neutral-100 p-4 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100"
+  class="flex h-[100vh] w-full bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100"
   data-tauri-drag-region
 >
   <div
-    class="left h-full w-1/5 border-r border-neutral-200 p-4 pl-0 dark:border-neutral-700"
+    class="left relative h-full w-1/5 border-r border-neutral-200 p-4 dark:border-neutral-700"
   >
     <ul class="flex h-full w-full flex-col justify-center">
       {#each settings as setting}
@@ -69,17 +70,21 @@
             ? 'bg-neutral-300 dark:bg-neutral-600'
             : 'hover:bg-neutral-200 dark:hover:bg-neutral-700'}"
         >
-          <button
-            type="button"
+          <Button.Root
             class="w-full cursor-pointer p-2 text-left"
-            class:active={activeSetting.id === setting.id}
             onclick={() => handleClickSetting(setting)}
           >
             {setting.name}
-          </button>
+          </Button.Root>
         </li>
       {/each}
     </ul>
+    <Button.Root
+      class="absolute right-[0] bottom-[0] left-[0] w-full cursor-pointer p-2 hover:bg-neutral-200 dark:hover:bg-neutral-700"
+      onclick={() => goto("/plugins")}
+    >
+      插件管理
+    </Button.Root>
   </div>
   <div class="main h-full flex-1 overflow-auto">
     <ActiveComponent />
