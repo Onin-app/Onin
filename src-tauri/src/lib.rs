@@ -12,6 +12,7 @@ use tracing_subscriber::fmt::format::FmtSpan; // 导入 FmtSpan
 mod app_cache_manager;
 pub mod icon_utils;
 mod installed_apps;
+mod plugin_manager;
 pub mod shared_types;
 mod shortcut_manager;
 mod startup_apps_manager;
@@ -125,13 +126,36 @@ pub fn run() {
             // Add startup items manager commands
             startup_apps_manager::get_startup_items,
             startup_apps_manager::add_startup_items,
-            startup_apps_manager::remove_startup_item
+            startup_apps_manager::remove_startup_item,
+            // Add plugin manager commands
+            plugin_manager::get_plugin_list,
+            plugin_manager::get_plugin,
+            plugin_manager::discover_plugins,
+            plugin_manager::enable_plugin,
+            plugin_manager::disable_plugin,
+            plugin_manager::toggle_plugin,
+            plugin_manager::load_plugin,
+            plugin_manager::unload_plugin,
+            plugin_manager::get_plugins_by_status,
+            plugin_manager::get_enabled_plugins,
+            plugin_manager::get_loaded_plugins,
+            plugin_manager::has_plugin,
+            plugin_manager::get_plugin_count
         ])
         .setup(move |app| {
             // 托管自定义启动项管理器
             app.manage(startup_apps_manager::StartupAppsManager::new(
                 app.handle().clone(),
             ));
+            
+            // Set up plugin manager
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = plugin_manager::setup_plugin_manager(&app_handle).await {
+                    eprintln!("[ERROR] Failed to set up plugin manager: {}", e);
+                }
+            });
+            
             #[cfg(desktop)]
             {
                 // Load and register the initial toggle shortcut from the store

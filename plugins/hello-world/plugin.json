@@ -1,0 +1,15 @@
+{
+  "name": "hello-world",
+  "version": "1.0.0",
+  "description": "A simple hello world plugin for testing",
+  "author": "Baize Team",
+  "main": "index.js",
+  "permissions": [
+    "notifications"
+  ],
+  "engines": {
+    "baize": ">=0.1.0"
+  },
+  "keywords": ["example", "hello-world"],
+  "repository": "https://github.com/baize/hello-world-plugin"
+}

@@ -1,0 +1,17 @@
+{
+  "name": "advanced-example",
+  "version": "2.1.0",
+  "description": "An advanced example plugin demonstrating more complex features",
+  "author": "Baize Team",
+  "main": "dist/index.js",
+  "permissions": [
+    "notifications",
+    "storage",
+    "dialogs"
+  ],
+  "engines": {
+    "baize": ">=0.1.0"
+  },
+  "keywords": ["example", "advanced", "storage", "dialogs"],
+  "repository": "https://github.com/baize/advanced-example-plugin"
+}
