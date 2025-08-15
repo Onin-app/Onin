@@ -18,7 +18,10 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "clean": "rimraf dist"
+    "clean": "rimraf dist",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [
     "baize",
@@ -30,7 +33,9 @@
   "license": "MIT",
   "devDependencies": {
     "typescript": "~5.8.3",
-    "rimraf": "^6.0.1"
+    "rimraf": "^6.0.1",
+    "vitest": "^2.1.8",
+    "@vitest/coverage-v8": "^2.1.8"
   },
   "peerDependencies": {
     "@tauri-apps/api": "^2.6.0"
