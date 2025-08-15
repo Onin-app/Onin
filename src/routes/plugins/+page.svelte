@@ -5,9 +5,22 @@
 
   import { goto } from "$app/navigation";
   import { escapeHandler } from "$lib/stores/escapeHandler";
+  import { pluginStore } from "$lib/stores/pluginStore";
+  import PluginList from "$lib/components/plugins/PluginList.svelte";
+  import PluginSearch from "$lib/components/plugins/PluginSearch.svelte";
+  import PluginDetailsModal from "$lib/components/plugins/PluginDetailsModal.svelte";
+  import PluginErrorBoundary from "$lib/components/plugins/PluginErrorBoundary.svelte";
+  import type { PluginInfo } from "$lib/types/plugin";
 
   let searchQuery = $state("");
   let showAllPlugins = $state(true); // true: 全部, false: 已安装
+  let selectedPlugin = $state<PluginInfo | null>(null);
+  let showDetailsModal = $state(false);
+
+  // Subscribe to plugin store
+  const plugins = pluginStore.plugins;
+  const loading = pluginStore.loading;
+  const pluginErrors = pluginStore.pluginErrors;
 
   const handleEsc = () => {
     console.log("Plugins page ESC handler executing");
@@ -18,6 +31,8 @@
     console.log("Plugins component has mounted");
     // Register this page's ESC handler
     escapeHandler.set(handleEsc);
+    // Load plugins using store action
+    pluginStore.actions.loadPlugins();
   });
 
   onDestroy(() => {
@@ -31,13 +46,49 @@
     goto("/settings");
   };
 
-  const handleImportPlugin = () => {
-    // TODO: 实现手动导入插件功能
+  const handleImportPlugin = async () => {
+    // TODO: 实现文件选择对话框
     console.log("手动导入插件");
+    // For now, just refresh the plugin list
+    await pluginStore.actions.refreshPlugins();
   };
 
-  const togglePluginView = () => {
-    showAllPlugins = !showAllPlugins;
+  const handleTogglePlugin = async (event: CustomEvent<{ plugin: PluginInfo }>) => {
+    const { plugin } = event.detail;
+    await pluginStore.actions.togglePlugin(plugin.name);
+  };
+
+  const handleViewDetails = (event: CustomEvent<{ plugin: PluginInfo }>) => {
+    selectedPlugin = event.detail.plugin;
+    showDetailsModal = true;
+  };
+
+  const handleSaveConfig = async (event: CustomEvent<{ plugin: PluginInfo; config: Record<string, any> }>) => {
+    const { plugin, config } = event.detail;
+    try {
+      // TODO: 调用 Tauri 命令保存插件配置
+      // await invoke('save_plugin_config', { name: plugin.name, config });
+      console.log(`Saving config for plugin ${plugin.name}:`, config);
+    } catch (error) {
+      console.error("Failed to save plugin config:", error);
+    }
+  };
+
+  const handleClearError = (event: CustomEvent<{ plugin: string }>) => {
+    pluginStore.actions.clearPluginError(event.detail.plugin);
+  };
+
+  const handleClearAllErrors = () => {
+    pluginStore.actions.clearErrors();
+  };
+
+  const handleRetryPlugin = async (event: CustomEvent<{ plugin: string }>) => {
+    const { plugin } = event.detail;
+    await pluginStore.actions.togglePlugin(plugin);
+  };
+
+  const handleRefresh = async () => {
+    await pluginStore.actions.refreshPlugins();
   };
 </script>
 
@@ -73,73 +124,11 @@
         <h2 class="text-xl font-semibold">插件管理</h2>
       </div>
 
-      <div class="flex items-center gap-3">
-        <!-- 搜索框 -->
-        <div class="relative">
-          <svg
-            class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-neutral-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
-          <input
-            type="text"
-            bind:value={searchQuery}
-            placeholder="搜索插件..."
-            class="bg-background text-foreground w-64 rounded border border-neutral-300 py-2 pr-4 pl-10 text-sm focus:border-neutral-500 focus:outline-none dark:border-neutral-600 dark:focus:border-neutral-400"
-          />
-        </div>
-
-        <!-- 全部/已安装切换 -->
-        <div
-          class="flex rounded border border-neutral-300 dark:border-neutral-600"
-        >
-          <Button.Root
-            class="px-3 py-2 text-sm {showAllPlugins
-              ? 'bg-neutral-200 text-neutral-900 dark:bg-neutral-600 dark:text-neutral-100'
-              : 'text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-700'}"
-            onclick={() => (showAllPlugins = true)}
-          >
-            全部
-          </Button.Root>
-          <Button.Root
-            class="px-3 py-2 text-sm {!showAllPlugins
-              ? 'bg-neutral-200 text-neutral-900 dark:bg-neutral-600 dark:text-neutral-100'
-              : 'text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-700'}"
-            onclick={() => (showAllPlugins = false)}
-          >
-            已安装
-          </Button.Root>
-        </div>
-
-        <!-- 手动导入插件按钮 -->
-        <Button.Root
-          class="rounded-input bg-dark text-background shadow-mini hover:bg-dark/95 inline-flex h-9 items-center justify-center px-4 text-sm font-medium active:scale-[0.98] active:transition-all"
-          onclick={handleImportPlugin}
-        >
-          <svg
-            class="mr-2 h-4 w-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 4v16m8-8H4"
-            />
-          </svg>
-          手动导入
-        </Button.Root>
-      </div>
+      <PluginSearch 
+        bind:searchQuery 
+        bind:showAllPlugins 
+        on:importPlugin={handleImportPlugin}
+      />
     </div>
 
     <!-- Main Content Area -->
@@ -147,14 +136,57 @@
       <!-- Content Area -->
       <div class="flex-1 p-2">
         <div
-          class="h-full rounded-lg border border-neutral-200 bg-white p-6 dark:border-neutral-700 dark:bg-neutral-900"
+          class="h-full rounded-lg border border-neutral-200 bg-white p-6 dark:border-neutral-700 dark:bg-neutral-900 overflow-y-auto"
         >
-          <!-- 这里是插件内容区域，你可以在这里填充具体内容 -->
-          <div class="flex h-full items-center justify-center text-neutral-500">
-            <p>插件内容区域 - 请在这里添加你的插件管理功能</p>
-          </div>
+          {#if $loading}
+            <div class="flex h-full items-center justify-center">
+              <div class="flex items-center gap-3 text-neutral-500">
+                <svg class="h-6 w-6 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                <span>正在加载插件...</span>
+              </div>
+            </div>
+          {:else}
+            <!-- Error display -->
+            <PluginErrorBoundary 
+              errors={$pluginErrors}
+              on:clearError={handleClearError}
+              on:clearAllErrors={handleClearAllErrors}
+              on:retryPlugin={handleRetryPlugin}
+            />
+
+            <!-- Refresh button -->
+            <div class="mb-4 flex justify-end">
+              <Button.Root
+                class="rounded px-3 py-1 text-sm font-medium transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                onclick={handleRefresh}
+              >
+                <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                刷新
+              </Button.Root>
+            </div>
+
+            <PluginList 
+              plugins={$plugins} 
+              {searchQuery} 
+              {showAllPlugins}
+              on:togglePlugin={handleTogglePlugin}
+              on:viewDetails={handleViewDetails}
+            />
+          {/if}
         </div>
       </div>
     </div>
   </div>
 </main>
+
+<!-- Plugin Details Modal -->
+<PluginDetailsModal 
+  plugin={selectedPlugin}
+  bind:open={showDetailsModal}
+  on:togglePlugin={handleTogglePlugin}
+  on:saveConfig={handleSaveConfig}
+/>
