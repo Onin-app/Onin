@@ -11,7 +11,11 @@
   - _需求: 1.1, 6.1_
 
 - [ ] 2. 创建插件 SDK 核心包
-  - [ ] 2.1 实现基础类型定义和接口
+
+  - [x] 2.1 实现基础类型定义和接口
+
+
+
     - 创建 `@baize/plugin-sdk` 包的基础结构
     - 定义 PluginManifest、Plugin、PluginContext 等核心接口
     - 实现 AppAPI、EventAPI、StorageAPI 接口定义
