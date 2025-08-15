@@ -12,6 +12,8 @@
 export * from './types';
 export * from './api';
 export * from './events';
+export * from './communication';
+export * from './context';
 
 // Import specific classes for utility functions
 import { PluginError, PluginErrorCode, type PluginManifest } from './types';

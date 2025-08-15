@@ -150,6 +150,66 @@ throw createPluginError(
 );
 ```
 
+## Communication Layer
+
+The SDK includes a robust communication layer that handles all plugin-app communication with built-in error handling and retry mechanisms.
+
+### CommunicationBridge
+
+The core communication class that manages API calls:
+
+```typescript
+import { createCommunicationBridge } from '@baize/plugin-sdk';
+
+const bridge = createCommunicationBridge('my-plugin', {
+  maxRetries: 3,
+  retryDelay: 1000,
+  timeout: 5000,
+  debug: true
+});
+
+// Make API calls
+const result = await bridge.invoke('some_command', { param: 'value' });
+```
+
+### Plugin Context Factory
+
+Create a complete plugin context with communication bridge:
+
+```typescript
+import { createPluginContext } from '@baize/plugin-sdk';
+
+const context = createPluginContext({
+  pluginId: 'my-plugin',
+  communication: {
+    maxRetries: 3,
+    timeout: 5000
+  }
+});
+
+// Use the context
+await context.app.showNotification('Hello!');
+```
+
+### Safe API Utilities
+
+Utility functions with built-in error handling:
+
+```typescript
+import { ApiUtils } from '@baize/plugin-sdk';
+
+// Safe notification with fallback
+await ApiUtils.showNotificationSafe('Message', (msg) => {
+  console.log(`Fallback: ${msg}`);
+});
+
+// Safe version check with fallback
+const version = await ApiUtils.getAppVersionSafe('1.0.0');
+
+// Safe permission check
+const hasPermission = await ApiUtils.checkPermissionSafe('storage');
+```
+
 ## System Events
 
 The SDK defines several system events that plugins can listen to:
