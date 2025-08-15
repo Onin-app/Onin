@@ -1,0 +1,38 @@
+{
+  "name": "@baize/plugin-sdk",
+  "version": "0.1.0",
+  "description": "SDK for developing Baize plugins",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rimraf dist"
+  },
+  "keywords": [
+    "baize",
+    "plugin",
+    "sdk",
+    "tauri"
+  ],
+  "author": "Baize Team",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "~5.8.3",
+    "rimraf": "^6.0.1"
+  },
+  "peerDependencies": {
+    "@tauri-apps/api": "^2.6.0"
+  }
+}

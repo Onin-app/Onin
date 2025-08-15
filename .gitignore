@@ -8,3 +8,12 @@ node_modules
 !.env.example
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Monorepo build outputs
+packages/*/dist
+packages/*/node_modules
+plugins/*/dist
+plugins/*/node_modules
+
+# TypeScript build info
+*.tsbuildinfo

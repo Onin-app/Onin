@@ -11,7 +11,11 @@
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "tauri": "tauri",
     "format": "prettier --write \"src/**/*.svelte\"",
-    "release": "semantic-release"
+    "release": "semantic-release",
+    "build:packages": "pnpm -r --filter=\"./packages/*\" run build",
+    "dev:packages": "pnpm -r --filter=\"./packages/*\" run dev",
+    "clean:packages": "pnpm -r --filter=\"./packages/*\" run clean",
+    "install:all": "pnpm install && pnpm -r install"
   },
   "license": "MIT",
   "dependencies": {
@@ -40,6 +44,7 @@
     "prettier": "^3.6.2",
     "prettier-plugin-svelte": "^3.4.0",
     "prettier-plugin-tailwindcss": "^0.6.14",
+    "rimraf": "^6.0.1",
     "semantic-release": "^24.2.7",
     "svelte": "^5.34.7",
     "svelte-check": "^4.2.2",

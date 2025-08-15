@@ -1,6 +1,10 @@
 # 插件系统实施计划
 
-- [ ] 1. 设置 Monorepo 基础架构
+- [x] 1. 设置 Monorepo 基础架构
+
+
+
+
   - 配置 pnpm workspace 来管理多个包
   - 创建基础的项目结构和目录
   - 设置 TypeScript 配置和构建工具
