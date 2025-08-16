@@ -15,7 +15,12 @@
     "build:packages": "pnpm -r --filter=\"./packages/*\" run build",
     "dev:packages": "pnpm -r --filter=\"./packages/*\" run dev",
     "clean:packages": "pnpm -r --filter=\"./packages/*\" run clean",
-    "install:all": "pnpm install && pnpm -r install"
+    "install:all": "pnpm install && pnpm -r install",
+    "build:plugins": "node scripts/build-plugin.js build",
+    "build:plugin": "node scripts/build-plugin.js build",
+    "package:plugin": "node scripts/build-plugin.js package",
+    "dev:plugins": "node scripts/dev-server.js",
+    "clean:plugins": "pnpm -r --filter=\"./plugins/*\" run clean"
   },
   "license": "MIT",
   "dependencies": {
@@ -41,6 +46,9 @@
     "@sveltejs/vite-plugin-svelte": "^5.1.0",
     "@tauri-apps/cli": "^2.6.0",
     "@types/pinyin": "^2.10.2",
+    "archiver": "^7.0.1",
+    "chokidar": "^4.0.1",
+    "fs-extra": "^11.2.0",
     "prettier": "^3.6.2",
     "prettier-plugin-svelte": "^3.4.0",
     "prettier-plugin-tailwindcss": "^0.6.14",

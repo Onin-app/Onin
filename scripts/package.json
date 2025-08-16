@@ -1,0 +1,10 @@
+{
+  "name": "baize-build-scripts",
+  "version": "1.0.0",
+  "description": "Build scripts for Baize plugins",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "chokidar": "^4.0.1"
+  }
+}

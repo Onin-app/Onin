@@ -1,0 +1,31 @@
+{
+  "name": "hello-world-plugin",
+  "version": "1.0.0",
+  "description": "A simple hello world plugin demonstrating the Baize plugin system",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rimraf dist",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "baize",
+    "plugin",
+    "example",
+    "hello-world"
+  ],
+  "author": "Baize Team",
+  "license": "MIT",
+  "dependencies": {
+    "@baize/plugin-sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "~5.8.3",
+    "rimraf": "^6.0.1",
+    "vitest": "^2.1.8"
+  }
+}

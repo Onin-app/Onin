@@ -1,0 +1,15 @@
+{
+  "name": "{{PLUGIN_NAME}}",
+  "version": "1.0.0",
+  "description": "{{PLUGIN_DESCRIPTION}}",
+  "author": "{{AUTHOR_NAME}}",
+  "main": "dist/index.js",
+  "permissions": [
+    "notifications"
+  ],
+  "engines": {
+    "baize": ">=0.1.0"
+  },
+  "keywords": ["{{PLUGIN_NAME}}", "example"],
+  "repository": "{{REPOSITORY_URL}}"
+}

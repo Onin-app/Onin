@@ -1,0 +1,33 @@
+{
+  "name": "hello-world",
+  "version": "1.0.0",
+  "description": "A simple hello world plugin demonstrating the Baize plugin system",
+  "author": "Baize Team",
+  "main": "dist/index.js",
+  "permissions": [
+    "notifications",
+    "storage"
+  ],
+  "engines": {
+    "baize": ">=0.1.0"
+  },
+  "keywords": [
+    "example",
+    "hello-world",
+    "demo"
+  ],
+  "repository": "https://github.com/baize/hello-world-plugin",
+  "packageInfo": {
+    "format": "folder",
+    "packagedAt": "2025-08-16T11:29:54.658Z",
+    "packagedBy": "Baize Plugin Build System",
+    "version": "1.0.0",
+    "includesSource": false
+  },
+  "buildInfo": {
+    "nodeVersion": "v22.12.0",
+    "platform": "win32",
+    "arch": "x64",
+    "buildTool": "baize-plugin-builder"
+  }
+}
