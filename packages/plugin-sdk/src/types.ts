@@ -43,19 +43,41 @@ export interface PluginContext {
 }
 
 /**
- * Main plugin interface that all plugins must implement
+ * Plugin metadata interface
+ */
+export interface PluginMeta {
+  /** Plugin name */
+  name?: string;
+  /** Plugin version */
+  version?: string;
+  /** Plugin description */
+  description?: string;
+  /** Plugin author */
+  author?: string;
+}
+
+/**
+ * Functional plugin definition configuration
+ */
+export interface PluginDefinition {
+  /** Callback function when plugin is activated */
+  onActivate?: (context: PluginContext) => Promise<void> | void;
+  /** Callback function when plugin is deactivated */
+  onDeactivate?: () => Promise<void> | void;
+  /** Plugin metadata */
+  meta?: PluginMeta;
+}
+
+/**
+ * Functional plugin interface (simplified version)
  */
 export interface Plugin {
-  /**
-   * Called when the plugin is activated
-   * @param context - Plugin context with available APIs
-   */
-  activate(context: PluginContext): Promise<void>;
-  
-  /**
-   * Called when the plugin is deactivated
-   */
-  deactivate(): Promise<void>;
+  /** Callback function when plugin is activated */
+  onActivate?: () => Promise<void> | void;
+  /** Callback function when plugin is deactivated */
+  onDeactivate?: () => Promise<void> | void;
+  /** Plugin metadata */
+  meta?: PluginMeta;
 }
 
 /**
@@ -226,5 +248,11 @@ export enum PluginErrorCode {
   /** API call failed */
   API_CALL_FAILED = 'API_CALL_FAILED',
   /** Plugin activation failed */
-  ACTIVATION_FAILED = 'ACTIVATION_FAILED'
+  ACTIVATION_FAILED = 'ACTIVATION_FAILED',
+  /** Plugin context not available */
+  CONTEXT_NOT_AVAILABLE = 'CONTEXT_NOT_AVAILABLE',
+  /** Plugin lifecycle error */
+  LIFECYCLE_ERROR = 'LIFECYCLE_ERROR',
+  /** Hook call error */
+  HOOK_ERROR = 'HOOK_ERROR'
 }

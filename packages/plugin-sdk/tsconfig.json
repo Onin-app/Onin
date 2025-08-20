@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
+    "module": "CommonJS",
+    "moduleResolution": "node",
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
@@ -22,6 +22,7 @@
   ],
   "exclude": [
     "node_modules",
-    "dist"
+    "dist",
+    "src/**/*.test.ts"
   ]
 }

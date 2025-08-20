@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { HelloWorldPlugin } from './index';
-import type { PluginContext } from '@baize/plugin-sdk';
+import helloWorldPlugin, { getStoredData } from './index';
+import type { PluginContext, Plugin } from '@baize/plugin-sdk';
+import { contextManager, injectPluginContext } from '@baize/plugin-sdk';
 
 // Mock the plugin context
 const createMockContext = (): PluginContext => ({
@@ -23,21 +24,24 @@ const createMockContext = (): PluginContext => ({
   }
 });
 
-describe('HelloWorldPlugin', () => {
-  let plugin: HelloWorldPlugin;
+describe('HelloWorldPlugin (Functional)', () => {
+  let plugin: Plugin;
   let mockContext: PluginContext;
 
   beforeEach(() => {
-    plugin = new HelloWorldPlugin();
     mockContext = createMockContext();
+    // Inject context into the plugin for testing
+    plugin = injectPluginContext(helloWorldPlugin, mockContext);
     vi.clearAllMocks();
   });
 
   describe('activation', () => {
     it('should activate successfully', async () => {
-      await plugin.activate(mockContext);
+      // Set context for hooks to work
+      contextManager.setContext(mockContext);
       
-      expect(plugin.isPluginActive()).toBe(true);
+      await plugin.onActivate!();
+      
       expect(mockContext.app.showNotification).toHaveBeenCalledWith(
         'Hello World Plugin activated! 🎉'
       );
@@ -48,7 +52,9 @@ describe('HelloWorldPlugin', () => {
     });
 
     it('should set up event listeners on activation', async () => {
-      await plugin.activate(mockContext);
+      contextManager.setContext(mockContext);
+      
+      await plugin.onActivate!();
       
       expect(mockContext.events.on).toHaveBeenCalledWith(
         'app:ready',
@@ -67,21 +73,24 @@ describe('HelloWorldPlugin', () => {
     it('should handle activation errors', async () => {
       const error = new Error('Notification failed');
       mockContext.app.showNotification = vi.fn().mockRejectedValue(error);
+      contextManager.setContext(mockContext);
       
-      await expect(plugin.activate(mockContext)).rejects.toThrow('Notification failed');
+      await expect(plugin.onActivate!()).rejects.toThrow('Notification failed');
     });
   });
 
   describe('deactivation', () => {
     beforeEach(async () => {
-      await plugin.activate(mockContext);
+      contextManager.setContext(mockContext);
+      await plugin.onActivate!();
       vi.clearAllMocks();
     });
 
     it('should deactivate successfully', async () => {
-      await plugin.deactivate();
+      contextManager.setContext(mockContext);
       
-      expect(plugin.isPluginActive()).toBe(false);
+      await plugin.onDeactivate!();
+      
       expect(mockContext.app.showNotification).toHaveBeenCalledWith(
         'Hello World Plugin deactivated. Goodbye! 👋'
       );
@@ -92,7 +101,9 @@ describe('HelloWorldPlugin', () => {
     });
 
     it('should clean up event listeners on deactivation', async () => {
-      await plugin.deactivate();
+      contextManager.setContext(mockContext);
+      
+      await plugin.onDeactivate!();
       
       expect(mockContext.events.off).toHaveBeenCalledWith(
         'app:ready',
@@ -111,13 +122,15 @@ describe('HelloWorldPlugin', () => {
 
   describe('event handling', () => {
     beforeEach(async () => {
-      await plugin.activate(mockContext);
+      contextManager.setContext(mockContext);
+      await plugin.onActivate!();
     });
 
     it('should handle app ready event', async () => {
       const onAppReady = (mockContext.events.on as any).mock.calls
-        .find(call => call[0] === 'app:ready')[1];
+        .find((call: any) => call[0] === 'app:ready')[1];
       
+      contextManager.setContext(mockContext);
       await onAppReady();
       
       expect(mockContext.app.getAppVersion).toHaveBeenCalled();
@@ -132,8 +145,9 @@ describe('HelloWorldPlugin', () => {
 
     it('should handle greet event', async () => {
       const onGreetEvent = (mockContext.events.on as any).mock.calls
-        .find(call => call[0] === 'hello:greet')[1];
+        .find((call: any) => call[0] === 'hello:greet')[1];
       
+      contextManager.setContext(mockContext);
       const testData = { message: 'Test greeting!' };
       await onGreetEvent(testData);
       
@@ -142,8 +156,9 @@ describe('HelloWorldPlugin', () => {
 
     it('should handle greet event with default message', async () => {
       const onGreetEvent = (mockContext.events.on as any).mock.calls
-        .find(call => call[0] === 'hello:greet')[1];
+        .find((call: any) => call[0] === 'hello:greet')[1];
       
+      contextManager.setContext(mockContext);
       await onGreetEvent();
       
       expect(mockContext.app.showNotification).toHaveBeenCalledWith(
@@ -154,7 +169,8 @@ describe('HelloWorldPlugin', () => {
 
   describe('storage operations', () => {
     beforeEach(async () => {
-      await plugin.activate(mockContext);
+      contextManager.setContext(mockContext);
+      await plugin.onActivate!();
     });
 
     it('should retrieve stored data', async () => {
@@ -169,7 +185,8 @@ describe('HelloWorldPlugin', () => {
         .mockResolvedValueOnce(mockData.lastDeactivated)
         .mockResolvedValueOnce(mockData.lastShutdown);
 
-      const result = await plugin.getStoredData();
+      contextManager.setContext(mockContext);
+      const result = await getStoredData();
       
       expect(result).toEqual(mockData);
       expect(mockContext.storage.get).toHaveBeenCalledTimes(3);
@@ -178,20 +195,26 @@ describe('HelloWorldPlugin', () => {
     it('should handle storage errors gracefully', async () => {
       mockContext.storage.get = vi.fn().mockRejectedValue(new Error('Storage error'));
       
-      const result = await plugin.getStoredData();
+      contextManager.setContext(mockContext);
+      const result = await getStoredData();
       
       expect(result).toBeNull();
     });
   });
 
-  describe('inactive plugin', () => {
-    it('should return null for stored data when inactive', async () => {
-      const result = await plugin.getStoredData();
-      expect(result).toBeNull();
+  describe('plugin metadata', () => {
+    it('should have correct metadata', () => {
+      expect(plugin.meta).toEqual({
+        name: 'Hello World Plugin',
+        version: '1.0.0',
+        description: 'A simple example plugin demonstrating functional plugin development',
+        author: 'Baize Team'
+      });
     });
 
-    it('should start as inactive', () => {
-      expect(plugin.isPluginActive()).toBe(false);
+    it('should have activation and deactivation functions', () => {
+      expect(typeof plugin.onActivate).toBe('function');
+      expect(typeof plugin.onDeactivate).toBe('function');
     });
   });
 });

@@ -2,7 +2,7 @@
   "name": "@baize/plugin-sdk",
   "version": "0.1.0",
   "description": "SDK for developing Baize plugins",
-  "type": "module",
+
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
