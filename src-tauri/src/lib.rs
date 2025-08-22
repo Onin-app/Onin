@@ -132,7 +132,8 @@ pub fn run() {
             system_commands::reboot,
             system_commands::sleep,
             system_commands::lock_screen,
-            system_commands::logout
+            system_commands::logout,
+            system_commands::open_app_data_dir
         ])
         .setup(move |app| {
             // 托管自定义启动项管理器

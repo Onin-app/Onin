@@ -269,4 +269,16 @@
       </div>
     {/snippet}
   </SetItem>
+
+  <h2 class="mt-4 text-xl font-bold">数据存储</h2>
+  <SetItem title="应用数据">
+    {#snippet content()}
+      <Button.Root
+        class="rounded-input bg-dark text-background shadow-mini hover:bg-dark/95 inline-flex h-8 items-center justify-center px-[14px] text-[12px] font-semibold active:scale-[0.98] active:transition-all"
+        onclick={() => invoke("open_app_data_dir")}
+      >
+        打开数据目录
+      </Button.Root>
+    {/snippet}
+  </SetItem>
 </main>

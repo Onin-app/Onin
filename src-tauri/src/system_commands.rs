@@ -1,4 +1,5 @@
 use tauri::command;
+use tauri::Manager;
 
 #[command]
 pub fn shutdown() {
@@ -149,6 +150,15 @@ pub fn logout() {
             .output()
         {
             eprintln!("Failed to execute logout on Linux: {}", e);
+        }
+    }
+}
+
+#[command]
+pub fn open_app_data_dir(app: tauri::AppHandle) {
+    if let Ok(path) = app.path().app_data_dir() {
+        if let Err(e) = opener::open(&path) {
+            eprintln!("Failed to open app data dir: {}", e);
         }
     }
 }
