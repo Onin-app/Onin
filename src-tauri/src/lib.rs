@@ -1,10 +1,10 @@
+use once_cell::sync::Lazy;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, AtomicU32};
 use std::sync::Mutex;
-use once_cell::sync::Lazy;
 use tauri::{Emitter, Manager};
-use tokio::sync::broadcast;
 use tauri_plugin_global_shortcut::{Shortcut, ShortcutState};
+use tokio::sync::broadcast;
 
 use tracing_subscriber;
 use tracing_subscriber::fmt::format::FmtSpan; // 导入 FmtSpan
@@ -12,13 +12,14 @@ use tracing_subscriber::fmt::format::FmtSpan; // 导入 FmtSpan
 mod app_cache_manager;
 pub mod icon_utils;
 mod installed_apps;
+mod plugin_manager;
 pub mod shared_types;
 mod shortcut_manager;
 mod startup_apps_manager;
+mod system_commands;
 mod tray_manager;
 mod unified_launch_manager;
 mod window_manager;
-mod system_commands;
 
 // 创建一个全局的、一次性的通道，用于广播 rdev 的输入事件。
 // 这样我们只需要一个系统监听线程，而不是每次失焦都创建一个。
@@ -26,7 +27,6 @@ pub static RDEV_EVENT_CHANNEL: Lazy<(
     broadcast::Sender<rdev::Event>,
     broadcast::Receiver<rdev::Event>,
 )> = Lazy::new(|| broadcast::channel(128));
-
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -70,9 +70,7 @@ pub fn run() {
             hiding_initiated_by_command: AtomicBool::new(false),
         })
         // 新增：托管窗口关闭锁的状态
-        .manage(window_manager::WindowCloseLockState(AtomicU32::new(
-            0,
-        )))
+        .manage(window_manager::WindowCloseLockState(AtomicU32::new(0)))
         .manage(window_manager::HideTaskState {
             handle: tokio::sync::Mutex::new(None),
         })
@@ -133,7 +131,9 @@ pub fn run() {
             system_commands::sleep,
             system_commands::lock_screen,
             system_commands::logout,
-            system_commands::open_app_data_dir
+            system_commands::open_app_data_dir,
+            // 注册插件相关命令
+            plugin_manager::load_plugins
         ])
         .setup(move |app| {
             // 托管自定义启动项管理器

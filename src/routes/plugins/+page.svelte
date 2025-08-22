@@ -2,22 +2,38 @@
   import { onMount, onDestroy } from "svelte";
   import { get } from "svelte/store";
   import { Button } from "bits-ui";
+  import { invoke } from "@tauri-apps/api/core";
+
+  interface PluginManifest {
+    id: string;
+    name: string;
+    version: string;
+    description: string;
+    entry: string;
+  }
 
   import { goto } from "$app/navigation";
   import { escapeHandler } from "$lib/stores/escapeHandler";
 
   let searchQuery = $state("");
   let showAllPlugins = $state(true); // true: 全部, false: 已安装
+  let plugins: PluginManifest[] = $state([]);
 
   const handleEsc = () => {
-    console.log("Plugins page ESC handler executing");
     goto("/");
   };
 
-  onMount(() => {
-    console.log("Plugins component has mounted");
+  onMount(async () => {
     // Register this page's ESC handler
     escapeHandler.set(handleEsc);
+
+    try {
+      const result = await invoke("load_plugins");
+      plugins = result as PluginManifest[];
+      console.log("Loaded plugins state:", plugins);
+    } catch (error) {
+      console.error("Failed to load plugins via invoke:", error);
+    }
   });
 
   onDestroy(() => {
@@ -150,8 +166,31 @@
           class="h-full rounded-lg border border-neutral-200 bg-white p-6 dark:border-neutral-700 dark:bg-neutral-900"
         >
           <!-- 这里是插件内容区域，你可以在这里填充具体内容 -->
-          <div class="flex h-full items-center justify-center text-neutral-500">
-            <p>插件内容区域 - 请在这里添加你的插件管理功能</p>
+          <div>
+            {#if plugins.length > 0}
+              <ul class="space-y-4">
+                {#each plugins as plugin (plugin.id)}
+                  <li
+                    class="rounded-lg border border-neutral-200 p-4 dark:border-neutral-700"
+                  >
+                    <h3 class="text-lg font-semibold">{plugin.name}</h3>
+                    <p class="text-sm text-neutral-500 dark:text-neutral-400">
+                      {plugin.description}
+                    </p>
+                    <span
+                      class="mt-2 inline-block rounded bg-neutral-200 px-2 py-1 text-xs dark:bg-neutral-700"
+                      >{plugin.version}</span
+                    >
+                  </li>
+                {/each}
+              </ul>
+            {:else}
+              <div
+                class="flex h-full items-center justify-center text-neutral-500"
+              >
+                <p>没有找到插件</p>
+              </div>
+            {/if}
           </div>
         </div>
       </div>
