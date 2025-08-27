@@ -31,6 +31,24 @@
       const result = await invoke("load_plugins");
       plugins = result as PluginManifest[];
       console.log("Loaded plugins state:", plugins);
+
+      for (const plugin of plugins) {
+        try {
+          if (plugin.entry.endsWith(".js")) {
+            // Execute headless JS plugin in the backend runtime
+            await invoke("execute_plugin_entry", {
+              pluginId: plugin.id,
+            });
+            console.log(`Successfully executed JS plugin: ${plugin.name}`);
+          } else {
+            console.warn(
+              `Unsupported plugin entry type for ${plugin.name}: ${plugin.entry}`,
+            );
+          }
+        } catch (e) {
+          console.error(`Failed to load plugin ${plugin?.name}:`, e);
+        }
+      }
     } catch (error) {
       console.error("Failed to load plugins via invoke:", error);
     }

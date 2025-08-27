@@ -12,6 +12,7 @@ use tracing_subscriber::fmt::format::FmtSpan; // 导入 FmtSpan
 mod app_cache_manager;
 pub mod icon_utils;
 mod installed_apps;
+mod js_runtime;
 mod plugin_manager;
 pub mod shared_types;
 mod shortcut_manager;
@@ -59,6 +60,7 @@ pub fn run() {
     });
 
     tauri::Builder::default()
+        .manage(plugin_manager::PluginStore(Default::default()))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(
@@ -133,7 +135,8 @@ pub fn run() {
             system_commands::logout,
             system_commands::open_app_data_dir,
             // 注册插件相关命令
-            plugin_manager::load_plugins
+            plugin_manager::load_plugins,
+            plugin_manager::execute_plugin_entry,
         ])
         .setup(move |app| {
             // 托管自定义启动项管理器
