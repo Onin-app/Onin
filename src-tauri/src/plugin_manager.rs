@@ -88,5 +88,5 @@ pub fn execute_plugin_entry(
 
     let js_code = std::fs::read_to_string(entry_path).map_err(|e| e.to_string())?;
 
-    js_runtime::execute_js(&js_code)
+    js_runtime::execute_js(&app, &js_code)
 }

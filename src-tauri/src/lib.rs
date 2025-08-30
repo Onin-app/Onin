@@ -13,6 +13,7 @@ mod app_cache_manager;
 pub mod icon_utils;
 mod installed_apps;
 mod js_runtime;
+mod plugin_api;
 mod plugin_manager;
 pub mod shared_types;
 mod shortcut_manager;
@@ -60,6 +61,7 @@ pub fn run() {
     });
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_notification::init())
         .manage(plugin_manager::PluginStore(Default::default()))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())

@@ -45,6 +45,7 @@
   "plugins": {
     "globalShortcut": {
       "enable": true
-    }
+    },
+    "notification": null
   }
 }
