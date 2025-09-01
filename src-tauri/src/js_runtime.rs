@@ -74,29 +74,21 @@ fn op_invoke(
     }
 }
 
-pub fn execute_js(app_handle: &AppHandle, js_code: &str) -> Result<(), String> {
+pub async fn execute_js(app_handle: &AppHandle, js_code: &str) -> Result<(), String> {
     let ext = baize_plugin_api::init(app_handle.clone());
 
     let mut runtime = JsRuntime::new(RuntimeOptions {
         extensions: vec![ext],
         ..Default::default()
     });
-
-    let tokio_runtime = Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|e| e.to_string())?;
-
     let js_code_owned = js_code.to_string();
 
-    tokio_runtime.block_on(async {
-        let result = runtime.execute_script("<plugin>", js_code_owned);
-        match result {
-            Ok(_) => runtime
-                .run_event_loop(PollEventLoopOptions::default())
-                .await
-                .map_err(|e| e.to_string()),
-            Err(e) => Err(e.to_string()),
-        }
-    })
+    let result = runtime.execute_script("<plugin>", js_code_owned);
+    match result {
+        Ok(_) => runtime
+            .run_event_loop(PollEventLoopOptions::default())
+            .await
+            .map_err(|e| e.to_string()),
+        Err(e) => Err(e.to_string()),
+    }
 }

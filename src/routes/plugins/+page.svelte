@@ -31,24 +31,6 @@
       const result = await invoke("load_plugins");
       plugins = result as PluginManifest[];
       console.log("Loaded plugins state:", plugins);
-
-      for (const plugin of plugins) {
-        try {
-          if (plugin.entry.endsWith(".js")) {
-            // Execute headless JS plugin in the backend runtime
-            await invoke("execute_plugin_entry", {
-              pluginId: plugin.id,
-            });
-            console.log(`Successfully executed JS plugin: ${plugin.name}`);
-          } else {
-            console.warn(
-              `Unsupported plugin entry type for ${plugin.name}: ${plugin.entry}`,
-            );
-          }
-        } catch (e) {
-          console.error(`Failed to load plugin ${plugin?.name}:`, e);
-        }
-      }
     } catch (error) {
       console.error("Failed to load plugins via invoke:", error);
     }
@@ -72,6 +54,14 @@
 
   const togglePluginView = () => {
     showAllPlugins = !showAllPlugins;
+  };
+  const executePlugin = async (pluginId: string) => {
+    try {
+      await invoke("execute_plugin_entry", { pluginId });
+      console.log(`Successfully executed plugin with ID: ${pluginId}`);
+    } catch (e) {
+      console.error(`Failed to execute plugin with ID ${pluginId}:`, e);
+    }
   };
 </script>
 
@@ -189,7 +179,8 @@
               <ul class="space-y-4">
                 {#each plugins as plugin (plugin.id)}
                   <li
-                    class="rounded-lg border border-neutral-200 p-4 dark:border-neutral-700"
+                    class="cursor-pointer rounded-lg border border-neutral-200 p-4 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
+                    on:click={() => executePlugin(plugin.id)}
                   >
                     <h3 class="text-lg font-semibold">{plugin.name}</h3>
                     <p class="text-sm text-neutral-500 dark:text-neutral-400">
