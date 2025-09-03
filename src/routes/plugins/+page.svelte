@@ -63,6 +63,20 @@
       console.error(`Failed to execute plugin with ID ${pluginId}:`, e);
     }
   };
+
+  const showNotification = async () => {
+    try {
+      await invoke("show_notification", {
+        options: {
+          title: "来自 Tauri 的通知",
+          body: "这是一个通过 invoke 调用的通知！",
+        },
+      });
+      console.log("Notification sent successfully.");
+    } catch (e) {
+      console.error("Failed to send notification:", e);
+    }
+  };
 </script>
 
 <main
@@ -162,6 +176,14 @@
             />
           </svg>
           手动导入
+        </Button.Root>
+
+        <!-- 显示通知按钮 -->
+        <Button.Root
+          class="rounded-input bg-blue-500 text-white shadow-mini hover:bg-blue-600 inline-flex h-9 items-center justify-center px-4 text-sm font-medium active:scale-[0.98] active:transition-all"
+          onclick={showNotification}
+        >
+          显示通知
         </Button.Root>
       </div>
     </div>

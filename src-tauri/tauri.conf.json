@@ -28,7 +28,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self' plugin: 'unsafe-inline' 'unsafe-eval'; script-src 'self' plugin: 'unsafe-inline' 'unsafe-eval'; style-src 'self' plugin: 'unsafe-inline'; img-src 'self' plugin: data:; font-src 'self' plugin:; connect-src 'self' plugin:;"
     }
   },
   "bundle": {

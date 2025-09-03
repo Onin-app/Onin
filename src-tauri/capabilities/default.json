@@ -16,6 +16,7 @@
     "autostart:allow-enable",
     "autostart:allow-disable",
     "autostart:allow-is-enabled",
-    "notification:allow-show"
+    "notification:allow-show",
+    "core:webview:allow-internal-toggle-devtools"
   ]
 }

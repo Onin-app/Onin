@@ -7,8 +7,9 @@ pub struct NotificationOptions {
     pub body: Option<String>,
 }
 
+#[tauri::command]
 pub fn show_notification(
-    app_handle: &tauri::AppHandle,
+    app_handle: tauri::AppHandle,
     options: NotificationOptions,
 ) -> Result<(), String> {
     app_handle

@@ -63,6 +63,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .manage(plugin_manager::PluginStore(Default::default()))
+        .register_uri_scheme_protocol("plugin", plugin_manager::handle_plugin_protocol)
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(
@@ -139,6 +140,8 @@ pub fn run() {
             // 注册插件相关命令
             plugin_manager::load_plugins,
             plugin_manager::execute_plugin_entry,
+            // 注册 notification 命令
+            plugin_api::notification::show_notification,
         ])
         .setup(move |app| {
             // 托管自定义启动项管理器

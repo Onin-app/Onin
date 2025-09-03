@@ -2,7 +2,6 @@ use deno_core::op2;
 use deno_core::{JsRuntime, OpState, PollEventLoopOptions, RuntimeOptions};
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
-use tokio::runtime::Builder;
 
 use crate::plugin_api;
 
@@ -58,7 +57,7 @@ fn op_invoke(
             
             match final_options {
                 Ok(options) => {
-                    match plugin_api::notification::show_notification(&app_handle, options) {
+                    match plugin_api::notification::show_notification(app_handle, options) {
                         Ok(_) => InvokeResult::Ok(serde_json::Value::Null),
                         Err(e) => InvokeResult::Err { error: e },
                     }

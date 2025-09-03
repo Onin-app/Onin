@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Mutex;
+use tauri::http::{Request, Response};
 use tauri::{Manager, State, WebviewWindowBuilder};
 
 pub struct PluginStore(pub Mutex<HashMap<String, LoadedPlugin>>);
@@ -24,7 +25,10 @@ pub struct LoadedPlugin {
 }
 
 #[tauri::command]
-pub fn load_plugins(app: tauri::AppHandle, store: State<PluginStore>) -> Result<Vec<LoadedPlugin>, String> {
+pub fn load_plugins(
+    app: tauri::AppHandle,
+    store: State<PluginStore>,
+) -> Result<Vec<LoadedPlugin>, String> {
     println!("[plugin_manager] Loading plugins...");
     let data_dir = app.path().app_data_dir().map_err(|e| {
         println!("[plugin_manager] Error getting data dir: {}", e);
@@ -60,7 +64,10 @@ pub fn load_plugins(app: tauri::AppHandle, store: State<PluginStore>) -> Result<
                     dir_name,
                 };
 
-                println!("[plugin_manager] Loaded plugin: {} from {}", manifest.name, loaded_plugin.dir_name);
+                println!(
+                    "[plugin_manager] Loaded plugin: {} from {}",
+                    manifest.name, loaded_plugin.dir_name
+                );
                 store_lock.insert(manifest.id.clone(), loaded_plugin);
             }
         }
@@ -128,15 +135,23 @@ pub fn execute_plugin_entry(
                         return;
                     }
 
-                    let entry_url = format!("file://{}", entry_path.to_str().unwrap());
+                    // 使用自定义协议来加载插件文件
+                    let plugin_url = format!(
+                        "plugin://localhost/{}/{}",
+                        plugin.dir_name, plugin.manifest.entry
+                    );
+                    println!("[plugin_manager] Loading plugin from: {}", plugin_url);
 
                     let builder = WebviewWindowBuilder::new(
                         &app_clone,
-                        window_label,
-                        tauri::WebviewUrl::External(entry_url.parse().unwrap()),
-                    );
+                        window_label.clone(),
+                        tauri::WebviewUrl::External(plugin_url.parse().unwrap()),
+                    )
+                    .title(plugin.manifest.name)
+                    .inner_size(800.0, 600.0)
+                    .resizable(true);
 
-                    if let Err(e) = builder.title(plugin.manifest.name).build() {
+                    if let Err(e) = builder.build() {
                         eprintln!("Failed to build plugin window: {}", e);
                     }
                 });
@@ -147,4 +162,136 @@ pub fn execute_plugin_entry(
     } else {
         Err("Plugin entry file has no extension".to_string())
     }
+}
+
+pub fn handle_plugin_protocol<R: tauri::Runtime>(
+    context: tauri::UriSchemeContext<'_, R>,
+    request: Request<Vec<u8>>,
+) -> Response<std::borrow::Cow<'static, [u8]>> {
+    let uri = request.uri();
+    let path = uri.path();
+
+    println!("[plugin_protocol] Request URI: {}", uri);
+    println!("[plugin_protocol] Request path: {}", path);
+
+    // 解析路径，格式为 /plugin_dir_name/file_path 或者 /plugin_dir_name/assets/file_path
+    let path_parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+    println!("[plugin_protocol] Path parts: {:?}", path_parts);
+
+    if path_parts.is_empty() || path_parts[0].is_empty() {
+        println!("[plugin_protocol] Empty path");
+        return Response::builder()
+            .status(404)
+            .body("Not Found".as_bytes().to_vec().into())
+            .unwrap();
+    }
+
+    let plugin_dir_name = path_parts[0];
+    let file_path = if path_parts.len() > 1 {
+        path_parts[1..].join("/")
+    } else {
+        // 如果只有插件目录名，默认加载 index.html
+        "index.html".to_string()
+    };
+
+    // 获取插件目录
+    let data_dir = match context.app_handle().path().app_data_dir() {
+        Ok(dir) => dir,
+        Err(e) => {
+            println!("[plugin_protocol] Failed to get app data dir: {}", e);
+            return Response::builder()
+                .status(500)
+                .body("Internal Server Error".as_bytes().to_vec().into())
+                .unwrap();
+        }
+    };
+
+    let plugin_file_path = data_dir
+        .join("plugins")
+        .join(plugin_dir_name)
+        .join(&file_path);
+
+    println!("[plugin_protocol] Requesting file: {:?}", plugin_file_path);
+
+    // 检查文件是否存在
+    if !plugin_file_path.exists() {
+        println!("[plugin_protocol] File does not exist: {:?}", plugin_file_path);
+        
+        // 尝试列出插件目录的内容以便调试
+        let plugin_dir = data_dir.join("plugins").join(plugin_dir_name);
+        if plugin_dir.exists() {
+            println!("[plugin_protocol] Plugin directory exists: {:?}", plugin_dir);
+            if let Ok(entries) = std::fs::read_dir(&plugin_dir) {
+                println!("[plugin_protocol] Directory contents:");
+                for entry in entries {
+                    if let Ok(entry) = entry {
+                        println!("  - {:?}", entry.file_name());
+                    }
+                }
+            }
+        } else {
+            println!("[plugin_protocol] Plugin directory does not exist: {:?}", plugin_dir);
+        }
+        
+        return Response::builder()
+            .status(404)
+            .body(format!("File Not Found: {}", file_path).as_bytes().to_vec().into())
+            .unwrap();
+    }
+
+    // 读取文件内容
+    let mut content = match std::fs::read(&plugin_file_path) {
+        Ok(content) => content,
+        Err(e) => {
+            println!("[plugin_protocol] Failed to read file: {}", e);
+            return Response::builder()
+                .status(500)
+                .body("Failed to read file".as_bytes().to_vec().into())
+                .unwrap();
+        }
+    };
+
+    // 如果是 HTML 文件，需要修改其中的资源路径
+    if plugin_file_path.extension().and_then(|s| s.to_str()) == Some("html") {
+        if let Ok(html_content) = String::from_utf8(content.clone()) {
+            // 将绝对路径转换为相对路径，这样浏览器会通过同一个协议请求资源
+            let modified_html = html_content
+                .replace("src=\"/assets/", "src=\"./assets/")
+                .replace("href=\"/assets/", "href=\"./assets/")
+                .replace("src='/assets/", "src='./assets/")
+                .replace("href='/assets/", "href='./assets/")
+                .replace("href=\"/vite.svg\"", "href=\"./vite.svg\"");
+            
+            content = modified_html.into_bytes();
+            println!("[plugin_protocol] Modified HTML content for plugin: {}", plugin_dir_name);
+        }
+    }
+
+    // 根据文件扩展名设置Content-Type
+    let content_type = match plugin_file_path.extension().and_then(|s| s.to_str()) {
+        Some("html") => "text/html; charset=utf-8",
+        Some("js") => "application/javascript; charset=utf-8",
+        Some("css") => "text/css; charset=utf-8",
+        Some("json") => "application/json; charset=utf-8",
+        Some("png") => "image/png",
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("svg") => "image/svg+xml",
+        Some("ico") => "image/x-icon",
+        Some("woff") => "font/woff",
+        Some("woff2") => "font/woff2",
+        Some("ttf") => "font/ttf",
+        _ => "application/octet-stream",
+    };
+
+    println!("[plugin_protocol] Serving file with content-type: {}", content_type);
+
+    Response::builder()
+        .status(200)
+        .header("Content-Type", content_type)
+        .header("Access-Control-Allow-Origin", "*")
+        .header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        .header("Access-Control-Allow-Headers", "Content-Type")
+        .header("Cache-Control", "no-cache")
+        .body(content.into())
+        .unwrap()
 }
