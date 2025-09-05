@@ -144,6 +144,13 @@ pub fn run() {
             plugin_api::notification::show_notification,
         ])
         .setup(move |app| {
+            // Ensure the app data directory exists on startup.
+            if let Ok(app_data_dir) = app.path().app_data_dir() {
+                if let Err(e) = std::fs::create_dir_all(&app_data_dir) {
+                    eprintln!("Failed to create app data directory: {}", e);
+                }
+            }
+
             // 托管自定义启动项管理器
             app.manage(startup_apps_manager::StartupAppsManager::new(
                 app.handle().clone(),
