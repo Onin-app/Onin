@@ -1,6 +1,8 @@
 use deno_core::op2;
 use deno_core::{JsRuntime, OpState, PollEventLoopOptions, RuntimeOptions};
 use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
+use std::rc::Rc;
 use tauri::AppHandle;
 
 use crate::plugin_api;
@@ -25,21 +27,23 @@ deno_core::extension!(
 );
 
 // 异步 op
-#[op2]
+#[op2(async)]
 #[serde]
-fn op_invoke(
-    state: &mut OpState,
+async fn op_invoke(
+    state: Rc<RefCell<OpState>>,
     #[string] method: String,
     #[serde] arg: serde_json::Value,
 ) -> InvokeResult {
-    println!("插件同步调用 invoke: method={}, arg={}", method, arg);
+    println!("插件异步调用 invoke: method={}, arg={}", method, arg);
 
-    let app_handle = state.borrow::<AppHandle>().clone();
+    let app_handle = state.borrow().borrow::<AppHandle>().clone();
 
     match method.as_str() {
         "show_notification" => {
             // 首先，尝试直接从 Value 反序列化
-            let options_result = serde_json::from_value::<plugin_api::notification::NotificationOptions>(arg.clone());
+            let options_result = serde_json::from_value::<
+                plugin_api::notification::NotificationOptions,
+            >(arg.clone());
 
             // 如果失败，并且 arg 是一个字符串，则尝试将该字符串作为 JSON 解析
             let final_options = match options_result {
@@ -49,12 +53,13 @@ fn op_invoke(
                         serde_json::from_str(s)
                     } else {
                         // Provide a type annotation for the compiler
-                        let err_result: Result<plugin_api::notification::NotificationOptions, _> = serde_json::from_str("");
+                        let err_result: Result<plugin_api::notification::NotificationOptions, _> =
+                            serde_json::from_str("");
                         Err(err_result.unwrap_err())
                     }
                 }
             };
-            
+
             match final_options {
                 Ok(options) => {
                     match plugin_api::notification::show_notification(app_handle, options) {
@@ -63,7 +68,10 @@ fn op_invoke(
                     }
                 }
                 Err(e) => InvokeResult::Err {
-                    error: format!("Invalid argument for show_notification: {}. Original arg: {}", e, arg),
+                    error: format!(
+                        "Invalid argument for show_notification: {}. Original arg: {}",
+                        e, arg
+                    ),
                 },
             }
         }
