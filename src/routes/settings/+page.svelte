@@ -6,12 +6,13 @@
   import { goto } from "$app/navigation";
   import GeneralSettings from "$lib/components/settings/GeneralSettings.svelte";
   import StartupSettings from "$lib/components/settings/StartupSettings.svelte";
+  import CommandSettings from "$lib/components/settings/CommandSettings.svelte";
   import { escapeHandler } from "$lib/stores/escapeHandler";
 
   interface SettingItem {
     name: string;
     id: string;
-    component: typeof GeneralSettings | typeof StartupSettings;
+    component: typeof GeneralSettings | typeof StartupSettings | typeof CommandSettings;
     icon: string;
   }
 
@@ -27,6 +28,12 @@
       id: "startup",
       component: StartupSettings,
       icon: "icon-startup",
+    },
+    {
+      name: "指令设置",
+      id: "commands",
+      component: CommandSettings,
+      icon: "icon-commands",
     },
   ];
 
