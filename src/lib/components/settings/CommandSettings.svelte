@@ -1,5 +1,7 @@
 <script lang="ts">
   import { Button, Command, DropdownMenu, Tabs } from "bits-ui";
+  import { onMount } from "svelte";
+  import { invoke } from "@tauri-apps/api/core";
 
   // 定义关键词类型
   type Keyword = {
@@ -17,38 +19,19 @@
   // 基础指令
   let basicCommands = $state({
     // 功能指令
-    function: [
-      {
-        title: "屏幕截图",
-        command: "screenshot",
-        keywords: [
-          {
-            name: "截图",
-            disabled: false,
-          },
-          {
-            name: "Screenshot",
-            disabled: true,
-          },
-        ],
-      },
-      {
-        title: "屏幕颜色拾取",
-        command: "pick-color",
-        keywords: [
-          {
-            name: "取色",
-            disabled: false,
-          },
-          {
-            name: "Pick Color",
-            disabled: false,
-          },
-        ],
-      },
-    ],
+    function: [] as CommandType[],
     // 匹配指令
     match: [],
+  });
+
+  onMount(async () => {
+    try {
+      const commands = await invoke<CommandType[]>("get_basic_commands");
+      console.log("Fetched basic commands:", commands);
+      basicCommands.function = commands;
+    } catch (error) {
+      console.error("Failed to fetch basic commands:", error);
+    }
   });
 
   const builtInCommandList = [
@@ -140,7 +123,15 @@
                         ? 'cursor-not-allowed opacity-50'
                         : ''}"
                     >
-                      <div class="flex items-center">打开指令</div>
+                      <div
+                        class="flex items-center"
+                        onclick={() =>
+                          invoke("execute_system_command", {
+                            command: command.command,
+                          })}
+                      >
+                        打开指令
+                      </div>
                     </DropdownMenu.Item>
                     <DropdownMenu.Item
                       class="rounded-button data-highlighted:bg-muted flex h-10 items-center py-3 pr-1.5 pl-3 text-sm font-medium ring-0! ring-transparent! select-none focus-visible:outline-none"

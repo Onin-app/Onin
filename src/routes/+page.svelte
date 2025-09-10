@@ -61,16 +61,9 @@
       console.log("Fetching all launchable items...");
       const res = await invoke<LaunchableItem[]>("get_all_launchable_items");
       console.log("本机软件列表: ", res);
-      const commands: LaunchableItem[] = [
-          { name: 'Shutdown', aliases: ['shutdown', '关机'], path: '', icon: 'shutdown', icon_type: 'Iconfont', item_type: 'App', source: 'Command', action: 'shutdown' },
-          { name: 'Restart', aliases: ['restart', 'reboot', '重启'], path: '', icon: 'restart', icon_type: 'Iconfont', item_type: 'App', source: 'Command', action: 'reboot' },
-          { name: 'Sleep', aliases: ['sleep', '睡眠'], path: '', icon: 'sleep', icon_type: 'Iconfont', item_type: 'App', source: 'Command', action: 'sleep' },
-          { name: 'Lock Screen', aliases: ['lock', '锁屏'], path: '', icon: 'lock', icon_type: 'Iconfont', item_type: 'App', source: 'Command', action: 'lock_screen' },
-          { name: 'Logout', aliases: ['logout', '注销'], path: '', icon: 'logout', icon_type: 'Iconfont', item_type: 'App', source: 'Command', action: 'logout' },
-      ];
       if (res) {
-        originAppList = [...res, ...commands];
-        appList = [...res, ...commands];
+        originAppList = res;
+        appList = res;
       }
       console.log(`Got ${appList.length} apps.`);
     } catch (error) {
@@ -95,7 +88,7 @@
   const openApp = async (app: LaunchableItem) => {
     try {
       if (app.source === 'Command' && app.action) {
-        await invoke(app.action);
+        await invoke("execute_system_command", { command: app.action });
       } else {
         await invoke("open_app", {
           path: app.path,

@@ -2,6 +2,7 @@ use crate::app_cache_manager::AppCache;
 use crate::installed_apps;
 use crate::shared_types::{ItemSource, ItemType, LaunchableItem};
 use crate::startup_apps_manager::StartupAppsManager;
+use crate::system_commands;
 use tauri::State;
 
 /// A unified command to get all launchable items from various sources.
@@ -57,6 +58,10 @@ pub async fn get_all_launchable_items(
 
     // 4. Combine the lists.
     all_items.extend(custom_items);
+
+    // 5. Get system commands.
+    let system_commands = system_commands::get_system_commands_as_launchable_items();
+    all_items.extend(system_commands);
 
     Ok(all_items)
 }

@@ -131,12 +131,8 @@ pub fn run() {
             startup_apps_manager::add_startup_items,
             startup_apps_manager::remove_startup_item,
             // Add system commands
-            system_commands::shutdown,
-            system_commands::reboot,
-            system_commands::sleep,
-            system_commands::lock_screen,
-            system_commands::logout,
-            system_commands::open_app_data_dir,
+            system_commands::execute_system_command,
+            system_commands::get_basic_commands,
             // 注册插件相关命令
             plugin_manager::load_plugins,
             plugin_manager::execute_plugin_entry,
