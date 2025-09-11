@@ -13,6 +13,20 @@ export interface LaunchableItem {
   action?: string;
 }
 
+export interface CommandKeyword {
+  name: string;
+  disabled?: boolean;
+}
+
+export interface Command {
+  name: string;
+  title: string;
+  english_name: string;
+  keywords: CommandKeyword[];
+  icon: string;
+  source: Source;
+}
+
 export enum Theme {
   LIGHT = "light",
   DARK = "dark",

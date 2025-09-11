@@ -11,6 +11,7 @@ use tauri::State;
 pub async fn get_all_launchable_items(
     app_cache: State<'_, AppCache>,
     startup_manager: State<'_, StartupAppsManager>,
+    app: tauri::AppHandle,
 ) -> Result<Vec<LaunchableItem>, String> {
     // We need a write lock because we might populate the cache.
     let mut apps_guard = app_cache.apps.write().await;
@@ -60,7 +61,7 @@ pub async fn get_all_launchable_items(
     all_items.extend(custom_items);
 
     // 5. Get system commands.
-    let system_commands = system_commands::get_system_commands_as_launchable_items();
+    let system_commands = system_commands::get_system_commands_as_launchable_items(app);
     all_items.extend(system_commands);
 
     Ok(all_items)

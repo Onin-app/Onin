@@ -1,19 +1,21 @@
 use tauri::{command, AppHandle, Manager};
-use serde::{Deserialize, Serialize};
-use crate::shared_types::{IconType, ItemSource, ItemType, LaunchableItem};
+use crate::shared_types::{Command, IconType, ItemSource, ItemType, LaunchableItem};
 
 // --- 1. Single Source of Truth ---
 
-struct SystemCommandInfo {
-    name: &'static str,
-    title: &'static str,
-    english_name: &'static str,
-    aliases: &'static [&'static str],
-    icon: &'static str,
-    action: fn(AppHandle),
+
+use crate::command_manager;
+
+pub struct SystemCommandInfo {
+    pub name: &'static str,
+    pub title: &'static str,
+    pub english_name: &'static str,
+    pub aliases: &'static [&'static str],
+    pub icon: &'static str,
+    pub action: fn(AppHandle),
 }
 
-static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
+pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
     SystemCommandInfo {
         name: "shutdown",
         title: "关机",
@@ -66,48 +68,39 @@ static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
 
 // --- 2. Derived Data Functions ---
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Keyword {
-    name: String,
-    disabled: bool,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Command {
-    title: String,
-    command: String,
-    keywords: Vec<Keyword>,
-}
-
 #[command]
-pub fn get_basic_commands() -> Vec<Command> {
-    SYSTEM_COMMANDS.iter().map(|cmd| Command {
-        title: cmd.title.to_string(),
-        command: cmd.name.to_string(),
-        keywords: cmd.aliases.iter().map(|&alias| Keyword {
-            name: alias.to_string(),
-            disabled: false,
-        }).collect(),
-    }).collect()
+pub fn get_basic_commands(app: AppHandle) -> Vec<Command> {
+    command_manager::load_commands(&app)
 }
 
-pub fn get_system_commands_as_launchable_items() -> Vec<LaunchableItem> {
-    SYSTEM_COMMANDS.iter().map(|cmd| LaunchableItem {
-        name: cmd.english_name.to_string(),
-        aliases: cmd.aliases.iter().map(|&s| s.to_string()).collect(),
-        path: "".to_string(),
-        icon: cmd.icon.to_string(),
-        icon_type: IconType::Iconfont,
-        item_type: ItemType::App,
-        source: ItemSource::Command,
-        action: Some(cmd.name.to_string()),
-    }).collect()
+pub fn get_system_commands_as_launchable_items(app: AppHandle) -> Vec<LaunchableItem> {
+    let commands = command_manager::load_commands(&app);
+    commands
+        .iter()
+        .map(|cmd| LaunchableItem {
+            name: cmd.english_name.clone(),
+            aliases: cmd
+                .keywords
+                .iter()
+                .filter(|kw| kw.disabled.is_none() || !kw.disabled.unwrap())
+                .map(|kw| kw.name.clone())
+                .collect(),
+            path: "".to_string(),
+            icon: cmd.icon.clone(),
+            icon_type: IconType::Iconfont,
+            item_type: ItemType::App,
+            source: ItemSource::Command,
+            action: Some(cmd.name.clone()),
+        })
+        .collect()
 }
 
 // --- 3. Unified Command Executor ---
 
 #[command]
 pub fn execute_system_command(command: String, app: AppHandle) {
+    // To execute, we still need the original static definition
+    // because the action (function pointer) is not serializable to JSON.
     if let Some(cmd_info) = SYSTEM_COMMANDS.iter().find(|&cmd| cmd.name == command) {
         (cmd_info.action)(app);
     } else {

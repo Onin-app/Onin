@@ -51,3 +51,21 @@ pub struct LaunchableItem {
     pub source: ItemSource,
     pub action: Option<String>,
 }
+
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct CommandKeyword {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub disabled: Option<bool>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Command {
+    pub name: String,
+    pub title: String,
+    pub english_name: String,
+    pub keywords: Vec<CommandKeyword>,
+    pub icon: String,
+    pub source: ItemSource,
+}

@@ -10,6 +10,7 @@ use tracing_subscriber;
 use tracing_subscriber::fmt::format::FmtSpan; // 导入 FmtSpan
 
 mod app_cache_manager;
+mod command_manager;
 pub mod icon_utils;
 mod installed_apps;
 mod js_runtime;
@@ -138,6 +139,8 @@ pub fn run() {
             plugin_manager::execute_plugin_entry,
             // 注册 notification 命令
             plugin_api::notification::show_notification,
+            // Command manager commands
+            command_manager::update_command,
         ])
         .setup(move |app| {
             // Ensure the app data directory exists on startup.
@@ -146,6 +149,9 @@ pub fn run() {
                     eprintln!("Failed to create app data directory: {}", e);
                 }
             }
+
+            // Initialize the command manager
+            command_manager::init(app.handle());
 
             // 托管自定义启动项管理器
             app.manage(startup_apps_manager::StartupAppsManager::new(
