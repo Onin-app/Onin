@@ -9,7 +9,6 @@ use tokio::sync::broadcast;
 use tracing_subscriber;
 use tracing_subscriber::fmt::format::FmtSpan; // 导入 FmtSpan
 
-mod app_cache_manager;
 mod command_manager;
 pub mod icon_utils;
 mod installed_apps;
@@ -84,10 +83,6 @@ pub fn run() {
         .manage(tray_manager::TrayVisibilityState(Mutex::new(
             is_tray_initially_visible,
         )))
-        // 新增：托管应用列表缓存的状态
-        .manage(app_cache_manager::AppCache {
-            apps: tokio::sync::RwLock::new(None),
-        })
         // Manage the shortcut state
         .manage(shortcut_manager::ShortcutState {
             toggle_shortcut: Mutex::new(
@@ -116,7 +111,6 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             unified_launch_manager::get_all_launchable_items,
-            installed_apps::open_app,
             // 注册新的锁命令
             window_manager::acquire_window_close_lock,
             window_manager::release_window_close_lock,
@@ -132,7 +126,7 @@ pub fn run() {
             startup_apps_manager::add_startup_items,
             startup_apps_manager::remove_startup_item,
             // Add system commands
-            system_commands::execute_system_command,
+            system_commands::execute_command,
             system_commands::get_basic_commands,
             // 注册插件相关命令
             plugin_manager::load_plugins,
@@ -150,8 +144,11 @@ pub fn run() {
                 }
             }
 
-            // Initialize the command manager
-            command_manager::init(app.handle());
+            // Initialize the command manager asynchronously
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                command_manager::init(&app_handle).await;
+            });
 
             // 托管自定义启动项管理器
             app.manage(startup_apps_manager::StartupAppsManager::new(

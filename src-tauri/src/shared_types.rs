@@ -43,7 +43,7 @@ impl Default for IconType {
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct LaunchableItem {
     pub name: String,
-    pub aliases: Vec<String>,
+    pub keywords: Vec<String>,
     pub path: String,
     pub icon: String,
     pub icon_type: IconType,
@@ -61,11 +61,18 @@ pub struct CommandKeyword {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum CommandAction {
+    System(String),
+    App(String), // The string will hold the executable path
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Command {
-    pub name: String,
+    pub name: String, // A unique identifier, e.g., "shutdown" or a hash for an app
     pub title: String,
     pub english_name: String,
     pub keywords: Vec<CommandKeyword>,
     pub icon: String,
     pub source: ItemSource,
+    pub action: CommandAction,
 }

@@ -48,12 +48,24 @@
     // })();
 
     // 2. 监听后端的更新通知
-    unlisten = await listen("apps_updated", (event) => {
+    const unlistenAppsUpdated = await listen("apps_updated", (event) => {
       console.log(
         "Received apps_updated event from backend. Refetching list...",
       );
       fetchApps();
     });
+
+    const unlistenCommandsReady = await listen("commands_ready", (event) => {
+      console.log(
+        "Received commands_ready event from backend. Refetching list...",
+      );
+      fetchApps();
+    });
+
+    unlisten = () => {
+      unlistenAppsUpdated();
+      unlistenCommandsReady();
+    };
   });
 
   const fetchApps = async () => {
@@ -87,9 +99,13 @@
 
   const openApp = async (app: LaunchableItem) => {
     try {
-      if (app.source === 'Command' && app.action) {
-        await invoke("execute_system_command", { command: app.action });
-      } else {
+      if (app.action) {
+        await invoke("execute_command", {
+          name: app.action,
+          window: await WebviewWindow.getCurrent(),
+        });
+      } else if (app.source === 'Custom') {
+        // Handle custom items that might not have an action
         await invoke("open_app", {
           path: app.path,
           window: await WebviewWindow.getCurrent(),

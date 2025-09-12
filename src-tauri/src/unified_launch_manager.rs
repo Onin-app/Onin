@@ -1,56 +1,41 @@
-use crate::app_cache_manager::AppCache;
-use crate::installed_apps;
-use crate::shared_types::{ItemSource, ItemType, LaunchableItem};
+use crate::command_manager;
+use crate::shared_types::{IconType, ItemSource, ItemType, LaunchableItem};
 use crate::startup_apps_manager::StartupAppsManager;
-use crate::system_commands;
 use tauri::State;
 
 /// A unified command to get all launchable items from various sources.
-/// It combines installed applications from the cache and custom startup items.
+/// It combines commands from commands.json and custom startup items.
 #[tauri::command]
 pub async fn get_all_launchable_items(
-    app_cache: State<'_, AppCache>,
     startup_manager: State<'_, StartupAppsManager>,
     app: tauri::AppHandle,
 ) -> Result<Vec<LaunchableItem>, String> {
-    // We need a write lock because we might populate the cache.
-    let mut apps_guard = app_cache.apps.write().await;
+    // 1. Load all commands from the central command store.
+    let all_commands = command_manager::load_commands(&app).await;
 
-    // 1. If the cache is empty, this is likely the first run.
-    //    Fetch the apps now and populate the cache. This ensures the first load is always complete.
-    if apps_guard.is_none() {
-        tracing::info!("App cache is empty. Performing initial fetch...");
-        match installed_apps::fetch_installed_apps().await {
-            Ok(new_apps) => {
-                *apps_guard = Some(new_apps);
-                tracing::info!("App cache populated successfully.");
-            }
-            Err(e) => {
-                // If fetching fails, log the error but continue, so custom items can still be shown.
-                // We set the cache to an empty Vec to prevent re-fetching on every call.
-                tracing::error!("Initial app fetch failed: {}", e);
-                *apps_guard = Some(vec![]);
-            }
-        }
-    }
-
-    let installed_apps = apps_guard.clone().unwrap_or_default();
-
-    // 2. Convert AppInfo into the common LaunchableItem format.
-    // We filter out any apps that don't have a valid executable path.
-    let mut all_items: Vec<LaunchableItem> = installed_apps
+    // 2. Convert Command into the common LaunchableItem format.
+    let mut all_items: Vec<LaunchableItem> = all_commands
         .into_iter()
-        .filter_map(|app_info| {
-            app_info.path.map(|path| LaunchableItem {
-                name: app_info.name,
-                aliases: app_info.aliases,
-                path,
-                icon: app_info.icon.unwrap_or_default(), // Use default icon if None
-                icon_type: crate::shared_types::IconType::Base64,
-                item_type: ItemType::App,
-                source: ItemSource::Application,
-                action: None,
-            })
+        .map(|cmd| LaunchableItem {
+            name: cmd.title,
+            keywords: cmd
+                .keywords
+                .into_iter()
+                .filter(|kw| kw.disabled.is_none() || !kw.disabled.unwrap())
+                .map(|kw| kw.name)
+                .collect(),
+            path: match &cmd.action {
+                crate::shared_types::CommandAction::App(path) => path.clone(),
+                _ => "".to_string(),
+            },
+            icon: cmd.icon,
+            icon_type: match cmd.source {
+                ItemSource::Application => IconType::Base64,
+                _ => IconType::Iconfont,
+            },
+            item_type: ItemType::App, // All commands are treated as apps for launching
+            source: cmd.source,
+            action: Some(cmd.name), // The unique name is the action identifier
         })
         .collect();
 
@@ -59,10 +44,6 @@ pub async fn get_all_launchable_items(
 
     // 4. Combine the lists.
     all_items.extend(custom_items);
-
-    // 5. Get system commands.
-    let system_commands = system_commands::get_system_commands_as_launchable_items(app);
-    all_items.extend(system_commands);
 
     Ok(all_items)
 }

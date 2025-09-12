@@ -19,7 +19,7 @@ pub enum AppOrigin {
 #[derive(serde::Serialize, Clone, Debug)]
 pub struct AppInfo {
     pub name: String,
-    pub aliases: Vec<String>,
+    pub keywords: Vec<String>,
     pub path: Option<String>,
     pub icon: Option<String>,
     #[cfg(target_os = "windows")]

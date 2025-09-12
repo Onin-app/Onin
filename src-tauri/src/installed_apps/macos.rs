@@ -279,7 +279,7 @@ pub async fn get_apps() -> Result<Vec<AppInfo>, String> {
                             if file_name.ends_with(".app") {
                                 let app_path = entry.path();
                                 let app_path_str = app_path.to_string_lossy().to_string();
-                                let mut aliases: Vec<String> = Vec::new();
+                                let mut keywords: Vec<String> = Vec::new();
 
                                 let name = app_path
                                     .file_stem()
@@ -290,8 +290,8 @@ pub async fn get_apps() -> Result<Vec<AppInfo>, String> {
                                 // 1. 获取本地化名称
                                 if let Some(localized_name) = get_localized_name(&app_path, &name) {
                                     // 移除了 != name 的条件判断
-                                    if !aliases.contains(&localized_name) {
-                                        aliases.push(localized_name);
+                                    if !keywords.contains(&localized_name) {
+                                        keywords.push(localized_name);
                                     }
                                 }
 
@@ -304,15 +304,15 @@ pub async fn get_apps() -> Result<Vec<AppInfo>, String> {
                                             .get("CFBundleDisplayName")
                                             .and_then(|v| v.as_string())
                                         {
-                                            if !aliases.contains(&display_name.to_string()) {
-                                                aliases.push(display_name.to_string());
+                                            if !keywords.contains(&display_name.to_string()) {
+                                                keywords.push(display_name.to_string());
                                             }
                                         }
                                         if let Some(bundle_name) =
                                             dict.get("CFBundleName").and_then(|v| v.as_string())
                                         {
-                                            if !aliases.contains(&bundle_name.to_string()) {
-                                                aliases.push(bundle_name.to_string());
+                                            if !keywords.contains(&bundle_name.to_string()) {
+                                                keywords.push(bundle_name.to_string());
                                             }
                                         }
                                     }
@@ -321,7 +321,7 @@ pub async fn get_apps() -> Result<Vec<AppInfo>, String> {
                                 let icon = get_app_icon(&app_path_str);
                                 let app_info = AppInfo {
                                     name: name.clone(),
-                                    aliases,
+                                    keywords,
                                     path: Some(app_path_str),
                                     icon,
                                     origin: None,

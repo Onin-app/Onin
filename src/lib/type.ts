@@ -4,7 +4,7 @@ export type IconType = 'Base64' | 'Iconfont'
 
 export interface LaunchableItem {
   name: string;
-  aliases: string[];
+  keywords: string[];
   path: string;
   icon: string;
   icon_type: IconType;
@@ -18,6 +18,8 @@ export interface CommandKeyword {
   disabled?: boolean;
 }
 
+export type CommandAction = { System: string } | { App: string };
+
 export interface Command {
   name: string;
   title: string;
@@ -25,6 +27,7 @@ export interface Command {
   keywords: CommandKeyword[];
   icon: string;
   source: Source;
+  action: CommandAction;
 }
 
 export enum Theme {

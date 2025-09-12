@@ -42,23 +42,10 @@ export const fuzzyMatch = (value: string, array: LaunchableItem[]): LaunchableIt
       pinyinInitials.includes(lowerValue);
   };
 
-  return array.reduce<LaunchableItem[]>((results, item) => {
-    // 优先匹配名称
-    if (checkMatch(item.name)) {
-      // 如果名称匹配，直接将原项目（的副本）加入结果列表
-      results.push({ ...item });
-      return results;
-    }
-
-    // 如果名称不匹配，则查找匹配的别名
-    if (item.aliases) {
-      const matchedAlias = item.aliases.find(alias => checkMatch(alias));
-      if (matchedAlias) {
-        // 如果找到匹配的别名，创建一个新对象，将 name 设置为该别名
-        results.push({ ...item, name: matchedAlias });
-      }
-    }
-
-    return results;
-  }, []);
+  return array.filter(item => {
+    // The backend provides a comprehensive `keywords` list that includes the name
+    // and has already filtered out any disabled keywords.
+    // Therefore, we only need to search against the `keywords`.
+    return (item.keywords || []).some(keyword => checkMatch(keyword));
+  });
 }

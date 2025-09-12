@@ -156,7 +156,7 @@ impl StartupAppsManager {
 
         Some(LaunchableItem {
             name,
-            aliases: vec![],
+            keywords: vec![],
             path: path_str,
             icon,
             icon_type: crate::shared_types::IconType::Base64,

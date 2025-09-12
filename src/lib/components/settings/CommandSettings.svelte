@@ -36,25 +36,46 @@
     }
   }
 
-  const builtInCommandList = [{ name: "基础常用", id: "basic" }];
-  let activeSetting = $state(builtInCommandList[0]);
+  const sourceNameMap = {
+    Command: "基础常用",
+    Application: "程序启动",
+    Custom: "自定义",
+  };
+
+  let commandCategories = $derived(
+    Array.from(new Set(commands.map((cmd) => cmd.source))).map((source) => ({
+      id: source,
+      name: sourceNameMap[source] || source,
+    })),
+  );
+
+  let activeCategory = $state(commandCategories[0] || null);
+  $effect(() => {
+    if (!activeCategory && commandCategories.length > 0) {
+      activeCategory = commandCategories[0];
+    }
+  });
+
+  let filteredCommands = $derived(
+    commands.filter((cmd) => cmd.source === activeCategory?.id),
+  );
 </script>
 
 <main class="flex h-full">
   <div class="w-36 border-r border-neutral-200 dark:border-neutral-700">
-    <h3 class="p-2 text-sm text-gray-500 dark:text-gray-400">内置指令</h3>
+    <h3 class="p-2 text-sm text-gray-500 dark:text-gray-400">指令类型</h3>
     <ul class="flex w-full flex-col justify-center">
-      {#each builtInCommandList as item}
+      {#each commandCategories as category}
         <li
-          class={activeSetting.id === item.id
+          class={activeCategory?.id === category.id
             ? "bg-neutral-300 dark:bg-neutral-600"
             : "hover:bg-neutral-200 dark:hover:bg-neutral-700"}
         >
           <Button.Root
             class="h-full w-full cursor-pointer px-2 py-1 text-left"
-            onclick={() => (activeSetting = item)}
+            onclick={() => (activeCategory = category)}
           >
-            {item.name}
+            {category.name}
           </Button.Root>
         </li>
       {/each}
@@ -79,7 +100,7 @@
         </Tabs.Trigger>
       </Tabs.List>
       <Tabs.Content value="function" class="pt-3 select-none">
-        {#each commands as command}
+        {#each filteredCommands as command}
           <div class="mb-4">
             <div class="mb-2 flex items-center">
               <h4 class="font-semibold">{command.title}</h4>
