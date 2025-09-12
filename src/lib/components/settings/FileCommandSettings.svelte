@@ -9,20 +9,20 @@
   import { getCurrentWebview } from "@tauri-apps/api/webview";
   import { TauriEvent } from "@tauri-apps/api/event";
 
-  let startupItems = $state<LaunchableItem[]>([]);
+  let fileCommands = $state<LaunchableItem[]>([]);
   let listContainerEl: HTMLDivElement | undefined = $state();
   let isLoading = $state(true);
   let isProcessing = $state(false);
   let isDraggingOver = $state(false);
   let unlistenDragDrop = $state<() => void>();
 
-  async function fetchStartupItems() {
+  async function fetchFileCommands() {
     isLoading = true;
     try {
-      const items = await invoke<LaunchableItem[]>("get_startup_items");
-      startupItems = items.filter(item => item.source !== 'Command');
+      const items = await invoke<LaunchableItem[]>("get_all_launchable_items");
+      fileCommands = items.filter(item => item.source === 'FileCommand');
     } catch (e) {
-      console.error("Failed to get startup items:", e);
+      console.error("Failed to get file commands:", e);
     } finally {
       isLoading = false;
     }
@@ -33,12 +33,12 @@
 
     isProcessing = true;
     try {
-      const newItems: LaunchableItem[] = await invoke("add_startup_items", {
+      const newItems: LaunchableItem[] = await invoke("add_file_commands", {
         paths,
       });
-      startupItems = newItems;
+      fileCommands = newItems;
     } catch (e) {
-      console.error("Failed to add startup paths:", e);
+      console.error("Failed to add file commands:", e);
     } finally {
       isProcessing = false;
     }
@@ -58,18 +58,18 @@
   async function deleteItem(path: string) {
     try {
       // 乐观更新UI，立即移除项以获得更好的用户体验
-      const originalItems = startupItems;
-      startupItems = startupItems.filter((item) => item.path !== path);
+      const originalItems = fileCommands;
+      fileCommands = fileCommands.filter((item) => item.path !== path);
 
       // 调用后端并同步最终状态
-      const newItems: LaunchableItem[] = await invoke("remove_startup_item", {
+      const newItems: LaunchableItem[] = await invoke("remove_file_command", {
         path,
       });
-      startupItems = newItems;
+      fileCommands = newItems;
     } catch (e) {
-      console.error("Failed to remove startup item:", e);
+      console.error("Failed to remove file command:", e);
       // 如果出错，则从后端重新获取列表以回滚状态
-      fetchStartupItems();
+      fetchFileCommands();
     }
   }
 
@@ -95,12 +95,12 @@
         return;
       }
 
-      const newItems: LaunchableItem[] = await invoke("add_startup_items", {
+      const newItems: LaunchableItem[] = await invoke("add_file_commands", {
         paths: selected,
       });
-      startupItems = newItems;
+      fileCommands = newItems;
     } catch (e) {
-      console.error("Failed to add startup paths:", e);
+      console.error("Failed to add file commands:", e);
     } finally {
       isProcessing = false;
       // 确保操作结束后（无论成功、失败还是取消），都释放锁
@@ -157,7 +157,7 @@
   });
 
   onMount(() => {
-    fetchStartupItems();
+    fetchFileCommands();
     listenDragDrop();
   });
 
@@ -167,11 +167,11 @@
 </script>
 
 <main class="flex h-full w-full flex-col p-4">
-  <h2 class="mb-2 text-xl font-bold">自定义启动项</h2>
-  {#if startupItems.length > 0}
+  <h2 class="mb-2 text-xl font-bold">文件启动设置</h2>
+  {#if fileCommands.length > 0}
     <div class="mb-2 flex items-center text-sm text-neutral-500">
       <!-- <Icon icon="warning-circle" class="mr-2" /> -->
-      可以通过拖放或者粘贴文件/文件夹路径来添加启动项，也可以点击
+      可以通过拖放或者粘贴文件/文件夹路径来添加文件，也可以点击
       <Button.Root
         class="rounded-input bg-dark text-background shadow-mini hover:bg-dark/95 mx-1
 	inline-flex h-5 items-center justify-center px-[6px]
@@ -198,10 +198,10 @@
       >
         {#if isLoading}
           <p class="text-neutral-500">正在加载...</p>
-        {:else if startupItems.length === 0}
+        {:else if fileCommands.length === 0}
           <div class="mb-2 flex items-center text-sm text-neutral-500">
             <!-- <Icon icon="warning-circle" class="mr-2" /> -->
-            可以通过拖放或者粘贴文件/文件夹路径来添加启动项，也可以点击
+            可以通过拖放或者粘贴文件/文件夹路径来添加文件指令，也可以点击
             <Button.Root
               class="rounded-input bg-dark text-background shadow-mini hover:bg-dark/95 mx-1
 	inline-flex h-5 items-center justify-center px-[6px]
@@ -214,7 +214,7 @@
           </div>
         {:else}
           <ul class="h-full w-full overflow-y-auto text-left">
-            {#each startupItems as item, index (item.path)}
+            {#each fileCommands as item, index (item.path)}
               <li
                 class="group flex items-center rounded-lg p-2 hover:bg-neutral-200 dark:hover:bg-neutral-700"
               >

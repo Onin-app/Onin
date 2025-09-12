@@ -17,7 +17,7 @@ mod plugin_api;
 mod plugin_manager;
 pub mod shared_types;
 mod shortcut_manager;
-mod startup_apps_manager;
+mod file_command_manager;
 mod system_commands;
 mod tray_manager;
 mod unified_launch_manager;
@@ -122,9 +122,9 @@ pub fn run() {
             shortcut_manager::get_toggle_shortcut,
             shortcut_manager::set_toggle_shortcut,
             // Add startup items manager commands
-            startup_apps_manager::get_startup_items,
-            startup_apps_manager::add_startup_items,
-            startup_apps_manager::remove_startup_item,
+            file_command_manager::get_file_commands,
+            file_command_manager::add_file_commands,
+            file_command_manager::remove_file_command,
             // Add system commands
             system_commands::execute_command,
             system_commands::get_basic_commands,
@@ -151,7 +151,7 @@ pub fn run() {
             });
 
             // 托管自定义启动项管理器
-            app.manage(startup_apps_manager::StartupAppsManager::new(
+            app.manage(file_command_manager::FileCommandManager::new(
                 app.handle().clone(),
             ));
             #[cfg(desktop)]

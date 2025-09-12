@@ -1,10 +1,10 @@
 export type ItemType = 'App' | 'Folder' | 'File';
-export type Source = 'Application' | 'Custom' | 'Command'
+export type Source = 'Application' | 'Custom' | 'Command' | 'FileCommand'
 export type IconType = 'Base64' | 'Iconfont'
 
 export interface LaunchableItem {
   name: string;
-  keywords: string[];
+  keywords: CommandKeyword[];
   path: string;
   icon: string;
   icon_type: IconType;

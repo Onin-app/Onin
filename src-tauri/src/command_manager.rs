@@ -1,5 +1,5 @@
 use crate::shared_types::{Command, CommandAction, CommandKeyword, ItemSource};
-use crate::{installed_apps, system_commands};
+use crate::{file_command_manager, installed_apps, system_commands};
 use std::fs;
 use std::path::PathBuf;
 use tauri::{AppHandle, Emitter, Manager};
@@ -16,6 +16,8 @@ async fn generate_and_save_commands(app: &AppHandle) -> Vec<Command> {
     let mut initial_commands = get_initial_system_commands();
     let app_commands = get_initial_app_commands().await;
     initial_commands.extend(app_commands);
+    let file_commands = get_initial_file_commands(app).await;
+    initial_commands.extend(file_commands);
     save_commands(app, &initial_commands);
     initial_commands
 }
@@ -138,4 +140,25 @@ async fn get_initial_app_commands() -> Vec<Command> {
     } else {
         vec![]
     }
+}
+
+async fn get_initial_file_commands(app: &AppHandle) -> Vec<Command> {
+    let file_manager = app.state::<file_command_manager::FileCommandManager>();
+    let file_items = file_manager.get_items().await;
+
+    file_items
+        .into_iter()
+        .map(|item| Command {
+            name: format!("file_{}", item.path), // Create a unique name
+            title: item.name.clone(),
+            english_name: item.name.clone(),
+            keywords: vec![CommandKeyword {
+                name: item.name,
+                disabled: None,
+            }],
+            icon: item.icon,
+            source: ItemSource::FileCommand,
+            action: CommandAction::File(item.path),
+        })
+        .collect()
 }

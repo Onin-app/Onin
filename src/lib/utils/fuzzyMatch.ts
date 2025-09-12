@@ -46,6 +46,6 @@ export const fuzzyMatch = (value: string, array: LaunchableItem[]): LaunchableIt
     // The backend provides a comprehensive `keywords` list that includes the name
     // and has already filtered out any disabled keywords.
     // Therefore, we only need to search against the `keywords`.
-    return (item.keywords || []).some(keyword => checkMatch(keyword));
+    return (item.keywords || []).some(keyword => checkMatch(keyword.name));
   });
 }

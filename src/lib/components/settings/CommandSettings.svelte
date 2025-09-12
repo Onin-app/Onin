@@ -2,13 +2,19 @@
   import { Button, DropdownMenu, Switch, Tabs } from "bits-ui";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import type { Command } from "$lib/type";
+  import type { Command, LaunchableItem } from "$lib/type";
 
   let commands = $state<Command[]>([]);
 
   onMount(async () => {
     try {
-      commands = await invoke<Command[]>("get_basic_commands");
+      const launchableItems = await invoke<LaunchableItem[]>("get_all_launchable_items");
+      commands = launchableItems.map(item => ({
+        ...item,
+        title: item.name,
+        english_name: item.name,
+        action: { System: item.action || '' } // Placeholder for action
+      }));
       console.log("Fetched basic commands:", commands);
     } catch (error) {
       console.error("Failed to fetch basic commands:", error);
@@ -40,6 +46,7 @@
     Command: "基础常用",
     Application: "程序启动",
     Custom: "自定义",
+    FileCommand: "文件启动",
   };
 
   let commandCategories = $derived(

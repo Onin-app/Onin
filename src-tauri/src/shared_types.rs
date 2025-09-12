@@ -5,12 +5,13 @@ pub enum ItemSource {
     Application, // System-installed applications
     Custom,      // User-defined items (files, folders, URLs, etc.)
     Command,     // System commands
+    FileCommand, // User-defined file commands
 }
 
 impl Default for ItemSource {
     fn default() -> Self {
         // 对于用户手动添加的项目，默认为 Custom
-        ItemSource::Custom
+        ItemSource::FileCommand
     }
 }
 
@@ -43,7 +44,7 @@ impl Default for IconType {
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct LaunchableItem {
     pub name: String,
-    pub keywords: Vec<String>,
+    pub keywords: Vec<CommandKeyword>,
     pub path: String,
     pub icon: String,
     pub icon_type: IconType,
@@ -64,6 +65,7 @@ pub struct CommandKeyword {
 pub enum CommandAction {
     System(String),
     App(String), // The string will hold the executable path
+    File(String),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

@@ -104,7 +104,7 @@
           name: app.action,
           window: await WebviewWindow.getCurrent(),
         });
-      } else if (app.source === 'Custom') {
+      } else if (app.source === 'FileCommand') {
         // Handle custom items that might not have an action
         await invoke("open_app", {
           path: app.path,

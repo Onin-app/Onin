@@ -82,7 +82,7 @@ pub async fn get_system_commands_as_launchable_items(app: AppHandle) -> Vec<Laun
                 .keywords
                 .iter()
                 .filter(|kw| kw.disabled.is_none() || !kw.disabled.unwrap())
-                .map(|kw| kw.name.clone())
+                .map(|kw| kw.clone())
                 .collect(),
             path: "".to_string(),
             icon: cmd.icon.clone(),
@@ -112,6 +112,11 @@ pub async fn execute_command(name: String, app: AppHandle, window: tauri::Webvie
             CommandAction::App(path) => {
                 if let Err(e) = installed_apps::open_app(path.clone(), window) {
                     eprintln!("Failed to open app {}: {}", path, e);
+                }
+            }
+            CommandAction::File(path) => {
+                if let Err(e) = opener::open(path) {
+                    eprintln!("Failed to open file {}: {}", path, e);
                 }
             }
         }
