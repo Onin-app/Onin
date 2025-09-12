@@ -580,20 +580,28 @@ pub async fn get_apps() -> Result<Vec<AppInfo>, String> {
 
     let mut unique_apps: HashMap<String, AppInfo> = HashMap::new();
 
-    // 1. 优先添加 AppsFolder 中的应用程序
-    for app in apps_folder_apps {
+    // 优先级 1: 注册表应用 (通常路径准确)
+    for app in hkey_apps {
         unique_apps.insert(app.name.clone(), app);
     }
 
-    // 2. 添加注册表中的应用程序
-    for app in hkey_apps {
-        unique_apps.entry(app.name.clone()).or_insert(app);
-    }
-
-    // 3. 添加快捷方式中的应用程序
+    // 优先级 2: 快捷方式应用 (补充注册表未找到的)
     for app in shortcut_apps {
         let normalized_name = normalize_app_name(&app.name);
         unique_apps.entry(normalized_name).or_insert(app);
+    }
+
+    // 优先级 3: AppsFolder 应用 (主要用于补充 UWP 应用和更高质量的图标)
+    for app in apps_folder_apps {
+        unique_apps
+            .entry(app.name.clone())
+            .and_modify(|existing_app| {
+                // 如果现有应用没有图标，而 AppsFolder 应用有，则更新图标
+                if existing_app.icon.is_none() && app.icon.is_some() {
+                    existing_app.icon = app.icon.clone();
+                }
+            })
+            .or_insert(app); // 如果应用不存在，则插入 (这通常是 UWP 应用)
     }
 
     let final_apps: Vec<AppInfo> = unique_apps.into_values().collect();
