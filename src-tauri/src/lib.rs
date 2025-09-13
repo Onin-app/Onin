@@ -10,6 +10,7 @@ use tracing_subscriber;
 use tracing_subscriber::fmt::format::FmtSpan; // 导入 FmtSpan
 
 mod command_manager;
+mod file_command_manager;
 pub mod icon_utils;
 mod installed_apps;
 mod js_runtime;
@@ -17,7 +18,6 @@ mod plugin_api;
 mod plugin_manager;
 pub mod shared_types;
 mod shortcut_manager;
-mod file_command_manager;
 mod system_commands;
 mod tray_manager;
 mod unified_launch_manager;
@@ -134,6 +134,7 @@ pub fn run() {
             // 注册 notification 命令
             plugin_api::notification::show_notification,
             // Command manager commands
+            command_manager::get_commands,
             command_manager::update_command,
         ])
         .setup(move |app| {

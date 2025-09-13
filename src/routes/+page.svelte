@@ -104,7 +104,7 @@
           name: app.action,
           window: await WebviewWindow.getCurrent(),
         });
-      } else if (app.source === 'FileCommand') {
+      } else if (app.source === "FileCommand") {
         // Handle custom items that might not have an action
         await invoke("open_app", {
           path: app.path,
@@ -208,8 +208,10 @@
               onclick={() => openApp(app)}
             >
               {#if app.icon}
-                {#if app.icon_type === 'Iconfont'}
-                  <div class="mr-2 flex h-8 w-8 items-center justify-center rounded-md bg-gray-200 dark:bg-gray-700">
+                {#if app.icon_type === "Iconfont"}
+                  <div
+                    class="mr-2 flex h-8 w-8 items-center justify-center rounded-md bg-gray-200 dark:bg-gray-700"
+                  >
                     <Icon icon={app.icon} class="h-6 w-6" />
                   </div>
                 {:else if app.icon}
@@ -231,10 +233,10 @@
                     {app.source}
                   </span>
                 </div>
-                {#if app.source !== 'Command'}
-                <span class="text-neutral-399 text-xs dark:text-neutral-500">
-                  {app.path}
-                </span>
+                {#if app.source !== "Command"}
+                  <span class="text-neutral-399 text-xs dark:text-neutral-500">
+                    {app.path}
+                  </span>
                 {/if}
               </div>
             </button>

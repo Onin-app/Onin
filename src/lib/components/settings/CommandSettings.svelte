@@ -2,26 +2,16 @@
   import { Button, DropdownMenu, Switch, Tabs } from "bits-ui";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import type { Command, LaunchableItem } from "$lib/type";
+  import type { Command } from "$lib/type";
 
   let commands = $state<Command[]>([]);
 
   onMount(async () => {
     try {
-      const launchableItems = await invoke<LaunchableItem[]>(
-        "get_all_launchable_items",
-      );
-      commands = launchableItems.map((item) => ({
-        ...item,
-        title: item.name,
-        english_name: item.name,
-        action: { System: item.action || "" }, // Placeholder for action
-        path: item.path,
-        origin: item.origin,
-      }));
-      console.log("Fetched basic commands:", commands);
+      commands = await invoke<Command[]>("get_commands");
+      console.log("Fetched commands:", commands);
     } catch (error) {
-      console.error("Failed to fetch basic commands:", error);
+      console.error("Failed to fetch commands:", error);
     }
   });
 

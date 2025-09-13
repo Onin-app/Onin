@@ -59,6 +59,11 @@ fn save_commands(app: &AppHandle, commands: &[Command]) {
 }
 
 #[tauri::command]
+pub async fn get_commands(app: AppHandle) -> Vec<Command> {
+    load_commands(&app).await
+}
+
+#[tauri::command]
 pub async fn update_command(app: AppHandle, command_to_update: Command) {
     let mut commands = load_commands(&app).await;
     if let Some(command) = commands
