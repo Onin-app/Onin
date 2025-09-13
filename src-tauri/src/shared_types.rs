@@ -41,6 +41,13 @@ impl Default for IconType {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub enum AppOrigin {
+    Hkey,
+    Shortcut,
+    Uwp,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct LaunchableItem {
     pub name: String,
@@ -51,6 +58,8 @@ pub struct LaunchableItem {
     pub item_type: ItemType,
     pub source: ItemSource,
     pub action: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<AppOrigin>,
 }
 
 
@@ -77,4 +86,6 @@ pub struct Command {
     pub icon: String,
     pub source: ItemSource,
     pub action: CommandAction,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<AppOrigin>,
 }

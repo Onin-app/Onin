@@ -1,6 +1,8 @@
 export type ItemType = 'App' | 'Folder' | 'File';
 export type Source = 'Application' | 'Custom' | 'Command' | 'FileCommand'
 export type IconType = 'Base64' | 'Iconfont'
+export type AppOrigin = 'Hkey' | 'Shortcut' | 'Uwp';
+
 
 export interface LaunchableItem {
   name: string;
@@ -11,6 +13,7 @@ export interface LaunchableItem {
   item_type: ItemType;
   source: Source;
   action?: string;
+  origin?: AppOrigin;
 }
 
 export interface CommandKeyword {
@@ -28,6 +31,8 @@ export interface Command {
   icon: string;
   source: Source;
   action: CommandAction;
+  path?: string;
+  origin?: AppOrigin;
 }
 
 export enum Theme {

@@ -7,14 +7,8 @@ mod macos;
 #[cfg(target_os = "windows")]
 mod windows;
 
+use crate::shared_types::AppOrigin;
 use tauri::command;
-
-#[derive(serde::Serialize, Clone, Debug)]
-pub enum AppOrigin {
-    Hkey,
-    Shortcut,
-    Uwp,
-}
 
 #[derive(serde::Serialize, Clone, Debug)]
 pub struct AppInfo {

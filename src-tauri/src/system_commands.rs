@@ -90,6 +90,7 @@ pub async fn get_system_commands_as_launchable_items(app: AppHandle) -> Vec<Laun
             item_type: ItemType::App,
             source: ItemSource::Command,
             action: Some(cmd.name.clone()),
+            origin: None,
         })
         .collect()
 }

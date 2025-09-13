@@ -32,6 +32,7 @@ pub async fn get_all_launchable_items(
             },
             source: cmd.source,
             action: Some(cmd.name), // The unique name is the action identifier
+            origin: cmd.origin,
         })
         .collect();
 

@@ -104,6 +104,7 @@ fn get_initial_system_commands() -> Vec<Command> {
             icon: cmd_info.icon.to_string(),
             source: ItemSource::Command,
             action: CommandAction::System(cmd_info.name.to_string()),
+            origin: None,
         })
         .collect()
 }
@@ -133,6 +134,7 @@ async fn get_initial_app_commands() -> Vec<Command> {
                         icon: app_info.icon.unwrap_or_default(),
                         source: ItemSource::Application,
                         action: CommandAction::App(path),
+                        origin: app_info.origin,
                     }
                 })
             })
@@ -159,6 +161,7 @@ async fn get_initial_file_commands(app: &AppHandle) -> Vec<Command> {
             icon: item.icon,
             source: ItemSource::FileCommand,
             action: CommandAction::File(item.path),
+            origin: None,
         })
         .collect()
 }

@@ -8,12 +8,16 @@
 
   onMount(async () => {
     try {
-      const launchableItems = await invoke<LaunchableItem[]>("get_all_launchable_items");
-      commands = launchableItems.map(item => ({
+      const launchableItems = await invoke<LaunchableItem[]>(
+        "get_all_launchable_items",
+      );
+      commands = launchableItems.map((item) => ({
         ...item,
         title: item.name,
         english_name: item.name,
-        action: { System: item.action || '' } // Placeholder for action
+        action: { System: item.action || "" }, // Placeholder for action
+        path: item.path,
+        origin: item.origin,
       }));
       console.log("Fetched basic commands:", commands);
     } catch (error) {
@@ -89,7 +93,7 @@
     </ul>
   </div>
   <div class="flex-1 overflow-y-auto p-3">
-    <Tabs.Root value="function">
+    <Tabs.Root value="function" class="flex h-full flex-col">
       <Tabs.List
         class="rounded-9px bg-dark-10 shadow-mini-inset dark:bg-background grid w-full grid-cols-2 gap-1 p-1 text-sm leading-[0.01em] font-semibold dark:border dark:border-neutral-600/30"
       >
@@ -106,11 +110,16 @@
           匹配指令
         </Tabs.Trigger>
       </Tabs.List>
-      <Tabs.Content value="function" class="pt-3 select-none">
+      <Tabs.Content
+        value="function"
+        class="flex-1 overflow-y-auto pt-3 select-none"
+      >
         {#each filteredCommands as command}
           <div class="mb-4">
-            <div class="mb-2 flex items-center">
-              <h4 class="font-semibold">{command.title}</h4>
+            <div class="mb-2">
+              <h4 class="text-sm font-semibold">
+                {command.title}
+              </h4>
             </div>
             <div class="flex flex-wrap gap-2">
               {#each command.keywords as keyword}
