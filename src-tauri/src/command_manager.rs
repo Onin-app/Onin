@@ -75,6 +75,13 @@ pub async fn update_command(app: AppHandle, command_to_update: Command) {
     }
 }
 
+#[tauri::command]
+pub async fn refresh_commands(app: AppHandle) {
+    let _commands = generate_and_save_commands(&app).await;
+    // Emit an event to notify the frontend that commands have been refreshed
+    app.emit("commands_refreshed", ()).unwrap();
+}
+
 fn get_initial_system_commands() -> Vec<Command> {
     system_commands::SYSTEM_COMMANDS
         .iter()
@@ -89,6 +96,7 @@ fn get_initial_system_commands() -> Vec<Command> {
                     .map(|&alias| CommandKeyword {
                         name: alias.to_string(),
                         disabled: None,
+                        is_default: Some(true),
                     })
                     .collect();
                 // Ensure title and english_name are also part of keywords so they can be disabled.
@@ -96,12 +104,14 @@ fn get_initial_system_commands() -> Vec<Command> {
                     kws.push(CommandKeyword {
                         name: cmd_info.title.to_string(),
                         disabled: None,
+                        is_default: Some(true),
                     });
                 }
                 if !kws.iter().any(|kw| kw.name == cmd_info.english_name) {
                     kws.push(CommandKeyword {
                         name: cmd_info.english_name.to_string(),
                         disabled: None,
+                        is_default: Some(true),
                     });
                 }
                 kws
@@ -134,6 +144,7 @@ async fn get_initial_app_commands() -> Vec<Command> {
                             .map(|kw| CommandKeyword {
                                 name: kw,
                                 disabled: None,
+                                is_default: Some(true),
                             })
                             .collect(),
                         icon: app_info.icon.unwrap_or_default(),
@@ -162,6 +173,7 @@ async fn get_initial_file_commands(app: &AppHandle) -> Vec<Command> {
             keywords: vec![CommandKeyword {
                 name: item.name,
                 disabled: None,
+                is_default: Some(true),
             }],
             icon: item.icon,
             source: ItemSource::FileCommand,

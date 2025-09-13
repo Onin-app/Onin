@@ -161,6 +161,7 @@ impl FileCommandManager {
             keywords: vec![CommandKeyword {
                 name,
                 disabled: None,
+                is_default: Some(true),
             }],
             path: path_str,
             icon,

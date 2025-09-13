@@ -62,12 +62,13 @@ pub struct LaunchableItem {
     pub origin: Option<AppOrigin>,
 }
 
-
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct CommandKeyword {
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub disabled: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_default: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

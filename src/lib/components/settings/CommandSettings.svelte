@@ -45,6 +45,36 @@
     }
   }
 
+  function addKeyword(commandName: string, newKeyword: string) {
+    if (!newKeyword || !newKeyword.trim()) return;
+    const command = commands.find((cmd) => cmd.name === commandName);
+    if (command && !command.keywords.some((kw) => kw.name === newKeyword)) {
+      command.keywords.push({
+        name: newKeyword,
+        disabled: false,
+        is_default: false,
+      });
+      commands = [...commands];
+      updateCommand(command);
+    }
+  }
+
+  function removeKeyword(commandName: string, keywordName: string) {
+    const command = commands.find((cmd) => cmd.name === commandName);
+    if (command) {
+      const keywordToRemove = command.keywords.find(
+        (kw) => kw.name === keywordName,
+      );
+      if (keywordToRemove && !keywordToRemove.is_default) {
+        command.keywords = command.keywords.filter(
+          (kw) => kw.name !== keywordName,
+        );
+        commands = [...commands];
+        updateCommand(command);
+      }
+    }
+  }
+
   const sourceNameMap = {
     Command: "基础常用",
     Application: "程序启动",
@@ -83,7 +113,9 @@
         >
           <Button.Root
             class="h-full w-full cursor-pointer px-2 py-1 text-left"
-            onclick={() => (activeCategory = category)}
+            onclick={() => {
+              activeCategory = category;
+            }}
           >
             {category.name}
           </Button.Root>
@@ -122,45 +154,73 @@
             </div>
             <div class="flex flex-wrap gap-2">
               {#each command.keywords as keyword}
-                <DropdownMenu.Root>
-                  <DropdownMenu.Trigger
-                    class="border-input text-foreground shadow-btn hover:bg-muted inline-flex cursor-pointer items-center justify-center rounded-full border px-2 py-1 text-sm font-medium select-none active:scale-[0.98] {keyword.disabled
-                      ? 'bg-neutral-200 text-neutral-500 line-through dark:bg-neutral-700 dark:text-neutral-400'
-                      : 'bg-white dark:bg-neutral-800'}"
-                  >
-                    {keyword.name}
-                  </DropdownMenu.Trigger>
-                  <DropdownMenu.Portal>
-                    <DropdownMenu.Content
-                      class="border-muted bg-background shadow-popover w-[229px] rounded-xl border px-1 py-1.5 outline-hidden focus-visible:outline-hidden"
-                      sideOffset={8}
-                      align="start"
+                <div
+                  class="border-input text-foreground shadow-btn hover:bg-muted group relative inline-flex cursor-pointer items-center justify-center rounded-full border px-2 py-1 text-sm font-medium select-none active:scale-[0.98] {keyword.disabled
+                    ? 'bg-neutral-200 text-neutral-500 line-through dark:bg-neutral-700 dark:text-neutral-400'
+                    : 'bg-white dark:bg-neutral-800'}"
+                >
+                  <DropdownMenu.Root>
+                    <DropdownMenu.Trigger>
+                      {keyword.name}
+                    </DropdownMenu.Trigger>
+                    <DropdownMenu.Portal>
+                      <DropdownMenu.Content
+                        class="border-muted bg-background shadow-popover w-[229px] rounded-xl border px-1 py-1.5 outline-hidden focus-visible:outline-hidden"
+                        sideOffset={8}
+                        align="start"
+                      >
+                        <DropdownMenu.Item
+                          class="rounded-button data-highlighted:bg-muted flex h-10 items-center py-3 pr-1.5 pl-3 text-sm font-medium ring-0! ring-transparent! select-none focus-visible:outline-none"
+                        >
+                          <Button.Root
+                            class="w-full"
+                            onclick={() => {
+                              executeCommand(command.name);
+                            }}
+                          >
+                            执行指令
+                          </Button.Root>
+                        </DropdownMenu.Item>
+                        <DropdownMenu.Item
+                          class="rounded-button data-highlighted:bg-muted flex h-10 items-center py-3 pr-1.5 pl-3 text-sm font-medium ring-0! ring-transparent! select-none focus-visible:outline-none"
+                        >
+                          <Button.Root
+                            class="w-full"
+                            onclick={() => {
+                              toggleKeywordDisabled(command.name, keyword.name);
+                            }}
+                          >
+                            {keyword.disabled ? "启用指令" : "禁用指令"}
+                          </Button.Root>
+                        </DropdownMenu.Item>
+                      </DropdownMenu.Content>
+                    </DropdownMenu.Portal>
+                  </DropdownMenu.Root>
+                  {#if !keyword.is_default}
+                    <button
+                      class="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white group-hover:flex"
+                      onclick={() => {
+                        removeKeyword(command.name, keyword.name);
+                      }}
                     >
-                      <DropdownMenu.Item
-                        class="rounded-button data-highlighted:bg-muted flex h-10 items-center py-3 pr-1.5 pl-3 text-sm font-medium ring-0! ring-transparent! select-none focus-visible:outline-none"
-                      >
-                        <Button.Root
-                          class="w-full"
-                          onclick={() => executeCommand(command.name)}
-                        >
-                          执行指令
-                        </Button.Root>
-                      </DropdownMenu.Item>
-                      <DropdownMenu.Item
-                        class="rounded-button data-highlighted:bg-muted flex h-10 items-center py-3 pr-1.5 pl-3 text-sm font-medium ring-0! ring-transparent! select-none focus-visible:outline-none"
-                      >
-                        <Button.Root
-                          class="w-full"
-                          onclick={() =>
-                            toggleKeywordDisabled(command.name, keyword.name)}
-                        >
-                          {keyword.disabled ? "启用指令" : "禁用指令"}
-                        </Button.Root>
-                      </DropdownMenu.Item>
-                    </DropdownMenu.Content>
-                  </DropdownMenu.Portal>
-                </DropdownMenu.Root>
+                      &times;
+                    </button>
+                  {/if}
+                </div>
               {/each}
+              <div>
+                <input
+                  type="text"
+                  placeholder="添加关键字"
+                  class="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-9 w-24 rounded-md border px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  onkeydown={(e) => {
+                    if (e.key === 'Enter') {
+                      addKeyword(command.name, e.currentTarget.value);
+                      e.currentTarget.value = '';
+                    }
+                  }}
+                />
+              </div>
             </div>
           </div>
         {/each}

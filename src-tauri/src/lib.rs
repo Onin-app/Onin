@@ -137,6 +137,7 @@ pub fn run() {
             // Command manager commands
             command_manager::get_commands,
             command_manager::update_command,
+            command_manager::refresh_commands,
             // Shortcut and alias manager commands
             shortcut_alias_manager::get_command_aliases,
             shortcut_alias_manager::add_command_alias,

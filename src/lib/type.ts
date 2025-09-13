@@ -19,6 +19,7 @@ export interface LaunchableItem {
 export interface CommandKeyword {
   name: string;
   disabled?: boolean;
+  is_default?: boolean;
 }
 
 export type CommandAction = { System: string } | { App: string };
