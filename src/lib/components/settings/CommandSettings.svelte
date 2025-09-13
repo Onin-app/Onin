@@ -24,6 +24,15 @@
     }
   }
 
+  async function executeCommand(commandName: string) {
+    try {
+      await invoke("execute_command", { name: commandName });
+      console.log("Command executed:", commandName);
+    } catch (error) {
+      console.error("Failed to execute command:", error);
+    }
+  }
+
   function toggleKeywordDisabled(commandName: string, keywordName: string) {
     const command = commands.find((cmd) => cmd.name === commandName);
     if (command) {
@@ -127,6 +136,16 @@
                       sideOffset={8}
                       align="start"
                     >
+                      <DropdownMenu.Item
+                        class="rounded-button data-highlighted:bg-muted flex h-10 items-center py-3 pr-1.5 pl-3 text-sm font-medium ring-0! ring-transparent! select-none focus-visible:outline-none"
+                      >
+                        <Button.Root
+                          class="w-full"
+                          onclick={() => executeCommand(command.name)}
+                        >
+                          执行指令
+                        </Button.Root>
+                      </DropdownMenu.Item>
                       <DropdownMenu.Item
                         class="rounded-button data-highlighted:bg-muted flex h-10 items-center py-3 pr-1.5 pl-3 text-sm font-medium ring-0! ring-transparent! select-none focus-visible:outline-none"
                       >
