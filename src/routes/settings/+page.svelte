@@ -7,12 +7,13 @@
   import GeneralSettings from "$lib/components/settings/GeneralSettings.svelte";
   import FileCommandSettings from "$lib/components/settings/FileCommandSettings.svelte";
   import CommandSettings from "$lib/components/settings/CommandSettings.svelte";
+  import ShortcutSettings from "$lib/components/settings/ShortcutSettings.svelte";
   import { escapeHandler } from "$lib/stores/escapeHandler";
 
   interface SettingItem {
     name: string;
     id: string;
-    component: typeof GeneralSettings | typeof FileCommandSettings | typeof CommandSettings;
+    component: typeof GeneralSettings | typeof FileCommandSettings | typeof CommandSettings | typeof ShortcutSettings;
     icon: string;
   }
 
@@ -34,6 +35,12 @@
       id: "commands",
       component: CommandSettings,
       icon: "icon-commands",
+    },
+    {
+      name: "快捷方式",
+      id: "shortcuts",
+      component: ShortcutSettings,
+      icon: "icon-shortcuts",
     },
   ];
 

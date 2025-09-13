@@ -18,6 +18,7 @@ mod plugin_api;
 mod plugin_manager;
 pub mod shared_types;
 mod shortcut_manager;
+mod shortcut_alias_manager;
 mod system_commands;
 mod tray_manager;
 mod unified_launch_manager;
@@ -136,6 +137,11 @@ pub fn run() {
             // Command manager commands
             command_manager::get_commands,
             command_manager::update_command,
+            // Shortcut and alias manager commands
+            shortcut_alias_manager::get_command_aliases,
+            shortcut_alias_manager::add_command_alias,
+            shortcut_alias_manager::update_command_alias,
+            shortcut_alias_manager::remove_command_alias,
         ])
         .setup(move |app| {
             // Ensure the app data directory exists on startup.
