@@ -13,7 +13,11 @@
   interface SettingItem {
     name: string;
     id: string;
-    component: typeof GeneralSettings | typeof FileCommandSettings | typeof CommandSettings | typeof ShortcutSettings;
+    component:
+      | typeof GeneralSettings
+      | typeof FileCommandSettings
+      | typeof CommandSettings
+      | typeof ShortcutSettings;
     icon: string;
   }
 
@@ -37,7 +41,7 @@
       icon: "icon-commands",
     },
     {
-      name: "快捷方式",
+      name: "全局快捷键",
       id: "shortcuts",
       component: ShortcutSettings,
       icon: "icon-shortcuts",
