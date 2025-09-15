@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Button, DropdownMenu, Switch, Tabs } from "bits-ui";
+  import { Button, DropdownMenu, Tabs } from "bits-ui";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import type { Command } from "$lib/type";
@@ -146,7 +146,7 @@
         class="flex-1 overflow-y-auto pt-3 select-none"
       >
         {#each filteredCommands as command}
-          <div class="mb-4">
+          <div class="group/box mb-4">
             <div class="mb-2">
               <h4 class="text-sm font-semibold">
                 {command.title}
@@ -155,7 +155,7 @@
             <div class="flex flex-wrap gap-2">
               {#each command.keywords as keyword}
                 <div
-                  class="border-input text-foreground shadow-btn hover:bg-muted group relative inline-flex cursor-pointer items-center justify-center rounded-full border px-2 py-1 text-sm font-medium select-none active:scale-[0.98] {keyword.disabled
+                  class="group/button border-input text-foreground shadow-btn hover:bg-muted relative inline-flex cursor-pointer items-center justify-center rounded-full border px-2 py-1 text-sm font-medium select-none active:scale-[0.98] {keyword.disabled
                     ? 'bg-neutral-200 text-neutral-500 line-through dark:bg-neutral-700 dark:text-neutral-400'
                     : 'bg-white dark:bg-neutral-800'}"
                 >
@@ -197,26 +197,26 @@
                     </DropdownMenu.Portal>
                   </DropdownMenu.Root>
                   {#if !keyword.is_default}
-                    <button
-                      class="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white group-hover:flex"
+                    <Button.Root
+                      class="absolute -top-1 -right-1 hidden h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white group-hover/button:flex"
                       onclick={() => {
                         removeKeyword(command.name, keyword.name);
                       }}
                     >
                       &times;
-                    </button>
+                    </Button.Root>
                   {/if}
                 </div>
               {/each}
-              <div>
+              <div class="hidden group-hover/box:block">
                 <input
                   type="text"
                   placeholder="添加关键字"
-                  class="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-9 w-24 rounded-md border px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  class="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-7 w-24 rounded-md border px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                   onkeydown={(e) => {
-                    if (e.key === 'Enter') {
+                    if (e.key === "Enter") {
                       addKeyword(command.name, e.currentTarget.value);
-                      e.currentTarget.value = '';
+                      e.currentTarget.value = "";
                     }
                   }}
                 />
