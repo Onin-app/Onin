@@ -85,19 +85,18 @@ pub fn run() {
         )))
         // Manage the shortcut state
         .manage(shortcut_manager::ShortcutState {
-            toggle_shortcut: Mutex::new(
-                Shortcut::from_str(shortcut_manager::DEFAULT_TOGGLE_SHORTCUT).unwrap(),
-            ),
+            shortcuts: Mutex::new(vec![]),
         })
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler({
                     let close_window_shortcut_clone = close_window_shortcut.clone();
                     move |app, shortcut, event| {
-                        shortcut_manager::handle_toggle_shortcut(app, shortcut, &event.state);
+                        println!("Shortcut event: {:?}, state: {:?}", shortcut, event.state());
+                        shortcut_manager::handle_global_shortcut(app, shortcut, event.state());
 
                         if shortcut == &close_window_shortcut_clone {
-                            if event.state == ShortcutState::Pressed {
+                            if event.state() == ShortcutState::Pressed {
                                 if let Some(window) = app.get_webview_window("main") {
                                     window.emit("esc_key_pressed", ()).unwrap_or_default();
                                 }
@@ -119,8 +118,11 @@ pub fn run() {
             tray_manager::set_tray_visibility,
             tray_manager::is_tray_visible,
             // Add shortcut manager commands
-            shortcut_manager::get_toggle_shortcut,
+            shortcut_manager::get_shortcuts,
+            shortcut_manager::add_shortcut,
+            shortcut_manager::remove_shortcut,
             shortcut_manager::set_toggle_shortcut,
+            shortcut_manager::get_toggle_shortcut,
             // Add startup items manager commands
             file_command_manager::get_file_commands,
             file_command_manager::add_file_commands,
@@ -161,6 +163,16 @@ pub fn run() {
                 // Load and register the initial toggle shortcut from the store
                 if let Err(e) = shortcut_manager::setup_shortcuts(app) {
                     eprintln!("[ERROR] Failed to set up shortcuts: {}", e);
+                }
+
+                // Register the ESC shortcut
+                use tauri_plugin_global_shortcut::GlobalShortcutExt;
+                let close_window_shortcut =
+                    Shortcut::from_str(window_manager::CLOSE_WINDOW_SHORTCUT_STR).unwrap();
+                if !app.global_shortcut().is_registered(close_window_shortcut.clone()) {
+                    if let Err(e) = app.global_shortcut().register(close_window_shortcut) {
+                        eprintln!("[ERROR] Failed to register ESC shortcut: {}", e);
+                    }
                 }
 
                 // 创建托盘图标

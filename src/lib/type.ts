@@ -41,3 +41,9 @@ export enum Theme {
   DARK = "dark",
   SYSTEM = "system",
 }
+
+export interface Shortcut {
+  shortcut: string;
+  command_name: string;
+  readonly?: boolean;
+}
