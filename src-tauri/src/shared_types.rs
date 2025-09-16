@@ -95,4 +95,6 @@ pub struct Command {
 pub struct Shortcut {
     pub shortcut: String,
     pub command_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command_title: Option<String>,
 }

@@ -1,4 +1,4 @@
-use crate::shared_types::Shortcut as AppShortcut;
+use crate::{command_manager, shared_types::Shortcut as AppShortcut};
 use std::fs;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -54,16 +54,40 @@ fn save_shortcuts_to_disk(app: &AppHandle, shortcuts: &[AppShortcut]) {
 }
 
 #[tauri::command]
-pub fn get_shortcuts(state: State<ShortcutState>) -> Result<Vec<AppShortcut>, String> {
-    let shortcuts = state
+pub async fn get_shortcuts(
+    app: AppHandle,
+    state: State<'_, ShortcutState>,
+) -> Result<Vec<AppShortcut>, String> {
+    let mut shortcuts = state
         .shortcuts
         .lock()
-        .map_err(|_| "Failed to lock shortcut state".to_string())?;
-    Ok(shortcuts.clone())
+        .map_err(|_| "Failed to lock shortcut state".to_string())?
+        .clone();
+
+    let commands = command_manager::load_commands(&app).await;
+
+    for shortcut in shortcuts.iter_mut() {
+        if let Some(command) = commands
+            .iter()
+            .find(|cmd| cmd.name == shortcut.command_name)
+        {
+            shortcut.command_title = Some(command.title.clone());
+        }
+    }
+
+    Ok(shortcuts)
 }
 
 #[tauri::command]
 pub async fn add_shortcut(
+    app: AppHandle,
+    state: State<'_, ShortcutState>,
+    mut shortcut: AppShortcut,
+) -> Result<(), String> {
+    add_shortcut_sync(app, state, shortcut)
+}
+
+fn add_shortcut_sync(
     app: AppHandle,
     state: State<'_, ShortcutState>,
     shortcut: AppShortcut,
@@ -153,14 +177,14 @@ fn normalize_shortcut_string(shortcut_str: &str) -> String {
             "ctrl" | "control" => modifiers.push("ctrl"),
             "alt" => modifiers.push("alt"),
             "shift" => modifiers.push("shift"),
-            "cmd" | "command" | "meta" => modifiers.push("cmd"),
+            "cmd" | "command" | "meta" | "super" => modifiers.push("cmd"),
             _ => {
-                // Handle cases like "KeyN" -> "N"
-                if part.starts_with("Key") && part.len() > 3 {
-                    key = part[3..].to_string().to_uppercase();
-                } else {
-                    key = part.to_string();
+                // Handle cases like "KeyN" -> "N" or "B" -> "B"
+                let mut key_part = *part;
+                if key_part.starts_with("Key") && key_part.len() > 3 {
+                    key_part = &key_part[3..];
                 }
+                key = key_part.to_string().to_uppercase();
             }
         }
     }
@@ -268,6 +292,7 @@ pub async fn set_toggle_shortcut(
         let new_shortcut = AppShortcut {
             shortcut: shortcut_str.clone(),
             command_name: toggle_command_name.to_string(),
+            command_title: Some("显示/隐藏窗口".to_string()),
         };
         let new_tauri_shortcut = Shortcut::from_str(&shortcut_str).map_err(|e| e.to_string())?;
         app.global_shortcut()

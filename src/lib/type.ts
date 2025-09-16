@@ -45,5 +45,6 @@ export enum Theme {
 export interface Shortcut {
   shortcut: string;
   command_name: string;
+  command_title?: string;
   readonly?: boolean;
 }

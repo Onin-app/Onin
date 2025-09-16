@@ -86,37 +86,32 @@
     <div></div>
   </div>
 
-  {#each shortcuts as shortcut, index}
+  {#each shortcuts as shortcutInfo, index}
     <div
       class="mb-2 grid grid-cols-[1fr_1fr_auto] items-center gap-4 rounded"
-      class:opacity-50={shortcut.readonly}
+      class:opacity-50={shortcutInfo.readonly}
     >
       <ShortcutInput
-        bind:value={shortcut.shortcut}
-        onSave={() => saveShortcut(shortcut)}
-        disabled={shortcut.readonly}
+        bind:value={shortcutInfo.shortcut}
+        onSave={() => saveShortcut(shortcutInfo)}
+        disabled={shortcutInfo.readonly}
       />
-      <!-- <select
-        bind:value={shortcut.command_name}
-        class="bg-background text-foreground w-full rounded border p-1"
-        on:change={() => saveShortcut(shortcut)}
-        disabled={shortcut.readonly}
-      >
-        <option value="" disabled>选择一个指令</option>
-        {#if shortcut.readonly}
-          <option value={shortcut.command_name} selected
-            >{shortcut.command_name}</option
-          >
-        {/if}
-        {#each commands as command}
-          <option value={command.name}>{command.title}</option>
-        {/each}
-      </select> -->
       <Combobox.Root
-        type="multiple"
-        name="favoriteFruit"
+        type="single"
+        name="command"
+        disabled={shortcutInfo.readonly}
+        inputValue={shortcutInfo.readonly
+          ? "显示/隐藏窗口"
+          : shortcutInfo.command_title}
         onOpenChange={(o) => {
           if (!o) searchValue = "";
+        }}
+        onValueChange={(value) => {
+          saveShortcut({
+            shortcut: shortcutInfo.shortcut,
+            command_name: value,
+          });
+          searchValue = "";
         }}
       >
         <div class="relative">
@@ -128,8 +123,8 @@
           <Combobox.Input
             oninput={(e) => (searchValue = e.currentTarget.value)}
             class="h-input rounded-9px border-border-input bg-background placeholder:text-foreground-alt/50 focus:ring-foreground focus:ring-offset-background inline-flex w-[296px] touch-none truncate border px-11 text-base transition-colors focus:ring-2 focus:ring-offset-2 focus:outline-hidden sm:text-sm"
-            placeholder="Search a fruit"
-            aria-label="Search a fruit"
+            placeholder="搜索一个指令"
+            aria-label="搜索一个指令"
           />
           <Combobox.Trigger
             class="absolute end-3 top-1/2 size-6 -translate-y-1/2 touch-none"
@@ -151,8 +146,8 @@
               {#each filteredCommands as command, i (i + command.title)}
                 <Combobox.Item
                   class="rounded-button data-highlighted:bg-muted flex h-10 w-full items-center py-3 pr-1.5 pl-5 text-sm capitalize outline-hidden select-none"
-                  value={command.title}
-                  label={command.name}
+                  value={command.name}
+                  label={command.title}
                 >
                   {#snippet children({ selected })}
                     {command.title}
@@ -180,7 +175,7 @@
       <Button.Root
         class="rounded-input shadow-mini inline-flex h-8 w-8 items-center justify-center bg-red-500 p-0 text-lg font-semibold text-white hover:bg-red-600 active:scale-[0.98] active:transition-all"
         onclick={() => removeShortcut(index)}
-        disabled={shortcut.readonly}
+        disabled={shortcutInfo.readonly}
       >
         &times;
       </Button.Root>
