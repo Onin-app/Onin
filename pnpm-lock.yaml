@@ -72,6 +72,9 @@ importers:
       '@types/pinyin':
         specifier: ^2.10.2
         version: 2.10.2
+      phosphor-svelte:
+        specifier: ^3.0.1
+        version: 3.0.1(svelte@5.34.7)(vite@7.0.0(jiti@2.4.2)(lightningcss@1.30.1))
       prettier:
         specifier: ^3.6.2
         version: 3.6.2
@@ -1117,6 +1120,9 @@ packages:
   esrap@1.4.9:
     resolution: {integrity: sha512-3OMlcd0a03UGuZpPeUC1HxR3nA23l+HEyCiZw3b3FumJIN9KphoGzDJKMXI1S72jVS1dsenDyQC0kJlO1U9E1g==}
 
+  estree-walker@3.0.3:
+    resolution: {integrity: sha512-7RUKfXgSMMkzt6ZuXmqapOurLGPPfgj6l9uRZ7lRGolvk0y2yocc35LdcxKC5PQZdn2DMqioAQ2NoWcrTKmm6g==}
+
   execa@5.1.1:
     resolution: {integrity: sha512-8uSpZZocAZRBAPIEINJj3Lo9HyGitllczc27Eh5YYojjMFMn8yHMDMaUHE2Jqfq05D/wucwI4JGURyXt1vchyg==}
     engines: {node: '>=10'}
@@ -1865,6 +1871,15 @@ packages:
   path-type@6.0.0:
     resolution: {integrity: sha512-Vj7sf++t5pBD637NSfkxpHSMfWaeig5+DKWLhcqIYx6mWQz5hdJTGDVMQiJcw1ZYkhs7AazKDGpRVji1LJCZUQ==}
     engines: {node: '>=18'}
+
+  phosphor-svelte@3.0.1:
+    resolution: {integrity: sha512-QuxdzWCBjNZXglk4XpmaKb+JRA6XgKOYWpBY8k82NZwxO5ec7u2iFuueAijKYgj/7hLWHtreAPc2Q5uZFNTRSQ==}
+    peerDependencies:
+      svelte: ^5.0.0 || ^5.0.0-next.96
+      vite: '>=5'
+    peerDependenciesMeta:
+      vite:
+        optional: true
 
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
@@ -3363,6 +3378,10 @@ snapshots:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.0
 
+  estree-walker@3.0.3:
+    dependencies:
+      '@types/estree': 1.0.8
+
   execa@5.1.1:
     dependencies:
       cross-spawn: 7.0.6
@@ -3997,6 +4016,14 @@ snapshots:
   path-type@4.0.0: {}
 
   path-type@6.0.0: {}
+
+  phosphor-svelte@3.0.1(svelte@5.34.7)(vite@7.0.0(jiti@2.4.2)(lightningcss@1.30.1)):
+    dependencies:
+      estree-walker: 3.0.3
+      magic-string: 0.30.17
+      svelte: 5.34.7
+    optionalDependencies:
+      vite: 7.0.0(jiti@2.4.2)(lightningcss@1.30.1)
 
   picocolors@1.1.1: {}
 

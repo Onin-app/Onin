@@ -3,6 +3,13 @@
   import { onMount } from "svelte";
   import ShortcutInput from "./ShortcutInput.svelte";
   import { invoke } from "@tauri-apps/api/core";
+  import {
+    CaretUpDown,
+    Check,
+    Command as CommandIcon,
+    CaretDoubleUp,
+    CaretDoubleDown,
+  } from "phosphor-svelte";
   import type { Command, Shortcut } from "$lib/type";
 
   let shortcuts = $state<Shortcut[]>([]);
@@ -116,11 +123,9 @@
               searchValue = "";
             }}
           >
-            <span
-              class="text-muted-foreground pointer-events-none absolute start-3 top-1/2 size-6 -translate-y-1/2"
-            >
-              😍
-            </span>
+            <CommandIcon
+              class="text-muted-foreground absolute start-3 top-1/2 size-6 -translate-y-1/2"
+            />
             <Combobox.Input
               oninput={(e) => (searchValue = e.currentTarget.value)}
               class="h-input rounded-9px border-border-input bg-background placeholder:text-foreground-alt/50 focus:ring-foreground focus:ring-offset-background inline-flex w-full touch-none truncate border px-11 text-base transition-colors focus:ring-2 focus:ring-offset-2 focus:outline-hidden sm:text-sm"
@@ -130,7 +135,7 @@
             <Combobox.Trigger
               class="absolute end-3 top-1/2 size-6 -translate-y-1/2 touch-none"
             >
-              <span class="text-muted-foreground size-6">😇</span>
+              <CaretUpDown class="text-muted-foreground size-6" />
             </Combobox.Trigger>
             <Combobox.Portal>
               <Combobox.Content
@@ -140,7 +145,7 @@
                 <Combobox.ScrollUpButton
                   class="flex w-full items-center justify-center py-1"
                 >
-                  🔼
+                  <CaretDoubleUp class="size-3" />
                 </Combobox.ScrollUpButton>
                 <Combobox.Viewport class="p-1">
                   {#each filteredCommands as command, i (i + command.title)}
@@ -153,7 +158,7 @@
                         {command.title}
                         {#if selected}
                           <div class="ml-auto">
-                            <span>✓</span>
+                            <Check />
                           </div>
                         {/if}
                       {/snippet}
@@ -167,7 +172,7 @@
                 <Combobox.ScrollDownButton
                   class="flex w-full items-center justify-center py-1"
                 >
-                  🔽
+                  <CaretDoubleDown class="size-3" />
                 </Combobox.ScrollDownButton>
               </Combobox.Content>
             </Combobox.Portal>
