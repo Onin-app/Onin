@@ -6,6 +6,7 @@ pub enum ItemSource {
     Custom,      // User-defined items (files, folders, URLs, etc.)
     Command,     // System commands
     FileCommand, // User-defined file commands
+    Plugin,      // Plugins
 }
 
 impl Default for ItemSource {
@@ -76,6 +77,7 @@ pub enum CommandAction {
     System(String),
     App(String), // The string will hold the executable path
     File(String),
+    Plugin(String), // The string will hold the plugin id
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

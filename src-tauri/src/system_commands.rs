@@ -1,5 +1,5 @@
 use crate::command_manager;
-use crate::installed_apps;
+use crate::{installed_apps, plugin_manager};
 use crate::shared_types::{Command, CommandAction, IconType, ItemSource, ItemType, LaunchableItem};
 use tauri::{command, AppHandle, Manager};
 
@@ -118,6 +118,14 @@ pub async fn execute_command(name: String, app: AppHandle, window: tauri::Webvie
             CommandAction::File(path) => {
                 if let Err(e) = opener::open(path) {
                     eprintln!("Failed to open file {}: {}", path, e);
+                }
+            }
+            CommandAction::Plugin(plugin_id) => {
+                let plugin_store = app.state::<plugin_manager::PluginStore>();
+                if let Err(e) =
+                    plugin_manager::execute_plugin_entry(app.clone(), plugin_store, plugin_id.clone())
+                {
+                    eprintln!("Failed to execute plugin {}: {}", plugin_id, e);
                 }
             }
         }

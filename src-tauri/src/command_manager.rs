@@ -1,6 +1,6 @@
 use crate::shared_types::{Command, CommandAction, CommandKeyword, ItemSource};
-use crate::{file_command_manager, installed_apps, system_commands};
-use std::fs;
+use crate::{file_command_manager, installed_apps, plugin_manager, system_commands};
+use std::{collections::HashSet, fs};
 use std::path::PathBuf;
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -18,6 +18,8 @@ async fn generate_and_save_commands(app: &AppHandle) -> Vec<Command> {
     initial_commands.extend(app_commands);
     let file_commands = get_initial_file_commands(app).await;
     initial_commands.extend(file_commands);
+    let plugin_commands = get_initial_plugin_commands(app);
+    initial_commands.extend(plugin_commands);
     save_commands(app, &initial_commands);
     initial_commands
 }
@@ -35,16 +37,53 @@ pub async fn load_commands(app: &AppHandle) -> Vec<Command> {
     }
 
     match fs::read_to_string(&path) {
-        Ok(json_str) => match serde_json::from_str(&json_str) {
-            Ok(commands) => commands,
-            Err(e) => {
+        Ok(json_str) => {
+            let result: Result<Vec<Command>, serde_json::Error> = serde_json::from_str(&json_str);
+            match result {
+                Ok(mut commands) => {
+                    let installed_plugins = get_initial_plugin_commands(app);
+                    let installed_plugins_map: std::collections::HashMap<_, _> =
+                        installed_plugins
+                            .into_iter()
+                            .map(|p| (p.name.clone(), p))
+                            .collect();
+
+                    let final_commands: Vec<Command> = commands
+                        .iter()
+                        .filter(|c| c.source != ItemSource::Plugin)
+                        .cloned()
+                        .collect();
+
+                    let mut final_plugins: Vec<Command> = Vec::new();
+                    for (name, plugin_command) in installed_plugins_map {
+                        // Find if this plugin command already exists in the saved commands
+                        let existing_command = commands
+                            .iter()
+                            .find(|c| c.source == ItemSource::Plugin && c.name == name);
+
+                        if let Some(existing) = existing_command {
+                            // If it exists, keep the saved version (with user changes)
+                            final_plugins.push(existing.clone());
+                        } else {
+                            // If it's a new plugin, add it
+                            final_plugins.push(plugin_command);
+                        }
+                    }
+
+                    let mut mutable_final_commands = final_commands;
+                    mutable_final_commands.extend(final_plugins);
+                    save_commands(app, &mutable_final_commands);
+                    mutable_final_commands
+                }
+                Err(e) => {
                 eprintln!("Failed to parse commands.json: {}. Deleting and regenerating.", e);
                 if let Err(err) = fs::remove_file(&path) {
                     eprintln!("Failed to delete corrupted commands.json: {}", err);
                 }
-                generate_and_save_commands(app).await
+                    generate_and_save_commands(app).await
+                }
             }
-        },
+        }
         Err(e) => {
             eprintln!("Failed to read commands.json: {}. Regenerating.", e);
             generate_and_save_commands(app).await
@@ -181,4 +220,31 @@ async fn get_initial_file_commands(app: &AppHandle) -> Vec<Command> {
             origin: None,
         })
         .collect()
+}
+
+fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
+    let plugin_store: tauri::State<plugin_manager::PluginStore> = app.state();
+    match plugin_manager::load_plugins(app.clone(), plugin_store) {
+        Ok(plugins) => plugins
+            .into_iter()
+            .map(|plugin| Command {
+                name: format!("plugin_{}", plugin.manifest.id),
+                title: plugin.manifest.name.clone(),
+                english_name: plugin.manifest.name.clone(),
+                keywords: vec![CommandKeyword {
+                    name: plugin.manifest.name,
+                    disabled: None,
+                    is_default: Some(true),
+                }],
+                icon: "".to_string(), // Plugins might not have icons in the manifest yet
+                source: ItemSource::Plugin,
+                action: CommandAction::Plugin(plugin.manifest.id),
+                origin: None,
+            })
+            .collect(),
+        Err(e) => {
+            eprintln!("Failed to load plugins as commands: {}", e);
+            vec![]
+        }
+    }
 }
