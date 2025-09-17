@@ -100,3 +100,28 @@ pub struct Shortcut {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub command_title: Option<String>,
 }
+
+
+/// Represents a command registered by a plugin.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PluginCommand {
+    /// A unique identifier for the command.
+    pub name: String,
+    /// The name of the command displayed to the user.
+    pub label: String,
+    /// A brief description of what the command does.
+    pub description: String,
+    /// A list of keywords to make the command easier to find.
+    pub keywords: Vec<String>,
+    /// The ID of the plugin that registered this command.
+    pub plugin_id: String,
+}
+
+/// Represents the result of a command execution.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum CommandResult {
+    /// Indicates that the command executed successfully, returning a string result.
+    Success(String),
+    /// Indicates that the command failed to execute, returning an error message.
+    Error(String),
+}

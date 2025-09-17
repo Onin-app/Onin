@@ -135,6 +135,7 @@ pub fn run() {
             plugin_manager::execute_plugin_entry,
             // 注册 notification 命令
             plugin_api::notification::show_notification,
+            plugin_api::command::register_plugin_command,
             // Command manager commands
             command_manager::get_commands,
             command_manager::update_command,
