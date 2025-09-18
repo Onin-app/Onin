@@ -122,9 +122,7 @@ pub async fn execute_command(name: String, app: AppHandle, window: tauri::Webvie
             }
             CommandAction::Plugin(plugin_id) => {
                 let plugin_store = app.state::<plugin_manager::PluginStore>();
-                if let Err(e) =
-                    plugin_manager::execute_plugin_entry(app.clone(), plugin_store, plugin_id.clone())
-                {
+                if let Err(e) = plugin_manager::execute_plugin_entry(app.clone(), plugin_store, plugin_id.clone()) {
                     eprintln!("Failed to execute plugin {}: {}", plugin_id, e);
                 }
             }

@@ -1,6 +1,6 @@
 use crate::shared_types::{Command, CommandAction, CommandKeyword, ItemSource};
 use crate::{file_command_manager, installed_apps, plugin_manager, system_commands};
-use std::{collections::HashSet, fs};
+use std::fs;
 use std::path::PathBuf;
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -40,13 +40,12 @@ pub async fn load_commands(app: &AppHandle) -> Vec<Command> {
         Ok(json_str) => {
             let result: Result<Vec<Command>, serde_json::Error> = serde_json::from_str(&json_str);
             match result {
-                Ok(mut commands) => {
+                Ok(commands) => {
                     let installed_plugins = get_initial_plugin_commands(app);
-                    let installed_plugins_map: std::collections::HashMap<_, _> =
-                        installed_plugins
-                            .into_iter()
-                            .map(|p| (p.name.clone(), p))
-                            .collect();
+                    let installed_plugins_map: std::collections::HashMap<_, _> = installed_plugins
+                        .into_iter()
+                        .map(|p| (p.name.clone(), p))
+                        .collect();
 
                     let final_commands: Vec<Command> = commands
                         .iter()
@@ -76,10 +75,13 @@ pub async fn load_commands(app: &AppHandle) -> Vec<Command> {
                     mutable_final_commands
                 }
                 Err(e) => {
-                eprintln!("Failed to parse commands.json: {}. Deleting and regenerating.", e);
-                if let Err(err) = fs::remove_file(&path) {
-                    eprintln!("Failed to delete corrupted commands.json: {}", err);
-                }
+                    eprintln!(
+                        "Failed to parse commands.json: {}. Deleting and regenerating.",
+                        e
+                    );
+                    if let Err(err) = fs::remove_file(&path) {
+                        eprintln!("Failed to delete corrupted commands.json: {}", err);
+                    }
                     generate_and_save_commands(app).await
                 }
             }
@@ -247,4 +249,29 @@ fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
             vec![]
         }
     }
+}
+
+// 获取插件中定义的指令
+pub fn get_plugin_commands(
+    app: &AppHandle,
+) -> Vec<(String, Vec<plugin_manager::PluginCommandManifest>)> {
+    let plugin_store: tauri::State<plugin_manager::PluginStore> = app.state();
+    match plugin_manager::load_plugins(app.clone(), plugin_store) {
+        Ok(plugins) => plugins
+            .into_iter()
+            .filter(|plugin| !plugin.manifest.commands.is_empty())
+            .map(|plugin| (plugin.manifest.name, plugin.manifest.commands))
+            .collect(),
+        Err(e) => {
+            eprintln!("Failed to load plugin commands: {}", e);
+            vec![]
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn get_plugin_commands_list(
+    app: AppHandle,
+) -> Vec<(String, Vec<plugin_manager::PluginCommandManifest>)> {
+    get_plugin_commands(&app)
 }

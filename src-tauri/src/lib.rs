@@ -140,6 +140,7 @@ pub fn run() {
             command_manager::get_commands,
             command_manager::update_command,
             command_manager::refresh_commands,
+            command_manager::get_plugin_commands_list,
         ])
         .setup(move |app| {
             // Ensure the app data directory exists on startup.
@@ -170,7 +171,10 @@ pub fn run() {
                 use tauri_plugin_global_shortcut::GlobalShortcutExt;
                 let close_window_shortcut =
                     Shortcut::from_str(window_manager::CLOSE_WINDOW_SHORTCUT_STR).unwrap();
-                if !app.global_shortcut().is_registered(close_window_shortcut.clone()) {
+                if !app
+                    .global_shortcut()
+                    .is_registered(close_window_shortcut.clone())
+                {
                     if let Err(e) = app.global_shortcut().register(close_window_shortcut) {
                         eprintln!("[ERROR] Failed to register ESC shortcut: {}", e);
                     }

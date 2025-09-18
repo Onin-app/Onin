@@ -1,5 +1,6 @@
 use crate::js_runtime;
 use serde::{Deserialize, Serialize};
+
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Mutex;
@@ -9,12 +10,31 @@ use tauri::{Manager, State, WebviewWindowBuilder};
 pub struct PluginStore(pub Mutex<HashMap<String, LoadedPlugin>>);
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PluginCommandManifest {
+    pub code: String,
+    pub name: String,
+    pub description: String,
+    pub keywords: Vec<PluginCommandKeyword>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PluginCommandKeyword {
+    pub name: String,
+    #[serde(rename = "type")]
+    pub keyword_type: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PluginManifest {
     pub id: String,
     pub name: String,
     pub version: String,
     pub description: String,
     pub entry: String,
+    #[serde(rename = "type")]
+    pub plugin_type: Option<String>,
+    #[serde(default)]
+    pub commands: Vec<PluginCommandManifest>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -163,6 +183,8 @@ pub fn execute_plugin_entry(
         Err("Plugin entry file has no extension".to_string())
     }
 }
+
+
 
 pub fn handle_plugin_protocol<R: tauri::Runtime>(
     context: tauri::UriSchemeContext<'_, R>,

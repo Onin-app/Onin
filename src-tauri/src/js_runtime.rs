@@ -99,3 +99,5 @@ pub async fn execute_js(app_handle: &AppHandle, js_code: &str) -> Result<(), Str
         Err(e) => Err(e.to_string()),
     }
 }
+
+
