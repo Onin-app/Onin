@@ -67,3 +67,4 @@ export function registerCommandHandler(
    */
   (globalThis as any).__BAIZE_COMMAND_HANDLER__ = handler;
 }
+

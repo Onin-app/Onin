@@ -269,9 +269,34 @@ pub fn get_plugin_commands(
     }
 }
 
+// 获取插件ID到名称的映射
+pub fn get_plugin_id_name_mapping(
+    app: &AppHandle,
+) -> Vec<(String, String)> {
+    let plugin_store: tauri::State<plugin_manager::PluginStore> = app.state();
+    match plugin_manager::load_plugins(app.clone(), plugin_store) {
+        Ok(plugins) => plugins
+            .into_iter()
+            .filter(|plugin| !plugin.manifest.commands.is_empty())
+            .map(|plugin| (plugin.manifest.name.clone(), plugin.manifest.id.clone()))
+            .collect(),
+        Err(e) => {
+            eprintln!("Failed to load plugin id mapping: {}", e);
+            vec![]
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn get_plugin_commands_list(
     app: AppHandle,
 ) -> Vec<(String, Vec<plugin_manager::PluginCommandManifest>)> {
     get_plugin_commands(&app)
+}
+
+#[tauri::command]
+pub async fn get_plugin_id_mapping(
+    app: AppHandle,
+) -> Vec<(String, String)> {
+    get_plugin_id_name_mapping(&app)
 }

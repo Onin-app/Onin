@@ -358,6 +358,7 @@ name = "baize"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "chrono",
  "deno_core",
  "futures",
  "icns",
@@ -382,6 +383,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "uuid",
  "walkdir",
  "whoami",
  "widestring",

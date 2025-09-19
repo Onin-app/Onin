@@ -13,6 +13,7 @@
   };
   
   let pluginCommands = $state<Array<[string, Array<PluginCommand>]>>([]);
+  let pluginIdMapping = $state<Array<[string, string]>>([]);
   let selectedPlugin = $state<string | null>(null);
 
   onMount(async () => {
@@ -21,7 +22,9 @@
       console.log("Fetched commands:", commands);
       
       pluginCommands = await invoke("get_plugin_commands_list");
+      pluginIdMapping = await invoke("get_plugin_id_mapping");
       console.log("Fetched plugin commands:", pluginCommands);
+      console.log("Fetched plugin ID mapping:", pluginIdMapping);
     } catch (error) {
       console.error("Failed to fetch commands:", error);
     }
@@ -42,6 +45,27 @@
       console.log("Command executed:", commandName);
     } catch (error) {
       console.error("Failed to execute command:", error);
+    }
+  }
+
+  async function executePluginCommand(pluginName: string, commandCode: string, args: any = null) {
+    try {
+      // 从插件ID映射中找到对应的插件ID
+      const pluginMapping = pluginIdMapping.find(([name]) => name === pluginName);
+      if (!pluginMapping) {
+        console.error("Plugin ID mapping not found:", pluginName);
+        return;
+      }
+      
+      const pluginId = pluginMapping[1]; // 获取插件ID
+      const result = await invoke("execute_plugin_command", { 
+        pluginId, 
+        commandName: commandCode, 
+        args 
+      });
+      console.log("Plugin command executed:", commandCode, result);
+    } catch (error) {
+      console.error("Failed to execute plugin command:", error);
     }
   }
 
@@ -199,7 +223,44 @@
                   <div
                     class="group/button border-input text-foreground shadow-btn hover:bg-muted relative inline-flex cursor-pointer items-center justify-center rounded-full border px-2 py-1 text-sm font-medium select-none active:scale-[0.98] bg-white dark:bg-neutral-800"
                   >
-                    {keyword.name}
+                    <DropdownMenu.Root>
+                      <DropdownMenu.Trigger>
+                        {keyword.name}
+                      </DropdownMenu.Trigger>
+                      <DropdownMenu.Portal>
+                        <DropdownMenu.Content
+                          class="border-muted bg-background shadow-popover w-[229px] rounded-xl border px-1 py-1.5 outline-hidden focus-visible:outline-hidden"
+                          sideOffset={8}
+                          align="start"
+                        >
+                          <DropdownMenu.Item
+                            class="rounded-button data-highlighted:bg-muted flex h-10 items-center py-3 pr-1.5 pl-3 text-sm font-medium ring-0! ring-transparent! select-none focus-visible:outline-none"
+                          >
+                            <Button.Root
+                              class="w-full"
+                              onclick={() => {
+                                executePluginCommand(selectedPlugin!, pluginCommand.code);
+                              }}
+                            >
+                              执行指令
+                            </Button.Root>
+                          </DropdownMenu.Item>
+                          <DropdownMenu.Item
+                            class="rounded-button data-highlighted:bg-muted flex h-10 items-center py-3 pr-1.5 pl-3 text-sm font-medium ring-0! ring-transparent! select-none focus-visible:outline-none"
+                          >
+                            <Button.Root
+                              class="w-full"
+                              onclick={() => {
+                                // TODO: 实现插件指令关键词的禁用功能
+                                console.log("禁用插件指令关键词:", keyword.name);
+                              }}
+                            >
+                              禁用指令
+                            </Button.Root>
+                          </DropdownMenu.Item>
+                        </DropdownMenu.Content>
+                      </DropdownMenu.Portal>
+                    </DropdownMenu.Root>
                   </div>
                 {/each}
               </div>

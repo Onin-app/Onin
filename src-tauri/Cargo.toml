@@ -57,6 +57,8 @@ icns = "0.3.0"
 widestring = "0.5.1"
 deno_core = "0.355.0"
 tauri-plugin-notification = "2"
+uuid = { version = "1.0", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"

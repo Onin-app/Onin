@@ -63,6 +63,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .manage(plugin_manager::PluginStore(Default::default()))
+        .manage(plugin_api::command::CommandExecutionStore(Default::default()))
+        .manage(plugin_api::command::PluginLoadedState(Default::default()))
         .register_uri_scheme_protocol("plugin", plugin_manager::handle_plugin_protocol)
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
@@ -135,12 +137,14 @@ pub fn run() {
             plugin_manager::execute_plugin_entry,
             // 注册 notification 命令
             plugin_api::notification::show_notification,
-            plugin_api::command::register_plugin_command,
+            plugin_api::command::execute_plugin_command,
+            plugin_api::command::plugin_command_result,
             // Command manager commands
             command_manager::get_commands,
             command_manager::update_command,
             command_manager::refresh_commands,
             command_manager::get_plugin_commands_list,
+            command_manager::get_plugin_id_mapping,
         ])
         .setup(move |app| {
             // Ensure the app data directory exists on startup.
@@ -154,6 +158,8 @@ pub fn run() {
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 command_manager::init(&app_handle).await;
+                // Initialize plugin runtime manager
+                js_runtime::init_plugin_runtime_manager(app_handle.clone()).await;
             });
 
             // 托管自定义启动项管理器

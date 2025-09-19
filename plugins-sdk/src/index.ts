@@ -13,6 +13,9 @@ export interface NotificationOptions {
   body: string;
 }
 
+// 定义指令处理器类型
+export type CommandHandler = (command: string, args: any) => any | Promise<any>;
+
 /**
  * 显示一个系统通知。
  *
@@ -36,6 +39,29 @@ export function showNotification(options: NotificationOptions): Promise<any> {
   return Promise.reject(new Error(`Unsupported environment: ${environment}`));
 }
 
+/**
+ * 注册指令处理器。
+ *
+ * 当宿主应用执行插件指令时，会调用注册的处理器函数。
+ *
+ * @param handler 指令处理器函数
+ * @returns {Promise<void>} 注册完成时解析的 Promise
+ */
+export function registerCommandHandler(handler: CommandHandler): Promise<void> {
+  const environment = getEnvironment();
+
+  if (environment === RuntimeEnvironment.Headless) {
+    HeadlessAdapter.registerCommandHandler(handler);
+    return Promise.resolve();
+  }
+
+  if (environment === RuntimeEnvironment.Webview) {
+    return WebviewAdapter.registerCommandHandler(handler);
+  }
+
+  return Promise.reject(new Error(`Unsupported environment: ${environment}`));
+}
+
 // 测试对象
 export const test = {
   message: "SDK is working!",
@@ -46,6 +72,7 @@ export const test = {
 // 创建默认导出对象
 const baize = {
   showNotification,
+  registerCommandHandler,
   test,
 };
 
