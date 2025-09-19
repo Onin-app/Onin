@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, State};
 use uuid::Uuid;
-use std::sync::Arc;
 
 // 存储webview插件指令执行请求的状态
 pub struct CommandExecutionStore(pub Mutex<HashMap<String, tokio::sync::oneshot::Sender<CommandExecutionResult>>>);

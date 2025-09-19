@@ -82,7 +82,7 @@ pub async fn get_shortcuts(
 pub async fn add_shortcut(
     app: AppHandle,
     state: State<'_, ShortcutState>,
-    mut shortcut: AppShortcut,
+    shortcut: AppShortcut,
 ) -> Result<(), String> {
     add_shortcut_sync(app, state, shortcut)
 }

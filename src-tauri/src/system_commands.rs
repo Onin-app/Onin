@@ -1,6 +1,6 @@
 use crate::command_manager;
 use crate::{installed_apps, plugin_manager};
-use crate::shared_types::{Command, CommandAction, IconType, ItemSource, ItemType, LaunchableItem};
+use crate::shared_types::{Command, CommandAction, };
 use tauri::{command, AppHandle, Manager};
 
 // --- 1. Single Source of Truth ---
@@ -70,29 +70,6 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
 #[command]
 pub async fn get_basic_commands(app: AppHandle) -> Vec<Command> {
     command_manager::load_commands(&app).await
-}
-
-pub async fn get_system_commands_as_launchable_items(app: AppHandle) -> Vec<LaunchableItem> {
-    let commands = command_manager::load_commands(&app).await;
-    commands
-        .iter()
-        .map(|cmd| LaunchableItem {
-            name: cmd.english_name.clone(),
-            keywords: cmd
-                .keywords
-                .iter()
-                .filter(|kw| kw.disabled.is_none() || !kw.disabled.unwrap())
-                .map(|kw| kw.clone())
-                .collect(),
-            path: "".to_string(),
-            icon: cmd.icon.clone(),
-            icon_type: IconType::Iconfont,
-            item_type: ItemType::App,
-            source: ItemSource::Command,
-            action: Some(cmd.name.clone()),
-            origin: None,
-        })
-        .collect()
 }
 
 // --- 3. Unified Command Executor ---
