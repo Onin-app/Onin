@@ -153,16 +153,49 @@ pub async fn remove_shortcut(
 }
 
 pub fn setup_shortcuts(app: &App) -> Result<(), Box<dyn std::error::Error>> {
+    // macOS 特定检查
+    #[cfg(target_os = "macos")]
+    {
+        // 检查辅助功能权限
+        if !check_accessibility_permissions() {
+            eprintln!("Warning: Accessibility permissions not granted. Global shortcuts may not work properly.");
+            eprintln!("Please grant accessibility permissions in System Preferences > Security & Privacy > Privacy > Accessibility");
+        }
+    }
+
     let shortcuts = load_shortcuts_from_disk(&app.handle());
     let state: State<ShortcutState> = app.state();
     *state.shortcuts.lock().unwrap() = shortcuts.clone();
 
     for shortcut in shortcuts {
-        let tauri_shortcut = Shortcut::from_str(&shortcut.shortcut)?;
-        app.global_shortcut().register(tauri_shortcut)?;
+        match Shortcut::from_str(&shortcut.shortcut) {
+            Ok(tauri_shortcut) => {
+                if let Err(e) = app.global_shortcut().register(tauri_shortcut) {
+                    eprintln!("Failed to register shortcut {}: {}", shortcut.shortcut, e);
+                }
+            }
+            Err(e) => {
+                eprintln!("Invalid shortcut format {}: {}", shortcut.shortcut, e);
+            }
+        }
     }
 
     Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn check_accessibility_permissions() -> bool {
+    use std::process::Command;
+
+    let output = Command::new("osascript")
+        .arg("-e")
+        .arg("tell application \"System Events\" to get name of every process")
+        .output();
+
+    match output {
+        Ok(_) => true,
+        Err(_) => false,
+    }
 }
 
 // Helper function to normalize shortcut strings for comparison
@@ -209,50 +242,72 @@ pub fn handle_global_shortcut(
         return;
     }
 
-    let triggered_shortcut = normalize_shortcut_string(&shortcut.to_string());
+    // 安全地获取快捷键字符串
+    let shortcut_str = shortcut.to_string();
+    let triggered_shortcut = normalize_shortcut_string(&shortcut_str);
+
     println!(
         "Handling shortcut: {} (normalized: {})",
-        shortcut.to_string(),
-        triggered_shortcut
+        shortcut_str, triggered_shortcut
     );
 
+    // 安全地获取状态
     let state: State<ShortcutState> = app.state();
-    let shortcuts = state.shortcuts.lock().unwrap();
+    let shortcuts = match state.shortcuts.lock() {
+        Ok(shortcuts) => shortcuts,
+        Err(e) => {
+            eprintln!("Failed to lock shortcuts state: {}", e);
+            return;
+        }
+    };
 
-    for s in shortcuts.iter() {
+    // 查找匹配的快捷键
+    let matching_shortcut = shortcuts.iter().find(|s| {
         let stored_shortcut = normalize_shortcut_string(&s.shortcut);
         println!(
             "Comparing with stored shortcut: {} (normalized: {})",
             s.shortcut, stored_shortcut
         );
-    }
+        stored_shortcut == triggered_shortcut
+    });
 
-    if let Some(app_shortcut) = shortcuts
-        .iter()
-        .find(|s| normalize_shortcut_string(&s.shortcut) == triggered_shortcut)
-    {
+    if let Some(app_shortcut) = matching_shortcut {
         println!(
             "Found matching shortcut: {} -> {}",
             app_shortcut.shortcut, app_shortcut.command_name
         );
-        if app_shortcut.command_name == "toggle_window" {
-            if let Some(window) = app.get_webview_window("main") {
-                if window.is_visible().unwrap_or(false) {
+
+        // 安全地执行快捷键动作
+        execute_shortcut_action(app, app_shortcut);
+    } else {
+        println!("No matching shortcut found for: {}", triggered_shortcut);
+    }
+}
+
+// 分离快捷键动作执行逻辑，便于错误处理
+fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::Shortcut) {
+    if app_shortcut.command_name == "toggle_window" {
+        if let Some(window) = app.get_webview_window("main") {
+            match window.is_visible() {
+                Ok(true) => {
                     let _ = window.hide();
-                } else {
+                }
+                Ok(false) => {
                     let _ = window.show();
                     let _ = window.set_focus();
                 }
+                Err(e) => {
+                    eprintln!("Error checking window visibility: {}", e);
+                }
             }
-        } else {
-            println!("Executing command: {}", app_shortcut.command_name);
-            let _ = app
-                .get_webview_window("main")
-                .unwrap()
-                .emit("execute_command_by_name", &app_shortcut.command_name);
         }
     } else {
-        println!("No matching shortcut found for: {}", triggered_shortcut);
+        println!("Executing command: {}", app_shortcut.command_name);
+        if let Some(window) = app.get_webview_window("main") {
+            if let Err(e) = window.emit("execute_command_by_name", &app_shortcut.command_name) {
+                eprintln!("Error emitting command: {}", e);
+            }
+        }
     }
 }
 

@@ -41,7 +41,14 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "macOS": {
+      "entitlements": "entitlements.macos.plist",
+      "exceptionDomain": "localhost",
+      "frameworks": [],
+      "providerShortName": null,
+      "signingIdentity": null
+    }
   },
   "plugins": {
     "globalShortcut": {

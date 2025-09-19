@@ -49,16 +49,25 @@ pub fn run() {
     let close_window_shortcut =
         Shortcut::from_str(window_manager::CLOSE_WINDOW_SHORTCUT_STR).unwrap();
 
-    // 在一个单独的线程中启动全局事件监听器
-    std::thread::spawn(|| {
-        let sender = RDEV_EVENT_CHANNEL.0.clone();
-        if let Err(e) = rdev::listen(move |event| {
-            // 尝试发送事件，如果另一端没有监听者也无所谓
-            let _ = sender.send(event);
-        }) {
-            eprintln!("[ERROR] rdev could not listen for events: {:?}", e);
-        }
-    });
+    // 临时禁用 rdev 监听器以解决 macOS 崩溃问题
+    #[cfg(not(target_os = "macos"))]
+    {
+        // 在一个单独的线程中启动全局事件监听器
+        std::thread::spawn(|| {
+            let sender = RDEV_EVENT_CHANNEL.0.clone();
+            if let Err(e) = rdev::listen(move |event| {
+                // 尝试发送事件，如果另一端没有监听者也无所谓
+                let _ = sender.send(event);
+            }) {
+                eprintln!("[ERROR] rdev could not listen for events: {:?}", e);
+            }
+        });
+    }
+    
+    #[cfg(target_os = "macos")]
+    {
+        eprintln!("[INFO] rdev listener disabled on macOS to prevent crashes");
+    }
 
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
@@ -94,14 +103,27 @@ pub fn run() {
                 .with_handler({
                     let close_window_shortcut_clone = close_window_shortcut.clone();
                     move |app, shortcut, event| {
+                        // macOS 特殊处理：只处理按下事件，避免崩溃
+                        if event.state() != ShortcutState::Pressed {
+                            return;
+                        }
+                        
+                        // 安全的快捷键处理逻辑
                         println!("Shortcut event: {:?}, state: {:?}", shortcut, event.state());
-                        shortcut_manager::handle_global_shortcut(app, shortcut, event.state());
+                        
+                        // 使用 try-catch 包装快捷键处理，防止崩溃
+                        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                            shortcut_manager::handle_global_shortcut(app, shortcut, event.state());
+                        }));
+                        
+                        if let Err(e) = result {
+                            eprintln!("Error in shortcut handler: {:?}", e);
+                        }
 
+                        // ESC 快捷键处理
                         if shortcut == &close_window_shortcut_clone {
-                            if event.state() == ShortcutState::Pressed {
-                                if let Some(window) = app.get_webview_window("main") {
-                                    window.emit("esc_key_pressed", ()).unwrap_or_default();
-                                }
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.emit("esc_key_pressed", ());
                             }
                         }
                     }
