@@ -161,6 +161,7 @@ pub fn run() {
             plugin_api::notification::show_notification,
             plugin_api::command::execute_plugin_command,
             plugin_api::command::plugin_command_result,
+            plugin_api::request::plugin_request,
             // Command manager commands
             command_manager::get_commands,
             command_manager::update_command,

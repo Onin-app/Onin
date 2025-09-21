@@ -6,6 +6,10 @@
 import { getEnvironment, RuntimeEnvironment } from './core/environment';
 import * as HeadlessAdapter from './adapters/headless';
 import * as WebviewAdapter from './adapters/webview';
+import * as request from './api/request';
+
+// 导出 request 模块中的所有内容
+export * from './api/request';
 
 // 定义通知选项的类型
 export interface NotificationOptions {
@@ -73,6 +77,7 @@ export const test = {
 const baize = {
   showNotification,
   registerCommandHandler,
+  request: request.request,
   test,
 };
 
