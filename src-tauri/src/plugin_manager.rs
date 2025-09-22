@@ -25,6 +25,12 @@ pub struct PluginCommandKeyword {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PluginPermissions {
+    #[serde(default)]
+    pub network: Option<Vec<String>>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PluginManifest {
     pub id: String,
     pub name: String,
@@ -35,6 +41,7 @@ pub struct PluginManifest {
     pub plugin_type: Option<String>,
     #[serde(default)]
     pub commands: Vec<PluginCommandManifest>,
+    pub permissions: Option<PluginPermissions>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

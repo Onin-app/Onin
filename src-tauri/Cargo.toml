@@ -59,6 +59,8 @@ deno_core = "0.355.0"
 tauri-plugin-notification = "2"
 uuid = { version = "1.0", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
+reqwest = { version = "0.12", features = ["json"] }
+url = "2.5"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"

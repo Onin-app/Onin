@@ -12,30 +12,25 @@
  * @throws 如果后端返回错误，则会抛出异常。
  */
 export async function invoke<T>(method: string, arg: any): Promise<T> {
-  try {
-    // @ts-ignore: Deno.core is injected by the Deno runtime in Rust.
-    const result = await Deno.core.ops.op_invoke(method, arg);
+  // 直接调用 Deno.core.ops.op_invoke，就像 showNotification 一样
+  // @ts-ignore: Deno.core is injected by the Deno runtime in Rust.
+  const result = await Deno.core.ops.op_invoke(method, arg);
 
-    // The Rust backend returns an enum InvokeResult { Ok(T), Err { error: String } }
-    // We need to handle this structure.
-    if (result && typeof result === 'object') {
-      if ('error' in result) {
-        // This is the Err variant
-        throw new Error(result.error || 'Unknown error from op_invoke');
-      } else {
-        // This is the Ok variant, which directly contains the data
-        return result as T;
-      }
-    } else if (result === null || result === undefined) {
-        // Handle cases where the Ok variant contains `()` in Rust, resulting in `null`.
-        return result as T;
-    } else {
-        throw new Error('Invalid response format from op_invoke');
+  // 处理 InvokeResult 枚举
+  if (result && typeof result === 'object') {
+    if (result.type === 'error') {
+      throw new Error(result.error);
+    } else if (result.type === 'ok') {
+      return result.value as T;
     }
-  } catch (e) {
-    // Re-throw the error to be caught by the caller
-    throw e;
   }
+
+  // 兼容旧格式
+  if (result && typeof result === 'object' && 'error' in result) {
+    throw new Error(result.error);
+  }
+
+  return result as T;
 }
 
 

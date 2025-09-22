@@ -180,7 +180,7 @@
 
         <!-- 显示通知按钮 -->
         <Button.Root
-          class="rounded-input bg-blue-500 text-white shadow-mini hover:bg-blue-600 inline-flex h-9 items-center justify-center px-4 text-sm font-medium active:scale-[0.98] active:transition-all"
+          class="rounded-input shadow-mini inline-flex h-9 items-center justify-center bg-blue-500 px-4 text-sm font-medium text-white hover:bg-blue-600 active:scale-[0.98] active:transition-all"
           onclick={showNotification}
         >
           显示通知
@@ -193,7 +193,7 @@
       <!-- Content Area -->
       <div class="flex-1 p-2">
         <div
-          class="h-full rounded-lg border border-neutral-200 bg-white p-6 dark:border-neutral-700 dark:bg-neutral-900"
+          class="h-full overflow-auto rounded-lg border border-neutral-200 bg-white p-6 dark:border-neutral-700 dark:bg-neutral-900"
         >
           <!-- 这里是插件内容区域，你可以在这里填充具体内容 -->
           <div>

@@ -11,10 +11,12 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::plugin_api;
 
-#[derive(Serialize, Deserialize)]
-#[serde(untagged)]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(tag = "type")]
 enum InvokeResult {
-    Ok(serde_json::Value),
+    #[serde(rename = "ok")]
+    Ok { value: serde_json::Value },
+    #[serde(rename = "error")]
     Err { error: String },
 }
 
@@ -74,7 +76,7 @@ async fn op_invoke(
             match final_options {
                 Ok(options) => {
                     match plugin_api::notification::show_notification(app_handle, options) {
-                        Ok(_) => InvokeResult::Ok(serde_json::Value::Null),
+                        Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
                         Err(e) => InvokeResult::Err { error: e },
                     }
                 }
@@ -83,6 +85,31 @@ async fn op_invoke(
                         "Invalid argument for show_notification: {}. Original arg: {}",
                         e, arg
                     ),
+                },
+            }
+        }
+
+        "plugin_request" => {
+            // 处理两种格式：直接的 RequestOptions 或 {"options": RequestOptions}
+            let request_options = if let Some(options) = arg.get("options") {
+                options.clone()
+            } else {
+                arg.clone()
+            };
+
+            let options_result = serde_json::from_value::<
+                plugin_api::request::RequestOptions,
+            >(request_options.clone());
+
+            match options_result {
+                Ok(options) => {
+                    match plugin_api::request::make_request(app_handle, options).await {
+                        Ok(response) => InvokeResult::Ok { value: response },
+                        Err(e) => InvokeResult::Err { error: e },
+                    }
+                }
+                Err(e) => InvokeResult::Err {
+                    error: format!("Invalid argument for plugin_request: {}", e),
                 },
             }
         }
@@ -113,8 +140,9 @@ pub fn create_runtime(app_handle: &AppHandle) -> Result<JsRuntime, String> {
         ..Default::default()
     });
 
-    // 重写console.log以使用我们的op
-    let console_setup = r#"
+    // 设置全局对象和函数
+    let global_setup = r#"
+        // 重写console.log以使用我们的op
         globalThis.console = {
             log: (...args) => {
                 const message = args.map(arg => 
@@ -135,11 +163,13 @@ pub fn create_runtime(app_handle: &AppHandle) -> Result<JsRuntime, String> {
                 Deno.core.ops.op_console_log(message);
             }
         };
+
+
     "#;
 
-    // 设置console
+    // 设置全局对象
     runtime
-        .execute_script("<console_setup>", console_setup.to_string())
+        .execute_script("<global_setup>", global_setup.to_string())
         .map_err(|e| e.to_string())?;
 
     Ok(runtime)
