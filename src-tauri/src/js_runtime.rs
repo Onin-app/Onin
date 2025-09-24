@@ -50,8 +50,12 @@ async fn op_invoke(
     println!("插件异步调用 invoke: method={}, arg={}", method, arg);
 
     let app_handle = state.borrow().borrow::<AppHandle>().clone();
-
-    match method.as_str() {
+    let plugin_id = state.borrow().borrow::<String>().clone();
+    
+    // 设置当前插件ID到线程本地存储
+    crate::plugin_api::storage::set_current_plugin_id(plugin_id);
+    
+    let result = match method.as_str() {
         "show_notification" => {
             // 首先，尝试直接从 Value 反序列化
             let options_result = serde_json::from_value::<
@@ -114,10 +118,99 @@ async fn op_invoke(
             }
         }
 
+        "plugin_storage_set" => {
+            let key = match arg.get("key").and_then(|v| v.as_str()) {
+                Some(k) => k.to_string(),
+                None => return InvokeResult::Err { error: "key is required".to_string() },
+            };
+            let value = match arg.get("value") {
+                Some(v) => v.clone(),
+                None => return InvokeResult::Err { error: "value is required".to_string() },
+            };
+            
+            match plugin_api::storage::plugin_storage_set(app_handle, key, value).await {
+                Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
+                Err(e) => InvokeResult::Err { error: format!("Storage error: {:?}", e) },
+            }
+        }
+
+        "plugin_storage_get" => {
+            let key = match arg.get("key").and_then(|v| v.as_str()) {
+                Some(k) => k.to_string(),
+                None => return InvokeResult::Err { error: "key is required".to_string() },
+            };
+            
+            match plugin_api::storage::plugin_storage_get(app_handle, key).await {
+                Ok(value) => InvokeResult::Ok { value: value.unwrap_or(serde_json::Value::Null) },
+                Err(e) => InvokeResult::Err { error: format!("Storage error: {:?}", e) },
+            }
+        }
+
+        "plugin_storage_remove" => {
+            let key = match arg.get("key").and_then(|v| v.as_str()) {
+                Some(k) => k.to_string(),
+                None => return InvokeResult::Err { error: "key is required".to_string() },
+            };
+            
+            match plugin_api::storage::plugin_storage_remove(app_handle, key).await {
+                Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
+                Err(e) => InvokeResult::Err { error: format!("Storage error: {:?}", e) },
+            }
+        }
+
+        "plugin_storage_clear" => {
+            match plugin_api::storage::plugin_storage_clear(app_handle).await {
+                Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
+                Err(e) => InvokeResult::Err { error: format!("Storage error: {:?}", e) },
+            }
+        }
+
+        "plugin_storage_keys" => {
+            match plugin_api::storage::plugin_storage_keys(app_handle).await {
+                Ok(keys) => InvokeResult::Ok { value: serde_json::json!(keys) },
+                Err(e) => InvokeResult::Err { error: format!("Storage error: {:?}", e) },
+            }
+        }
+
+        "plugin_storage_set_items" => {
+            let items = match arg.get("items") {
+                Some(items_value) => match items_value.as_object() {
+                    Some(obj) => obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+                    None => return InvokeResult::Err { error: "items must be an object".to_string() },
+                },
+                None => return InvokeResult::Err { error: "items is required".to_string() },
+            };
+            
+            match plugin_api::storage::plugin_storage_set_items(app_handle, items).await {
+                Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
+                Err(e) => InvokeResult::Err { error: format!("Storage error: {:?}", e) },
+            }
+        }
+
+        "plugin_storage_get_items" => {
+            let keys = match arg.get("keys") {
+                Some(keys_value) => match keys_value.as_array() {
+                    Some(arr) => arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect(),
+                    None => return InvokeResult::Err { error: "keys must be an array".to_string() },
+                },
+                None => return InvokeResult::Err { error: "keys is required".to_string() },
+            };
+            
+            match plugin_api::storage::plugin_storage_get_items(app_handle, keys).await {
+                Ok(items) => InvokeResult::Ok { value: serde_json::json!(items) },
+                Err(e) => InvokeResult::Err { error: format!("Storage error: {:?}", e) },
+            }
+        }
+
         _ => InvokeResult::Err {
             error: "unknown method".to_string(),
         },
-    }
+    };
+    
+    // 清除当前插件ID
+    crate::plugin_api::storage::clear_current_plugin_id();
+    
+    result
 }
 
 // 定义扩展
@@ -126,14 +219,20 @@ deno_core::extension!(
     ops = [op_invoke, op_console_log],
     options = {
         app_handle: AppHandle,
+        plugin_id: String,
     },
     state = |state, options| {
         state.put(options.app_handle);
+        state.put(options.plugin_id);
     },
 );
 
 pub fn create_runtime(app_handle: &AppHandle) -> Result<JsRuntime, String> {
-    let ext = baize_plugin_api::init(app_handle.clone());
+    create_runtime_with_plugin_id(app_handle, "")
+}
+
+pub fn create_runtime_with_plugin_id(app_handle: &AppHandle, plugin_id: &str) -> Result<JsRuntime, String> {
+    let ext = baize_plugin_api::init(app_handle.clone(), plugin_id.to_string());
 
     let mut runtime = JsRuntime::new(RuntimeOptions {
         extensions: vec![ext],
@@ -259,7 +358,7 @@ impl PluginRuntimeManager {
             return Ok(()); // 已经初始化过了
         }
 
-        let mut runtime = create_runtime(app_handle)?;
+        let mut runtime = create_runtime_with_plugin_id(app_handle, plugin_id)?;
 
         // 执行插件初始化代码
         runtime

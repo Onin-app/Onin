@@ -162,6 +162,14 @@ pub fn run() {
             plugin_api::command::execute_plugin_command,
             plugin_api::command::plugin_command_result,
             plugin_api::request::plugin_request,
+            // 注册 storage 命令
+            plugin_api::storage::plugin_storage_set,
+            plugin_api::storage::plugin_storage_get,
+            plugin_api::storage::plugin_storage_remove,
+            plugin_api::storage::plugin_storage_clear,
+            plugin_api::storage::plugin_storage_keys,
+            plugin_api::storage::plugin_storage_set_items,
+            plugin_api::storage::plugin_storage_get_items,
             // Command manager commands
             command_manager::get_commands,
             command_manager::update_command,

@@ -11,11 +11,13 @@ export { getEnvironment, RuntimeEnvironment } from './core/environment';
 export * from './api/request';
 export * from './api/notification';
 export * from './api/command';
+export * from './api/storage';
 
 // Import APIs for default export
 import * as request from './api/request';
 import * as notification from './api/notification';
 import * as command from './api/command';
+import * as storage from './api/storage';
 import { invoke, listen } from './core/ipc';
 
 // 测试对象
@@ -30,6 +32,7 @@ const baize = {
   ...request,
   ...notification,
   ...command,
+  ...storage,
   invoke,
   listen,
   test,
