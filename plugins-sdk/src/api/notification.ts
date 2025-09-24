@@ -20,3 +20,11 @@ export function showNotification(options: NotificationOptions): Promise<void> {
     headless: () => invoke("show_notification", options),
   });
 }
+
+// 简化的方法名
+export const show = showNotification;
+
+// 导出通知对象
+export const notification = {
+  show: showNotification,
+};

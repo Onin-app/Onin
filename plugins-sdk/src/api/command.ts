@@ -47,3 +47,11 @@ export async function registerCommandHandler(handler: CommandHandler): Promise<v
 
   isHandlerRegistered = true;
 }
+
+// 简化的方法名
+export const register = registerCommandHandler;
+
+// 导出命令对象
+export const command = {
+  register: registerCommandHandler,
+};

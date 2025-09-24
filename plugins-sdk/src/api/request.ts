@@ -143,3 +143,49 @@ export async function request<T>(options: RequestOptions): Promise<Response<T>> 
     }
   }
 }
+
+// 便捷方法
+export async function get<T>(url: string, options?: Omit<RequestOptions, 'url' | 'method'>): Promise<Response<T>> {
+  return request({ ...options, url, method: 'GET' });
+}
+
+export async function post<T>(url: string, body?: any, options?: Omit<RequestOptions, 'url' | 'method' | 'body'>): Promise<Response<T>> {
+  return request({ ...options, url, method: 'POST', body });
+}
+
+export async function put<T>(url: string, body?: any, options?: Omit<RequestOptions, 'url' | 'method' | 'body'>): Promise<Response<T>> {
+  return request({ ...options, url, method: 'PUT', body });
+}
+
+export async function patch<T>(url: string, body?: any, options?: Omit<RequestOptions, 'url' | 'method' | 'body'>): Promise<Response<T>> {
+  return request({ ...options, url, method: 'PATCH', body });
+}
+
+export async function del<T>(url: string, options?: Omit<RequestOptions, 'url' | 'method'>): Promise<Response<T>> {
+  return request({ ...options, url, method: 'DELETE' });
+}
+
+// 错误处理工具集合
+export const errors = {
+  createBaizeRequestError,
+  createPermissionDeniedError,
+  createTimeoutError,
+  createNetworkError,
+  createHttpError,
+  isBaizeRequestError,
+  isPermissionDeniedError,
+  isTimeoutError,
+  isNetworkError,
+  isHttpError,
+};
+
+// HTTP 客户端对象 - 提供核心功能和便捷方法
+export const http = {
+  request,
+  get,
+  post,
+  put,
+  patch,
+  delete: del, // delete 是关键字，用 del
+  errors,
+};

@@ -7,19 +7,23 @@
 export { invoke, listen } from './core/ipc';
 export { getEnvironment, RuntimeEnvironment } from './core/environment';
 
-// APIs
+// 直接导入各个模块的命名空间对象
+export { http } from './api/request';
+export { storage } from './api/storage';
+export { notification } from './api/notification';
+export { command } from './api/command';
+import { invoke, listen } from './core/ipc';
+import { getEnvironment } from './core/environment';
+import { http } from './api/request';
+import { storage } from './api/storage';
+import { notification } from './api/notification';
+import { command } from './api/command';
+
+// 为了向后兼容，仍然导出原始 API（但不推荐使用）
 export * from './api/request';
 export * from './api/notification';
 export * from './api/command';
 export * from './api/storage';
-
-// Import APIs for default export
-import * as request from './api/request';
-import * as notification from './api/notification';
-import * as command from './api/command';
-import * as storage from './api/storage';
-import { invoke, listen } from './core/ipc';
-import { getEnvironment } from './core/environment';
 
 // SDK 信息和调试工具
 export const debug = {
@@ -41,12 +45,12 @@ export const debug = {
   }
 };
 
-// 创建默认导出对象
+// 创建默认导出对象 - 使用命名空间结构
 const baize = {
-  ...request,
-  ...notification,
-  ...command,
-  ...storage,
+  http,
+  storage,
+  notification,
+  command,
   invoke,
   listen,
   debug,
