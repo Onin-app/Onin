@@ -19,12 +19,26 @@ import * as notification from './api/notification';
 import * as command from './api/command';
 import * as storage from './api/storage';
 import { invoke, listen } from './core/ipc';
+import { getEnvironment } from './core/environment';
 
-// 测试对象
-export const test = {
-  message: "SDK is working!",
+// SDK 信息和调试工具
+export const debug = {
   version: "0.0.1",
-  timestamp: Date.now()
+  getEnvironment,
+  getRuntimeInfo: () => ({
+    timestamp: Date.now(),
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'Deno Runtime',
+    platform: typeof navigator !== 'undefined' ? navigator.platform : 'Unknown'
+  }),
+  async testConnection() {
+    try {
+      // 测试基础的 invoke 连接
+      const result = await invoke('plugin_test_connection', {});
+      return { success: true, result };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
 };
 
 // 创建默认导出对象
@@ -35,7 +49,7 @@ const baize = {
   ...storage,
   invoke,
   listen,
-  test,
+  debug,
 };
 
 // 默认导出

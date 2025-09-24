@@ -23,16 +23,21 @@ export function isStorageError(error: any): error is StorageError {
   return error && error.name === 'StorageError';
 }
 
+// 通用的存储调用辅助函数
+function callStorageApi<T = any>(method: string, args?: any): Promise<T> {
+  return dispatch({
+    webview: () => invoke<T>(method, args),
+    headless: () => invoke<T>(method, args),
+  });
+}
+
 /**
  * 设置一个键值对到存储中
  * @param key 存储键
  * @param value 存储值（会自动序列化）
  */
 export function setItem(key: string, value: any): Promise<void> {
-  return dispatch({
-    webview: () => invoke("plugin_storage_set", { key, value }),
-    headless: () => invoke("plugin_storage_set", { key, value }),
-  });
+  return callStorageApi("plugin_storage_set", { key, value });
 }
 
 /**
@@ -41,10 +46,7 @@ export function setItem(key: string, value: any): Promise<void> {
  * @returns 存储的值，如果不存在则返回 null
  */
 export function getItem<T = any>(key: string): Promise<T | null> {
-  return dispatch({
-    webview: () => invoke<T | null>("plugin_storage_get", { key }),
-    headless: () => invoke<T | null>("plugin_storage_get", { key }),
-  });
+  return callStorageApi<T | null>("plugin_storage_get", { key });
 }
 
 /**
@@ -52,20 +54,14 @@ export function getItem<T = any>(key: string): Promise<T | null> {
  * @param key 要删除的键
  */
 export function removeItem(key: string): Promise<void> {
-  return dispatch({
-    webview: () => invoke("plugin_storage_remove", { key }),
-    headless: () => invoke("plugin_storage_remove", { key }),
-  });
+  return callStorageApi("plugin_storage_remove", { key });
 }
 
 /**
  * 清空当前插件的所有存储数据
  */
 export function clear(): Promise<void> {
-  return dispatch({
-    webview: () => invoke("plugin_storage_clear"),
-    headless: () => invoke("plugin_storage_clear"),
-  });
+  return callStorageApi("plugin_storage_clear");
 }
 
 /**
@@ -73,10 +69,7 @@ export function clear(): Promise<void> {
  * @returns 所有键的数组
  */
 export function keys(): Promise<string[]> {
-  return dispatch({
-    webview: () => invoke<string[]>("plugin_storage_keys"),
-    headless: () => invoke<string[]>("plugin_storage_keys"),
-  });
+  return callStorageApi<string[]>("plugin_storage_keys");
 }
 
 /**
@@ -84,10 +77,7 @@ export function keys(): Promise<string[]> {
  * @param items 要设置的键值对对象
  */
 export function setItems(items: Record<string, any>): Promise<void> {
-  return dispatch({
-    webview: () => invoke("plugin_storage_set_items", { items }),
-    headless: () => invoke("plugin_storage_set_items", { items }),
-  });
+  return callStorageApi("plugin_storage_set_items", { items });
 }
 
 /**
@@ -96,10 +86,7 @@ export function setItems(items: Record<string, any>): Promise<void> {
  * @returns 包含键值对的对象
  */
 export function getItems<T = any>(keys: string[]): Promise<Record<string, T>> {
-  return dispatch({
-    webview: () => invoke<Record<string, T>>("plugin_storage_get_items", { keys }),
-    headless: () => invoke<Record<string, T>>("plugin_storage_get_items", { keys }),
-  });
+  return callStorageApi<Record<string, T>>("plugin_storage_get_items", { keys });
 }
 
 // 导出默认的存储对象
