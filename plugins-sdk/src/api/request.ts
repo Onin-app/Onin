@@ -54,7 +54,7 @@ export function createBaizeRequestError(message: string): BaizeRequestError {
 
 export function createPermissionDeniedError(url: string, message?: string): PermissionDeniedError {
   const error = new Error(
-    message || `Permission denied for URL: ${url}. Please add it to the 'permissions.network' in your manifest.json.`
+    message || `Permission denied for URL: ${url}. Please add it to the 'permissions.http.allowUrls' array in your manifest.json.`
   ) as PermissionDeniedError;
   error.name = 'PermissionDeniedError';
   error.url = url;

@@ -123,9 +123,13 @@ export declare function request<T = any>(options: RequestOptions): Promise<Respo
 
 ### 2.1. `manifest.json` 权限声明
 
-在插件的 `manifest.json` 文件中，新增一个顶层的 `permissions` 字段，用于管理各类权限。网络权限在其下的 `network` 数组中声明。
+在插件的 `manifest.json` 文件中，新增一个顶层的 `permissions` 字段，用于管理各类权限。HTTP 权限采用对象结构，提供更灵活的配置选项。
 
-- **`permissions.network`**: 一个字符串数组，包含了所有允许访问的域名或域名模式。
+- **`permissions.http`**: HTTP 权限配置对象
+  - `enable`: 布尔值，是否启用 HTTP 权限
+  - `allowUrls`: 字符串数组，包含所有允许访问的域名或域名模式
+  - `timeout`: 可选，请求超时时间（毫秒）
+  - `maxRetries`: 可选，最大重试次数
 
 **示例 `manifest.json`:**
 
@@ -137,11 +141,26 @@ export declare function request<T = any>(options: RequestOptions): Promise<Respo
   "description": "A plugin that fetches data from APIs.",
   "entry": "dist/index.js",
   "permissions": {
-    "network": [
-      "https://api.example.com",
-      "https://*.github.com",
-      "https://raw.githubusercontent.com"
-    ]
+    "http": {
+      "enable": true,
+      "allowUrls": [
+        "https://api.example.com",
+        "https://*.github.com",
+        "https://raw.githubusercontent.com"
+      ],
+      "timeout": 30000,
+      "maxRetries": 3
+    },
+    "storage": {
+      "enable": true,
+      "local": true,
+      "session": false
+    },
+    "notification": {
+      "enable": true,
+      "sound": true,
+      "badge": false
+    }
   }
 }
 ```
@@ -163,8 +182,8 @@ export declare function request<T = any>(options: RequestOptions): Promise<Respo
 2.  **请求转发**: 请求通过 Tauri `invoke` 机制被发送到 Rust 后端。
 3.  **权限验证**: 在 Rust 后端，执行以下步骤：
     a.  根据当前插件的 ID，加载其 `manifest.json` 文件。
-    b.  解析 `permissions.network` 数组。
-    c.  获取请求 `options.url`，并将其与 `network` 数组中的所有规则进行逐一匹配。
+    b.  解析 `permissions.http` 对象，检查 `enable` 状态。
+    c.  获取请求 `options.url`，并将其与 `allowUrls` 数组中的所有规则进行逐一匹配。
 4.  **处理结果**:
     - **匹配成功**: Rust 后端继续执行实际的网络请求，并将结果返回给插件。
     - **匹配失败**: Rust 后端将立即拒绝请求，并向 JavaScript 环境返回一个 `PermissionDeniedError` 错误，其中应包含请求的 URL 和权限不足的明确信息。

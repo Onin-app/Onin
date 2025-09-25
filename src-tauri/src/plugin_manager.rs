@@ -25,9 +25,59 @@ pub struct PluginCommandKeyword {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct HttpPermission {
+    #[serde(default)]
+    pub enable: bool,
+    #[serde(default, rename = "allowUrls")]
+    pub allow_urls: Vec<String>,
+    #[serde(default)]
+    pub timeout: Option<u64>,
+    #[serde(default, rename = "maxRetries")]
+    pub max_retries: Option<u32>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct StoragePermission {
+    #[serde(default)]
+    pub enable: bool,
+    #[serde(default)]
+    pub local: bool,
+    #[serde(default)]
+    pub session: bool,
+    #[serde(default, rename = "maxSize")]
+    pub max_size: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct NotificationPermission {
+    #[serde(default)]
+    pub enable: bool,
+    #[serde(default)]
+    pub sound: bool,
+    #[serde(default)]
+    pub badge: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CommandPermission {
+    #[serde(default)]
+    pub enable: bool,
+    #[serde(default, rename = "allowCommands")]
+    pub allow_commands: Vec<String>,
+    #[serde(default, rename = "maxExecutionTime")]
+    pub max_execution_time: Option<u64>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PluginPermissions {
     #[serde(default)]
-    pub network: Option<Vec<String>>,
+    pub http: Option<HttpPermission>,
+    #[serde(default)]
+    pub storage: Option<StoragePermission>,
+    #[serde(default)]
+    pub notification: Option<NotificationPermission>,
+    #[serde(default)]
+    pub command: Option<CommandPermission>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

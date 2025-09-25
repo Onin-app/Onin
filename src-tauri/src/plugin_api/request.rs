@@ -166,8 +166,8 @@ pub async fn plugin_request(
     }
 }
 
-async fn check_network_permission(
-    app: &AppHandle,
+async fn check_http_permission(
+    _app: &AppHandle,
     plugin_store: &State<'_, crate::plugin_manager::PluginStore>,
     plugin_id: &str,
     url: &str,
@@ -193,11 +193,25 @@ async fn check_network_permission(
         response: None,
     })?;
 
-    // 检查插件 manifest 中的网络权限
+    // 检查插件 manifest 中的 HTTP 权限
     if let Some(permissions) = &plugin.manifest.permissions {
-        if let Some(network_permissions) = &permissions.network {
-            for permission in network_permissions {
-                if is_url_allowed(&request_url, permission) {
+        if let Some(http_permission) = &permissions.http {
+            // 首先检查 HTTP 权限是否启用
+            if !http_permission.enable {
+                return Err(RequestError {
+                    name: "PermissionDeniedError".to_string(),
+                    message: format!(
+                        "HTTP permission is disabled for plugin. Please set 'permissions.http.enable' to true in your manifest.json."
+                    ),
+                    url: Some(url.to_string()),
+                    timeout: None,
+                    response: None,
+                });
+            }
+            
+            // 检查 URL 是否在允许列表中
+            for allowed_url in &http_permission.allow_urls {
+                if is_url_allowed(&request_url, allowed_url) {
                     return Ok(());
                 }
             }
@@ -208,7 +222,7 @@ async fn check_network_permission(
     Err(RequestError {
         name: "PermissionDeniedError".to_string(),
         message: format!(
-            "Permission denied for URL: {}. Please add it to the 'permissions.network' in your manifest.json.",
+            "Permission denied for URL: {}. Please add it to the 'permissions.http.allowUrls' array in your manifest.json.",
             url
         ),
         url: Some(url.to_string()),

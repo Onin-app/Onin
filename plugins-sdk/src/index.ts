@@ -20,10 +20,20 @@ import { notification } from './api/notification';
 import { command } from './api/command';
 
 // 为了向后兼容，仍然导出原始 API（但不推荐使用）
-export * from './api/request';
-export * from './api/notification';
-export * from './api/command';
-export * from './api/storage';
+// export * from './api/request';
+// export * from './api/notification';
+// export * from './api/command';
+// export * from './api/storage';
+
+// 类型定义
+export type {
+  HttpPermission,
+  StoragePermission,
+  NotificationPermission,
+  CommandPermission,
+  PluginPermissions,
+  PluginManifest
+} from './types/permissions';
 
 // SDK 信息和调试工具
 export const debug = {
