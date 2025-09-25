@@ -170,6 +170,17 @@ pub fn run() {
             plugin_api::storage::plugin_storage_keys,
             plugin_api::storage::plugin_storage_set_items,
             plugin_api::storage::plugin_storage_get_items,
+            // 注册文件系统命令
+            plugin_api::fs::plugin_fs_read_file,
+            plugin_api::fs::plugin_fs_write_file,
+            plugin_api::fs::plugin_fs_exists,
+            plugin_api::fs::plugin_fs_create_dir,
+            plugin_api::fs::plugin_fs_list_dir,
+            plugin_api::fs::plugin_fs_delete_file,
+            plugin_api::fs::plugin_fs_delete_dir,
+            plugin_api::fs::plugin_fs_get_file_info,
+            plugin_api::fs::plugin_fs_copy_file,
+            plugin_api::fs::plugin_fs_move_file,
             // Command manager commands
             command_manager::get_commands,
             command_manager::update_command,

@@ -61,7 +61,7 @@ fn get_plugin_store_path(plugin_id: &str) -> String {
 }
 
 // 获取当前执行插件的 ID
-fn get_current_plugin_id(_app: &AppHandle) -> Result<String, StorageError> {
+pub fn get_current_plugin_id(_app: &AppHandle) -> Result<String, StorageError> {
     CURRENT_PLUGIN_ID.with(|id| {
         id.borrow().clone().ok_or_else(|| {
             StorageError::from("No plugin context found. Storage API must be called from within a plugin execution context.")

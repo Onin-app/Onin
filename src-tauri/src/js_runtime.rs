@@ -202,6 +202,141 @@ async fn op_invoke(
             }
         }
 
+        // 文件系统 API
+        "plugin_fs_read_file" => {
+            let path = match arg.get("path").and_then(|v| v.as_str()) {
+                Some(p) => p.to_string(),
+                None => return InvokeResult::Err { error: "path is required".to_string() },
+            };
+            
+            match plugin_api::fs::plugin_fs_read_file(app_handle, path).await {
+                Ok(content) => InvokeResult::Ok { value: serde_json::json!(content) },
+                Err(e) => InvokeResult::Err { error: format!("File system error: {:?}", e) },
+            }
+        }
+
+        "plugin_fs_write_file" => {
+            let path = match arg.get("path").and_then(|v| v.as_str()) {
+                Some(p) => p.to_string(),
+                None => return InvokeResult::Err { error: "path is required".to_string() },
+            };
+            let content = match arg.get("content").and_then(|v| v.as_str()) {
+                Some(c) => c.to_string(),
+                None => return InvokeResult::Err { error: "content is required".to_string() },
+            };
+            
+            match plugin_api::fs::plugin_fs_write_file(app_handle, path, content).await {
+                Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
+                Err(e) => InvokeResult::Err { error: format!("File system error: {:?}", e) },
+            }
+        }
+
+        "plugin_fs_exists" => {
+            let path = match arg.get("path").and_then(|v| v.as_str()) {
+                Some(p) => p.to_string(),
+                None => return InvokeResult::Err { error: "path is required".to_string() },
+            };
+            
+            match plugin_api::fs::plugin_fs_exists(app_handle, path).await {
+                Ok(exists) => InvokeResult::Ok { value: serde_json::json!(exists) },
+                Err(e) => InvokeResult::Err { error: format!("File system error: {:?}", e) },
+            }
+        }
+
+        "plugin_fs_create_dir" => {
+            let path = match arg.get("path").and_then(|v| v.as_str()) {
+                Some(p) => p.to_string(),
+                None => return InvokeResult::Err { error: "path is required".to_string() },
+            };
+            let recursive = arg.get("recursive").and_then(|v| v.as_bool()).unwrap_or(true);
+            
+            match plugin_api::fs::plugin_fs_create_dir(app_handle, path, recursive).await {
+                Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
+                Err(e) => InvokeResult::Err { error: format!("File system error: {:?}", e) },
+            }
+        }
+
+        "plugin_fs_list_dir" => {
+            let path = match arg.get("path").and_then(|v| v.as_str()) {
+                Some(p) => p.to_string(),
+                None => return InvokeResult::Err { error: "path is required".to_string() },
+            };
+            
+            match plugin_api::fs::plugin_fs_list_dir(app_handle, path).await {
+                Ok(files) => InvokeResult::Ok { value: serde_json::json!(files) },
+                Err(e) => InvokeResult::Err { error: format!("File system error: {:?}", e) },
+            }
+        }
+
+        "plugin_fs_delete_file" => {
+            let path = match arg.get("path").and_then(|v| v.as_str()) {
+                Some(p) => p.to_string(),
+                None => return InvokeResult::Err { error: "path is required".to_string() },
+            };
+            
+            match plugin_api::fs::plugin_fs_delete_file(app_handle, path).await {
+                Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
+                Err(e) => InvokeResult::Err { error: format!("File system error: {:?}", e) },
+            }
+        }
+
+        "plugin_fs_delete_dir" => {
+            let path = match arg.get("path").and_then(|v| v.as_str()) {
+                Some(p) => p.to_string(),
+                None => return InvokeResult::Err { error: "path is required".to_string() },
+            };
+            let recursive = arg.get("recursive").and_then(|v| v.as_bool()).unwrap_or(false);
+            
+            match plugin_api::fs::plugin_fs_delete_dir(app_handle, path, recursive).await {
+                Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
+                Err(e) => InvokeResult::Err { error: format!("File system error: {:?}", e) },
+            }
+        }
+
+        "plugin_fs_get_file_info" => {
+            let path = match arg.get("path").and_then(|v| v.as_str()) {
+                Some(p) => p.to_string(),
+                None => return InvokeResult::Err { error: "path is required".to_string() },
+            };
+            
+            match plugin_api::fs::plugin_fs_get_file_info(app_handle, path).await {
+                Ok(info) => InvokeResult::Ok { value: serde_json::json!(info) },
+                Err(e) => InvokeResult::Err { error: format!("File system error: {:?}", e) },
+            }
+        }
+
+        "plugin_fs_copy_file" => {
+            let source_path = match arg.get("sourcePath").and_then(|v| v.as_str()) {
+                Some(p) => p.to_string(),
+                None => return InvokeResult::Err { error: "sourcePath is required".to_string() },
+            };
+            let dest_path = match arg.get("destPath").and_then(|v| v.as_str()) {
+                Some(p) => p.to_string(),
+                None => return InvokeResult::Err { error: "destPath is required".to_string() },
+            };
+            
+            match plugin_api::fs::plugin_fs_copy_file(app_handle, source_path, dest_path).await {
+                Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
+                Err(e) => InvokeResult::Err { error: format!("File system error: {:?}", e) },
+            }
+        }
+
+        "plugin_fs_move_file" => {
+            let source_path = match arg.get("sourcePath").and_then(|v| v.as_str()) {
+                Some(p) => p.to_string(),
+                None => return InvokeResult::Err { error: "sourcePath is required".to_string() },
+            };
+            let dest_path = match arg.get("destPath").and_then(|v| v.as_str()) {
+                Some(p) => p.to_string(),
+                None => return InvokeResult::Err { error: "destPath is required".to_string() },
+            };
+            
+            match plugin_api::fs::plugin_fs_move_file(app_handle, source_path, dest_path).await {
+                Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
+                Err(e) => InvokeResult::Err { error: format!("File system error: {:?}", e) },
+            }
+        }
+
         _ => InvokeResult::Err {
             error: "unknown method".to_string(),
         },

@@ -42,6 +42,19 @@ export interface CommandPermission {
   maxExecutionTime?: number;
 }
 
+interface FileSystemPermission {
+  /** 是否启用文件系统权限 */
+  enable: boolean;
+  /** 是否允许读取文件 */
+  read: boolean;
+  /** 是否允许写入文件 */
+  write: boolean;
+  /** 是否允许删除文件 */
+  delete: boolean;
+  /** 最大文件大小限制（字节），可选 */
+  maxFileSize?: number;
+}
+
 export interface PluginPermissions {
   /** HTTP 权限配置 */
   http?: HttpPermission;
@@ -51,6 +64,8 @@ export interface PluginPermissions {
   notification?: NotificationPermission;
   /** 命令权限配置 */
   command?: CommandPermission;
+  /** 文件系统权限配置 */
+  fs?: FileSystemPermission;
 }
 
 export interface PluginManifest {

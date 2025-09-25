@@ -12,12 +12,14 @@ export { http } from './api/request';
 export { storage } from './api/storage';
 export { notification } from './api/notification';
 export { command } from './api/command';
+export { fs } from './api/fs';
 import { invoke, listen } from './core/ipc';
 import { getEnvironment } from './core/environment';
 import { http } from './api/request';
 import { storage } from './api/storage';
 import { notification } from './api/notification';
 import { command } from './api/command';
+import { fs } from './api/fs';
 
 // 为了向后兼容，仍然导出原始 API（但不推荐使用）
 // export * from './api/request';
@@ -31,9 +33,16 @@ export type {
   StoragePermission,
   NotificationPermission,
   CommandPermission,
+  FileSystemPermission,
   PluginPermissions,
   PluginManifest
 } from './types/permissions';
+
+// 文件系统相关类型
+export type {
+  FileSystemError,
+  FileInfo
+} from './api/fs';
 
 // SDK 信息和调试工具
 export const debug = {
@@ -61,6 +70,7 @@ const baize = {
   storage,
   notification,
   command,
+  fs,
   invoke,
   listen,
   debug,
