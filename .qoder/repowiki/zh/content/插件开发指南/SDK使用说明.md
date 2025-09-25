@@ -1,4 +1,4 @@
-# Baize SDK 使用说明
+# SDK使用说明
 
 <cite>
 **本文档引用的文件**
@@ -15,7 +15,16 @@
 - [src-tauri/src/plugin_api/command.rs](file://src-tauri/src/plugin_api/command.rs)
 - [src-tauri/capabilities/plugin.json](file://src-tauri/capabilities/plugin.json)
 - [README.md](file://README.md)
+- [example-plugin.ts](file://example-plugin.ts)
 </cite>
+
+## 更新摘要
+**已做更改**
+- 更新了核心API部分，以反映SDK API导出方式的变更
+- 添加了关于`debug`对象的新内容
+- 修正了代码示例以匹配新的命名空间导入模式
+- 更新了架构概览和IPC通信机制部分的相关信息
+- 增加了对新HTTP便捷方法的文档说明
 
 ## 目录
 1. [简介](#简介)
@@ -131,7 +140,7 @@ export function registerCommandHandler(handler: CommandHandler): Promise<void>;
 import baize from 'baize-sdk';
 
 // 注册命令处理器
-await baize.registerCommandHandler(async (command, args) => {
+await baize.command.register(async (command, args) => {
   switch (command) {
     case 'greet':
       return `Hello, ${args.name}!`;
@@ -176,13 +185,13 @@ interface NotificationOptions {
 import baize from 'baize-sdk';
 
 // 发送简单通知
-await baize.showNotification({
+await baize.notification.show({
   title: '任务完成',
   body: '您的备份已经成功完成！'
 });
 
 // 发送带样式的通知
-await baize.showNotification({
+await baize.notification.show({
   title: '重要提醒',
   body: '请在下午3点参加会议'
 });
@@ -227,9 +236,7 @@ type ResponseType = 'json' | 'text' | 'arraybuffer';
 import baize from 'baize-sdk';
 
 // GET 请求
-const response = await baize.request({
-  url: 'https://api.example.com/users',
-  method: 'GET',
+const response = await baize.http.get('https://api.example.com/users', {
   headers: {
     'Authorization': 'Bearer token123',
     'Content-Type': 'application/json'
@@ -237,20 +244,17 @@ const response = await baize.request({
 });
 
 // POST 请求
-const postResponse = await baize.request({
-  url: 'https://api.example.com/users',
-  method: 'POST',
+const postResponse = await baize.http.post('https://api.example.com/users', {
+  name: '张三',
+  email: 'zhangsan@example.com'
+}, {
   headers: {
     'Content-Type': 'application/json'
-  },
-  body: {
-    name: '张三',
-    email: 'zhangsan@example.com'
   }
 });
 
 // 文件下载
-const fileResponse = await baize.request({
+const fileResponse = await baize.http.request({
   url: 'https://example.com/document.pdf',
   responseType: 'arraybuffer'
 });
@@ -267,10 +271,20 @@ interface Response<T = any> {
 }
 ```
 
+#### HTTP 便捷方法
+
+SDK 提供了以下便捷方法：
+- `http.get(url, options)`
+- `http.post(url, body, options)`
+- `http.put(url, body, options)`
+- `http.patch(url, body, options)`
+- `http.delete(url, options)`
+
 **章节来源**
 - [plugins-sdk/src/api/command.ts](file://plugins-sdk/src/api/command.ts#L1-L49)
 - [plugins-sdk/src/api/notification.ts](file://plugins-sdk/src/api/notification.ts#L1-L22)
-- [plugins-sdk/src/api/request.ts](file://plugins-sdk/src/api/request.ts#L1-L145)
+- [plugins-sdk/src/api/request.ts](file://plugins-sdk/src/api/request.ts#L1-L190)
+- [example-plugin.ts](file://example-plugin.ts#L1-L86)
 
 ## 架构概览
 
@@ -454,8 +468,7 @@ InitPlugin --> ExecuteCmd["执行命令"]
 WaitResponse --> ReceiveResult["接收结果"]
 ExecuteCmd --> ReturnResult["返回结果"]
 ReceiveResult --> ParseResult["解析执行结果"]
-ReturnResult --> ParseResult
-ParseResult --> Success{"执行成功?"}
+ReturnResult --> Success{"执行成功?"}
 Success --> |是| ReturnSuccess["返回成功结果"]
 Success --> |否| ReturnError["返回错误信息"]
 ReturnSuccess --> End([执行结束])
@@ -539,20 +552,19 @@ import baize from 'baize-sdk';
 
 async function safeRequest() {
   try {
-    const response = await baize.request({
-      url: 'https://api.example.com/data',
+    const response = await baize.http.get('https://api.example.com/data', {
       timeout: 5000
     });
     
     return response.body;
   } catch (error) {
-    if (baize.isTimeoutError(error)) {
+    if (baize.http.errors.isTimeoutError(error)) {
       console.error(`请求超时: ${error.url} 超时时间: ${error.timeout}ms`);
-    } else if (baize.isPermissionDeniedError(error)) {
+    } else if (baize.http.errors.isPermissionDeniedError(error)) {
       console.error(`权限被拒绝: ${error.url}`);
-    } else if (baize.isNetworkError(error)) {
+    } else if (baize.http.errors.isNetworkError(error)) {
       console.error('网络连接失败');
-    } else if (baize.isHttpError(error)) {
+    } else if (baize.http.errors.isHttpError(error)) {
       console.error(`HTTP错误: ${error.response.status} ${error.response.statusText}`);
     } else {
       console.error('未知错误:', error.message);
@@ -564,7 +576,7 @@ async function safeRequest() {
 ```
 
 **章节来源**
-- [plugins-sdk/src/api/request.ts](file://plugins-sdk/src/api/request.ts#L25-L145)
+- [plugins-sdk/src/api/request.ts](file://plugins-sdk/src/api/request.ts#L25-L190)
 
 ## 最佳实践
 
@@ -613,7 +625,7 @@ class PluginCommands {
 }
 
 // 注册命令处理器
-await baize.registerCommandHandler(
+await baize.command.register(
   PluginCommands.getInstance().handleCommand.bind(PluginCommands.getInstance())
 );
 ```
@@ -634,27 +646,27 @@ class RequestInterceptor {
     return this.instance;
   }
   
-  async intercept<T>(options: RequestOptions): Promise<Response<T>> {
+  async intercept<T>(url: string, options?: Omit<RequestOptions, 'url'>): Promise<Response<T>> {
     // 添加通用请求头
     const headers = {
       'User-Agent': 'Baize-Plugin/1.0',
       'X-Plugin-ID': this.getPluginId(),
-      ...options.headers
+      ...options?.headers
     };
     
     // 记录请求日志
-    console.log(`[Request] ${options.method || 'GET'} ${options.url}`);
+    console.log(`[Request] GET ${url}`);
     
     try {
-      const response = await baize.request({ ...options, headers });
+      const response = await baize.http.get(url, { ...options, headers });
       
       // 记录响应日志
-      console.log(`[Response] ${response.status} ${options.url}`);
+      console.log(`[Response] ${response.status} ${url}`);
       
       return response;
     } catch (error) {
       // 记录错误日志
-      console.error(`[Error] ${options.url}:`, error);
+      console.error(`[Error] ${url}:`, error);
       throw error;
     }
   }
@@ -667,10 +679,7 @@ class RequestInterceptor {
 
 // 使用拦截器
 const interceptor = RequestInterceptor.getInstance();
-const response = await interceptor.intercept({
-  url: 'https://api.example.com/data',
-  method: 'GET'
-});
+const response = await interceptor.intercept('https://api.example.com/data');
 ```
 
 ### 3. 通知管理
@@ -699,7 +708,7 @@ class NotificationManager {
       this.notifications.set(id, options);
     }
     
-    await baize.showNotification(options);
+    await baize.notification.show(options);
   }
   
   async showWithAction(
@@ -754,10 +763,38 @@ function retry(maxRetries: number = 3, delay: number = 1000) {
 class RobustAPI {
   @retry(3, 1000)
   async getData(url: string): Promise<any> {
-    return baize.request({ url, timeout: 10000 });
+    return baize.http.get(url, { timeout: 10000 });
   }
 }
 ```
+
+### 5. 调试工具使用
+
+```typescript
+// 使用调试工具检查连接状态
+async function checkConnection() {
+  console.log('SDK 版本:', baize.debug.version);
+  console.log('运行环境信息:', baize.debug.getRuntimeInfo());
+  
+  const connectionTest = await baize.debug.testConnection();
+  if (connectionTest.success) {
+    console.log('IPC 连接测试成功');
+  } else {
+    console.error('IPC 连接测试失败:', connectionTest.error);
+  }
+}
+
+// 在开发环境中启用详细日志
+if (process.env.NODE_ENV === 'development') {
+  console.log('[SDK] 当前环境:', baize.debug.getEnvironment());
+  await checkConnection();
+}
+```
+
+**章节来源**
+- [plugins-sdk/src/index.ts](file://plugins-sdk/src/index.ts#L60-L80)
+- [plugins-sdk/src/api/command.ts](file://plugins-sdk/src/api/command.ts#L10-L25)
+- [plugins-sdk/src/api/request.ts](file://plugins-sdk/src/api/request.ts#L100-L190)
 
 ## 故障排除
 
@@ -776,7 +813,7 @@ let isHandlerRegistered = false;
 
 async function initializePlugin() {
   if (!isHandlerRegistered) {
-    await baize.registerCommandHandler(myCommandHandler);
+    await baize.command.register(myCommandHandler);
     isHandlerRegistered = true;
   }
 }
@@ -793,10 +830,13 @@ async function initializePlugin() {
 ```json
 {
   "permissions": {
-    "network": [
-      "https://api.example.com/*",
-      "https://*.github.com/*"
-    ]
+    "http": {
+      "enable": true,
+      "allowUrls": [
+        "https://api.example.com/*",
+        "https://*.github.com/*"
+      ]
+    }
   }
 }
 ```
@@ -814,7 +854,7 @@ async function initializePlugin() {
 import baize from 'baize-sdk';
 
 // 检查运行环境
-const environment = baize.getEnvironment();
+const environment = baize.debug.getEnvironment();
 
 if (environment === 'headless') {
   // Headless 环境下的特殊处理
@@ -835,17 +875,13 @@ if (environment === 'headless') {
 **解决方案**：
 ```typescript
 // 设置合理的超时时间
-const response = await baize.request({
-  url: 'https://api.example.com/data',
-  timeout: 30000, // 30秒
-  method: 'GET'
+const response = await baize.http.get('https://api.example.com/data', {
+  timeout: 30000 // 30秒
 });
 
 // 或者使用更短的超时时间进行快速失败
-const fastResponse = await baize.request({
-  url: 'https://api.example.com/status',
-  timeout: 5000, // 5秒
-  method: 'GET'
+const fastResponse = await baize.http.get('https://api.example.com/status', {
+  timeout: 5000 // 5秒
 }).catch(() => {
   // 快速失败处理
   return { status: 500, body: { error: '服务不可用' } };
@@ -859,8 +895,8 @@ const fastResponse = await baize.request({
 ```typescript
 // 在开发环境中启用详细日志
 if (process.env.NODE_ENV === 'development') {
-  console.log('[SDK] 当前环境:', baize.getEnvironment());
-  console.log('[SDK] 测试对象:', baize.test);
+  console.log('[SDK] 当前环境:', baize.debug.getEnvironment());
+  console.log('[SDK] 测试对象:', baize.debug);
 }
 ```
 
@@ -886,13 +922,14 @@ async function debugAPI<T>(
 
 // 使用调试包装器
 const data = await debugAPI('获取数据', () => 
-  baize.request({ url: 'https://api.example.com/data' })
+  baize.http.get('https://api.example.com/data')
 );
 ```
 
 **章节来源**
 - [plugins-sdk/src/api/command.ts](file://plugins-sdk/src/api/command.ts#L10-L25)
-- [plugins-sdk/src/api/request.ts](file://plugins-sdk/src/api/request.ts#L100-L145)
+- [plugins-sdk/src/api/request.ts](file://plugins-sdk/src/api/request.ts#L100-L190)
+- [plugins-sdk/src/index.ts](file://plugins-sdk/src/index.ts#L60-L80)
 
 ## 总结
 

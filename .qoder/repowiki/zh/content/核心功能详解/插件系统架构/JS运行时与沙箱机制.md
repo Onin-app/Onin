@@ -2,12 +2,12 @@
 
 <cite>
 **本文档引用的文件**
-- [js_runtime.rs](file://src-tauri/src/js_runtime.rs)
+- [js_runtime.rs](file://src-tauri/src/js_runtime.rs) - *已更新：新增存储API支持*
 - [plugin_api/mod.rs](file://src-tauri/src/plugin_api/mod.rs)
 - [plugin_api/command.rs](file://src-tauri/src/plugin_api/command.rs)
 - [plugin_api/notification.rs](file://src-tauri/src/plugin_api/notification.rs)
 - [plugin_api/request.rs](file://src-tauri/src/plugin_api/request.rs)
-- [plugin_api/storage.rs](file://src-tauri/src/plugin_api/storage.rs)
+- [plugin_api/storage.rs](file://src-tauri/src/plugin_api/storage.rs) - *新增：实现插件存储管理功能*
 - [plugin_manager.rs](file://src-tauri/src/plugin_manager.rs)
 - [Cargo.toml](file://src-tauri/Cargo.toml)
 - [tauri.conf.json](file://src-tauri/tauri.conf.json)
@@ -16,7 +16,17 @@
 - [plugins-sdk/src/api/command.ts](file://plugins-sdk/src/api/command.ts)
 - [plugins-sdk/src/api/notification.ts](file://plugins-sdk/src/api/notification.ts)
 - [plugins-sdk/src/api/request.ts](file://plugins-sdk/src/api/request.ts)
+- [plugins-sdk/src/api/storage.ts](file://plugins-sdk/src/api/storage.ts) - *已更新：增强存储API功能*
+- [plugins-sdk/src/index.ts](file://plugins-sdk/src/index.ts) - *已更新：新增debug对象用于调试*
 </cite>
+
+## 更新摘要
+**变更内容**
+- 在“桥接API设计”部分新增了存储API的详细说明
+- 在“安全通信机制”部分更新了权限验证机制以包含存储权限
+- 在“故障排除指南”中添加了关于`debug`对象的新调试工具说明
+- 所有受影响的代码示例均已根据最新实现进行更新
+- 新增对`storage`模块和`debug`对象的文档支持
 
 ## 目录
 1. [简介](#简介)
@@ -110,11 +120,11 @@ Note over PM,DC : 插件运行时已就绪，可以执行插件代码
 
 ### 运行时配置选项
 
-`create_runtime`函数负责创建配置完整的JS运行时实例：
+`create_runtime_with_plugin_id`函数负责创建配置完整的JS运行时实例，并为特定插件ID设置上下文：
 
 ```rust
-pub fn create_runtime(app_handle: &AppHandle) -> Result<JsRuntime, String> {
-    let ext = baize_plugin_api::init(app_handle.clone());
+pub fn create_runtime_with_plugin_id(app_handle: &AppHandle, plugin_id: &str) -> Result<JsRuntime, String> {
+    let ext = baize_plugin_api::init(app_handle.clone(), plugin_id.to_string());
     
     let mut runtime = JsRuntime::new(RuntimeOptions {
         extensions: vec![ext],
@@ -133,6 +143,12 @@ pub fn create_runtime(app_handle: &AppHandle) -> Result<JsRuntime, String> {
             },
             error: (...args) => {
                 const message = '[ERROR] ' + args.map(arg => 
+                    typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+                ).join(' ');
+                Deno.core.ops.op_console_log(message);
+            },
+            warn: (...args) => {
+                const message = '[WARN] ' + args.map(arg => 
                     typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
                 ).join(' ');
                 Deno.core.ops.op_console_log(message);
@@ -257,6 +273,9 @@ class StorageAPI {
 +plugin_storage_get()
 +plugin_storage_remove()
 +plugin_storage_clear()
++plugin_storage_keys()
++plugin_storage_set_items()
++plugin_storage_get_items()
 }
 BaizePluginAPI --> CommandAPI : "提供"
 BaizePluginAPI --> NotificationAPI : "提供"
@@ -270,7 +289,7 @@ BaizePluginAPI --> StorageAPI : "提供"
 
 ### 操作符（Ops）系统
 
-系统使用Deno Core的操作符机制实现安全的IPC调用：
+系统使用Deno Core的操作符机制实现安全的IPC调用，包括新增的存储相关操作：
 
 ```rust
 // 异步invoke操作符
@@ -282,26 +301,53 @@ async fn op_invoke(
     #[serde] arg: serde_json::Value,
 ) -> InvokeResult {
     let app_handle = state.borrow().borrow::<AppHandle>().clone();
+    let plugin_id = state.borrow().borrow::<String>().clone();
     
-    match method.as_str() {
+    // 设置当前插件ID到线程本地存储
+    crate::plugin_api::storage::set_current_plugin_id(plugin_id);
+    
+    let result = match method.as_str() {
         "show_notification" => {
-            // 处理通知显示
-            match plugin_api::notification::show_notification(app_handle, options) {
-                Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
-                Err(e) => InvokeResult::Err { error: e },
-            }
+            // 处理通知显示逻辑...
         }
         "plugin_request" => {
-            // 处理HTTP请求
-            match plugin_api::request::make_request(app_handle, options).await {
-                Ok(response) => InvokeResult::Ok { value: response },
-                Err(e) => InvokeResult::Err { error: e },
+            // 处理HTTP请求逻辑...
+        }
+        "plugin_storage_set" => {
+            let key = match arg.get("key").and_then(|v| v.as_str()) {
+                Some(k) => k.to_string(),
+                None => return InvokeResult::Err { error: "key is required".to_string() },
+            };
+            let value = match arg.get("value") {
+                Some(v) => v.clone(),
+                None => return InvokeResult::Err { error: "value is required".to_string() },
+            };
+            
+            match plugin_api::storage::plugin_storage_set(app_handle, key, value).await {
+                Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
+                Err(e) => InvokeResult::Err { error: format!("Storage error: {:?}", e) },
+            }
+        }
+        "plugin_storage_get" => {
+            let key = match arg.get("key").and_then(|v| v.as_str()) {
+                Some(k) => k.to_string(),
+                None => return InvokeResult::Err { error: "key is required".to_string() },
+            };
+            
+            match plugin_api::storage::plugin_storage_get(app_handle, key).await {
+                Ok(value) => InvokeResult::Ok { value: value.unwrap_or(serde_json::Value::Null) },
+                Err(e) => InvokeResult::Err { error: format!("Storage error: {:?}", e) },
             }
         }
         _ => InvokeResult::Err {
             error: "unknown method".to_string(),
         },
-    }
+    };
+    
+    // 清除当前插件ID
+    crate::plugin_api::storage::clear_current_plugin_id();
+    
+    result
 }
 ```
 
@@ -310,7 +356,7 @@ async fn op_invoke(
 
 ### 控制台重定向机制
 
-为了统一日志输出，系统重写了JavaScript的console对象：
+为了统一日志输出，系统重写了JavaScript的console对象，现在支持log、error和warn方法：
 
 ```javascript
 // 全局设置中的console重写
@@ -323,6 +369,12 @@ globalThis.console = {
     },
     error: (...args) => {
         const message = '[ERROR] ' + args.map(arg => 
+            typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+        ).join(' ');
+        Deno.core.ops.op_console_log(message);
+    },
+    warn: (...args) => {
+        const message = '[WARN] ' + args.map(arg => 
             typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
         ).join(' ');
         Deno.core.ops.op_console_log(message);
@@ -371,7 +423,7 @@ async fn handle_init_plugin(
         return Ok(()); // 已经初始化过了
     }
 
-    let mut runtime = create_runtime(app_handle)?;
+    let mut runtime = create_runtime_with_plugin_id(app_handle, plugin_id)?;
 
     // 执行插件初始化代码
     runtime.execute_script("<plugin_init>", js_code.to_string())
@@ -379,6 +431,7 @@ async fn handle_init_plugin(
 
     // 运行事件循环完成初始化
     runtime.run_event_loop(PollEventLoopOptions::default())
+        .await
         .map_err(|e| e.to_string())?;
 
     runtimes.insert(plugin_id.to_string(), runtime);
@@ -468,7 +521,7 @@ Note over Plugin,HostApp : 所有通信都经过权限检查
 
 ### 权限验证机制
 
-每个API调用都会经过严格的权限验证：
+每个API调用都会经过严格的权限验证，包括新增的存储权限检查：
 
 ```rust
 // 权限检查示例
@@ -493,10 +546,23 @@ pub async fn execute_plugin_command(
         execute_headless_command(&app, &plugin, &command_name, args).await
     }
 }
+
+// 存储权限检查
+export interface StoragePermission {
+  /** 是否启用存储权限 */
+  enable: boolean;
+  /** 是否允许本地存储 */
+  local: boolean;
+  /** 是否允许会话存储 */
+  session: boolean;
+  /** 最大存储大小，可选 */
+  maxSize?: string;
+}
 ```
 
 **节来源**
 - [plugin_api/command.rs](file://src-tauri/src/plugin_api/command.rs#L20-L50)
+- [types/permissions.ts](file://plugins-sdk/src/types/permissions.ts#L15-L24)
 
 ### 错误处理与安全
 
@@ -617,28 +683,33 @@ impl PluginRuntimeManager {
 
 ### 调试工具
 
-系统提供了丰富的调试功能：
+系统提供了丰富的调试功能，包括新增的`debug`对象：
 
-```rust
-// 控制台日志重定向
-#[op2(fast)]
-fn op_console_log(state: Rc<RefCell<OpState>>, #[string] message: String) {
-    println!("[Plugin Console] {}", message);
-    
-    // 尝试发送到前端
-    if let Ok(app_handle) = state.try_borrow().map(|s| s.borrow::<AppHandle>().clone()) {
-        if let Some(window) = app_handle.get_webview_window("main") {
-            let _ = window.emit("plugin_console_log", serde_json::json!({
-                "message": message,
-                "timestamp": chrono::Utc::now().timestamp_millis()
-            }));
-        }
+```typescript
+// SDK主入口新增debug对象
+export const debug = {
+  version: "0.0.1",
+  getEnvironment,
+  getRuntimeInfo: () => ({
+    timestamp: Date.now(),
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'Deno Runtime',
+    platform: typeof navigator !== 'undefined' ? navigator.platform : 'Unknown'
+  }),
+  async testConnection() {
+    try {
+      // 测试基础的 invoke 连接
+      const result = await invoke('plugin_test_connection', {});
+      return { success: true, result };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
-}
+  }
+};
 ```
 
 **节来源**
 - [js_runtime.rs](file://src-tauri/src/js_runtime.rs#L25-L40)
+- [index.ts](file://plugins-sdk/src/index.ts#L50-L70)
 
 ### 日志分析
 

@@ -2,13 +2,20 @@
 
 <cite>
 **本文档中引用的文件**
-- [notification.ts](file://plugins-sdk/src/api/notification.ts)
-- [notification.rs](file://src-tauri/src/plugin_api/notification.rs)
-- [dispatch.ts](file://plugins-sdk/src/core/dispatch.ts)
-- [environment.ts](file://plugins-sdk/src/core/environment.ts)
-- [Cargo.toml](file://src-tauri/Cargo.toml)
-- [command.rs](file://src-tauri/src/plugin_api/command.rs)
+- [notification.ts](file://plugins-sdk\src\api\notification.ts) - *更新了导出结构*
+- [index.ts](file://plugins-sdk\src\index.ts) - *优化了SDK API的导入导出*
+- [notification.rs](file://src-tauri\src\plugin_api\notification.rs)
+- [dispatch.ts](file://plugins-sdk\src\core\dispatch.ts)
+- [environment.ts](file://plugins-sdk\src\core\environment.ts)
+- [Cargo.toml](file://src-tauri\Cargo.toml)
 </cite>
+
+## 更新摘要
+**变更内容**
+- 更新了 `sendNotification` API 的调用方式，现在通过 `baize.notification` 命名空间访问
+- 添加了对新导出结构的支持说明
+- 修正了代码示例以反映最新的 API 使用模式
+- 更新了相关文件来源注释
 
 ## 目录
 1. [简介](#简介)
@@ -60,18 +67,18 @@ E --> D
 ```
 
 **图表来源**
-- [notification.ts](file://plugins-sdk/src/api/notification.ts#L1-L22)
-- [notification.rs](file://src-tauri/src/plugin_api/notification.rs#L1-L25)
+- [notification.ts](file://plugins-sdk\src\api\notification.ts#L1-L29)
+- [notification.rs](file://src-tauri\src\plugin_api\notification.rs#L1-L24)
 
 **章节来源**
-- [notification.ts](file://plugins-sdk/src/api/notification.ts#L1-L22)
-- [notification.rs](file://src-tauri/src/plugin_api/notification.rs#L1-L25)
+- [notification.ts](file://plugins-sdk\src\api\notification.ts#L1-L29)
+- [notification.rs](file://src-tauri\src\plugin_api\notification.rs#L1-L24)
 
 ## 核心组件
 
 ### 前端通知接口
 
-前端通知接口定义了标准的通知选项和调用方法：
+前端通知接口定义了标准的通知选项和调用方法，并通过 `baize.notification` 命名空间导出：
 
 ```typescript
 export interface NotificationOptions {
@@ -79,7 +86,10 @@ export interface NotificationOptions {
   body: string;
 }
 
-export function showNotification(options: NotificationOptions): Promise<void>
+// 新的命名空间导出方式
+export const notification = {
+  show: showNotification,
+};
 ```
 
 ### 后端通知处理
@@ -97,8 +107,8 @@ pub fn show_notification(app_handle: tauri::AppHandle, options: NotificationOpti
 ```
 
 **章节来源**
-- [notification.ts](file://plugins-sdk/src/api/notification.ts#L4-L12)
-- [notification.rs](file://src-tauri/src/plugin_api/notification.rs#L4-L12)
+- [notification.ts](file://plugins-sdk\src\api\notification.ts#L4-L29)
+- [notification.rs](file://src-tauri\src\plugin_api\notification.rs#L4-L24)
 
 ## 架构概览
 
@@ -111,7 +121,7 @@ participant SDK as "通知SDK"
 participant Dispatcher as "调度器"
 participant Backend as "Rust后端"
 participant System as "系统通知服务"
-Plugin->>SDK : showNotification(options)
+Plugin->>SDK : baize.notification.show(options)
 SDK->>Dispatcher : dispatch({webview, headless})
 Dispatcher->>Backend : invoke("show_notification", options)
 Backend->>Backend : 解析NotificationOptions
@@ -125,8 +135,8 @@ SDK-->>Plugin : 通知完成
 ```
 
 **图表来源**
-- [notification.ts](file://plugins-sdk/src/api/notification.ts#L14-L21)
-- [notification.rs](file://src-tauri/src/plugin_api/notification.rs#L14-L23)
+- [notification.ts](file://plugins-sdk\src\api\notification.ts#L14-L21)
+- [notification.rs](file://src-tauri\src\plugin_api\notification.rs#L14-L24)
 
 ## 详细组件分析
 
@@ -161,8 +171,8 @@ ThrowError --> End
 ```
 
 **图表来源**
-- [dispatch.ts](file://plugins-sdk/src/core/dispatch.ts#L14-L25)
-- [environment.ts](file://plugins-sdk/src/core/environment.ts#L20-L35)
+- [dispatch.ts](file://plugins-sdk\src\core\dispatch.ts#L1-L29)
+- [environment.ts](file://plugins-sdk\src\core\environment.ts#L20-L36)
 
 ### 环境检测机制
 
@@ -214,14 +224,13 @@ NotificationBuilder --> SystemNotification : "发送到"
 ```
 
 **图表来源**
-- [notification.rs](file://src-tauri/src/plugin_api/notification.rs#L4-L12)
-- [notification.rs](file://src-tauri/src/plugin_api/notification.rs#L14-L23)
+- [notification.rs](file://src-tauri\src\plugin_api\notification.rs#L4-L24)
 
 **章节来源**
-- [notification.ts](file://plugins-sdk/src/api/notification.ts#L4-L21)
-- [dispatch.ts](file://plugins-sdk/src/core/dispatch.ts#L1-L30)
-- [environment.ts](file://plugins-sdk/src/core/environment.ts#L1-L37)
-- [notification.rs](file://src-tauri/src/plugin_api/notification.rs#L1-L25)
+- [notification.ts](file://plugins-sdk\src\api\notification.ts#L4-L29)
+- [dispatch.ts](file://plugins-sdk\src\core\dispatch.ts#L1-L29)
+- [environment.ts](file://plugins-sdk\src\core\environment.ts#L1-L36)
+- [notification.rs](file://src-tauri\src\plugin_api\notification.rs#L1-L24)
 
 ## 依赖关系分析
 
@@ -251,12 +260,12 @@ A --> B
 ```
 
 **图表来源**
-- [Cargo.toml](file://src-tauri/Cargo.toml#L40-L40)
-- [notification.rs](file://src-tauri/src/plugin_api/notification.rs#L1-L2)
+- [Cargo.toml](file://src-tauri\Cargo.toml#L40-L40)
+- [notification.rs](file://src-tauri\src\plugin_api\notification.rs#L1-L2)
 
 **章节来源**
-- [Cargo.toml](file://src-tauri/Cargo.toml#L1-L71)
-- [notification.rs](file://src-tauri/src/plugin_api/notification.rs#L1-L25)
+- [Cargo.toml](file://src-tauri\Cargo.toml#L1-L71)
+- [notification.rs](file://src-tauri\src\plugin_api\notification.rs#L1-L24)
 
 ## 性能考虑
 
@@ -295,7 +304,7 @@ A --> B
 **解决方案**：
 ```typescript
 try {
-  await showNotification({
+  await baize.notification.show({
     title: "成功",
     body: "操作已完成"
   });
@@ -335,8 +344,8 @@ if (env === RuntimeEnvironment.Unknown) {
 - 检查通知服务器是否运行
 
 **章节来源**
-- [environment.ts](file://plugins-sdk/src/core/environment.ts#L20-L35)
-- [notification.ts](file://plugins-sdk/src/api/notification.ts#L14-L21)
+- [environment.ts](file://plugins-sdk\src\core\environment.ts#L20-L36)
+- [notification.ts](file://plugins-sdk\src\api\notification.ts#L14-L21)
 
 ## 结论
 
