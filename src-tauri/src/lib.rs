@@ -182,6 +182,11 @@ pub fn run() {
             plugin_api::fs::plugin_fs_get_file_info,
             plugin_api::fs::plugin_fs_copy_file,
             plugin_api::fs::plugin_fs_move_file,
+            // 注册对话框命令
+            plugin_api::dialog::plugin_dialog_message,
+            plugin_api::dialog::plugin_dialog_confirm,
+            plugin_api::dialog::plugin_dialog_open,
+            plugin_api::dialog::plugin_dialog_save,
             // Command manager commands
             command_manager::get_commands,
             command_manager::update_command,

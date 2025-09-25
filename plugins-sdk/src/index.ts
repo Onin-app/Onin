@@ -13,6 +13,7 @@ export { storage } from './api/storage';
 export { notification } from './api/notification';
 export { command } from './api/command';
 export { fs } from './api/fs';
+export { dialog } from './api/dialog';
 import { invoke, listen } from './core/ipc';
 import { getEnvironment } from './core/environment';
 import { http } from './api/request';
@@ -20,6 +21,7 @@ import { storage } from './api/storage';
 import { notification } from './api/notification';
 import { command } from './api/command';
 import { fs } from './api/fs';
+import { dialog } from './api/dialog';
 
 // 为了向后兼容，仍然导出原始 API（但不推荐使用）
 // export * from './api/request';
@@ -34,6 +36,7 @@ export type {
   NotificationPermission,
   CommandPermission,
   FileSystemPermission,
+  DialogPermission,
   PluginPermissions,
   PluginManifest
 } from './types/permissions';
@@ -43,6 +46,16 @@ export type {
   FileSystemError,
   FileInfo
 } from './api/fs';
+
+// 对话框相关类型
+export type {
+  DialogError,
+  MessageDialogOptions,
+  ConfirmDialogOptions,
+  DialogFilter,
+  OpenDialogOptions,
+  SaveDialogOptions
+} from './api/dialog';
 
 // SDK 信息和调试工具
 export const debug = {
@@ -71,6 +84,7 @@ const baize = {
   notification,
   command,
   fs,
+  dialog,
   invoke,
   listen,
   debug,

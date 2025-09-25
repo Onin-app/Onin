@@ -55,6 +55,17 @@ interface FileSystemPermission {
   maxFileSize?: number;
 }
 
+interface DialogPermission {
+  /** 是否启用对话框权限 */
+  enable: boolean;
+  /** 是否允许消息对话框 */
+  message: boolean;
+  /** 是否允许确认对话框 */
+  confirm: boolean;
+  /** 是否允许文件选择对话框 */
+  fileDialog: boolean;
+}
+
 export interface PluginPermissions {
   /** HTTP 权限配置 */
   http?: HttpPermission;
@@ -66,6 +77,8 @@ export interface PluginPermissions {
   command?: CommandPermission;
   /** 文件系统权限配置 */
   fs?: FileSystemPermission;
+  /** 对话框权限配置 */
+  dialog?: DialogPermission;
 }
 
 export interface PluginManifest {
