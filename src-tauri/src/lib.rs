@@ -156,6 +156,7 @@ pub fn run() {
             system_commands::get_basic_commands,
             // 注册插件相关命令
             plugin_manager::load_plugins,
+            plugin_manager::refresh_plugins,
             plugin_manager::execute_plugin_entry,
             // 注册 notification 命令
             plugin_api::notification::show_notification,

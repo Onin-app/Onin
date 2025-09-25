@@ -101,10 +101,10 @@ pub struct LoadedPlugin {
     pub dir_name: String,
 }
 
-#[tauri::command]
-pub fn load_plugins(
-    app: tauri::AppHandle,
-    store: State<PluginStore>,
+fn load_plugins_internal(
+    app: &tauri::AppHandle,
+    store: &State<PluginStore>,
+    clear_existing: bool,
 ) -> Result<Vec<LoadedPlugin>, String> {
     println!("[plugin_manager] Loading plugins...");
     let data_dir = app.path().app_data_dir().map_err(|e| {
@@ -121,7 +121,10 @@ pub fn load_plugins(
     }
 
     let mut store_lock = store.0.lock().unwrap();
-    store_lock.clear(); // Clear old plugins
+    if clear_existing {
+        store_lock.clear(); // Clear old plugins
+        println!("[plugin_manager] Cleared existing plugins from store.");
+    }
 
     for entry in std::fs::read_dir(plugins_dir).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
@@ -153,6 +156,53 @@ pub fn load_plugins(
     let plugins = store_lock.values().cloned().collect();
     println!("[plugin_manager] Loaded {} plugins.", store_lock.len());
     Ok(plugins)
+}
+
+#[tauri::command]
+pub fn load_plugins(
+    app: tauri::AppHandle,
+    store: State<PluginStore>,
+) -> Result<Vec<LoadedPlugin>, String> {
+    load_plugins_internal(&app, &store, true)
+}
+
+#[tauri::command]
+pub async fn refresh_plugins(
+    app: tauri::AppHandle,
+    store: State<'_, PluginStore>,
+) -> Result<Vec<LoadedPlugin>, String> {
+    println!("[plugin_manager] Refreshing plugins...");
+    
+    // 清除 JavaScript 运行时缓存
+    if let Err(e) = crate::js_runtime::clear_all_plugin_runtimes().await {
+        println!("[plugin_manager] Warning: Failed to clear JS runtimes: {}", e);
+        // 不要因为这个错误而失败，继续刷新插件
+    } else {
+        println!("[plugin_manager] Successfully cleared all plugin runtimes");
+    }
+    
+    // 清除插件加载状态缓存
+    let loaded_state = app.state::<crate::plugin_api::command::PluginLoadedState>();
+    {
+        let mut state = loaded_state.0.lock().unwrap();
+        let count = state.len();
+        state.clear();
+        println!("[plugin_manager] Cleared {} plugin loaded states", count);
+    }
+    
+    // 重新加载所有插件
+    let result = load_plugins_internal(&app, &store, true);
+    
+    match &result {
+        Ok(plugins) => {
+            println!("[plugin_manager] Successfully refreshed {} plugins.", plugins.len());
+        }
+        Err(e) => {
+            println!("[plugin_manager] Failed to refresh plugins: {}", e);
+        }
+    }
+    
+    result
 }
 
 #[tauri::command]

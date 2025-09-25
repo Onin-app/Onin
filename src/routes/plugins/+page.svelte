@@ -47,6 +47,33 @@
     goto("/settings");
   };
 
+  const handleRefreshPlugins = async () => {
+    try {
+      console.log("正在刷新插件...");
+      const result = await invoke("refresh_plugins");
+      plugins = result as PluginManifest[];
+      console.log("插件刷新成功:", plugins);
+      
+      // 显示成功通知
+      await invoke("show_notification", {
+        options: {
+          title: "插件管理",
+          body: `成功刷新 ${plugins.length} 个插件`,
+        },
+      });
+    } catch (error) {
+      console.error("刷新插件失败:", error);
+      
+      // 显示错误通知
+      await invoke("show_notification", {
+        options: {
+          title: "插件管理",
+          body: "刷新插件失败，请查看控制台了解详情",
+        },
+      });
+    }
+  };
+
   const handleImportPlugin = () => {
     // TODO: 实现手动导入插件功能
     console.log("手动导入插件");
@@ -156,6 +183,27 @@
             已安装
           </Button.Root>
         </div>
+
+        <!-- 刷新插件按钮 -->
+        <Button.Root
+          class="rounded-input bg-green-500 text-white shadow-mini hover:bg-green-600 inline-flex h-9 items-center justify-center px-4 text-sm font-medium active:scale-[0.98] active:transition-all"
+          onclick={handleRefreshPlugins}
+        >
+          <svg
+            class="mr-2 h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            />
+          </svg>
+          刷新插件
+        </Button.Root>
 
         <!-- 手动导入插件按钮 -->
         <Button.Root

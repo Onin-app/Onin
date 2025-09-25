@@ -423,6 +423,13 @@ pub enum PluginTask {
         args: serde_json::Value,
         response: oneshot::Sender<Result<serde_json::Value, String>>,
     },
+    ClearPlugin {
+        plugin_id: String,
+        response: oneshot::Sender<Result<(), String>>,
+    },
+    ClearAllPlugins {
+        response: oneshot::Sender<Result<(), String>>,
+    },
 }
 
 // 全局插件运行时管理器
@@ -475,6 +482,17 @@ impl PluginRuntimeManager {
                             .await;
                             let _ = response.send(result);
                         }
+                        PluginTask::ClearPlugin {
+                            plugin_id,
+                            response,
+                        } => {
+                            let result = Self::handle_clear_plugin(&mut runtimes, &plugin_id);
+                            let _ = response.send(result);
+                        }
+                        PluginTask::ClearAllPlugins { response } => {
+                            let result = Self::handle_clear_all_plugins(&mut runtimes);
+                            let _ = response.send(result);
+                        }
                     }
                 }
             });
@@ -489,8 +507,10 @@ impl PluginRuntimeManager {
         plugin_id: &str,
         js_code: &str,
     ) -> Result<(), String> {
+        // 如果插件已经存在，先清除它（支持热重载）
         if runtimes.contains_key(plugin_id) {
-            return Ok(()); // 已经初始化过了
+            println!("[Plugin] Clearing existing runtime for plugin: {}", plugin_id);
+            runtimes.remove(plugin_id);
         }
 
         let mut runtime = create_runtime_with_plugin_id(app_handle, plugin_id)?;
@@ -509,6 +529,27 @@ impl PluginRuntimeManager {
         runtimes.insert(plugin_id.to_string(), runtime);
         println!("[Plugin] Initialized plugin runtime: {}", plugin_id);
 
+        Ok(())
+    }
+
+    fn handle_clear_plugin(
+        runtimes: &mut HashMap<String, JsRuntime>,
+        plugin_id: &str,
+    ) -> Result<(), String> {
+        if runtimes.remove(plugin_id).is_some() {
+            println!("[Plugin] Cleared runtime for plugin: {}", plugin_id);
+        } else {
+            println!("[Plugin] No runtime found for plugin: {}", plugin_id);
+        }
+        Ok(())
+    }
+
+    fn handle_clear_all_plugins(
+        runtimes: &mut HashMap<String, JsRuntime>,
+    ) -> Result<(), String> {
+        let count = runtimes.len();
+        runtimes.clear();
+        println!("[Plugin] Cleared all {} plugin runtimes", count);
         Ok(())
     }
 
@@ -595,6 +636,33 @@ impl PluginRuntimeManager {
             .await
             .map_err(|_| "Failed to receive execute command response")?
     }
+
+    pub async fn clear_plugin(&self, plugin_id: String) -> Result<(), String> {
+        let (response_tx, response_rx) = oneshot::channel();
+        self.sender
+            .send(PluginTask::ClearPlugin {
+                plugin_id,
+                response: response_tx,
+            })
+            .map_err(|_| "Failed to send clear plugin task")?;
+
+        response_rx
+            .await
+            .map_err(|_| "Failed to receive clear plugin response")?
+    }
+
+    pub async fn clear_all_plugins(&self) -> Result<(), String> {
+        let (response_tx, response_rx) = oneshot::channel();
+        self.sender
+            .send(PluginTask::ClearAllPlugins {
+                response: response_tx,
+            })
+            .map_err(|_| "Failed to send clear all plugins task")?;
+
+        response_rx
+            .await
+            .map_err(|_| "Failed to receive clear all plugins response")?
+    }
 }
 
 // 全局插件运行时管理器实例
@@ -616,6 +684,11 @@ pub async fn get_plugin_runtime_manager() -> Result<PluginRuntimeManager, String
         .map(|m| PluginRuntimeManager {
             sender: m.sender.clone(),
         })
+}
+
+pub async fn clear_all_plugin_runtimes() -> Result<(), String> {
+    let manager = get_plugin_runtime_manager().await?;
+    manager.clear_all_plugins().await
 }
 
 pub async fn execute_js(app_handle: &AppHandle, js_code: &str) -> Result<(), String> {
