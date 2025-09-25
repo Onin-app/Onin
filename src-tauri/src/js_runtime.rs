@@ -410,6 +410,64 @@ async fn op_invoke(
             }
         }
 
+        // Clipboard API
+        "plugin_clipboard_read_text" => {
+            match plugin_api::clipboard::plugin_clipboard_read_text(app_handle).await {
+                Ok(text) => InvokeResult::Ok { value: text.map(serde_json::Value::String).unwrap_or(serde_json::Value::Null) },
+                Err(e) => InvokeResult::Err { error: format!("Clipboard error: {:?}", e) },
+            }
+        }
+
+        "plugin_clipboard_write_text" => {
+            let options_result = serde_json::from_value::<
+                plugin_api::clipboard::WriteTextOptions,
+            >(arg.clone());
+            
+            match options_result {
+                Ok(options) => {
+                    match plugin_api::clipboard::plugin_clipboard_write_text(app_handle, options).await {
+                        Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
+                        Err(e) => InvokeResult::Err { error: format!("Clipboard error: {:?}", e) },
+                    }
+                }
+                Err(e) => InvokeResult::Err {
+                    error: format!("Invalid argument for plugin_clipboard_write_text: {}", e),
+                },
+            }
+        }
+
+        "plugin_clipboard_read_image" => {
+            match plugin_api::clipboard::plugin_clipboard_read_image(app_handle).await {
+                Ok(image) => InvokeResult::Ok { value: image.map(serde_json::Value::String).unwrap_or(serde_json::Value::Null) },
+                Err(e) => InvokeResult::Err { error: format!("Clipboard error: {:?}", e) },
+            }
+        }
+
+        "plugin_clipboard_write_image" => {
+            let options_result = serde_json::from_value::<
+                plugin_api::clipboard::WriteImageOptions,
+            >(arg.clone());
+            
+            match options_result {
+                Ok(options) => {
+                    match plugin_api::clipboard::plugin_clipboard_write_image(app_handle, options).await {
+                        Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
+                        Err(e) => InvokeResult::Err { error: format!("Clipboard error: {:?}", e) },
+                    }
+                }
+                Err(e) => InvokeResult::Err {
+                    error: format!("Invalid argument for plugin_clipboard_write_image: {}", e),
+                },
+            }
+        }
+
+        "plugin_clipboard_clear" => {
+            match plugin_api::clipboard::plugin_clipboard_clear(app_handle).await {
+                Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
+                Err(e) => InvokeResult::Err { error: format!("Clipboard error: {:?}", e) },
+            }
+        }
+
         _ => InvokeResult::Err {
             error: "unknown method".to_string(),
         },

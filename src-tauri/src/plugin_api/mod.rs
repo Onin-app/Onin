@@ -1,3 +1,4 @@
+pub mod clipboard;
 pub mod command;
 pub mod dialog;
 pub mod fs;

@@ -14,6 +14,7 @@ export { notification } from './api/notification';
 export { command } from './api/command';
 export { fs } from './api/fs';
 export { dialog } from './api/dialog';
+export { clipboard } from './api/clipboard';
 import { invoke, listen } from './core/ipc';
 import { getEnvironment } from './core/environment';
 import { http } from './api/request';
@@ -22,6 +23,7 @@ import { notification } from './api/notification';
 import { command } from './api/command';
 import { fs } from './api/fs';
 import { dialog } from './api/dialog';
+import { clipboard } from './api/clipboard';
 
 // 为了向后兼容，仍然导出原始 API（但不推荐使用）
 // export * from './api/request';
@@ -37,6 +39,7 @@ export type {
   CommandPermission,
   FileSystemPermission,
   DialogPermission,
+  ClipboardPermission,
   PluginPermissions,
   PluginManifest
 } from './types/permissions';
@@ -56,6 +59,11 @@ export type {
   OpenDialogOptions,
   SaveDialogOptions
 } from './api/dialog';
+
+// 剪贴板相关类型
+export type {
+  ClipboardError
+} from './api/clipboard';
 
 // SDK 信息和调试工具
 export const debug = {
@@ -85,6 +93,7 @@ const baize = {
   command,
   fs,
   dialog,
+  clipboard,
   invoke,
   listen,
   debug,

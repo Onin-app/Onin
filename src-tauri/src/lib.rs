@@ -71,6 +71,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .manage(plugin_manager::PluginStore(Default::default()))
         .manage(plugin_api::command::CommandExecutionStore(Default::default()))
         .manage(plugin_api::command::PluginLoadedState(Default::default()))
@@ -187,6 +188,12 @@ pub fn run() {
             plugin_api::dialog::plugin_dialog_confirm,
             plugin_api::dialog::plugin_dialog_open,
             plugin_api::dialog::plugin_dialog_save,
+            // 注册剪贴板命令
+            plugin_api::clipboard::plugin_clipboard_read_text,
+            plugin_api::clipboard::plugin_clipboard_write_text,
+            plugin_api::clipboard::plugin_clipboard_read_image,
+            plugin_api::clipboard::plugin_clipboard_write_image,
+            plugin_api::clipboard::plugin_clipboard_clear,
             // Command manager commands
             command_manager::get_commands,
             command_manager::update_command,

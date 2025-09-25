@@ -66,6 +66,21 @@ interface DialogPermission {
   fileDialog: boolean;
 }
 
+interface ClipboardPermission {
+  /** 是否启用剪贴板权限 */
+  enable: boolean;
+  /** 是否允许读取文本 */
+  readText: boolean;
+  /** 是否允许写入文本 */
+  writeText: boolean;
+  /** 是否允许读取图像 */
+  readImage: boolean;
+  /** 是否允许写入图像 */
+  writeImage: boolean;
+  /** 是否允许清空剪贴板 */
+  clear: boolean;
+}
+
 export interface PluginPermissions {
   /** HTTP 权限配置 */
   http?: HttpPermission;
@@ -79,6 +94,8 @@ export interface PluginPermissions {
   fs?: FileSystemPermission;
   /** 对话框权限配置 */
   dialog?: DialogPermission;
+  /** 剪贴板权限配置 */
+  clipboard?: ClipboardPermission;
 }
 
 export interface PluginManifest {
