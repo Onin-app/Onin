@@ -1,24 +1,7 @@
 import { invoke } from '../core/ipc';
 import { dispatch } from '../core/dispatch';
-
-// 文件系统错误类型
-export interface FileSystemError extends Error {
-  name: 'FileSystemError';
-  code?: string;
-  path?: string;
-}
-
-export function createFileSystemError(message: string, code?: string, path?: string): FileSystemError {
-  const error = new Error(message) as FileSystemError;
-  error.name = 'FileSystemError';
-  error.code = code;
-  error.path = path;
-  return error;
-}
-
-export function isFileSystemError(error: any): error is FileSystemError {
-  return error && error.name === 'FileSystemError';
-}
+import { errorUtils } from '../types/errors';
+import { parseFsError } from '../utils/error-parser';
 
 // 文件信息接口
 export interface FileInfo {
@@ -32,11 +15,24 @@ export interface FileInfo {
 }
 
 // 通用的文件系统调用辅助函数
-function callFsApi<T = any>(method: string, args?: any): Promise<T> {
-  return dispatch({
-    webview: () => invoke<T>(method, args),
-    headless: () => invoke<T>(method, args),
-  });
+async function callFsApi<T = any>(method: string, args?: any): Promise<T> {
+  try {
+    return await dispatch({
+      webview: () => invoke<T>(method, args),
+      headless: () => invoke<T>(method, args),
+    });
+  } catch (error: any) {
+    if (errorUtils.isPluginError(error)) {
+      throw error;
+    }
+
+    // 使用统一的错误解析器
+    throw parseFsError(error, {
+      path: args?.path || args?.sourcePath,
+      method,
+      args
+    });
+  }
 }
 
 /**
@@ -140,7 +136,4 @@ export const fs = {
   getFileInfo,
   copyFile,
   moveFile,
-  // 错误处理工具
-  createFileSystemError,
-  isFileSystemError,
 };

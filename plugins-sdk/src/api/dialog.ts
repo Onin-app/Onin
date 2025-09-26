@@ -1,22 +1,7 @@
 import { invoke } from '../core/ipc';
 import { dispatch } from '../core/dispatch';
-
-// Dialog 错误类型
-export interface DialogError extends Error {
-  name: 'DialogError';
-  code?: string;
-}
-
-export function createDialogError(message: string, code?: string): DialogError {
-  const error = new Error(message) as DialogError;
-  error.name = 'DialogError';
-  error.code = code;
-  return error;
-}
-
-export function isDialogError(error: any): error is DialogError {
-  return error && error.name === 'DialogError';
-}
+import { errorUtils } from '../types/errors';
+import { parseDialogError } from '../utils/error-parser';
 
 // 消息对话框选项
 export interface MessageDialogOptions {
@@ -58,11 +43,23 @@ export interface SaveDialogOptions {
 }
 
 // 通用的对话框调用辅助函数
-function callDialogApi<T = any>(method: string, args?: any): Promise<T> {
-  return dispatch({
-    webview: () => invoke<T>(method, args),
-    headless: () => invoke<T>(method, args),
-  });
+async function callDialogApi<T = any>(method: string, args?: any): Promise<T> {
+  try {
+    return await dispatch({
+      webview: () => invoke<T>(method, args),
+      headless: () => invoke<T>(method, args),
+    });
+  } catch (error: any) {
+    if (errorUtils.isPluginError(error)) {
+      throw error;
+    }
+
+    // 使用统一的错误解析器
+    throw parseDialogError(error, {
+      method,
+      args
+    });
+  }
 }
 
 /**
@@ -245,6 +242,5 @@ export const dialog = {
   saveFile,
   
   // 错误处理工具
-  createDialogError,
-  isDialogError,
+  parseDialogError,
 };

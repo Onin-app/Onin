@@ -1,29 +1,26 @@
 import { invoke } from '../core/ipc';
 import { dispatch } from '../core/dispatch';
-
-// Clipboard 错误类型
-export interface ClipboardError extends Error {
-  name: 'ClipboardError';
-  code?: string;
-}
-
-export function createClipboardError(message: string, code?: string): ClipboardError {
-  const error = new Error(message) as ClipboardError;
-  error.name = 'ClipboardError';
-  error.code = code;
-  return error;
-}
-
-export function isClipboardError(error: any): error is ClipboardError {
-  return error && error.name === 'ClipboardError';
-}
+import { errorUtils } from '../types/errors';
+import { parseClipboardError } from '../utils/error-parser';
 
 // 通用的剪贴板调用辅助函数
-function callClipboardApi<T = any>(method: string, args?: any): Promise<T> {
-  return dispatch({
-    webview: () => invoke<T>(method, args),
-    headless: () => invoke<T>(method, args),
-  });
+async function callClipboardApi<T = any>(method: string, args?: any): Promise<T> {
+  try {
+    return await dispatch({
+      webview: () => invoke<T>(method, args),
+      headless: () => invoke<T>(method, args),
+    });
+  } catch (error: any) {
+    if (errorUtils.isPluginError(error)) {
+      throw error;
+    }
+
+    // 使用统一的错误解析器
+    throw parseClipboardError(error, {
+      method,
+      args
+    });
+  }
 }
 
 /**
@@ -119,6 +116,5 @@ export const clipboard = {
   paste,
   
   // 错误处理工具
-  createClipboardError,
-  isClipboardError,
+  parseClipboardError,
 };

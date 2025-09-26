@@ -37,33 +37,46 @@ export type {
   StoragePermission,
   NotificationPermission,
   CommandPermission,
-  FileSystemPermission,
-  DialogPermission,
-  ClipboardPermission,
   PluginPermissions,
   PluginManifest
 } from './types/permissions';
 
+// 错误处理相关类型和工具
+export type {
+  ErrorCode,
+  PluginError
+} from './types/errors';
+export { 
+  errorCode,
+  createError,
+  errorUtils
+} from './types/errors';
+
+// 重试机制工具
+export type {
+  RetryOptions
+} from './utils/retry';
+export {
+  withRetry,
+  createRetryWrapper,
+  isRetryableError,
+  getRetryDelay,
+  retry
+} from './utils/retry';
+
 // 文件系统相关类型
 export type {
-  FileSystemError,
   FileInfo
 } from './api/fs';
 
 // 对话框相关类型
 export type {
-  DialogError,
   MessageDialogOptions,
   ConfirmDialogOptions,
   DialogFilter,
   OpenDialogOptions,
   SaveDialogOptions
 } from './api/dialog';
-
-// 剪贴板相关类型
-export type {
-  ClipboardError
-} from './api/clipboard';
 
 // SDK 信息和调试工具
 export const debug = {
