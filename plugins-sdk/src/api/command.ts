@@ -5,6 +5,11 @@ export type CommandHandler = (command: string, args: any) => any | Promise<any>;
 
 let isHandlerRegistered = false;
 
+// For testing purposes - reset the registration state
+export function _resetRegistrationState() {
+  isHandlerRegistered = false;
+}
+
 /**
  * 注册指令处理器。
  *
@@ -31,13 +36,21 @@ export async function registerCommandHandler(handler: CommandHandler): Promise<v
 
         try {
           const result = await handler(command, args);
-          await invoke("plugin_command_result", { requestId, success: true, result });
+          try {
+            await invoke("plugin_command_result", { requestId, success: true, result });
+          } catch (invokeError) {
+            console.error("Failed to send command result:", invokeError);
+          }
         } catch (error) {
-          await invoke("plugin_command_result", {
-            requestId,
-            success: false,
-            error: error instanceof Error ? error.message : String(error),
-          });
+          try {
+            await invoke("plugin_command_result", {
+              requestId,
+              success: false,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          } catch (invokeError) {
+            console.error("Failed to send command error:", invokeError);
+          }
         }
       };
       return listen("plugin_command_execute", eventCallback);
