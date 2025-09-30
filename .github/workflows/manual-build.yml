@@ -1,15 +1,15 @@
-name: Manual Build and Upload
+name: Manual Build
 
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag to upload to (e.g., v1.1.0)'
+        description: 'Release tag to build for (e.g., v1.1.0)'
         required: true
         type: string
 
 jobs:
-  build-and-upload:
+  build-tauri:
     strategy:
       fail-fast: false
       matrix:
@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -30,7 +32,7 @@ jobs:
           node-version: 20
           cache: 'pnpm'
       
-      - name: install Rust stable
+      - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
       - name: Rust cache
@@ -38,33 +40,20 @@ jobs:
         with:
           workdir: './src-tauri'
 
-      - name: install frontend dependencies
+      - name: Install frontend dependencies
         run: pnpm install
 
       - name: Build frontend
         run: pnpm build
 
       - name: Build Tauri app
-        run: pnpm tauri build
-
-      - name: Upload Windows artifacts
-        if: matrix.platform == 'windows-latest'
-        uses: actions/upload-release-asset@v1
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: src-tauri/target/release/bundle/msi/baize_${{ github.event.inputs.tag }}_x64_en-US.msi
-          asset_name: baize-${{ github.event.inputs.tag }}-x64.msi
-          asset_content_type: application/octet-stream
-
-      - name: Upload macOS artifacts
-        if: matrix.platform == 'macos-latest'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: src-tauri/target/release/bundle/dmg/baize_${{ github.event.inputs.tag }}_x64.dmg
-          asset_name: baize-${{ github.event.inputs.tag }}-x64.dmg
-          asset_content_type: application/octet-stream
+          tagName: ${{ github.event.inputs.tag }}
+          releaseName: 'Baize ${{ github.event.inputs.tag }}'
+          releaseBody: 'Manual build for ${{ github.event.inputs.tag }}'
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true

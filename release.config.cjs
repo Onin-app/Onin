@@ -38,6 +38,14 @@ module.exports = {
           "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}",
       },
     ],
-    "@semantic-release/github",
+    [
+      "@semantic-release/github",
+      {
+        successComment: false,
+        failComment: false,
+        releasedLabels: false,
+        addReleases: "bottom"
+      }
+    ],
   ],
 };
