@@ -44,14 +44,23 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # 记录发布前的版本
+          OLD_VERSION=$(node -p "require('./package.json').version")
+          echo "Version before release: $OLD_VERSION"
+          
+          # 运行 semantic-release
           pnpm release
-          # 检查是否有新的 release 生成
-          if git describe --tags --exact-match HEAD 2>/dev/null; then
-            VERSION=$(node -p "require('./package.json').version")
+          
+          # 记录发布后的版本
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          echo "Version after release: $NEW_VERSION"
+          
+          # 检查版本是否发生变化或者是否有新的 tag
+          if [ "$OLD_VERSION" != "$NEW_VERSION" ] || git describe --tags --exact-match HEAD 2>/dev/null; then
             echo "released=true" >> $GITHUB_OUTPUT
-            echo "version=$VERSION" >> $GITHUB_OUTPUT
-            echo "tag=v$VERSION" >> $GITHUB_OUTPUT
-            echo "New release created: v$VERSION"
+            echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+            echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
+            echo "New release created: v$NEW_VERSION"
           else
             echo "released=false" >> $GITHUB_OUTPUT
             echo "No new release created"
@@ -59,17 +68,21 @@ jobs:
 
   build-tauri:
     needs: release
-    if: needs.release.outputs.released == 'true'
+    if: always()
     strategy:
       fail-fast: false
       matrix:
         platform: [macos-latest, windows-latest]
     runs-on: ${{ matrix.platform }}
     steps:
+      - name: Debug outputs
+        run: |
+          echo "Released: ${{ needs.release.outputs.released }}"
+          echo "Version: ${{ needs.release.outputs.version }}"
+          echo "Tag: ${{ needs.release.outputs.tag }}"
+          
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.release.outputs.tag }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -107,4 +120,3 @@ jobs:
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
-          releaseId: ${{ needs.release.outputs.tag }}
