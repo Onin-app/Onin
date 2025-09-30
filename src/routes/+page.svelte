@@ -48,12 +48,24 @@
     // })();
 
     // 2. 监听后端的更新通知
-    unlisten = await listen("apps_updated", (event) => {
+    const unlistenAppsUpdated = await listen("apps_updated", (event) => {
       console.log(
         "Received apps_updated event from backend. Refetching list...",
       );
       fetchApps();
     });
+
+    const unlistenCommandsReady = await listen("commands_ready", (event) => {
+      console.log(
+        "Received commands_ready event from backend. Refetching list...",
+      );
+      fetchApps();
+    });
+
+    unlisten = () => {
+      unlistenAppsUpdated();
+      unlistenCommandsReady();
+    };
   });
 
   const fetchApps = async () => {
@@ -61,16 +73,9 @@
       console.log("Fetching all launchable items...");
       const res = await invoke<LaunchableItem[]>("get_all_launchable_items");
       console.log("本机软件列表: ", res);
-      const commands: LaunchableItem[] = [
-          { name: 'Shutdown', aliases: ['shutdown', '关机'], path: '', icon: 'shutdown', icon_type: 'Iconfont', item_type: 'App', source: 'Command', action: 'shutdown' },
-          { name: 'Restart', aliases: ['restart', 'reboot', '重启'], path: '', icon: 'restart', icon_type: 'Iconfont', item_type: 'App', source: 'Command', action: 'reboot' },
-          { name: 'Sleep', aliases: ['sleep', '睡眠'], path: '', icon: 'sleep', icon_type: 'Iconfont', item_type: 'App', source: 'Command', action: 'sleep' },
-          { name: 'Lock Screen', aliases: ['lock', '锁屏'], path: '', icon: 'lock', icon_type: 'Iconfont', item_type: 'App', source: 'Command', action: 'lock_screen' },
-          { name: 'Logout', aliases: ['logout', '注销'], path: '', icon: 'logout', icon_type: 'Iconfont', item_type: 'App', source: 'Command', action: 'logout' },
-      ];
       if (res) {
-        originAppList = [...res, ...commands];
-        appList = [...res, ...commands];
+        originAppList = res;
+        appList = res;
       }
       console.log(`Got ${appList.length} apps.`);
     } catch (error) {
@@ -94,9 +99,13 @@
 
   const openApp = async (app: LaunchableItem) => {
     try {
-      if (app.source === 'Command' && app.action) {
-        await invoke(app.action);
-      } else {
+      if (app.action) {
+        await invoke("execute_command", {
+          name: app.action,
+          window: await WebviewWindow.getCurrent(),
+        });
+      } else if (app.source === "FileCommand") {
+        // Handle custom items that might not have an action
         await invoke("open_app", {
           path: app.path,
           window: await WebviewWindow.getCurrent(),
@@ -199,8 +208,10 @@
               onclick={() => openApp(app)}
             >
               {#if app.icon}
-                {#if app.icon_type === 'Iconfont'}
-                  <div class="mr-2 flex h-8 w-8 items-center justify-center rounded-md bg-gray-200 dark:bg-gray-700">
+                {#if app.icon_type === "Iconfont"}
+                  <div
+                    class="mr-2 flex h-8 w-8 items-center justify-center rounded-md bg-gray-200 dark:bg-gray-700"
+                  >
                     <Icon icon={app.icon} class="h-6 w-6" />
                   </div>
                 {:else if app.icon}
@@ -222,10 +233,10 @@
                     {app.source}
                   </span>
                 </div>
-                {#if app.source !== 'Command'}
-                <span class="text-neutral-399 text-xs dark:text-neutral-500">
-                  {app.path}
-                </span>
+                {#if app.source !== "Command"}
+                  <span class="text-neutral-399 text-xs dark:text-neutral-500">
+                    {app.path}
+                  </span>
                 {/if}
               </div>
             </button>

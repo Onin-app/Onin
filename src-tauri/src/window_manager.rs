@@ -1,4 +1,3 @@
-use crate::app_cache_manager;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::time::Duration;
@@ -125,10 +124,6 @@ pub fn setup_window_events(app: &App) -> Result<(), Box<dyn std::error::Error>> 
                     eprintln!("[ERROR] Failed to register Esc shortcut: {}", err);
                 });
 
-            // Trigger a silent app list refresh.
-            println!("Window focused, triggering silent app list refresh.");
-            let handle = app_handle.clone();
-            app_cache_manager::trigger_app_refresh(handle);
         }
         tauri::WindowEvent::Focused(false) => {
             let window_state: State<WindowState> = app_handle.state();

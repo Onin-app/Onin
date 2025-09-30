@@ -3,7 +3,12 @@
   import { listen } from "@tauri-apps/api/event";
   import { escapeHandler } from "$lib/stores/escapeHandler";
   import { get } from "svelte/store"; // `get` is still needed for the custom escapeHandler store
+  import { invoke } from "@tauri-apps/api/core";
   import { page } from "$app/state"; // Use the new reactive state module
+  import { setupPluginConsoleListener } from "$lib/plugin-console";
+
+  // Setup plugin console listener to forward plugin console output to webview devtools
+  setupPluginConsoleListener();
 
   // This onMount block sets up a single, persistent listener for the 'esc_key_pressed' event.
   // It will live for the entire duration of the app, avoiding setup/teardown during page navigation.
@@ -34,14 +39,22 @@
         },
       );
 
-      return { unlisten, unlistenVisibility };
+      const unlistenCommand = await listen<string>(
+        "execute_command_by_name",
+        (event) => {
+          invoke("execute_command", { name: event.payload });
+        },
+      );
+
+      return { unlisten, unlistenVisibility, unlistenCommand };
     })();
 
     // The returned cleanup function will only run if the entire layout is destroyed.
     return () => {
-      listenersPromise.then(({ unlisten, unlistenVisibility }) => {
+      listenersPromise.then(({ unlisten, unlistenVisibility, unlistenCommand }) => {
         unlisten();
         unlistenVisibility();
+        unlistenCommand();
       });
     };
   });

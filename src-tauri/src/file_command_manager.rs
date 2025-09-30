@@ -1,24 +1,24 @@
 use crate::icon_utils;
-use crate::shared_types::{ItemSource, ItemType, LaunchableItem};
+use crate::shared_types::{CommandKeyword, ItemSource, ItemType, LaunchableItem};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use tauri::Manager;
 use tokio::sync::Mutex; // Use the async-aware Mutex from Tokio
 
-const STARTUP_APPS_FILENAME: &str = "startup_apps.json";
+const FILE_COMMANDS_FILENAME: &str = "file_commands.json";
 
 #[derive(Debug)]
-pub struct StartupAppsManager {
+pub struct FileCommandManager {
     // Change to an Option to support lazy loading.
-    pub startup_items: Mutex<Option<Vec<LaunchableItem>>>,
+    pub file_commands: Mutex<Option<Vec<LaunchableItem>>>,
     app_handle: tauri::AppHandle,
 }
 
-impl StartupAppsManager {
+impl FileCommandManager {
     pub fn new(app_handle: tauri::AppHandle) -> Self {
         // Initialize with None. Data will be loaded on first access.
         Self {
-            startup_items: Mutex::new(None),
+            file_commands: Mutex::new(None),
             app_handle,
         }
     }
@@ -28,12 +28,12 @@ impl StartupAppsManager {
             .path()
             .app_data_dir()
             .unwrap()
-            .join(STARTUP_APPS_FILENAME)
+            .join(FILE_COMMANDS_FILENAME)
     }
 
-    /// Ensures the startup items are loaded from disk, only performs load on first call.
+    /// Ensures the file commands are loaded from disk, only performs load on first call.
     async fn ensure_loaded(&self) {
-        let mut guard = self.startup_items.lock().await;
+        let mut guard = self.file_commands.lock().await;
         if guard.is_none() {
             let storage_path = self.get_storage_path();
             let items = if storage_path.exists() {
@@ -59,17 +59,17 @@ impl StartupAppsManager {
                     let _ = tokio::fs::create_dir_all(parent).await;
                 }
                 if let Err(e) = tokio::fs::write(storage_path, content).await {
-                    tracing::error!("Failed to write startup apps to disk: {:?}", e);
+                    tracing::error!("Failed to write file commands to disk: {:?}", e);
                 }
             }
-            Err(e) => tracing::error!("Failed to serialize startup items: {:?}", e),
+            Err(e) => tracing::error!("Failed to serialize file commands: {:?}", e),
         };
     }
 
     pub async fn get_items(&self) -> Vec<LaunchableItem> {
         self.ensure_loaded().await;
         // We can unwrap safely because ensure_loaded guarantees it's Some.
-        self.startup_items.lock().await.as_ref().unwrap().clone()
+        self.file_commands.lock().await.as_ref().unwrap().clone()
     }
 
     pub async fn add_paths(&self, paths: Vec<String>) -> Vec<LaunchableItem> {
@@ -77,7 +77,7 @@ impl StartupAppsManager {
 
         // The logic is enclosed in a block to ensure the lock is released before `await`.
         let updated_items = {
-            let mut items_guard = self.startup_items.lock().await;
+            let mut items_guard = self.file_commands.lock().await;
             // We can unwrap safely because ensure_loaded guarantees it's Some.
             let items = items_guard.as_mut().unwrap();
 
@@ -100,6 +100,7 @@ impl StartupAppsManager {
 
         // Now that the lock is released, we can safely perform async I/O.
         self.write_items_to_disk(&updated_items).await;
+        self.delete_commands_json();
 
         updated_items
     }
@@ -108,7 +109,7 @@ impl StartupAppsManager {
         self.ensure_loaded().await;
 
         let updated_items = {
-            let mut items_guard = self.startup_items.lock().await;
+            let mut items_guard = self.file_commands.lock().await;
             let items = items_guard.as_mut().unwrap();
             // 根据路径过滤掉要删除的项
             items.retain(|item| item.path != path_to_remove);
@@ -116,6 +117,7 @@ impl StartupAppsManager {
         }; // `items_guard` is dropped here.
 
         self.write_items_to_disk(&updated_items).await;
+        self.delete_commands_json();
 
         updated_items
     }
@@ -155,37 +157,55 @@ impl StartupAppsManager {
         };
 
         Some(LaunchableItem {
-            name,
-            aliases: vec![],
+            name: name.clone(),
+            keywords: vec![CommandKeyword {
+                name,
+                disabled: None,
+                is_default: Some(true),
+            }],
             path: path_str,
             icon,
             icon_type: crate::shared_types::IconType::Base64,
             item_type,
-            source: ItemSource::Custom,
+            source: ItemSource::FileCommand,
             action: None,
+            origin: None,
         })
+    }
+    fn delete_commands_json(&self) {
+        let path = self
+            .app_handle
+            .path()
+            .app_data_dir()
+            .unwrap()
+            .join("commands.json");
+        if path.exists() {
+            if let Err(e) = std::fs::remove_file(path) {
+                tracing::error!("Failed to delete commands.json: {:?}", e);
+            }
+        }
     }
 }
 
 #[tauri::command]
-pub async fn get_startup_items(
-    manager: tauri::State<'_, StartupAppsManager>,
+pub async fn get_file_commands(
+    manager: tauri::State<'_, FileCommandManager>,
 ) -> Result<Vec<LaunchableItem>, String> {
     Ok(manager.get_items().await)
 }
 
 #[tauri::command]
-pub async fn add_startup_items(
+pub async fn add_file_commands(
     paths: Vec<String>,
-    manager: tauri::State<'_, StartupAppsManager>,
+    manager: tauri::State<'_, FileCommandManager>,
 ) -> Result<Vec<LaunchableItem>, String> {
     Ok(manager.add_paths(paths).await)
 }
 
 #[tauri::command]
-pub async fn remove_startup_item(
+pub async fn remove_file_command(
     path: String,
-    manager: tauri::State<'_, StartupAppsManager>,
+    manager: tauri::State<'_, FileCommandManager>,
 ) -> Result<Vec<LaunchableItem>, String> {
     Ok(manager.remove_item(&path).await)
 }
