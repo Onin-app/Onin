@@ -5,6 +5,8 @@ on:
     types: [published]
   workflow_dispatch:
   push:
+    branches:
+      - master
     tags:
       - 'v*'
 
@@ -52,13 +54,18 @@ jobs:
       - name: Build frontend
         run: pnpm build
 
+      - name: Get version
+        id: version
+        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'Release ${{ github.ref_name }}'
+          tagName: v${{ steps.version.outputs.version }}
+          releaseName: 'App v${{ steps.version.outputs.version }}'
           releaseBody: 'See the assets to download and install.'
           releaseDraft: false
           prerelease: false
+          includeUpdaterJson: true
