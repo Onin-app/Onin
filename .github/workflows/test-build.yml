@@ -38,7 +38,5 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Build Tauri (dev)
-        run: |
-          cd src-tauri
-          cargo build
+      - name: Test Tauri build
+        run: pnpm tauri build --debug

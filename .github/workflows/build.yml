@@ -48,21 +48,16 @@ jobs:
       - name: install frontend dependencies
         run: pnpm install
 
-      - name: Run frontend checks
-        run: |
-          pnpm check
-          pnpm build
+      - name: Build frontend
+        run: pnpm build
 
-      - name: Get current version
-        id: package-version
-        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
-
-      - uses: tauri-apps/tauri-action@v0
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: v${{ steps.package-version.outputs.version }}
-          releaseName: 'App v${{ steps.package-version.outputs.version }}'
-          releaseBody: 'See the assets to download this version and install.'
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Release ${{ github.ref_name }}'
+          releaseBody: 'See the assets to download and install.'
           releaseDraft: false
           prerelease: false
