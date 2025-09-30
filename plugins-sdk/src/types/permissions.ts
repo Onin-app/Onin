@@ -1,117 +1,154 @@
 /**
- * 插件权限配置类型定义
+ * Plugin permission configuration type definitions
+ * @fileoverview Defines all permission interfaces for plugin capabilities
  */
 
+/**
+ * HTTP permission configuration
+ * @interface HttpPermission
+ */
 export interface HttpPermission {
-  /** 是否启用 HTTP 权限 */
+  /** Whether HTTP permission is enabled */
   enable: boolean;
-  /** 允许访问的 URL 列表，支持通配符 */
+  /** List of allowed URLs, supports wildcards */
   allowUrls: string[];
-  /** 请求超时时间（毫秒），可选 */
+  /** Request timeout in milliseconds (optional) */
   timeout?: number;
-  /** 最大重试次数，可选 */
+  /** Maximum number of retries (optional) */
   maxRetries?: number;
 }
 
+/**
+ * Storage permission configuration
+ * @interface StoragePermission
+ */
 export interface StoragePermission {
-  /** 是否启用存储权限 */
+  /** Whether storage permission is enabled */
   enable: boolean;
-  /** 是否允许本地存储 */
+  /** Whether local storage is allowed */
   local: boolean;
-  /** 是否允许会话存储 */
+  /** Whether session storage is allowed */
   session: boolean;
-  /** 最大存储大小，可选 */
+  /** Maximum storage size (optional) */
   maxSize?: string;
 }
 
+/**
+ * Notification permission configuration
+ * @interface NotificationPermission
+ */
 export interface NotificationPermission {
-  /** 是否启用通知权限 */
+  /** Whether notification permission is enabled */
   enable: boolean;
-  /** 是否允许声音通知 */
+  /** Whether sound notifications are allowed */
   sound: boolean;
-  /** 是否允许徽章通知 */
+  /** Whether badge notifications are allowed */
   badge: boolean;
 }
 
+/**
+ * Command permission configuration
+ * @interface CommandPermission
+ */
 export interface CommandPermission {
-  /** 是否启用命令权限 */
+  /** Whether command permission is enabled */
   enable: boolean;
-  /** 允许的命令列表，支持通配符 */
+  /** List of allowed commands, supports wildcards */
   allowCommands: string[];
-  /** 最大执行时间（毫秒），可选 */
+  /** Maximum execution time in milliseconds (optional) */
   maxExecutionTime?: number;
 }
 
+/**
+ * File system permission configuration
+ * @interface FileSystemPermission
+ */
 interface FileSystemPermission {
-  /** 是否启用文件系统权限 */
+  /** Whether file system permission is enabled */
   enable: boolean;
-  /** 是否允许读取文件 */
+  /** Whether file reading is allowed */
   read: boolean;
-  /** 是否允许写入文件 */
+  /** Whether file writing is allowed */
   write: boolean;
-  /** 是否允许删除文件 */
+  /** Whether file deletion is allowed */
   delete: boolean;
-  /** 最大文件大小限制（字节），可选 */
+  /** Maximum file size limit in bytes (optional) */
   maxFileSize?: number;
 }
 
+/**
+ * Dialog permission configuration
+ * @interface DialogPermission
+ */
 interface DialogPermission {
-  /** 是否启用对话框权限 */
+  /** Whether dialog permission is enabled */
   enable: boolean;
-  /** 是否允许消息对话框 */
+  /** Whether message dialogs are allowed */
   message: boolean;
-  /** 是否允许确认对话框 */
+  /** Whether confirmation dialogs are allowed */
   confirm: boolean;
-  /** 是否允许文件选择对话框 */
+  /** Whether file selection dialogs are allowed */
   fileDialog: boolean;
 }
 
+/**
+ * Clipboard permission configuration
+ * @interface ClipboardPermission
+ */
 interface ClipboardPermission {
-  /** 是否启用剪贴板权限 */
+  /** Whether clipboard permission is enabled */
   enable: boolean;
-  /** 是否允许读取文本 */
+  /** Whether text reading is allowed */
   readText: boolean;
-  /** 是否允许写入文本 */
+  /** Whether text writing is allowed */
   writeText: boolean;
-  /** 是否允许读取图像 */
+  /** Whether image reading is allowed */
   readImage: boolean;
-  /** 是否允许写入图像 */
+  /** Whether image writing is allowed */
   writeImage: boolean;
-  /** 是否允许清空剪贴板 */
+  /** Whether clipboard clearing is allowed */
   clear: boolean;
 }
 
+/**
+ * Plugin permissions configuration
+ * @interface PluginPermissions
+ */
 export interface PluginPermissions {
-  /** HTTP 权限配置 */
+  /** HTTP permission configuration */
   http?: HttpPermission;
-  /** 存储权限配置 */
+  /** Storage permission configuration */
   storage?: StoragePermission;
-  /** 通知权限配置 */
+  /** Notification permission configuration */
   notification?: NotificationPermission;
-  /** 命令权限配置 */
+  /** Command permission configuration */
   command?: CommandPermission;
-  /** 文件系统权限配置 */
+  /** File system permission configuration */
   fs?: FileSystemPermission;
-  /** 对话框权限配置 */
+  /** Dialog permission configuration */
   dialog?: DialogPermission;
-  /** 剪贴板权限配置 */
+  /** Clipboard permission configuration */
   clipboard?: ClipboardPermission;
 }
 
+/**
+ * Plugin manifest configuration
+ * @interface PluginManifest
+ */
 export interface PluginManifest {
-  /** 插件唯一标识符 */
+  /** Plugin unique identifier */
   id: string;
-  /** 插件名称 */
+  /** Plugin name */
   name: string;
-  /** 插件版本 */
+  /** Plugin version */
   version: string;
-  /** 插件描述 */
+  /** Plugin description */
   description: string;
-  /** 入口文件路径 */
+  /** Entry file path */
   entry: string;
-  /** 权限配置 */
+  /** Permission configuration */
   permissions?: PluginPermissions;
-  /** 命令定义 */
+  /** Command definitions */
   commands?: Array<{
     id: string;
     name: string;

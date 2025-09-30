@@ -1,22 +1,31 @@
 /**
- * 错误码定义 - 按命名空间组织
+ * Error code definitions organized by namespace
+ * 
+ * Provides a comprehensive set of error codes organized by functional area.
+ * Each error code follows a consistent naming pattern: `CATEGORY_SPECIFIC_ERROR`.
+ * This organization helps with error handling and debugging.
+ * 
+ * @fileoverview Defines all error codes and error handling utilities for the plugin SDK
+ * @version 0.1.0
+ * @since 0.1.0
+ * @group Types
  */
 export const errorCode = {
-  // 通用错误
+  /** Common errors */
   common: {
     UNKNOWN: 'COMMON_UNKNOWN',
     PERMISSION_DENIED: 'COMMON_PERMISSION_DENIED',
     INVALID_ARGUMENT: 'COMMON_INVALID_ARGUMENT',
   },
 
-  // HTTP 相关错误
+  /** HTTP related errors */
   http: {
     NETWORK_ERROR: 'HTTP_NETWORK_ERROR',
     TIMEOUT: 'HTTP_TIMEOUT',
-    HTTP_ERROR: 'HTTP_HTTP_ERROR', // 通用HTTP错误，包含状态码信息
+    HTTP_ERROR: 'HTTP_HTTP_ERROR', // Generic HTTP error with status code information
   },
 
-  // 文件系统错误
+  /** File system errors */
   fs: {
     FILE_NOT_FOUND: 'FS_FILE_NOT_FOUND',
     FILE_ACCESS_DENIED: 'FS_FILE_ACCESS_DENIED',
@@ -27,7 +36,7 @@ export const errorCode = {
     READ_ONLY_FILESYSTEM: 'FS_READ_ONLY_FILESYSTEM',
   },
 
-  // 剪贴板错误
+  /** Clipboard errors */
   clipboard: {
     UNAVAILABLE: 'CLIPBOARD_UNAVAILABLE',
     FORMAT_UNSUPPORTED: 'CLIPBOARD_FORMAT_UNSUPPORTED',
@@ -35,21 +44,23 @@ export const errorCode = {
     ACCESS_DENIED: 'CLIPBOARD_ACCESS_DENIED',
   },
 
-  // 对话框错误
+  /** Dialog errors */
   dialog: {
     CANCELLED: 'DIALOG_CANCELLED',
     UNAVAILABLE: 'DIALOG_UNAVAILABLE',
     INVALID_OPTIONS: 'DIALOG_INVALID_OPTIONS',
   },
 
-  // 存储错误
+  /** Storage errors */
   storage: {
     QUOTA_EXCEEDED: 'STORAGE_QUOTA_EXCEEDED',
     UNAVAILABLE: 'STORAGE_UNAVAILABLE',
   },
 } as const;
 
-// 扁平化的错误码类型
+/**
+ * Flattened error code type union
+ */
 export type ErrorCode =
   | typeof errorCode.common[keyof typeof errorCode.common]
   | typeof errorCode.http[keyof typeof errorCode.http]
@@ -59,7 +70,16 @@ export type ErrorCode =
   | typeof errorCode.storage[keyof typeof errorCode.storage];
 
 /**
- * 插件错误接口 - 使用普通对象而非类
+ * Plugin error interface - uses plain objects instead of classes
+ * 
+ * Represents errors that occur within the plugin system. These errors provide
+ * structured information including error codes, context data, and human-readable
+ * messages for better debugging and error handling.
+ * 
+ * @interface PluginError
+ * @extends Error
+ * @since 0.1.0
+ * @group Types
  */
 export interface PluginError extends Error {
   readonly name: 'PluginError';
@@ -68,7 +88,13 @@ export interface PluginError extends Error {
 }
 
 /**
- * 创建插件错误的工厂函数
+ * Factory function for creating plugin errors
+ * @param code - The error code
+ * @param message - The error message
+ * @param context - Additional context information
+ * @returns A new PluginError instance
+ * @internal
+ * @group Error Factories
  */
 function createPluginError(
   code: ErrorCode,
@@ -83,10 +109,38 @@ function createPluginError(
 }
 
 /**
- * 错误工厂函数 - 按命名空间组织
+ * Error factory functions organized by namespace
+ * 
+ * Provides convenient factory functions for creating specific types of plugin errors.
+ * Each namespace corresponds to a functional area (HTTP, file system, clipboard, etc.)
+ * and contains functions for creating the most common error scenarios.
+ * 
+ * @namespace createError
+ * @version 0.1.0
+ * @since 0.1.0
+ * @group Error Factories
+ * @example
+ * ```typescript
+ * // Create HTTP errors
+ * throw createError.http.networkError('Connection failed');
+ * throw createError.http.timeout('https://api.example.com', 5000);
+ * 
+ * // Create file system errors
+ * throw createError.fs.fileNotFound('/path/to/file.txt');
+ * throw createError.fs.accessDenied('/restricted/path');
+ * 
+ * // Create clipboard errors
+ * throw createError.clipboard.formatUnsupported('image/gif');
+ * 
+ * // Create with additional context
+ * throw createError.common.unknown('Unexpected error', {
+ *   operation: 'data-processing',
+ *   timestamp: Date.now()
+ * });
+ * ```
  */
 export const createError = {
-  // 通用错误
+  /** Common error factories */
   common: {
     unknown: (message: string, context?: Record<string, any>) =>
       createPluginError(errorCode.common.UNKNOWN, message, context),
@@ -106,7 +160,7 @@ export const createError = {
       ),
   },
 
-  // HTTP 错误
+  /** HTTP error factories */
   http: {
     networkError: (message: string, context?: Record<string, any>) =>
       createPluginError(errorCode.http.NETWORK_ERROR, message, context),
@@ -126,7 +180,7 @@ export const createError = {
       ),
   },
 
-  // 文件系统错误
+  /** File system error factories */
   fs: {
     fileNotFound: (path: string, context?: Record<string, any>) =>
       createPluginError(
@@ -164,7 +218,7 @@ export const createError = {
       ),
   },
 
-  // 剪贴板错误
+  /** Clipboard error factories */
   clipboard: {
     unavailable: (context?: Record<string, any>) =>
       createPluginError(
@@ -195,7 +249,7 @@ export const createError = {
       ),
   },
 
-  // 对话框错误
+  /** Dialog error factories */
   dialog: {
     cancelled: (context?: Record<string, any>) =>
       createPluginError(
@@ -219,7 +273,7 @@ export const createError = {
       ),
   },
 
-  // 存储错误
+  /** Storage error factories */
   storage: {
     quotaExceeded: (context?: Record<string, any>) =>
       createPluginError(
@@ -238,32 +292,70 @@ export const createError = {
 };
 
 /**
- * 错误检查工具函数
+ * Error checking utility functions
+ * 
+ * Provides utility functions for checking and analyzing plugin errors.
+ * These functions help identify error types, extract error information,
+ * and implement error-specific handling logic.
+ * 
+ * @namespace errorUtils
+ * @version 0.1.0
+ * @since 0.1.0
+ * @group Error Utilities
+ * @example
+ * ```typescript
+ * try {
+ *   await someOperation();
+ * } catch (error) {
+ *   if (errorUtils.isPluginError(error)) {
+ *     console.log('Plugin error:', error.code);
+ *     
+ *     if (errorUtils.isErrorCode(error, 'HTTP_NETWORK_ERROR')) {
+ *       console.log('Network error occurred');
+ *     }
+ *     
+ *     const info = errorUtils.getErrorInfo(error);
+ *     console.log('Error details:', info);
+ *   } else {
+ *     console.log('Unknown error:', error);
+ *   }
+ * }
+ * ```
  */
 export const errorUtils = {
   /**
-   * 检查是否为插件错误
+   * Checks if an error is a plugin error
+   * @param error - The error to check
+   * @returns True if the error is a PluginError
    */
   isPluginError: (error: any): error is PluginError => {
     return error && error.name === 'PluginError' && typeof error.code === 'string';
   },
 
   /**
-   * 检查错误是否为指定类型
+   * Checks if an error is of a specific type
+   * @param error - The error to check
+   * @param code - The error code to match
+   * @returns True if the error matches the specified code
    */
   isErrorCode: (error: any, code: ErrorCode): boolean => {
     return errorUtils.isPluginError(error) && error.code === code;
   },
 
   /**
-   * 检查错误是否为指定类型之一
+   * Checks if an error is one of the specified types
+   * @param error - The error to check
+   * @param codes - Array of error codes to match against
+   * @returns True if the error matches any of the specified codes
    */
   isOneOfErrorCodes: (error: any, codes: ErrorCode[]): boolean => {
     return errorUtils.isPluginError(error) && codes.includes(error.code);
   },
 
   /**
-   * 获取错误的详细信息
+   * Gets detailed information about an error
+   * @param error - The error to analyze
+   * @returns Error information object or null if not a plugin error
    */
   getErrorInfo: (error: any) => {
     if (errorUtils.isPluginError(error)) {

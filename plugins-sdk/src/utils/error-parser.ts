@@ -1,7 +1,8 @@
 import { errorCode, createError, PluginError } from '../types/errors';
 
 /**
- * 错误解析器 - 将底层错误转换为结构化的插件错误
+ * Error parser - converts low-level errors to structured plugin errors
+ * @fileoverview Provides error parsing utilities for different API categories
  */
 
 export interface ErrorPattern {
@@ -10,7 +11,8 @@ export interface ErrorPattern {
 }
 
 /**
- * 错误匹配结果
+ * Error matching result
+ * @interface ErrorMatchResult
  */
 interface ErrorMatchResult {
   matched: boolean;
@@ -19,11 +21,11 @@ interface ErrorMatchResult {
 }
 
 /**
- * HTTP 错误解析规则
- * 注意：模式按优先级排序，更具体的错误应该放在前面
+ * HTTP error parsing rules
+ * Note: Patterns are sorted by priority, more specific errors should come first
  */
 export const httpErrorPatterns: ErrorPattern[] = [
-  // 具体的网络错误（优先级高）
+  // Specific network errors (high priority)
   {
     patterns: ['timed out', 'timeout', 'TIMEOUT'],
     createError: (message, context) => createError.http.timeout(
@@ -37,7 +39,7 @@ export const httpErrorPatterns: ErrorPattern[] = [
     createError: (message, context) => createError.http.networkError(message, { originalError: message, ...context })
   },
 
-  // 通用权限错误（优先级低，放在最后）
+  // Generic permission errors (low priority, placed last)
   {
     patterns: ['Permission denied', 'permission denied', 'PERMISSION_DENIED'],
     createError: (message, context) => createError.common.permissionDenied(
@@ -48,11 +50,11 @@ export const httpErrorPatterns: ErrorPattern[] = [
 ];
 
 /**
- * 文件系统错误解析规则
- * 注意：模式按优先级排序，更具体的错误应该放在前面
+ * File system error parsing rules
+ * Note: Patterns are sorted by priority, more specific errors should come first
  */
 export const fsErrorPatterns: ErrorPattern[] = [
-  // 具体的文件系统错误（优先级高）
+  // Specific file system errors (high priority)
   {
     patterns: ['not found', 'No such file', 'FILE_NOT_FOUND', 'does not exist'],
     createError: (message, context) => createError.fs.fileNotFound(
@@ -88,7 +90,7 @@ export const fsErrorPatterns: ErrorPattern[] = [
       { originalError: message, ...context }
     )
   },
-  // 通用权限错误（优先级低，放在最后）
+  // Generic permission errors (low priority, placed last)
   {
     patterns: ['Permission denied', 'PERMISSION_DENIED'],
     createError: (message, context) => createError.common.permissionDenied(
@@ -99,11 +101,11 @@ export const fsErrorPatterns: ErrorPattern[] = [
 ];
 
 /**
- * 剪贴板错误解析规则
- * 注意：模式按优先级排序，更具体的错误应该放在前面
+ * Clipboard error parsing rules
+ * Note: Patterns are sorted by priority, more specific errors should come first
  */
 export const clipboardErrorPatterns: ErrorPattern[] = [
-  // 具体的剪贴板错误（优先级高）
+  // Specific clipboard errors (high priority)
   {
     patterns: ['format not supported', 'unsupported format', 'FORMAT_UNSUPPORTED'],
     createError: (message, context) => createError.clipboard.formatUnsupported(
@@ -123,7 +125,7 @@ export const clipboardErrorPatterns: ErrorPattern[] = [
     patterns: ['unavailable', 'not available', 'CLIPBOARD_UNAVAILABLE', 'clipboard not accessible'],
     createError: (message, context) => createError.clipboard.unavailable({ originalError: message, ...context })
   },
-  // 通用权限错误（优先级低，放在最后）
+  // Generic permission errors (low priority, placed last)
   {
     patterns: ['Permission denied', 'permission denied', 'PERMISSION_DENIED'],
     createError: (message, context) => createError.common.permissionDenied(
@@ -134,7 +136,7 @@ export const clipboardErrorPatterns: ErrorPattern[] = [
 ];
 
 /**
- * 对话框错误解析规则
+ * Dialog error parsing rules
  */
 export const dialogErrorPatterns: ErrorPattern[] = [
   {
@@ -162,7 +164,9 @@ export const dialogErrorPatterns: ErrorPattern[] = [
 ];
 
 /**
- * 安全的错误消息提取
+ * Safe error message extraction
+ * @param error - The error to extract message from
+ * @returns The error message string
  */
 function extractErrorMessage(error: unknown): string {
   if (typeof error === 'string') {
@@ -183,12 +187,15 @@ function extractErrorMessage(error: unknown): string {
 }
 
 /**
- * 匹配错误模式
+ * Matches error patterns against a message
+ * @param message - The error message to match
+ * @param patterns - Array of error patterns to match against
+ * @returns Error match result
  */
 function matchErrorPattern(message: string, patterns: ErrorPattern[]): ErrorMatchResult {
   const lowerMessage = message.toLowerCase();
   
-  // 按优先级匹配错误模式
+  // Match error patterns by priority
   for (const pattern of patterns) {
     for (const patternStr of pattern.patterns) {
       if (lowerMessage.includes(patternStr.toLowerCase())) {
@@ -204,7 +211,11 @@ function matchErrorPattern(message: string, patterns: ErrorPattern[]): ErrorMatc
 }
 
 /**
- * 通用错误解析器
+ * Generic error parser
+ * @param error - The error to parse
+ * @param patterns - Array of error patterns to match against
+ * @param context - Additional context information
+ * @returns Parsed plugin error
  */
 export function parseError(
   error: unknown, 
@@ -218,12 +229,12 @@ export function parseError(
     try {
       return matchResult.pattern.createError(message, context);
     } catch (createError) {
-      // 如果创建特定错误失败，降级到通用错误
+      // If creating specific error fails, fallback to generic error
       console.warn('Failed to create specific error, falling back to generic error:', createError);
     }
   }
   
-  // 如果没有匹配到特定模式，返回通用错误
+  // If no specific pattern matched, return generic error
   return createError.common.unknown(message, { 
     originalError: message, 
     parseContext: 'No pattern matched',
@@ -232,7 +243,10 @@ export function parseError(
 }
 
 /**
- * HTTP 错误解析器
+ * HTTP error parser
+ * @param error - The error to parse
+ * @param context - Additional context information
+ * @returns Parsed plugin error
  */
 export function parseHttpError(error: unknown, context?: Record<string, any>): PluginError {
   return parseError(error, httpErrorPatterns, { 
@@ -242,7 +256,10 @@ export function parseHttpError(error: unknown, context?: Record<string, any>): P
 }
 
 /**
- * 文件系统错误解析器
+ * File system error parser
+ * @param error - The error to parse
+ * @param context - Additional context information
+ * @returns Parsed plugin error
  */
 export function parseFsError(error: unknown, context?: Record<string, any>): PluginError {
   return parseError(error, fsErrorPatterns, { 
@@ -252,7 +269,10 @@ export function parseFsError(error: unknown, context?: Record<string, any>): Plu
 }
 
 /**
- * 剪贴板错误解析器
+ * Clipboard error parser
+ * @param error - The error to parse
+ * @param context - Additional context information
+ * @returns Parsed plugin error
  */
 export function parseClipboardError(error: unknown, context?: Record<string, any>): PluginError {
   return parseError(error, clipboardErrorPatterns, { 
@@ -262,7 +282,10 @@ export function parseClipboardError(error: unknown, context?: Record<string, any
 }
 
 /**
- * 对话框错误解析器
+ * Dialog error parser
+ * @param error - The error to parse
+ * @param context - Additional context information
+ * @returns Parsed plugin error
  */
 export function parseDialogError(error: unknown, context?: Record<string, any>): PluginError {
   return parseError(error, dialogErrorPatterns, { 

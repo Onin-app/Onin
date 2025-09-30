@@ -1,26 +1,27 @@
 /**
- * @module core/environment
- * @description 运行环境检测模块，用于识别当前 SDK 是在 Headless (Deno) 环境还是 Vwebview (html) 环境中运行。
+ * Runtime environment detection module
+ * @fileoverview Used to identify whether the current SDK is running in a Headless (Deno) environment or Webview (HTML) environment
  */
 
 /**
- * 定义支持的运行环境枚举。
+ * Supported runtime environment enumeration
+ * @enum {string}
  */
 export enum RuntimeEnvironment {
-  Headless = 'headless',  // 无界面的 Deno 环境
-  Webview = 'webview',    // 有界面的 Webview 环境
+  Headless = 'headless',  /** Headless Deno environment */
+  Webview = 'webview',    /** Webview environment with UI */
   Unknown = 'unknown',
 }
 
 /**
- * 获取当前的运行环境。
+ * Gets the current runtime environment.
  * 
- * 通过检查全局对象和运行时特征来确定当前代码的运行环境。
- * - 如果 `window.__TAURI_INTERNALS__` 对象存在，则认为是 Webview 环境
- * - 如果存在 `Deno.core`，则认为是 Headless 环境（包括插件运行时）
- * - 否则，认为是未知环境。
+ * Determines the current code's runtime environment by checking global objects and runtime characteristics.
+ * - If `window.__TAURI_INTERNALS__` object exists, it's considered a Webview environment
+ * - If `Deno.core` exists, it's considered a Headless environment (including plugin runtime)
+ * - Otherwise, it's considered an unknown environment.
  * 
- * @returns {RuntimeEnvironment} 当前的运行环境。
+ * @returns The current runtime environment
  */
 export function getEnvironment(): RuntimeEnvironment {
   // @ts-ignore

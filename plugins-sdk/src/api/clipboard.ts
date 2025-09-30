@@ -3,7 +3,15 @@ import { dispatch } from '../core/dispatch';
 import { errorUtils } from '../types/errors';
 import { parseClipboardError } from '../utils/error-parser';
 
-// 通用的剪贴板调用辅助函数
+/**
+ * Generic clipboard API call helper function
+ * @typeParam T - The expected return type
+ * @param method - The clipboard method to call
+ * @param args - Optional arguments for the method
+ * @returns Promise resolving to the method result
+ * @internal
+ * @group Core
+ */
 async function callClipboardApi<T = any>(method: string, args?: any): Promise<T> {
   try {
     return await dispatch({
@@ -15,7 +23,7 @@ async function callClipboardApi<T = any>(method: string, args?: any): Promise<T>
       throw error;
     }
 
-    // 使用统一的错误解析器
+    // Use unified error parser
     throw parseClipboardError(error, {
       method,
       args
@@ -24,32 +32,112 @@ async function callClipboardApi<T = any>(method: string, args?: any): Promise<T>
 }
 
 /**
- * 读取剪贴板中的文本内容
- * @returns 剪贴板中的文本，如果为空或不是文本则返回 null
+ * Reads text content from the clipboard.
+ * @returns Promise that resolves to the text in the clipboard, or null if the clipboard is empty or doesn't contain text.
+ * @throws {PluginError} With code `CLIPBOARD_UNAVAILABLE` when clipboard is not accessible
+ * @throws {PluginError} With code `CLIPBOARD_ACCESS_DENIED` when permission is denied
+ * @throws {PluginError} With code `PERMISSION_DENIED` for general permission issues
+ * @example
+ * ```typescript
+ * async function getClipboardText() {
+ *   try {
+ *     const text = await clipboard.readText();
+ *     if (text) {
+ *       console.log('Clipboard text:', text);
+ *     } else {
+ *       console.log('Clipboard is empty or does not contain text.');
+ *     }
+ *   } catch (error) {
+ *     if (errorUtils.isErrorCode(error, 'CLIPBOARD_ACCESS_DENIED')) {
+ *       console.error('Clipboard access denied');
+ *     }
+ *   }
+ * }
+ * ```
+ * @since 0.1.0
+ * @group API
  */
 export function readText(): Promise<string | null> {
   return callClipboardApi<string | null>("plugin_clipboard_read_text");
 }
 
 /**
- * 将文本写入剪贴板
- * @param text 要写入的文本内容
+ * Writes the specified text to the clipboard.
+ * @param text - The text to write to the clipboard.
+ * @returns Promise that resolves when the operation is complete.
+ * @throws {PluginError} With code `CLIPBOARD_UNAVAILABLE` when clipboard is not accessible
+ * @throws {PluginError} With code `CLIPBOARD_ACCESS_DENIED` when permission is denied
+ * @throws {PluginError} With code `PERMISSION_DENIED` for general permission issues
+ * @example
+ * ```typescript
+ * async function setClipboardText() {
+ *   try {
+ *     await clipboard.writeText('Hello from the plugin!');
+ *     console.log('Text written to clipboard.');
+ *   } catch (error) {
+ *     console.error('Failed to write to clipboard:', error.message);
+ *   }
+ * }
+ * ```
+ * @since 0.1.0
+ * @group API
  */
 export function writeText(text: string): Promise<void> {
   return callClipboardApi("plugin_clipboard_write_text", { text });
 }
 
 /**
- * 读取剪贴板中的图像数据（Base64 格式）
- * @returns 图像的 Base64 数据，如果为空或不是图像则返回 null
+ * Reads image data from the clipboard and returns it as a Base64 string.
+ * @returns Promise that resolves to the Base64 encoded string of the image, or null if the clipboard is empty or doesn't contain an image.
+ * @throws {PluginError} With code `CLIPBOARD_FORMAT_UNSUPPORTED` when image format is not supported
+ * @throws {PluginError} With code `CLIPBOARD_UNAVAILABLE` when clipboard is not accessible
+ * @throws {PluginError} With code `CLIPBOARD_ACCESS_DENIED` when permission is denied
+ * @example
+ * ```typescript
+ * async function getClipboardImage() {
+ *   try {
+ *     const imageBase64 = await clipboard.readImage();
+ *     if (imageBase64) {
+ *       const imgElement = document.createElement('img');
+ *       imgElement.src = `data:image/png;base64,${imageBase64}`;
+ *       document.body.appendChild(imgElement);
+ *     } else {
+ *       console.log('Clipboard does not contain an image.');
+ *     }
+ *   } catch (error) {
+ *     if (errorUtils.isErrorCode(error, 'CLIPBOARD_FORMAT_UNSUPPORTED')) {
+ *       console.error('Image format not supported');
+ *     }
+ *   }
+ * }
+ * ```
+ * @since 0.1.0
+ * @group API
  */
 export function readImage(): Promise<string | null> {
   return callClipboardApi<string | null>("plugin_clipboard_read_image");
 }
 
 /**
- * 将图像写入剪贴板
- * @param imageData 图像的 Base64 数据或 Uint8Array
+ * Writes image data to the clipboard.
+ * @param imageData - The image's Base64 encoded string or Uint8Array data.
+ * @returns Promise that resolves when the operation is complete.
+ * @throws {PluginError} With code `CLIPBOARD_FORMAT_UNSUPPORTED` when image format is not supported
+ * @throws {PluginError} With code `CLIPBOARD_UNAVAILABLE` when clipboard is not accessible
+ * @throws {PluginError} With code `CLIPBOARD_ACCESS_DENIED` when permission is denied
+ * @example
+ * ```typescript
+ * async function setClipboardImage(base64Data: string) {
+ *   try {
+ *     await clipboard.writeImage(base64Data);
+ *     console.log('Image written to clipboard.');
+ *   } catch (error) {
+ *     console.error('Failed to write image to clipboard:', error.message);
+ *   }
+ * }
+ * ```
+ * @since 0.1.0
+ * @group API
  */
 export function writeImage(imageData: string | Uint8Array): Promise<void> {
   const data = typeof imageData === 'string' ? imageData : Array.from(imageData);
@@ -57,15 +145,50 @@ export function writeImage(imageData: string | Uint8Array): Promise<void> {
 }
 
 /**
- * 清空剪贴板内容
+ * Clears all content from the clipboard.
+ * @returns Promise that resolves when the operation is complete.
+ * @throws {PluginError} With code `CLIPBOARD_UNAVAILABLE` when clipboard is not accessible
+ * @throws {PluginError} With code `CLIPBOARD_ACCESS_DENIED` when permission is denied
+ * @example
+ * ```typescript
+ * async function clearClipboard() {
+ *   try {
+ *     await clipboard.clear();
+ *     console.log('Clipboard cleared.');
+ *   } catch (error) {
+ *     console.error('Failed to clear clipboard:', error.message);
+ *   }
+ * }
+ * ```
+ * @since 0.1.0
+ * @group API
  */
 export function clear(): Promise<void> {
   return callClipboardApi("plugin_clipboard_clear");
 }
 
 /**
- * 检查剪贴板是否包含文本
- * @returns 如果剪贴板包含文本则返回 true
+ * Checks if the clipboard currently contains text content.
+ * @returns Promise that resolves to true if the clipboard contains text, false otherwise.
+ * @throws {PluginError} Same error conditions as {@link readText}
+ * @example
+ * ```typescript
+ * async function checkText() {
+ *   try {
+ *     if (await clipboard.hasText()) {
+ *       console.log('Clipboard has text.');
+ *       const text = await clipboard.readText();
+ *       console.log('Text content:', text);
+ *     } else {
+ *       console.log('Clipboard does not have text.');
+ *     }
+ *   } catch (error) {
+ *     console.error('Failed to check clipboard text:', error.message);
+ *   }
+ * }
+ * ```
+ * @since 0.1.0
+ * @group API
  */
 export async function hasText(): Promise<boolean> {
   const text = await readText();
@@ -73,48 +196,101 @@ export async function hasText(): Promise<boolean> {
 }
 
 /**
- * 检查剪贴板是否包含图像
- * @returns 如果剪贴板包含图像则返回 true
+ * Checks if the clipboard currently contains image content.
+ * @returns Promise that resolves to true if the clipboard contains an image, false otherwise.
+ * @throws {PluginError} Same error conditions as {@link readImage}
+ * @example
+ * ```typescript
+ * async function checkImage() {
+ *   try {
+ *     if (await clipboard.hasImage()) {
+ *       console.log('Clipboard has an image.');
+ *       const imageData = await clipboard.readImage();
+ *       console.log('Image data available:', !!imageData);
+ *     } else {
+ *       console.log('Clipboard does not have an image.');
+ *     }
+ *   } catch (error) {
+ *     console.error('Failed to check clipboard image:', error.message);
+ *   }
+ * }
+ * ```
+ * @since 0.1.0
+ * @group API
  */
 export async function hasImage(): Promise<boolean> {
   const image = await readImage();
   return image !== null;
 }
 
-// 便捷方法
 /**
- * 复制文本到剪贴板（writeText 的别名）
- * @param text 要复制的文本
+ * Copies text to the clipboard, alias for `writeText`.
+ * @param text - The text to copy.
+ * @returns Promise that resolves when the operation is complete.
+ * @throws {PluginError} Same error conditions as {@link writeText}
+ * @see {@link writeText} - For detailed error information
+ * @since 0.1.0
+ * @group API
  */
 export function copy(text: string): Promise<void> {
   return writeText(text);
 }
 
 /**
- * 粘贴剪贴板中的文本（readText 的别名）
- * @returns 剪贴板中的文本
+ * Pastes text content from the clipboard, alias for `readText`.
+ * @returns Promise that resolves to the text in the clipboard, or null if empty.
+ * @throws {PluginError} Same error conditions as {@link readText}
+ * @see {@link readText} - For detailed error information
+ * @since 0.1.0
+ * @group API
  */
 export function paste(): Promise<string | null> {
   return readText();
 }
 
-// 创建 Clipboard API 命名空间
+/**
+ * Clipboard API namespace - provides functions for interacting with the system clipboard
+ * 
+ * Supports reading and writing text and image data to/from the system clipboard.
+ * All operations require appropriate permissions and handle various clipboard states gracefully.
+ * 
+ * @namespace clipboard
+ * @version 0.1.0
+ * @since 0.1.0
+ * @group API
+ * @see {@link parseClipboardError} - For error handling utilities
+ * @example
+ * ```typescript
+ * import { clipboard } from 'baize-plugin-sdk';
+ * 
+ * // Read text from clipboard
+ * const text = await clipboard.readText();
+ * 
+ * // Write text to clipboard
+ * await clipboard.writeText('Hello World');
+ * 
+ * // Check if clipboard has content
+ * if (await clipboard.hasText()) {
+ *   console.log('Clipboard has text content');
+ * }
+ * ```
+ */
 export const clipboard = {
-  // 核心方法
+  /** Core methods */
   readText,
   writeText,
   readImage,
   writeImage,
   clear,
   
-  // 检查方法
+  /** Check methods */
   hasText,
   hasImage,
   
-  // 便捷方法
+  /** Convenience methods */
   copy,
   paste,
   
-  // 错误处理工具
+  /** Error handling tools */
   parseClipboardError,
 };

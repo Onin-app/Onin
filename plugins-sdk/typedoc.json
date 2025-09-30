@@ -1,0 +1,29 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["src/index.ts"],
+  "out": "docs/html",
+  "name": "Baize Plugin SDK",
+  "readme": "README.md",
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "excludeInternal": true,
+  "theme": "default",
+  "categorizeByGroup": true,
+  "categoryOrder": [
+    "API",
+    "Core",
+    "Types",
+    "Utilities",
+    "Error Factories",
+    "Error Utilities"
+  ],
+  "sort": ["source-order"],
+  "validation": {
+    "notExported": true,
+    "invalidLink": true,
+    "notDocumented": false
+  },
+  "includeVersion": true,
+  "searchInComments": true,
+  "searchInDocuments": true
+}

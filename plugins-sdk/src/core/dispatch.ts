@@ -1,19 +1,50 @@
 import { getEnvironment, RuntimeEnvironment } from './environment';
 
 /**
- * 定义不同环境下的处理器函数签名。
+ * Defines handler function signatures for different environments
+ * @interface Handlers
+ * @typeParam T - The return type of the handlers
+ * @since 0.1.0
+ * @group Core
  */
-interface Handlers<T> {
+export interface Handlers<T> {
   webview: () => T;
   headless: () => T;
 }
 
 /**
- * 根据当前运行环境，自动选择并执行相应的处理器函数。
+ * Automatically selects and executes the appropriate handler function based on the current runtime environment.
  * 
- * @param handlers 一个包含 webview 和 headless 两个环境下实现的对象。
- * @returns 返回所选处理器函数的执行结果。
- * @throws 如果环境不是 webview 或 headless，则抛出错误。
+ * This function provides environment-aware execution, allowing the same code to work seamlessly
+ * in both webview (UI) and headless (background) environments. It automatically detects the
+ * current runtime and calls the appropriate handler.
+ * 
+ * @typeParam T - The return type of the handler functions
+ * @param handlers - An object containing implementations for both webview and headless environments
+ * @returns The execution result of the selected handler function
+ * @throws {Error} If the environment is neither webview nor headless
+ * @example
+ * ```typescript
+ * // Different behavior for different environments
+ * const result = dispatch({
+ *   webview: () => {
+ *     // Code that runs in UI environment
+ *     return window.someWebAPICall();
+ *   },
+ *   headless: () => {
+ *     // Code that runs in background environment
+ *     return Deno.env.get('SOME_VALUE');
+ *   }
+ * });
+ * 
+ * // API calls that work in both environments
+ * await dispatch({
+ *   webview: () => invoke('some_command', args),
+ *   headless: () => invoke('some_command', args)
+ * });
+ * ```
+ * @since 0.1.0
+ * @group Core
  */
 export function dispatch<T>(handlers: Handlers<T>): T {
   const environment = getEnvironment();

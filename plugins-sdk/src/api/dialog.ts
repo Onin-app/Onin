@@ -3,46 +3,98 @@ import { dispatch } from '../core/dispatch';
 import { errorUtils } from '../types/errors';
 import { parseDialogError } from '../utils/error-parser';
 
-// 消息对话框选项
+/**
+ * Message dialog options
+ * @interface MessageDialogOptions
+ * @since 0.1.0
+ * @group Types
+ */
 export interface MessageDialogOptions {
+  /** Dialog title */
   title?: string;
+  /** Main message to display */
   message: string;
+  /** Dialog type, affects the displayed icon */
   kind?: 'info' | 'warning' | 'error';
+  /** Custom label for the "OK" button */
   okLabel?: string;
 }
 
-// 确认对话框选项
+/**
+ * Confirmation dialog options
+ * @interface ConfirmDialogOptions
+ * @since 0.1.0
+ * @group Types
+ */
 export interface ConfirmDialogOptions {
+  /** Dialog title */
   title?: string;
+  /** Main message to display */
   message: string;
+  /** Dialog type */
   kind?: 'info' | 'warning' | 'error';
+  /** Custom label for the "OK" button */
   okLabel?: string;
+  /** Custom label for the "Cancel" button */
   cancelLabel?: string;
 }
 
-// 文件对话框过滤器
+/**
+ * File type filter for file dialogs
+ * @interface DialogFilter
+ * @since 0.1.0
+ * @group Types
+ */
 export interface DialogFilter {
+  /** Filter name (e.g., "Image Files") */
   name: string;
+  /** Array of file extensions associated with this filter (e.g., ['png', 'jpg']) */
   extensions: string[];
 }
 
-// 打开文件对话框选项
+/**
+ * Open file dialog options
+ * @interface OpenDialogOptions
+ * @since 0.1.0
+ * @group Types
+ */
 export interface OpenDialogOptions {
+  /** Dialog title */
   title?: string;
+  /** Default path that should be displayed when the dialog opens */
   defaultPath?: string;
+  /** Array of file type filters to apply to file selection */
   filters?: DialogFilter[];
+  /** Whether to allow selecting multiple files */
   multiple?: boolean;
+  /** Whether to open a directory selector instead of a file selector */
   directory?: boolean;
 }
 
-// 保存文件对话框选项
+/**
+ * Save file dialog options
+ * @interface SaveDialogOptions
+ * @since 0.1.0
+ * @group Types
+ */
 export interface SaveDialogOptions {
+  /** Dialog title */
   title?: string;
+  /** Default suggested file path or name in the dialog */
   defaultPath?: string;
+  /** Array of file type filters to apply to file saving */
   filters?: DialogFilter[];
 }
 
-// 通用的对话框调用辅助函数
+/**
+ * Generic dialog API call helper function
+ * @typeParam T - The expected return type
+ * @param method - The dialog method to call
+ * @param args - Optional arguments for the method
+ * @returns Promise resolving to the method result
+ * @internal
+ * @group Core
+ */
 async function callDialogApi<T = any>(method: string, args?: any): Promise<T> {
   try {
     return await dispatch({
@@ -54,7 +106,7 @@ async function callDialogApi<T = any>(method: string, args?: any): Promise<T> {
       throw error;
     }
 
-    // 使用统一的错误解析器
+    // Use unified error parser
     throw parseDialogError(error, {
       method,
       args
@@ -63,41 +115,92 @@ async function callDialogApi<T = any>(method: string, args?: any): Promise<T> {
 }
 
 /**
- * 显示消息对话框
- * @param options 消息对话框选项
+ * Shows a standard message dialog.
+ * @param options - Dialog configuration options
+ * @returns Promise that resolves when the dialog is closed
+ * @throws {PluginError} With code `DIALOG_UNAVAILABLE` when dialog system is not available
+ * @throws {PluginError} With code `DIALOG_INVALID_OPTIONS` when options are malformed
+ * @throws {PluginError} With code `PERMISSION_DENIED` when dialog permission is denied
+ * @example
+ * ```typescript
+ * // Simple info message
+ * await dialog.showMessage({
+ *   title: 'Info',
+ *   message: 'This is an informational message.'
+ * });
+ * 
+ * // Warning message with custom styling
+ * await dialog.showMessage({
+ *   title: 'Warning',
+ *   message: 'This action cannot be undone.',
+ *   kind: 'warning',
+ *   okLabel: 'I Understand'
+ * });
+ * 
+ * // Error message
+ * await dialog.showMessage({
+ *   title: 'Error',
+ *   message: 'An unexpected error occurred.',
+ *   kind: 'error'
+ * });
+ * ```
+ * @since 0.1.0
+ * @group API
  */
 export function showMessage(options: MessageDialogOptions): Promise<void> {
   return callDialogApi("plugin_dialog_message", options);
 }
 
 /**
- * 显示确认对话框
- * @param options 确认对话框选项
- * @returns 用户是否点击了确认按钮
+ * Shows a confirmation dialog with "OK" and "Cancel" buttons.
+ * @param options - Dialog configuration options
+ * @returns Promise that resolves to true if user clicks "OK", false otherwise
+ * @example
+ * const confirmed = await dialog.showConfirm({
+ *   title: 'Confirm Action',
+ *   message: 'Are you sure you want to proceed?'
+ * });
+ * if (confirmed) {
+ *   console.log('User confirmed.');
+ * }
  */
 export function showConfirm(options: ConfirmDialogOptions): Promise<boolean> {
   return callDialogApi<boolean>("plugin_dialog_confirm", options);
 }
 
 /**
- * 显示打开文件对话框
- * @param options 打开文件对话框选项
- * @returns 选择的文件路径，如果取消则返回 null
+ * Shows an open dialog for selecting files or directories.
+ * @param options - Dialog configuration options
+ * @returns Promise that resolves to the selected file/directory path(s), or null if user cancels
+ * @example
+ * // Select single file
+ * const filePath = await dialog.showOpen({
+ *   filters: [{ name: 'Text Files', extensions: ['txt'] }]
+ * });
+ * if (filePath) {
+ *   console.log('Selected file:', filePath);
+ * }
+ *
+ * // Select multiple files
+ * const filePaths = await dialog.showOpen({ multiple: true });
+ * if (filePaths) {
+ *   console.log('Selected files:', filePaths);
+ * }
  */
 export async function showOpen(options?: OpenDialogOptions): Promise<string | string[] | null> {
   const result = await callDialogApi<any>("plugin_dialog_open", options || {});
   
-  // 处理返回值类型转换
+  // Handle return value type conversion
   if (result === null || result === undefined) {
     return null;
   }
   
-  // 如果是数组，说明是多文件选择
+  // If it's an array, it means multiple file selection
   if (Array.isArray(result)) {
     return result as string[];
   }
   
-  // 如果是字符串，说明是单文件选择
+  // If it's a string, it means single file selection
   if (typeof result === 'string') {
     return result;
   }
@@ -106,19 +209,26 @@ export async function showOpen(options?: OpenDialogOptions): Promise<string | st
 }
 
 /**
- * 显示保存文件对话框
- * @param options 保存文件对话框选项
- * @returns 选择的保存路径，如果取消则返回 null
+ * Shows a save dialog for selecting a file save path.
+ * @param options - Dialog configuration options
+ * @returns Promise that resolves to the user-selected save path, or null if user cancels
+ * @example
+ * const savePath = await dialog.showSave({
+ *   defaultPath: 'new-file.txt',
+ *   filters: [{ name: 'Text Files', extensions: ['txt'] }]
+ * });
+ * if (savePath) {
+ *   console.log('File will be saved to:', savePath);
+ * }
  */
 export function showSave(options?: SaveDialogOptions): Promise<string | null> {
   return callDialogApi<string | null>("plugin_dialog_save", options || {});
 }
 
-// 便捷方法
 /**
- * 显示信息消息
- * @param message 消息内容
- * @param title 标题（可选）
+ * Shows an info message
+ * @param message - Message content
+ * @param title - Title (optional)
  */
 export function info(message: string, title?: string): Promise<void> {
   return showMessage({
@@ -129,9 +239,9 @@ export function info(message: string, title?: string): Promise<void> {
 }
 
 /**
- * 显示警告消息
- * @param message 消息内容
- * @param title 标题（可选）
+ * Shows a warning message
+ * @param message - Message content
+ * @param title - Title (optional)
  */
 export function warning(message: string, title?: string): Promise<void> {
   return showMessage({
@@ -142,9 +252,9 @@ export function warning(message: string, title?: string): Promise<void> {
 }
 
 /**
- * 显示错误消息
- * @param message 消息内容
- * @param title 标题（可选）
+ * Shows an error message
+ * @param message - Message content
+ * @param title - Title (optional)
  */
 export function error(message: string, title?: string): Promise<void> {
   return showMessage({
@@ -155,10 +265,10 @@ export function error(message: string, title?: string): Promise<void> {
 }
 
 /**
- * 显示确认对话框（简化版）
- * @param message 消息内容
- * @param title 标题（可选）
- * @returns 用户是否点击了确认按钮
+ * Shows a confirmation dialog (simplified version)
+ * @param message - Message content
+ * @param title - Title (optional)
+ * @returns Whether the user clicked the confirm button
  */
 export function confirm(message: string, title?: string): Promise<boolean> {
   return showConfirm({
@@ -168,10 +278,10 @@ export function confirm(message: string, title?: string): Promise<boolean> {
 }
 
 /**
- * 选择单个文件
- * @param filters 文件过滤器（可选）
- * @param defaultPath 默认路径（可选）
- * @returns 选择的文件路径，如果取消则返回 null
+ * Selects a single file
+ * @param filters - File filters (optional)
+ * @param defaultPath - Default path (optional)
+ * @returns Selected file path, or null if cancelled
  */
 export function selectFile(filters?: DialogFilter[], defaultPath?: string): Promise<string | null> {
   return showOpen({
@@ -183,10 +293,10 @@ export function selectFile(filters?: DialogFilter[], defaultPath?: string): Prom
 }
 
 /**
- * 选择多个文件
- * @param filters 文件过滤器（可选）
- * @param defaultPath 默认路径（可选）
- * @returns 选择的文件路径数组，如果取消则返回 null
+ * Selects multiple files
+ * @param filters - File filters (optional)
+ * @param defaultPath - Default path (optional)
+ * @returns Array of selected file paths, or null if cancelled
  */
 export function selectFiles(filters?: DialogFilter[], defaultPath?: string): Promise<string[] | null> {
   return showOpen({
@@ -198,9 +308,9 @@ export function selectFiles(filters?: DialogFilter[], defaultPath?: string): Pro
 }
 
 /**
- * 选择文件夹
- * @param defaultPath 默认路径（可选）
- * @returns 选择的文件夹路径，如果取消则返回 null
+ * Selects a folder
+ * @param defaultPath - Default path (optional)
+ * @returns Selected folder path, or null if cancelled
  */
 export function selectFolder(defaultPath?: string): Promise<string | null> {
   return showOpen({
@@ -211,10 +321,10 @@ export function selectFolder(defaultPath?: string): Promise<string | null> {
 }
 
 /**
- * 保存文件对话框（简化版）
- * @param defaultName 默认文件名（可选）
- * @param filters 文件过滤器（可选）
- * @returns 选择的保存路径，如果取消则返回 null
+ * Save file dialog (simplified version)
+ * @param defaultName - Default file name (optional)
+ * @param filters - File filters (optional)
+ * @returns Selected save path, or null if cancelled
  */
 export function saveFile(defaultName?: string, filters?: DialogFilter[]): Promise<string | null> {
   return showSave({
@@ -223,15 +333,68 @@ export function saveFile(defaultName?: string, filters?: DialogFilter[]): Promis
   });
 }
 
-// 创建 Dialog API 命名空间
+/**
+ * Dialog API namespace - provides native system dialog functionality
+ * 
+ * Supports various types of system dialogs including message boxes, file pickers,
+ * and confirmation dialogs. All dialogs are native system dialogs that respect
+ * the user's operating system theme and accessibility settings.
+ * 
+ * **Cross-Platform Support**: All dialog functions work consistently across
+ * Windows, macOS, and Linux with platform-appropriate styling.
+ * 
+ * **Accessibility**: Native dialogs automatically support screen readers and
+ * keyboard navigation according to system accessibility settings.
+ * 
+ * **User Experience**: Dialogs are modal and will block plugin execution until
+ * the user responds, ensuring proper user interaction flow.
+ * 
+ * @namespace dialog
+ * @version 0.1.0
+ * @since 0.1.0
+ * @group API
+ * @see {@link parseDialogError} - For dialog error handling utilities
+ * @example
+ * ```typescript
+ * import { dialog } from 'baize-plugin-sdk';
+ * 
+ * // Show information message
+ * await dialog.info('Operation completed successfully!');
+ * 
+ * // Get user confirmation
+ * const confirmed = await dialog.confirm(
+ *   'Are you sure you want to delete this item?'
+ * );
+ * if (confirmed) {
+ *   // Proceed with deletion
+ * }
+ * 
+ * // File selection
+ * const filePath = await dialog.selectFile([
+ *   { name: 'Text Files', extensions: ['txt', 'md'] },
+ *   { name: 'All Files', extensions: ['*'] }
+ * ]);
+ * if (filePath) {
+ *   console.log('Selected file:', filePath);
+ * }
+ * 
+ * // Save file dialog
+ * const savePath = await dialog.saveFile('document.txt', [
+ *   { name: 'Text Files', extensions: ['txt'] }
+ * ]);
+ * if (savePath) {
+ *   // Save file to the selected path
+ * }
+ * ```
+ */
 export const dialog = {
-  // 核心方法
+  /** Core methods */
   showMessage,
   showConfirm,
   showOpen,
   showSave,
   
-  // 便捷方法
+  /** Convenience methods */
   info,
   warning,
   error,
@@ -241,6 +404,6 @@ export const dialog = {
   selectFolder,
   saveFile,
   
-  // 错误处理工具
+  /** Error handling tools */
   parseDialogError,
 };

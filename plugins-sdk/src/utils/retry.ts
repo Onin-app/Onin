@@ -1,27 +1,30 @@
 import { errorCode, errorUtils } from '../types/errors';
 
 /**
- * 重试配置选项
+ * Retry configuration options
+ * @interface RetryOptions
  */
 export interface RetryOptions {
-  /** 最大重试次数 */
+  /** Maximum number of retry attempts */
   maxRetries?: number;
-  /** 基础延迟时间（毫秒） */
+  /** Base delay time in milliseconds */
   baseDelay?: number;
-  /** 是否使用指数退避 */
+  /** Whether to use exponential backoff */
   exponentialBackoff?: boolean;
-  /** 最大延迟时间（毫秒） */
+  /** Maximum delay time in milliseconds */
   maxDelay?: number;
-  /** 自定义重试条件判断函数 */
+  /** Custom retry condition function */
   shouldRetry?: (error: unknown) => boolean;
-  /** 自定义延迟计算函数 */
+  /** Custom delay calculation function */
   getDelay?: (error: unknown, attempt: number) => number;
-  /** 重试前的回调函数 */
+  /** Callback function called before retry */
   onRetry?: (error: unknown, attempt: number, delay: number) => void;
 }
 
 /**
- * 检查错误是否可以重试
+ * Checks if an error is retryable
+ * @param error - The error to check
+ * @returns True if the error can be retried
  */
 export function isRetryableError(error: unknown): boolean {
   if (errorUtils.isPluginError(error)) {
@@ -31,7 +34,7 @@ export function isRetryableError(error: unknown): boolean {
         return true;
 
       case errorCode.http.HTTP_ERROR:
-        // 基于标准 HTTP 状态码判断是否可重试
+        // Based on standard HTTP status codes to determine if retryable
         const status = error.context?.status;
         return status === 429 || // Too Many Requests
           status === 500 || // Internal Server Error
@@ -50,7 +53,10 @@ export function isRetryableError(error: unknown): boolean {
 }
 
 /**
- * 获取建议的重试延迟时间（毫秒）
+ * Gets the suggested retry delay time in milliseconds
+ * @param error - The error that occurred
+ * @param attempt - The current attempt number (1-based)
+ * @returns Delay time in milliseconds
  */
 export function getRetryDelay(error: unknown, attempt: number = 1): number {
   if (errorUtils.isPluginError(error)) {
@@ -61,27 +67,31 @@ export function getRetryDelay(error: unknown, attempt: number = 1): number {
           case 429: // Too Many Requests
             return (error.context?.retryAfter || 60) * 1000;
           case 500: // Internal Server Error
-            return Math.min(10000 * attempt, 60000); // 10秒 * 尝试次数，最大60秒
+            return Math.min(10000 * attempt, 60000); // 10 seconds * attempt number, max 60 seconds
           case 502: // Bad Gateway
           case 503: // Service Unavailable
           case 504: // Gateway Timeout
-            return Math.min(5000 * attempt, 30000); // 5秒 * 尝试次数，最大30秒
+            return Math.min(5000 * attempt, 30000); // 5 seconds * attempt number, max 30 seconds
           default:
             return Math.min(3000 * attempt, 15000);
         }
 
       case errorCode.http.TIMEOUT:
-        return Math.min(5000 * attempt, 30000); // 5秒 * 尝试次数，最大30秒
+        return Math.min(5000 * attempt, 30000); // 5 seconds * attempt number, max 30 seconds
 
       default:
-        return Math.min(3000 * attempt, 15000); // 3秒 * 尝试次数，最大15秒
+        return Math.min(3000 * attempt, 15000); // 3 seconds * attempt number, max 15 seconds
     }
   }
   return 3000 * attempt;
 }
 
 /**
- * 计算指数退避延迟
+ * Calculates exponential backoff delay
+ * @param baseDelay - Base delay in milliseconds
+ * @param attempt - Current attempt number (1-based)
+ * @param maxDelay - Maximum delay in milliseconds
+ * @returns Calculated delay in milliseconds
  */
 export function calculateExponentialBackoff(
   baseDelay: number,
@@ -93,7 +103,14 @@ export function calculateExponentialBackoff(
 }
 
 /**
- * 带重试的操作执行器
+ * Operation executor with retry capability
+ * @typeParam T - The return type of the operation
+ * @param operation - The async operation to execute
+ * @param options - Retry configuration options
+ * @returns Promise that resolves to the operation result
+ * @throws The last error if all retry attempts fail
+ * @since 0.1.0
+ * @group Utilities
  */
 export async function withRetry<T>(
   operation: () => Promise<T>,
@@ -109,9 +126,9 @@ export async function withRetry<T>(
       ? calculateExponentialBackoff(baseDelay, attempt, maxDelay)
       : getRetryDelay(error, attempt),
     onRetry = (error, attempt, delay) => {
-      console.log(`操作失败，${delay}ms 后重试 (${attempt}/${maxRetries})`);
+      console.log(`Operation failed, retrying in ${delay}ms (${attempt}/${maxRetries})`);
       if (errorUtils.isPluginError(error)) {
-        console.log(`错误类型: ${error.code}, 消息: ${error.message}`);
+        console.log(`Error type: ${error.code}, message: ${error.message}`);
       }
     }
   } = options;
@@ -124,18 +141,18 @@ export async function withRetry<T>(
     } catch (error) {
       lastError = error;
 
-      // 如果是最后一次尝试或错误不可重试，直接抛出
+      // If this is the last attempt or error is not retryable, throw immediately
       if (attempt === maxRetries || !shouldRetry(error)) {
         throw error;
       }
 
-      // 计算延迟时间
+      // Calculate delay time
       const delay = getDelay(error, attempt);
 
-      // 调用重试回调
+      // Call retry callback
       onRetry(error, attempt, delay);
 
-      // 等待延迟时间
+      // Wait for delay time
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
@@ -144,7 +161,13 @@ export async function withRetry<T>(
 }
 
 /**
- * 创建带重试的函数包装器
+ * Creates a function wrapper with retry capability
+ * @typeParam T - The function type to wrap
+ * @param fn - The function to wrap with retry logic
+ * @param options - Retry configuration options
+ * @returns A new function with retry capability
+ * @since 0.1.0
+ * @group Utilities
  */
 export function createRetryWrapper<T extends (...args: any[]) => Promise<any>>(
   fn: T,
@@ -156,7 +179,58 @@ export function createRetryWrapper<T extends (...args: any[]) => Promise<any>>(
 }
 
 /**
- * 重试工具集合
+ * Retry utilities collection - provides retry mechanisms for error-prone operations
+ * 
+ * Offers configurable retry logic with exponential backoff, custom error filtering,
+ * and callback hooks for monitoring retry attempts. Particularly useful for network
+ * operations and other potentially unreliable operations.
+ * 
+ * **Features:**
+ * - Configurable retry count and delay strategies
+ * - Exponential backoff with jitter support
+ * - Custom error filtering to determine retry eligibility
+ * - Progress callbacks for monitoring retry attempts
+ * - Function wrapper utilities for easy integration
+ * 
+ * @namespace retry
+ * @version 0.1.0
+ * @since 0.1.0
+ * @group Utilities
+ * @example
+ * ```typescript
+ * import { retry, http } from 'baize-plugin-sdk';
+ * 
+ * // Basic retry with default options
+ * const data = await retry.withRetry(async () => {
+ *   return await http.get('https://api.example.com/data');
+ * });
+ * 
+ * // Advanced retry with custom options
+ * const result = await retry.withRetry(
+ *   async () => await someUnreliableOperation(),
+ *   {
+ *     maxRetries: 5,
+ *     exponentialBackoff: true,
+ *     baseDelay: 2000,
+ *     maxDelay: 30000,
+ *     shouldRetry: (error) => {
+ *       // Only retry on network errors
+ *       return errorUtils.isErrorCode(error, 'HTTP_NETWORK_ERROR');
+ *     },
+ *     onRetry: (error, attempt, delay) => {
+ *       console.log(`Retry attempt ${attempt}, waiting ${delay}ms`);
+ *     }
+ *   }
+ * );
+ * 
+ * // Create reusable retry wrapper
+ * const reliableHttpGet = retry.createRetryWrapper(
+ *   (url: string) => http.get(url),
+ *   { maxRetries: 3, exponentialBackoff: true }
+ * );
+ * 
+ * const response = await reliableHttpGet('https://api.example.com/data');
+ * ```
  */
 export const retry = {
   withRetry,
