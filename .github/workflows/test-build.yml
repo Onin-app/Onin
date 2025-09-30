@@ -1,0 +1,44 @@
+name: Test Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Check version
+        run: |
+          echo "Package version: $(node -p "require('./package.json').version")"
+          echo "Tauri version: $(node -p "require('./src-tauri/tauri.conf.json').version")"
+
+      - name: Build frontend
+        run: pnpm build
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build Tauri (dev)
+        run: |
+          cd src-tauri
+          cargo build
