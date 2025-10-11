@@ -103,6 +103,29 @@ pub async fn execute_command(name: String, app: AppHandle, window: tauri::Webvie
                     eprintln!("Failed to execute plugin {}: {}", plugin_id, e);
                 }
             }
+            CommandAction::PluginCommand { plugin_id, command_code } => {
+                use crate::plugin_api::command::execute_plugin_command;
+                let plugin_store = app.state::<plugin_manager::PluginStore>();
+                let execution_store = app.state::<crate::plugin_api::command::CommandExecutionStore>();
+                
+                match execute_plugin_command(
+                    app.clone(),
+                    plugin_store,
+                    execution_store,
+                    plugin_id.clone(),
+                    command_code.clone(),
+                    None,
+                ).await {
+                    Ok(result) => {
+                        if !result.success {
+                            eprintln!("Plugin command failed: {:?}", result.error);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to execute plugin command {}: {}", command_code, e);
+                    }
+                }
+            }
         }
     } else {
         eprintln!("Command not found: {}", name);

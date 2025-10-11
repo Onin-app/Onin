@@ -61,6 +61,9 @@ pub struct LaunchableItem {
     pub action: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<AppOrigin>,
+    /// Display name for the source (e.g., plugin name instead of "Plugin")
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_display: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -77,7 +80,13 @@ pub enum CommandAction {
     System(String),
     App(String), // The string will hold the executable path
     File(String),
-    Plugin(String), // The string will hold the plugin id
+    #[deprecated(note = "Use PluginCommand instead. Will be removed in v2.0")]
+    Plugin(String), // The string will hold the plugin id (deprecated, kept for compatibility)
+    // TODO: Remove Plugin(String) variant in v2.0 and migrate existing data
+    PluginCommand {
+        plugin_id: String,
+        command_code: String,
+    }, // Plugin command with plugin id and command code
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -100,7 +109,6 @@ pub struct Shortcut {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub command_title: Option<String>,
 }
-
 
 /// Represents a command registered by a plugin.
 #[derive(Serialize, Deserialize, Debug, Clone)]

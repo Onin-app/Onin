@@ -170,6 +170,7 @@ impl FileCommandManager {
             source: ItemSource::FileCommand,
             action: None,
             origin: None,
+            source_display: None,
         })
     }
     fn delete_commands_json(&self) {

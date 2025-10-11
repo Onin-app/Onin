@@ -224,26 +224,67 @@ async fn get_initial_file_commands(app: &AppHandle) -> Vec<Command> {
         .collect()
 }
 
+fn sanitize_command_name_part(s: &str) -> String {
+    // Replace characters that might cause issues in command names
+    s.replace(|c: char| !c.is_alphanumeric() && c != '_' && c != '-', "_")
+}
+
 fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
     let plugin_store: tauri::State<plugin_manager::PluginStore> = app.state();
     match plugin_manager::load_plugins(app.clone(), plugin_store) {
-        Ok(plugins) => plugins
-            .into_iter()
-            .map(|plugin| Command {
-                name: format!("plugin_{}", plugin.manifest.id),
-                title: plugin.manifest.name.clone(),
-                english_name: plugin.manifest.name.clone(),
-                keywords: vec![CommandKeyword {
-                    name: plugin.manifest.name,
-                    disabled: None,
-                    is_default: Some(true),
-                }],
-                icon: "".to_string(), // Plugins might not have icons in the manifest yet
-                source: ItemSource::Plugin,
-                action: CommandAction::Plugin(plugin.manifest.id),
-                origin: None,
-            })
-            .collect(),
+        Ok(plugins) => {
+            let mut commands = Vec::new();
+            
+            for plugin in plugins {
+                let safe_plugin_id = sanitize_command_name_part(&plugin.manifest.id);
+                
+                // 1. 为插件本身创建一个Command（用于打开插件）
+                #[allow(deprecated)]
+                commands.push(Command {
+                    name: format!("plugin_{}", safe_plugin_id),
+                    title: plugin.manifest.name.clone(),
+                    english_name: plugin.manifest.name.clone(),
+                    keywords: vec![CommandKeyword {
+                        name: plugin.manifest.name.clone(),
+                        disabled: None,
+                        is_default: Some(true),
+                    }],
+                    icon: "".to_string(),
+                    source: ItemSource::Plugin,
+                    action: CommandAction::Plugin(plugin.manifest.id.clone()),
+                    origin: None,
+                });
+                
+                // 2. 为每个插件的功能指令创建Command
+                for cmd in &plugin.manifest.commands {
+                    let safe_cmd_code = sanitize_command_name_part(&cmd.code);
+                    let keywords: Vec<CommandKeyword> = cmd.keywords
+                        .iter()
+                        .map(|kw| CommandKeyword {
+                            name: kw.name.clone(),
+                            disabled: None,
+                            is_default: Some(true),
+                        })
+                        .collect();
+                    
+                    commands.push(Command {
+                        name: format!("plugin_cmd_{}_{}", safe_plugin_id, safe_cmd_code),
+                        title: cmd.name.clone(),
+                        english_name: cmd.name.clone(),
+                        keywords,
+                        icon: "icon-plugin".to_string(),
+                        source: ItemSource::Plugin,
+                        action: CommandAction::PluginCommand {
+                            plugin_id: plugin.manifest.id.clone(),
+                            command_code: cmd.code.clone(),
+                        },
+                        origin: None,
+                    });
+                }
+            }
+            
+            commands
+        },
         Err(e) => {
             eprintln!("Failed to load plugins as commands: {}", e);
             vec![]

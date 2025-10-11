@@ -5,26 +5,12 @@
   import type { Command } from "$lib/type";
 
   let commands = $state<Command[]>([]);
-  type PluginCommand = {
-    code: string;
-    name: string;
-    description: string;
-    keywords: Array<{name: string, type: string}>;
-  };
-  
-  let pluginCommands = $state<Array<[string, Array<PluginCommand>]>>([]);
-  let pluginIdMapping = $state<Array<[string, string]>>([]);
   let selectedPlugin = $state<string | null>(null);
 
   onMount(async () => {
     try {
       commands = await invoke<Command[]>("get_commands");
       console.log("Fetched commands:", commands);
-      
-      pluginCommands = await invoke("get_plugin_commands_list");
-      pluginIdMapping = await invoke("get_plugin_id_mapping");
-      console.log("Fetched plugin commands:", pluginCommands);
-      console.log("Fetched plugin ID mapping:", pluginIdMapping);
     } catch (error) {
       console.error("Failed to fetch commands:", error);
     }
@@ -48,22 +34,10 @@
     }
   }
 
-  async function executePluginCommand(pluginName: string, commandCode: string, args: any = null) {
+  async function executePluginCommand(commandName: string) {
     try {
-      // 从插件ID映射中找到对应的插件ID
-      const pluginMapping = pluginIdMapping.find(([name]) => name === pluginName);
-      if (!pluginMapping) {
-        console.error("Plugin ID mapping not found:", pluginName);
-        return;
-      }
-      
-      const pluginId = pluginMapping[1]; // 获取插件ID
-      const result = await invoke("execute_plugin_command", { 
-        pluginId, 
-        commandName: commandCode, 
-        args 
-      });
-      console.log("Plugin command executed:", commandCode, result);
+      await invoke("execute_command", { name: commandName });
+      console.log("Plugin command executed:", commandName);
     } catch (error) {
       console.error("Failed to execute plugin command:", error);
     }
@@ -133,12 +107,68 @@
     }
   });
 
+  // 过滤出插件启动指令（打开插件本身）和插件功能指令
   let filteredCommands = $derived(
-    commands.filter((cmd) => cmd.source === activeCategory?.id),
+    commands.filter((cmd) => {
+      if (cmd.source !== activeCategory?.id) return false;
+      // 如果是插件分类，只显示插件启动指令（不显示功能指令）
+      if (activeCategory?.id === "Plugin") {
+        return cmd.name.startsWith("plugin_") && !cmd.name.includes("plugin_cmd_");
+      }
+      return true;
+    }),
   );
 
+  // Type guard for PluginCommand action
+  function isPluginCommandAction(action: any): action is { PluginCommand: { plugin_id: string; command_code: string } } {
+    return action && typeof action === "object" && "PluginCommand" in action;
+  }
+
+  function isPluginAction(action: any): action is { Plugin: string } {
+    return action && typeof action === "object" && "Plugin" in action;
+  }
+
+  // 构建插件ID到名称的映射（性能优化：避免重复查找）
+  let pluginIdToNameMap = $derived.by(() => {
+    const map = new Map<string, string>();
+    commands
+      .filter((cmd) => cmd.source === "Plugin" && cmd.name.startsWith("plugin_") && !cmd.name.startsWith("plugin_cmd_"))
+      .forEach((cmd) => {
+        if (isPluginAction(cmd.action)) {
+          map.set(cmd.action.Plugin, cmd.title);
+        }
+      });
+    return map;
+  });
+
+  // 获取所有插件的名称列表（用于左侧菜单）
+  let pluginNames = $derived(
+    Array.from(new Set(
+      commands
+        .filter((cmd) => cmd.source === "Plugin" && cmd.name.startsWith("plugin_cmd_"))
+        .map((cmd) => {
+          if (isPluginCommandAction(cmd.action)) {
+            const pluginId = cmd.action.PluginCommand.plugin_id;
+            return pluginIdToNameMap.get(pluginId) || pluginId;
+          }
+          return null;
+        })
+        .filter((name): name is string => name !== null)
+    ))
+  );
+
+  // 获取选中插件的功能指令
   let selectedPluginCommands = $derived(
-    selectedPlugin ? pluginCommands.find(([name]) => name === selectedPlugin)?.[1] || [] : []
+    selectedPlugin
+      ? commands.filter((cmd) => {
+          if (cmd.source !== "Plugin" || !cmd.name.startsWith("plugin_cmd_")) return false;
+          if (isPluginCommandAction(cmd.action)) {
+            const pluginId = cmd.action.PluginCommand.plugin_id;
+            return pluginIdToNameMap.get(pluginId) === selectedPlugin;
+          }
+          return false;
+        })
+      : []
   );
 </script>
 
@@ -166,7 +196,7 @@
     </ul>
     <h3 class="text-jgray-500 mt-4 p-2 text-sm dark:text-gray-400">插件指令</h3>
     <ul class="flex w-full flex-col justify-center">
-      {#each pluginCommands as [pluginName, pluginCmds]}
+      {#each pluginNames as pluginName}
         <li
           class={selectedPlugin === pluginName
             ? "bg-neutral-300 dark:bg-neutral-600"
@@ -209,19 +239,19 @@
       >
         {#if selectedPlugin}
           <!-- 显示插件指令 -->
-          {#each selectedPluginCommands as pluginCommand}
+          {#each selectedPluginCommands as command}
             <div class="group/box mb-4">
               <div class="mb-2">
                 <h4 class="text-sm font-semibold">
-                  {pluginCommand.name}
+                  {command.title}
                 </h4>
-                <p class="text-xs text-gray-500">{pluginCommand.description}</p>
-                <p class="text-xs text-gray-400">指令代码: {pluginCommand.code}</p>
               </div>
               <div class="flex flex-wrap gap-2">
-                {#each pluginCommand.keywords as keyword}
+                {#each command.keywords as keyword}
                   <div
-                    class="group/button border-input text-foreground shadow-btn hover:bg-muted relative inline-flex cursor-pointer items-center justify-center rounded-full border px-2 py-1 text-sm font-medium select-none active:scale-[0.98] bg-white dark:bg-neutral-800"
+                    class="group/button border-input text-foreground shadow-btn hover:bg-muted relative inline-flex cursor-pointer items-center justify-center rounded-full border px-2 py-1 text-sm font-medium select-none active:scale-[0.98] {keyword.disabled
+                      ? 'bg-neutral-200 text-neutral-500 line-through dark:bg-neutral-700 dark:text-neutral-400'
+                      : 'bg-white dark:bg-neutral-800'}"
                   >
                     <DropdownMenu.Root>
                       <DropdownMenu.Trigger>
@@ -239,7 +269,7 @@
                             <Button.Root
                               class="w-full"
                               onclick={() => {
-                                executePluginCommand(selectedPlugin!, pluginCommand.code);
+                                executePluginCommand(command.name);
                               }}
                             >
                               执行指令
@@ -251,18 +281,40 @@
                             <Button.Root
                               class="w-full"
                               onclick={() => {
-                                // TODO: 实现插件指令关键词的禁用功能
-                                console.log("禁用插件指令关键词:", keyword.name);
+                                toggleKeywordDisabled(command.name, keyword.name);
                               }}
                             >
-                              禁用指令
+                              {keyword.disabled ? "启用指令" : "禁用指令"}
                             </Button.Root>
                           </DropdownMenu.Item>
                         </DropdownMenu.Content>
                       </DropdownMenu.Portal>
                     </DropdownMenu.Root>
+                    {#if !keyword.is_default}
+                      <Button.Root
+                        class="absolute -top-1 -right-1 hidden h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white group-hover/button:flex"
+                        onclick={() => {
+                          removeKeyword(command.name, keyword.name);
+                        }}
+                      >
+                        &times;
+                      </Button.Root>
+                    {/if}
                   </div>
                 {/each}
+                <div class="hidden group-hover/box:block">
+                  <input
+                    type="text"
+                    placeholder="添加关键字"
+                    class="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-7 w-24 rounded-md border px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                    onkeydown={(e) => {
+                      if (e.key === "Enter") {
+                        addKeyword(command.name, e.currentTarget.value);
+                        e.currentTarget.value = "";
+                      }
+                    }}
+                  />
+                </div>
               </div>
             </div>
           {/each}

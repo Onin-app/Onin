@@ -1,5 +1,5 @@
 export type ItemType = 'App' | 'Folder' | 'File';
-export type Source = 'Application' | 'Custom' | 'Command' | 'FileCommand'
+export type Source = 'Application' | 'Custom' | 'Command' | 'FileCommand' | 'Plugin'
 export type IconType = 'Base64' | 'Iconfont'
 export type AppOrigin = 'Hkey' | 'Shortcut' | 'Uwp';
 
@@ -14,6 +14,7 @@ export interface LaunchableItem {
   source: Source;
   action?: string;
   origin?: AppOrigin;
+  source_display?: string;
 }
 
 export interface CommandKeyword {
@@ -22,7 +23,12 @@ export interface CommandKeyword {
   is_default?: boolean;
 }
 
-export type CommandAction = { System: string } | { App: string };
+export type CommandAction =
+  | { System: string }
+  | { App: string }
+  | { File: string }
+  | { Plugin: string }
+  | { PluginCommand: { plugin_id: string; command_code: string } };
 
 export interface Command {
   name: string;
