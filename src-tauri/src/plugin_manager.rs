@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Mutex;
 use tauri::http::{Request, Response};
-use tauri::{Manager, State, WebviewWindowBuilder};
+use tauri::{Emitter, Manager, State, WebviewWindowBuilder};
 
 pub struct PluginStore(pub Mutex<HashMap<String, LoadedPlugin>>);
 
@@ -92,6 +92,15 @@ pub struct PluginManifest {
     #[serde(default)]
     pub commands: Vec<PluginCommandManifest>,
     pub permissions: Option<PluginPermissions>,
+    /// Display mode for UI plugins: "inline" (default) or "window"
+    /// - "inline": Display in main window list area
+    /// - "window": Open in new webview window
+    #[serde(default = "default_display_mode")]
+    pub display_mode: String,
+}
+
+fn default_display_mode() -> String {
+    "inline".to_string()
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -250,39 +259,81 @@ pub fn execute_plugin_entry(
                 Ok(())
             }
             "html" => {
-                // UI plugin, create a new webview in a background task
-                let app_clone = app.clone();
-                tauri::async_runtime::spawn(async move {
-                    let window_label = format!("plugin_{}", plugin.manifest.id.replace('.', "_"));
+                // UI plugin - check display mode
+                let display_mode = plugin.manifest.display_mode.as_str();
+                
+                match display_mode {
+                    "window" => {
+                        // Open in new webview window
+                        let app_clone = app.clone();
+                        tauri::async_runtime::spawn(async move {
+                            let window_label = format!("plugin_{}", plugin.manifest.id.replace('.', "_"));
 
-                    if let Some(window) = app_clone.get_webview_window(&window_label) {
-                        if let Err(e) = window.set_focus() {
-                            eprintln!("Failed to focus plugin window: {}", e);
+                            if let Some(window) = app_clone.get_webview_window(&window_label) {
+                                if let Err(e) = window.set_focus() {
+                                    eprintln!("Failed to focus plugin window: {}", e);
+                                }
+                                return;
+                            }
+
+                            // 使用自定义协议来加载插件文件
+                            let plugin_url = format!(
+                                "plugin://localhost/{}/{}",
+                                plugin.dir_name, plugin.manifest.entry
+                            );
+                            println!("[plugin_manager] Loading plugin from: {}", plugin_url);
+
+                            let builder = WebviewWindowBuilder::new(
+                                &app_clone,
+                                window_label.clone(),
+                                tauri::WebviewUrl::External(plugin_url.parse().unwrap()),
+                            )
+                            .title(plugin.manifest.name)
+                            .inner_size(800.0, 600.0)
+                            .resizable(true);
+
+                            if let Err(e) = builder.build() {
+                                eprintln!("Failed to build plugin window: {}", e);
+                            }
+                        });
+                        Ok(())
+                    }
+                    "inline" | _ => {
+                        // Display inline - read and inline all resources (CSS, JS) into HTML
+                        let html_content = std::fs::read_to_string(&entry_path)
+                            .map_err(|e| format!("Failed to read plugin HTML: {}", e))?;
+                        
+                        let html_dir = entry_path.parent().unwrap_or(&plugin_dir);
+                        
+                        // Inline all CSS and JS resources
+                        let mut modified_html = inline_resources(&html_content, html_dir);
+                        
+                        // Inject Tauri API bridge
+                        modified_html = inject_tauri_bridge(&modified_html);
+                        
+                        // Send to frontend
+                        let main_window = app.get_webview_window("main")
+                            .ok_or_else(|| "Main window not found".to_string())?;
+                        
+                        #[derive(Serialize, Clone)]
+                        struct PluginInlinePayload {
+                            plugin_id: String,
+                            plugin_name: String,
+                            html_content: String,
                         }
-                        return;
+                        
+                        let payload = PluginInlinePayload {
+                            plugin_id: plugin.manifest.id.clone(),
+                            plugin_name: plugin.manifest.name.clone(),
+                            html_content: modified_html,
+                        };
+                        
+                        main_window.emit("show_plugin_inline", payload)
+                            .map_err(|e| format!("Failed to emit show_plugin_inline event: {}", e))?;
+                        
+                        Ok(())
                     }
-
-                    // 使用自定义协议来加载插件文件
-                    let plugin_url = format!(
-                        "plugin://localhost/{}/{}",
-                        plugin.dir_name, plugin.manifest.entry
-                    );
-                    println!("[plugin_manager] Loading plugin from: {}", plugin_url);
-
-                    let builder = WebviewWindowBuilder::new(
-                        &app_clone,
-                        window_label.clone(),
-                        tauri::WebviewUrl::External(plugin_url.parse().unwrap()),
-                    )
-                    .title(plugin.manifest.name)
-                    .inner_size(800.0, 600.0)
-                    .resizable(true);
-
-                    if let Err(e) = builder.build() {
-                        eprintln!("Failed to build plugin window: {}", e);
-                    }
-                });
-                Ok(())
+                }
             }
             _ => Err(format!("Unsupported plugin entry type: {}", extension)),
         }
@@ -292,6 +343,127 @@ pub fn execute_plugin_entry(
 }
 
 
+
+/// Inline CSS and JS resources into HTML content
+fn inline_resources(html_content: &str, html_dir: &std::path::Path) -> String {
+    let mut modified_html = html_content.to_string();
+    
+    // Inline CSS files
+    let css_regex = regex::Regex::new(r#"<link[^>]+href\s*=\s*["']([^"']+\.css)["'][^>]*>"#).unwrap();
+    let css_matches: Vec<_> = css_regex.captures_iter(html_content).collect();
+    
+    for cap in css_matches {
+        if let Some(css_path_match) = cap.get(1) {
+            let css_path = css_path_match.as_str();
+            let normalized_path = css_path.replace("/", std::path::MAIN_SEPARATOR_STR);
+            let css_file_path = html_dir.join(normalized_path.trim_start_matches("./").trim_start_matches(std::path::MAIN_SEPARATOR));
+            
+            if let Ok(css_content) = std::fs::read_to_string(&css_file_path) {
+                let inline_style = format!("<style>{}</style>", css_content);
+                let original_tag = cap.get(0).unwrap().as_str();
+                modified_html = modified_html.replace(original_tag, &inline_style);
+            } else {
+                eprintln!("[plugin_manager] Warning: Failed to read CSS file: {:?}", css_file_path);
+            }
+        }
+    }
+    
+    // Inline JS files
+    let js_regex = regex::Regex::new(r#"<script[^>]+src\s*=\s*["']([^"']+\.js)["'][^>]*></script>"#).unwrap();
+    let js_matches: Vec<_> = js_regex.captures_iter(html_content).collect();
+    
+    for cap in js_matches {
+        if let Some(js_path_match) = cap.get(1) {
+            let js_path = js_path_match.as_str();
+            let normalized_path = js_path.replace("/", std::path::MAIN_SEPARATOR_STR);
+            let js_file_path = html_dir.join(normalized_path.trim_start_matches("./").trim_start_matches(std::path::MAIN_SEPARATOR));
+            
+            if let Ok(js_content) = std::fs::read_to_string(&js_file_path) {
+                let original_tag = cap.get(0).unwrap().as_str();
+                let is_module = original_tag.contains("type=\"module\"") || original_tag.contains("type='module'");
+                
+                let inline_script = if is_module {
+                    format!("<script type=\"module\">{}</script>", js_content)
+                } else {
+                    format!("<script>{}</script>", js_content)
+                };
+                
+                modified_html = modified_html.replace(original_tag, &inline_script);
+            } else {
+                eprintln!("[plugin_manager] Warning: Failed to read JS file: {:?}", js_file_path);
+            }
+        }
+    }
+    
+    modified_html
+}
+
+/// Inject Tauri API bridge script into HTML
+fn inject_tauri_bridge(html: &str) -> String {
+    let tauri_init_script = r#"
+<script>
+(function() {
+  console.log('[Plugin Inline] Initializing Tauri API bridge');
+  
+  const createProxy = (command) => {
+    return (...args) => {
+      return new Promise((resolve, reject) => {
+        const messageId = 'tauri_' + Math.random().toString(36).substring(7) + '_' + Date.now();
+        
+        const handleResponse = (event) => {
+          if (event.data && event.data.messageId === messageId) {
+            window.removeEventListener('message', handleResponse);
+            if (event.data.error) {
+              reject(new Error(event.data.error));
+            } else {
+              resolve(event.data.result);
+            }
+          }
+        };
+        
+        window.addEventListener('message', handleResponse);
+        
+        window.parent.postMessage({
+          type: 'plugin-tauri-call',
+          messageId,
+          command,
+          args
+        }, '*');
+        
+        setTimeout(() => {
+          window.removeEventListener('message', handleResponse);
+          reject(new Error('Tauri call timeout'));
+        }, 30000);
+      });
+    };
+  };
+  
+  const invokeProxy = createProxy('invoke');
+  
+  window.__TAURI__ = {
+    core: { invoke: invokeProxy },
+    event: {
+      emit: createProxy('emit'),
+      listen: createProxy('listen')
+    },
+    invoke: invokeProxy
+  };
+  
+  window.__TAURI_INVOKE__ = invokeProxy;
+  
+  console.log('[Plugin Inline] Tauri API bridge ready');
+})();
+</script>
+"#;
+    
+    if html.contains("<head>") {
+        html.replace("<head>", &format!("<head>{}", tauri_init_script))
+    } else if html.contains("<html>") {
+        html.replace("<html>", &format!("<html><head>{}</head>", tauri_init_script))
+    } else {
+        format!("{}{}", tauri_init_script, html)
+    }
+}
 
 pub fn handle_plugin_protocol<R: tauri::Runtime>(
     context: tauri::UriSchemeContext<'_, R>,

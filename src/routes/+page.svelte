@@ -21,19 +21,59 @@
   let selectedIndex = $state<number>(0);
   let currentTheme = $state<Theme>(Theme.DARK);
   let unlisten = $state<null | (() => void)>(null);
+  
+  // Plugin inline display state
+  let showPluginInline = $state<boolean>(false);
+  let currentPluginHtml = $state<string>("");
+  let currentPluginId = $state<string>("");
 
   const handleEsc = () => {
     console.log("Main page ESC handler executing");
+    // If plugin is showing inline, close it first
+    if (showPluginInline) {
+      showPluginInline = false;
+      currentPluginHtml = "";
+      currentPluginId = "";
+      return;
+    }
     inputValue = "";
     appList = originAppList;
     selectedIndex = 0;
     invoke("close_main_window");
   };
 
+  // Handle Tauri API calls from plugin iframe
+  const handlePluginMessage = async (event: MessageEvent) => {
+    if (event.data?.type !== 'plugin-tauri-call') return;
+    
+    const { messageId, command, args } = event.data;
+    const iframe = document.querySelector('iframe');
+    if (!iframe?.contentWindow) return;
+    
+    try {
+      let result;
+      if (command === 'invoke') {
+        result = await invoke(args[0], args[1] || {});
+      } else if (command === 'emit') {
+        result = null; // Handle emit if needed
+      }
+      
+      iframe.contentWindow.postMessage({ messageId, result }, '*');
+    } catch (error) {
+      iframe.contentWindow.postMessage({
+        messageId,
+        error: error instanceof Error ? error.message : String(error)
+      }, '*');
+    }
+  };
+
   onMount(async () => {
     console.log("Main page component has mounted");
-    // Register this page's ESC handler with the global store
     escapeHandler.set(handleEsc);
+    
+    // Set up plugin message handler
+    pluginMessageHandler = handlePluginMessage;
+    window.addEventListener('message', handlePluginMessage);
 
     // 1. 立即获取一次数据
     await fetchApps();
@@ -62,9 +102,21 @@
       fetchApps();
     });
 
+    // Listen for plugin inline display events
+    const unlistenPluginInline = await listen<{
+      plugin_id: string;
+      plugin_name: string;
+      html_content: string;
+    }>("show_plugin_inline", (event) => {
+      showPluginInline = true;
+      currentPluginHtml = event.payload.html_content;
+      currentPluginId = event.payload.plugin_id;
+    });
+
     unlisten = () => {
       unlistenAppsUpdated();
       unlistenCommandsReady();
+      unlistenPluginInline();
     };
   });
 
@@ -148,6 +200,8 @@
     goto("/settings");
   };
 
+  let pluginMessageHandler: ((event: MessageEvent) => void) | null = null;
+  
   onDestroy(() => {
     // Clean up the theme subscription
     unsubscribe && unsubscribe();
@@ -158,6 +212,10 @@
     // 组件销毁时，清理监听器
     if (unlisten) {
       unlisten();
+    }
+    // Clean up plugin message handler
+    if (pluginMessageHandler) {
+      window.removeEventListener('message', pluginMessageHandler);
     }
   });
 </script>
@@ -194,54 +252,67 @@
       class="relative flex-1 overflow-hidden rounded-[10px] border px-2 py-2"
     >
       <ScrollArea.Viewport class="h-full w-full">
-        <div class="ajp-list overflow-auto">
-          {#each appList as app, index}
-            <button
-              role="option"
-              aria-selected={selectedIndex === index}
-              class="flex w-full rounded p-2 text-left text-2xl {selectedIndex !==
-              index
-                ? 'hover:bg-neutral-200 dark:hover:bg-neutral-700'
-                : ''} {selectedIndex === index
-                ? 'bg-neutral-300 dark:bg-neutral-600'
-                : ''}"
-              onclick={() => openApp(app)}
-            >
-              {#if app.icon}
-                {#if app.icon_type === "Iconfont"}
-                  <div
-                    class="mr-2 flex h-8 w-8 items-center justify-center rounded-md bg-gray-200 dark:bg-gray-700"
-                  >
-                    <Icon icon={app.icon} class="h-6 w-6" />
+        {#if showPluginInline}
+          <!-- Plugin inline display area -->
+          <!-- 使用 srcdoc 加载HTML内容，base标签指向 plugin:// 协议以加载资源 -->
+          <!-- 不使用 sandbox 属性，允许完整的脚本执行和 Tauri API 访问 -->
+          <iframe
+            srcdoc={currentPluginHtml}
+            class="h-full w-full border-0"
+            title="Plugin"
+            allow="clipboard-read; clipboard-write"
+          ></iframe>
+        {:else}
+          <!-- App list display area -->
+          <div class="ajp-list overflow-auto">
+            {#each appList as app, index}
+              <button
+                role="option"
+                aria-selected={selectedIndex === index}
+                class="flex w-full rounded p-2 text-left text-2xl {selectedIndex !==
+                index
+                  ? 'hover:bg-neutral-200 dark:hover:bg-neutral-700'
+                  : ''} {selectedIndex === index
+                  ? 'bg-neutral-300 dark:bg-neutral-600'
+                  : ''}"
+                onclick={() => openApp(app)}
+              >
+                {#if app.icon}
+                  {#if app.icon_type === "Iconfont"}
+                    <div
+                      class="mr-2 flex h-8 w-8 items-center justify-center rounded-md bg-gray-200 dark:bg-gray-700"
+                    >
+                      <Icon icon={app.icon} class="h-6 w-6" />
+                    </div>
+                  {:else if app.icon}
+                    <img
+                      src={`data:image/png;base64,${app.icon}`}
+                      class="mr-2 inline-block h-8 w-8"
+                      alt=""
+                    />
+                  {/if}
+                {/if}
+                <div class="flex flex-1 flex-col">
+                  <div class="flex items-center justify-between">
+                    <span>
+                      {app.name}
+                    </span>
+                    <span
+                      class="rounded-md bg-neutral-200 px-1.5 py-0.5 text-xs text-neutral-700 dark:bg-neutral-700 dark:text-neutral-300"
+                    >
+                      {app.source_display || app.source}
+                    </span>
                   </div>
-                {:else if app.icon}
-                  <img
-                    src={`data:image/png;base64,${app.icon}`}
-                    class="mr-2 inline-block h-8 w-8"
-                    alt=""
-                  />
-                {/if}
-              {/if}
-              <div class="flex flex-1 flex-col">
-                <div class="flex items-center justify-between">
-                  <span>
-                    {app.name}
-                  </span>
-                  <span
-                    class="rounded-md bg-neutral-200 px-1.5 py-0.5 text-xs text-neutral-700 dark:bg-neutral-700 dark:text-neutral-300"
-                  >
-                    {app.source_display || app.source}
-                  </span>
+                  {#if app.source !== "Command"}
+                    <span class="text-neutral-399 text-xs dark:text-neutral-500">
+                      {app.path}
+                    </span>
+                  {/if}
                 </div>
-                {#if app.source !== "Command"}
-                  <span class="text-neutral-399 text-xs dark:text-neutral-500">
-                    {app.path}
-                  </span>
-                {/if}
-              </div>
-            </button>
-          {/each}
-        </div>
+              </button>
+            {/each}
+          </div>
+        {/if}
       </ScrollArea.Viewport>
       <ScrollArea.Scrollbar
         orientation="vertical"
