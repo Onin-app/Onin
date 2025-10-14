@@ -2,13 +2,21 @@
   import { onMount } from "svelte";
   import { listen } from "@tauri-apps/api/event";
   import { escapeHandler } from "$lib/stores/escapeHandler";
-  import { get } from "svelte/store"; // `get` is still needed for the custom escapeHandler store
+  import { requestInputFocus } from "$lib/stores/focusInput";
+  import { get } from "svelte/store";
   import { invoke } from "@tauri-apps/api/core";
-  import { page } from "$app/state"; // Use the new reactive state module
+  import { page } from "$app/state";
   import { setupPluginConsoleListener } from "$lib/plugin-console";
 
   // Setup plugin console listener to forward plugin console output to webview devtools
   setupPluginConsoleListener();
+
+  // Focus input when navigating to main page
+  $effect(() => {
+    if (page.route.id === "/") {
+      requestInputFocus();
+    }
+  });
 
   // This onMount block sets up a single, persistent listener for the 'esc_key_pressed' event.
   // It will live for the entire duration of the app, avoiding setup/teardown during page navigation.
@@ -28,13 +36,7 @@
         (event) => {
           // When window becomes visible, check if we are on the main page.
           if (event.payload && page.route.id === "/") {
-            // Use queueMicrotask to ensure the DOM is ready after a potential navigation.
-            queueMicrotask(() => {
-              const input = document.querySelector<HTMLInputElement>(
-                'input[placeholder="Hi Baize!"]',
-              );
-              input?.focus();
-            });
+            requestInputFocus();
           }
         },
       );

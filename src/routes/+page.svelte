@@ -17,6 +17,7 @@
   import { Theme, type LaunchableItem } from "$lib/type";
   import { theme, getTheme } from "$lib/utils/theme";
   import { escapeHandler } from "$lib/stores/escapeHandler";
+  import { focusInputTrigger } from "$lib/stores/focusInput";
   import Icon from "$lib/components/Icon.svelte";
 
   import "../index.css";
@@ -35,6 +36,15 @@
 
   // Refresh state
   let isRefreshing = $state<boolean>(false);
+
+  // Input element reference
+  let inputElement: HTMLInputElement;
+
+  // Listen to focus requests from layout
+  $effect(() => {
+    $focusInputTrigger; // Subscribe to changes
+    queueMicrotask(() => inputElement?.focus());
+  });
 
   const handleEsc = () => {
     console.log("Main page ESC handler executing");
@@ -305,6 +315,7 @@
         />
       </button>
       <input
+        bind:this={inputElement}
         class="ml-2 h-[60px] w-full p-2 text-2xl focus:ring-0 focus:outline-none active:ring-0 active:outline-none"
         type="text"
         placeholder="Hi Baize!"
