@@ -1,11 +1,16 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import { get } from "svelte/store";
-  import { ScrollArea } from "bits-ui";
+  import { DropdownMenu, ScrollArea } from "bits-ui";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
-  import { ArrowsClockwise, DotsThreeVertical } from "phosphor-svelte";
+  import {
+    ArrowsClockwise,
+    AppWindow,
+    DotsThreeVertical,
+    X,
+  } from "phosphor-svelte";
 
   import { goto } from "$app/navigation";
   import { fuzzyMatch } from "$lib/utils/fuzzyMatch";
@@ -240,6 +245,25 @@
     }
   };
 
+  const handleClosePlugin = () => {
+    showPluginInline = false;
+    currentPluginHtml = "";
+    currentPluginId = "";
+  };
+
+  const handleDetachPlugin = async () => {
+    if (!currentPluginId) return;
+
+    try {
+      // Open plugin in separate window
+      await invoke("open_plugin_in_window", { pluginId: currentPluginId });
+      // Close inline display
+      handleClosePlugin();
+    } catch (error) {
+      console.error("Failed to detach plugin:", error);
+    }
+  };
+
   let pluginMessageHandler: ((event: MessageEvent) => void) | null = null;
 
   onDestroy(() => {
@@ -289,7 +313,45 @@
       />
       <div>
         {#if showPluginInline}
-          <DotsThreeVertical class="ml-2 size-8 cursor-pointer" />
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger class="ml-2 cursor-pointer">
+              <DotsThreeVertical class="size-8" />
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content
+                class="border-muted bg-background shadow-popover w-[180px] rounded-xl border px-1 py-1.5 outline-hidden focus-visible:outline-hidden"
+                sideOffset={8}
+              >
+                <DropdownMenu.Item
+                  class="rounded-button data-highlighted:bg-muted flex h-10 items-center py-3 pr-1.5 pl-3 text-sm font-medium ring-0! ring-transparent! select-none focus-visible:outline-none"
+                >
+                  <button
+                    class="flex w-full cursor-pointer items-center"
+                    onclick={handleDetachPlugin}
+                  >
+                    <AppWindow class="text-foreground-alt mr-2 size-5" />
+                    <span>分离窗口</span>
+                  </button>
+                </DropdownMenu.Item>
+                <DropdownMenu.Item
+                  class="rounded-button data-highlighted:bg-muted flex h-10 items-center py-3 pr-1.5 pl-3 text-sm font-medium ring-0! ring-transparent! select-none focus-visible:outline-none"
+                >
+                  <button
+                    class="flex w-full cursor-pointer items-center"
+                    onclick={handleClosePlugin}
+                  >
+                    <X class="text-foreground-alt mr-2 size-5" />
+                    <span>关闭插件</span>
+                    <kbd
+                      class="rounded-button border-dark-10 bg-background-alt text-muted-foreground shadow-kbd ml-auto inline-flex items-center justify-center border px-1 text-xs"
+                    >
+                      ESC
+                    </kbd>
+                  </button>
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
         {:else}
           <ArrowsClockwise
             class="ml-2 size-8 cursor-pointer transition-transform {isRefreshing

@@ -215,6 +215,63 @@ pub async fn refresh_plugins(
 }
 
 #[tauri::command]
+pub fn open_plugin_in_window(
+    app: tauri::AppHandle,
+    store: State<'_, PluginStore>,
+    plugin_id: String,
+) -> Result<(), String> {
+    // Clone plugin data to release the lock ASAP
+    let plugin = {
+        let store_lock = store.0.lock().unwrap();
+        store_lock.get(&plugin_id).cloned()
+    }
+    .ok_or_else(|| "Plugin not found".to_string())?;
+
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let plugin_dir = data_dir.join("plugins").join(&plugin.dir_name);
+    let entry_path = plugin_dir.join(&plugin.manifest.entry);
+
+    if !entry_path.is_file() {
+        return Err(format!("Plugin entry file not found: {:?}", entry_path));
+    }
+
+    // Force open in window mode
+    let app_clone = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let window_label = format!("plugin_{}", plugin.manifest.id.replace('.', "_"));
+
+        if let Some(window) = app_clone.get_webview_window(&window_label) {
+            if let Err(e) = window.set_focus() {
+                eprintln!("Failed to focus plugin window: {}", e);
+            }
+            return;
+        }
+
+        // 使用自定义协议来加载插件文件
+        let plugin_url = format!(
+            "plugin://localhost/{}/{}",
+            plugin.dir_name, plugin.manifest.entry
+        );
+        println!("[plugin_manager] Loading plugin in window from: {}", plugin_url);
+
+        let builder = WebviewWindowBuilder::new(
+            &app_clone,
+            window_label.clone(),
+            tauri::WebviewUrl::External(plugin_url.parse().unwrap()),
+        )
+        .title(plugin.manifest.name)
+        .inner_size(800.0, 600.0)
+        .resizable(true);
+
+        if let Err(e) = builder.build() {
+            eprintln!("Failed to build plugin window: {}", e);
+        }
+    });
+    
+    Ok(())
+}
+
+#[tauri::command]
 pub fn execute_plugin_entry(
     app: tauri::AppHandle,
     store: State<'_, PluginStore>,
