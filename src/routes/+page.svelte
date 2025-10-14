@@ -5,6 +5,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+  import { ArrowsClockwise, DotsThreeVertical } from "phosphor-svelte";
 
   import { goto } from "$app/navigation";
   import { fuzzyMatch } from "$lib/utils/fuzzyMatch";
@@ -21,11 +22,14 @@
   let selectedIndex = $state<number>(0);
   let currentTheme = $state<Theme>(Theme.DARK);
   let unlisten = $state<null | (() => void)>(null);
-  
+
   // Plugin inline display state
   let showPluginInline = $state<boolean>(false);
   let currentPluginHtml = $state<string>("");
   let currentPluginId = $state<string>("");
+
+  // Refresh state
+  let isRefreshing = $state<boolean>(false);
 
   const handleEsc = () => {
     console.log("Main page ESC handler executing");
@@ -44,36 +48,39 @@
 
   // Handle Tauri API calls from plugin iframe
   const handlePluginMessage = async (event: MessageEvent) => {
-    if (event.data?.type !== 'plugin-tauri-call') return;
-    
+    if (event.data?.type !== "plugin-tauri-call") return;
+
     const { messageId, command, args } = event.data;
-    const iframe = document.querySelector('iframe');
+    const iframe = document.querySelector("iframe");
     if (!iframe?.contentWindow) return;
-    
+
     try {
       let result;
-      if (command === 'invoke') {
+      if (command === "invoke") {
         result = await invoke(args[0], args[1] || {});
-      } else if (command === 'emit') {
+      } else if (command === "emit") {
         result = null; // Handle emit if needed
       }
-      
-      iframe.contentWindow.postMessage({ messageId, result }, '*');
+
+      iframe.contentWindow.postMessage({ messageId, result }, "*");
     } catch (error) {
-      iframe.contentWindow.postMessage({
-        messageId,
-        error: error instanceof Error ? error.message : String(error)
-      }, '*');
+      iframe.contentWindow.postMessage(
+        {
+          messageId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "*",
+      );
     }
   };
 
   onMount(async () => {
     console.log("Main page component has mounted");
     escapeHandler.set(handleEsc);
-    
+
     // Set up plugin message handler
     pluginMessageHandler = handlePluginMessage;
-    window.addEventListener('message', handlePluginMessage);
+    window.addEventListener("message", handlePluginMessage);
 
     // 1. 立即获取一次数据
     await fetchApps();
@@ -200,8 +207,41 @@
     goto("/settings");
   };
 
+  const handleRefresh = async () => {
+    if (isRefreshing) return;
+
+    isRefreshing = true;
+    try {
+      console.log("Refreshing all launchable items...");
+      // Trigger backend to refresh commands (rescan apps, plugins, etc.)
+      await invoke("refresh_commands");
+      // Fetch the updated list
+      await fetchApps();
+      console.log("Refresh completed successfully");
+
+      // Show success notification
+      await invoke("show_notification", {
+        options: {
+          title: "刷新完成",
+          body: `已更新 ${appList.length} 个项目`,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to refresh:", error);
+      // Show error notification
+      await invoke("show_notification", {
+        options: {
+          title: "刷新失败",
+          body: "请稍后重试",
+        },
+      });
+    } finally {
+      isRefreshing = false;
+    }
+  };
+
   let pluginMessageHandler: ((event: MessageEvent) => void) | null = null;
-  
+
   onDestroy(() => {
     // Clean up the theme subscription
     unsubscribe && unsubscribe();
@@ -215,7 +255,7 @@
     }
     // Clean up plugin message handler
     if (pluginMessageHandler) {
-      window.removeEventListener('message', pluginMessageHandler);
+      window.removeEventListener("message", pluginMessageHandler);
     }
   });
 </script>
@@ -247,6 +287,18 @@
         bind:value={inputValue}
         oninput={handleInput}
       />
+      <div>
+        {#if showPluginInline}
+          <DotsThreeVertical class="ml-2 size-8 cursor-pointer" />
+        {:else}
+          <ArrowsClockwise
+            class="ml-2 size-8 cursor-pointer transition-transform {isRefreshing
+              ? 'animate-spin'
+              : ''}"
+            onclick={handleRefresh}
+          />
+        {/if}
+      </div>
     </div>
     <ScrollArea.Root
       class="relative flex-1 overflow-hidden rounded-[10px] border px-2 py-2"
@@ -304,7 +356,9 @@
                     </span>
                   </div>
                   {#if app.source !== "Command"}
-                    <span class="text-neutral-399 text-xs dark:text-neutral-500">
+                    <span
+                      class="text-neutral-399 text-xs dark:text-neutral-500"
+                    >
                       {app.path}
                     </span>
                   {/if}
