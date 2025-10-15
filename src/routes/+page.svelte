@@ -46,6 +46,13 @@
     queueMicrotask(() => inputElement?.focus());
   });
 
+  // Focus input when plugin is closed
+  $effect(() => {
+    if (!showPluginInline) {
+      queueMicrotask(() => inputElement?.focus());
+    }
+  });
+
   const handleEsc = () => {
     console.log("Main page ESC handler executing");
     // If plugin is showing inline, close it first
