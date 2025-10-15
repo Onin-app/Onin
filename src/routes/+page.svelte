@@ -373,87 +373,87 @@
         {/if}
       </div>
     </div>
-    <ScrollArea.Root
-      class="relative flex-1 overflow-hidden rounded-[10px] border px-2 py-2"
-    >
-      <ScrollArea.Viewport class="h-full w-full">
-        {#if showPluginInline}
-          <!-- Plugin inline display area -->
-          <!-- 使用 srcdoc 加载HTML内容，base标签指向 plugin:// 协议以加载资源 -->
-          <!-- 不使用 sandbox 属性，允许完整的脚本执行和 Tauri API 访问 -->
-          <iframe
-            srcdoc={currentPluginHtml}
-            class="h-full w-full border-0"
-            title="Plugin"
-            allow="clipboard-read; clipboard-write"
-          ></iframe>
-        {:else}
-          <!-- App list display area -->
-          <div class="ajp-list overflow-auto">
-            {#each appList as app, index}
-              <button
-                role="option"
-                aria-selected={selectedIndex === index}
-                class="flex w-full rounded p-2 text-left text-2xl {selectedIndex !==
-                index
-                  ? 'hover:bg-neutral-200 dark:hover:bg-neutral-700'
-                  : ''} {selectedIndex === index
-                  ? 'bg-neutral-300 dark:bg-neutral-600'
-                  : ''}"
-                onclick={() => openApp(app)}
-              >
-                {#if app.icon}
-                  {#if app.icon_type === "Iconfont"}
-                    <div
-                      class="mr-2 flex h-8 w-8 items-center justify-center rounded-md bg-gray-200 dark:bg-gray-700"
-                    >
-                      <Icon icon={app.icon} class="h-6 w-6" />
+    <div class="relative flex-1 overflow-hidden">
+      {#if showPluginInline}
+        <!-- Plugin inline display area -->
+        <!-- 使用 srcdoc 加载HTML内容，base标签指向 plugin:// 协议以加载资源 -->
+        <!-- 不使用 sandbox 属性，允许完整的脚本执行和 Tauri API 访问 -->
+        <iframe
+          srcdoc={currentPluginHtml}
+          class="h-full w-full border-0"
+          title="Plugin"
+          allow="clipboard-read; clipboard-write"
+        ></iframe>
+      {:else}
+        <ScrollArea.Root class="h-full w-full rounded-[10px] border px-2 py-2">
+          <ScrollArea.Viewport class="h-full w-full">
+            <!-- App list display area -->
+            <div class="ajp-list overflow-auto">
+              {#each appList as app, index}
+                <button
+                  role="option"
+                  aria-selected={selectedIndex === index}
+                  class="flex w-full rounded p-2 text-left text-2xl {selectedIndex !==
+                  index
+                    ? 'hover:bg-neutral-200 dark:hover:bg-neutral-700'
+                    : ''} {selectedIndex === index
+                    ? 'bg-neutral-300 dark:bg-neutral-600'
+                    : ''}"
+                  onclick={() => openApp(app)}
+                >
+                  {#if app.icon}
+                    {#if app.icon_type === "Iconfont"}
+                      <div
+                        class="mr-2 flex h-8 w-8 items-center justify-center rounded-md bg-gray-200 dark:bg-gray-700"
+                      >
+                        <Icon icon={app.icon} class="h-6 w-6" />
+                      </div>
+                    {:else if app.icon}
+                      <img
+                        src={`data:image/png;base64,${app.icon}`}
+                        class="mr-2 inline-block h-8 w-8"
+                        alt=""
+                      />
+                    {/if}
+                  {/if}
+                  <div class="flex flex-1 flex-col">
+                    <div class="flex items-center justify-between">
+                      <span>
+                        {app.name}
+                      </span>
+                      <span
+                        class="rounded-md bg-neutral-200 px-1.5 py-0.5 text-xs text-neutral-700 dark:bg-neutral-700 dark:text-neutral-300"
+                      >
+                        {app.source_display || app.source}
+                      </span>
                     </div>
-                  {:else if app.icon}
-                    <img
-                      src={`data:image/png;base64,${app.icon}`}
-                      class="mr-2 inline-block h-8 w-8"
-                      alt=""
-                    />
-                  {/if}
-                {/if}
-                <div class="flex flex-1 flex-col">
-                  <div class="flex items-center justify-between">
-                    <span>
-                      {app.name}
-                    </span>
-                    <span
-                      class="rounded-md bg-neutral-200 px-1.5 py-0.5 text-xs text-neutral-700 dark:bg-neutral-700 dark:text-neutral-300"
-                    >
-                      {app.source_display || app.source}
-                    </span>
+                    {#if app.source !== "Command"}
+                      <span
+                        class="text-neutral-399 text-xs dark:text-neutral-500"
+                      >
+                        {app.path}
+                      </span>
+                    {/if}
                   </div>
-                  {#if app.source !== "Command"}
-                    <span
-                      class="text-neutral-399 text-xs dark:text-neutral-500"
-                    >
-                      {app.path}
-                    </span>
-                  {/if}
-                </div>
-              </button>
-            {/each}
-          </div>
-        {/if}
-      </ScrollArea.Viewport>
-      <ScrollArea.Scrollbar
-        orientation="vertical"
-        class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-2.5 touch-none rounded-full border-l border-l-transparent p-px transition-all duration-200 select-none hover:w-3"
-      >
-        <ScrollArea.Thumb class="bg-muted-foreground flex-1 rounded-full" />
-      </ScrollArea.Scrollbar>
-      <ScrollArea.Scrollbar
-        orientation="horizontal"
-        class="bg-muted hover:bg-dark-10 flex h-2.5 touch-none rounded-full border-t border-t-transparent p-px transition-all duration-200 select-none hover:h-3 "
-      >
-        <ScrollArea.Thumb class="bg-muted-foreground rounded-full" />
-      </ScrollArea.Scrollbar>
-      <ScrollArea.Corner />
-    </ScrollArea.Root>
+                </button>
+              {/each}
+            </div>
+          </ScrollArea.Viewport>
+          <ScrollArea.Scrollbar
+            orientation="vertical"
+            class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-2.5 touch-none rounded-full border-l border-l-transparent p-px transition-all duration-200 select-none hover:w-3"
+          >
+            <ScrollArea.Thumb class="bg-muted-foreground flex-1 rounded-full" />
+          </ScrollArea.Scrollbar>
+          <ScrollArea.Scrollbar
+            orientation="horizontal"
+            class="bg-muted hover:bg-dark-10 flex h-2.5 touch-none rounded-full border-t border-t-transparent p-px transition-all duration-200 select-none hover:h-3 "
+          >
+            <ScrollArea.Thumb class="bg-muted-foreground rounded-full" />
+          </ScrollArea.Scrollbar>
+          <ScrollArea.Corner />
+        </ScrollArea.Root>
+      {/if}
+    </div>
   </div>
 </main>
