@@ -1,0 +1,31 @@
+<script lang="ts">
+  import {
+    Power,
+    ArrowsClockwise,
+    Moon,
+    Lock,
+    SignOut,
+    Folder,
+  } from "phosphor-svelte";
+
+  interface PhosphorIconProps {
+    icon: string;
+    class?: string;
+  }
+
+  const { icon, class: cls }: PhosphorIconProps = $props();
+
+  // 图标映射表
+  const iconMap: Record<string, any> = {
+    shutdown: Power,
+    restart: ArrowsClockwise,
+    sleep: Moon,
+    lock: Lock,
+    logout: SignOut,
+    folder: Folder,
+  };
+
+  const IconComponent = $derived(iconMap[icon] || Power);
+</script>
+
+{@render IconComponent({ class: cls })}

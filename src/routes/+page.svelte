@@ -18,7 +18,7 @@
   import { theme, getTheme } from "$lib/utils/theme";
   import { escapeHandler } from "$lib/stores/escapeHandler";
   import { focusInputTrigger } from "$lib/stores/focusInput";
-  import Icon from "$lib/components/Icon.svelte";
+  import PhosphorIcon from "$lib/components/PhosphorIcon.svelte";
 
   import "../index.css";
 
@@ -409,18 +409,19 @@
                   onclick={() => openApp(app)}
                 >
                   {#if app.icon}
-                    {#if app.icon_type === "Iconfont"}
-                      <div
-                        class="mr-2 flex h-8 w-8 items-center justify-center rounded-md bg-gray-200 dark:bg-gray-700"
-                      >
-                        <Icon icon={app.icon} class="h-6 w-6" />
-                      </div>
-                    {:else if app.icon}
+                    {#if app.icon_type === "Base64"}
                       <img
                         src={`data:image/png;base64,${app.icon}`}
                         class="mr-2 inline-block h-8 w-8"
                         alt=""
                       />
+                    {:else}
+                      <!-- 所有其他情况使用 Phosphor 图标 -->
+                      <div
+                        class="mr-2 flex h-8 w-8 items-center justify-center rounded-md bg-gray-200 dark:bg-gray-700"
+                      >
+                        <PhosphorIcon icon={app.icon} class="h-6 w-6" />
+                      </div>
                     {/if}
                   {/if}
                   <div class="flex flex-1 flex-col">

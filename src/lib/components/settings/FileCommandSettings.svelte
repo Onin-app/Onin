@@ -4,10 +4,11 @@
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
   import type { LaunchableItem } from "$lib/type";
-  import Icon from "$lib/components/Icon.svelte";
+  import PhosphorIcon from "$lib/components/PhosphorIcon.svelte";
   // import { Webview } from "@tauri-apps/api/webview";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
   import { TauriEvent } from "@tauri-apps/api/event";
+  import { Trash, Folder, File, AppWindow } from "phosphor-svelte";
 
   let fileCommands = $state<LaunchableItem[]>([]);
   let listContainerEl: HTMLDivElement | undefined = $state();
@@ -20,7 +21,7 @@
     isLoading = true;
     try {
       const items = await invoke<LaunchableItem[]>("get_all_launchable_items");
-      fileCommands = items.filter(item => item.source === 'FileCommand');
+      fileCommands = items.filter((item) => item.source === "FileCommand");
     } catch (e) {
       console.error("Failed to get file commands:", e);
     } finally {
@@ -71,13 +72,6 @@
       // 如果出错，则从后端重新获取列表以回滚状态
       fetchFileCommands();
     }
-  }
-
-  function getIconForItem(item: LaunchableItem) {
-    if (item.item_type === "Folder") return "folder";
-    if (item.item_type === "File") return "file";
-    // 'App' 或其他类型的默认图标
-    return "app";
   }
 
   const handleOpenFolder = async () => {
@@ -170,7 +164,6 @@
   <h2 class="mb-2 text-xl font-bold">文件启动设置</h2>
   {#if fileCommands.length > 0}
     <div class="mb-2 flex items-center text-sm text-neutral-500">
-      <!-- <Icon icon="warning-circle" class="mr-2" /> -->
       可以通过拖放或者粘贴文件/文件夹路径来添加文件，也可以点击
       <Button.Root
         class="rounded-input bg-dark text-background shadow-mini hover:bg-dark/95 mx-1
@@ -200,7 +193,6 @@
           <p class="text-neutral-500">正在加载...</p>
         {:else if fileCommands.length === 0}
           <div class="mb-2 flex items-center text-sm text-neutral-500">
-            <!-- <Icon icon="warning-circle" class="mr-2" /> -->
             可以通过拖放或者粘贴文件/文件夹路径来添加文件指令，也可以点击
             <Button.Root
               class="rounded-input bg-dark text-background shadow-mini hover:bg-dark/95 mx-1
@@ -218,24 +210,29 @@
               <li
                 class="group flex items-center rounded-lg p-2 hover:bg-neutral-200 dark:hover:bg-neutral-700"
               >
-                {#if item.icon_type === 'Iconfont'}
-                  <div class="mr-4 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-gray-200 dark:bg-gray-700">
-                    <Icon icon={item.icon} class="h-6 w-6" />
-                  </div>
-                {:else if item.icon}
+                {#if item.icon && item.icon_type === "Base64"}
                   <img
                     src={`data:image/png;base64,${item.icon}`}
                     alt="{item.name} icon"
                     class="mr-4 h-8 w-8 flex-shrink-0"
                   />
+                {:else if item.icon}
+                  <div
+                    class="mr-4 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-gray-200 dark:bg-gray-700"
+                  >
+                    <PhosphorIcon icon={item.icon} class="h-6 w-6" />
+                  </div>
                 {:else}
                   <div
-                    class="mr-4 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded bg-gray-200 dark:bg-gray-700"
+                    class="mr-4 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-300"
                   >
-                    <Icon
-                      icon={getIconForItem(item)}
-                      class="h-5 w-5 text-gray-500"
-                    />
+                    {#if item.item_type === "Folder"}
+                      <Folder size={24} />
+                    {:else if item.item_type === "File"}
+                      <File size={24} />
+                    {:else}
+                      <AppWindow size={24} />
+                    {/if}
                   </div>
                 {/if}
                 <div class="flex-1 overflow-hidden">
@@ -246,10 +243,10 @@
                 <Popover.Root>
                   <Popover.Trigger>
                     <button
-                      class="ml-2 rounded-full p-1 text-neutral-400 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-neutral-300 hover:text-red-500 dark:hover:bg-neutral-600"
+                      class="ml-2 rounded-full p-1 text-neutral-400 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-500"
                       aria-label="删除 {item.name}"
                     >
-                      <Icon icon="delete" />
+                      <Trash size={20} />
                     </button>
                   </Popover.Trigger>
                   <Popover.Portal>

@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
   import { Tooltip } from "bits-ui";
-  import Icon from "$lib/components/Icon.svelte";
+  import { Question } from "phosphor-svelte";
 
   interface SetItemProps {
     title: string;
@@ -19,7 +19,7 @@
       <Tooltip.Provider>
         <Tooltip.Root delayDuration={200}>
           <Tooltip.Trigger class="">
-            <Icon icon="question-circle" />
+            <Question size={20} />
           </Tooltip.Trigger>
           <Tooltip.Content sideOffset={8}>
             <div class="">{description}</div>
