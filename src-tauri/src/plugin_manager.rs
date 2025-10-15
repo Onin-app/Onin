@@ -372,6 +372,18 @@ pub fn execute_plugin_entry(
                         let main_window = app.get_webview_window("main")
                             .ok_or_else(|| "Main window not found".to_string())?;
                         
+                        // 特殊处理：当通过快捷键触发内联插件时，需要显示主窗口
+                        // 这是因为内联插件默认在主窗口中显示，如果主窗口隐藏，用户将看不到任何反馈
+                        // 即使用户为主窗口显示/隐藏绑定了其他快捷键，这里也需要确保窗口可见
+                        if let Ok(false) = main_window.is_visible() {
+                            if let Err(e) = main_window.show() {
+                                eprintln!("[plugin_manager] Warning: Failed to show main window for inline plugin: {}", e);
+                            }
+                            if let Err(e) = main_window.set_focus() {
+                                eprintln!("[plugin_manager] Warning: Failed to focus main window for inline plugin: {}", e);
+                            }
+                        }
+                        
                         #[derive(Serialize, Clone)]
                         struct PluginInlinePayload {
                             plugin_id: String,
