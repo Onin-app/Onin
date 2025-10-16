@@ -19,6 +19,7 @@ function createDetachWindowShortcutStore() {
 
   return {
     subscribe,
+    set, // 暴露 set 方法以支持 bind:value
     /**
      * Set the shortcut both in backend and store
      */
