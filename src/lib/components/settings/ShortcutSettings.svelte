@@ -22,7 +22,10 @@
       shortcuts.forEach((s) => {
         if (s.command_name === "toggle_window") {
           s.readonly = true;
-          s.command_name = "显示/隐藏窗口";
+          s.command_title = "显示/隐藏窗口";
+        } else if (s.command_name === "detach_window") {
+          s.readonly = true;
+          s.command_title = "分离窗口";
         }
       });
       shortcuts.sort((a, b) => {
@@ -109,9 +112,7 @@
             type="single"
             name="command"
             disabled={shortcutInfo.readonly}
-            inputValue={shortcutInfo.readonly
-              ? "显示/隐藏窗口"
-              : shortcutInfo.command_title}
+            inputValue={shortcutInfo.command_title || ""}
             onOpenChange={(o) => {
               if (!o) searchValue = "";
             }}

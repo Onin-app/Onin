@@ -3,6 +3,7 @@
   import { listen } from "@tauri-apps/api/event";
   import { escapeHandler } from "$lib/stores/escapeHandler";
   import { requestInputFocus } from "$lib/stores/focusInput";
+  import { detachWindowShortcut } from "$lib/stores/shortcuts";
   import { get } from "svelte/store";
   import { invoke } from "@tauri-apps/api/core";
   import { page } from "$app/state";
@@ -10,6 +11,10 @@
 
   // Setup plugin console listener to forward plugin console output to webview devtools
   setupPluginConsoleListener();
+
+  // Subscribe to shortcuts store to trigger auto-loading
+  // The subscription itself triggers the load in the store's start function
+  $detachWindowShortcut;
 
   // Focus input when navigating to main page
   $effect(() => {

@@ -301,6 +301,13 @@ fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::
                 }
             }
         }
+    } else if app_shortcut.command_name == "detach_window" {
+        println!("Executing detach window command");
+        if let Some(window) = app.get_webview_window("main") {
+            if let Err(e) = window.emit("detach_window_shortcut", ()) {
+                eprintln!("Error emitting detach window command: {}", e);
+            }
+        }
     } else {
         println!("Executing command: {}", app_shortcut.command_name);
         if let Some(window) = app.get_webview_window("main") {
@@ -373,6 +380,75 @@ pub fn get_toggle_shortcut(state: State<ShortcutState>) -> Result<String, String
     if let Some(shortcut) = shortcuts
         .iter()
         .find(|s| s.command_name == toggle_command_name)
+    {
+        Ok(shortcut.shortcut.clone())
+    } else {
+        Ok("".to_string())
+    }
+}
+
+#[tauri::command]
+pub async fn set_detach_window_shortcut(
+    app: AppHandle,
+    state: State<'_, ShortcutState>,
+    shortcut_str: String,
+) -> Result<(), String> {
+    let mut shortcuts = state
+        .shortcuts
+        .lock()
+        .map_err(|_| "Failed to acquire lock on shortcut state".to_string())?;
+
+    let detach_command_name = "detach_window";
+
+    // Remove old detach window shortcut if it exists
+    if let Some(index) = shortcuts
+        .iter()
+        .position(|s| s.command_name == detach_command_name)
+    {
+        let old_shortcut_str = &shortcuts[index].shortcut;
+        let old_tauri_shortcut = Shortcut::from_str(old_shortcut_str).map_err(|e| e.to_string())?;
+        if app
+            .global_shortcut()
+            .is_registered(old_tauri_shortcut.clone())
+        {
+            app.global_shortcut()
+                .unregister(old_tauri_shortcut)
+                .map_err(|e| e.to_string())?;
+        }
+        shortcuts.remove(index);
+    }
+
+    // Add new detach window shortcut
+    if !shortcut_str.is_empty() {
+        let new_shortcut = AppShortcut {
+            shortcut: shortcut_str.clone(),
+            command_name: detach_command_name.to_string(),
+            command_title: Some("分离窗口".to_string()),
+        };
+        let new_tauri_shortcut = Shortcut::from_str(&shortcut_str).map_err(|e| e.to_string())?;
+        app.global_shortcut()
+            .register(new_tauri_shortcut)
+            .map_err(|e| e.to_string())?;
+        shortcuts.push(new_shortcut);
+    }
+
+    save_shortcuts_to_disk(&app, &shortcuts);
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_detach_window_shortcut(state: State<ShortcutState>) -> Result<String, String> {
+    let shortcuts = state
+        .shortcuts
+        .lock()
+        .map_err(|_| "Failed to lock shortcut state".to_string())?;
+
+    let detach_command_name = "detach_window";
+
+    if let Some(shortcut) = shortcuts
+        .iter()
+        .find(|s| s.command_name == detach_command_name)
     {
         Ok(shortcut.shortcut.clone())
     } else {

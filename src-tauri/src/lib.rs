@@ -148,6 +148,8 @@ pub fn run() {
             shortcut_manager::remove_shortcut,
             shortcut_manager::set_toggle_shortcut,
             shortcut_manager::get_toggle_shortcut,
+            shortcut_manager::set_detach_window_shortcut,
+            shortcut_manager::get_detach_window_shortcut,
             // Add startup items manager commands
             file_command_manager::get_file_commands,
             file_command_manager::add_file_commands,

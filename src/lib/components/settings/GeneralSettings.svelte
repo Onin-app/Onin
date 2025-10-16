@@ -5,6 +5,7 @@
 
   import { theme, toggleTheme } from "$lib/utils/theme";
   import { Theme } from "$lib/type";
+  import { detachWindowShortcut } from "$lib/stores/shortcuts";
 
   import SetItem from "./SetItem.svelte";
   import ShortcutInput from "./ShortcutInput.svelte";
@@ -141,12 +142,21 @@
       </Switch.Root>
     {/snippet}
   </SetItem>
-  <SetItem title="快捷键">
+  <SetItem title="显示/隐藏窗口快捷键">
     {#snippet content()}
       <ShortcutInput
         bind:value={shortcut}
         onSave={() => invoke("set_toggle_shortcut", { shortcutStr: shortcut })}
         showPresets={true}
+      />
+    {/snippet}
+  </SetItem>
+  <SetItem title="分离窗口快捷键">
+    {#snippet content()}
+      <ShortcutInput
+        bind:value={$detachWindowShortcut}
+        onSave={() => detachWindowShortcut.setShortcut($detachWindowShortcut)}
+        showPresets={false}
       />
     {/snippet}
   </SetItem>

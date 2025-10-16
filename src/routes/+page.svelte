@@ -18,6 +18,7 @@
   import { theme, getTheme } from "$lib/utils/theme";
   import { escapeHandler } from "$lib/stores/escapeHandler";
   import { focusInputTrigger } from "$lib/stores/focusInput";
+  import { detachWindowShortcut } from "$lib/stores/shortcuts";
   import PhosphorIcon from "$lib/components/PhosphorIcon.svelte";
 
   import "../index.css";
@@ -142,10 +143,17 @@
       currentPluginId = event.payload.plugin_id;
     });
 
+    // Listen for detach window shortcut event
+    const unlistenDetachWindow = await listen("detach_window_shortcut", () => {
+      console.log("Detach window shortcut triggered");
+      handleDetachPlugin();
+    });
+
     unlisten = () => {
       unlistenAppsUpdated();
       unlistenCommandsReady();
       unlistenPluginInline();
+      unlistenDetachWindow();
     };
   });
 
@@ -337,7 +345,7 @@
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
               <DropdownMenu.Content
-                class="border-muted bg-background shadow-popover w-[180px] rounded-xl border px-1 py-1.5 outline-hidden focus-visible:outline-hidden"
+                class="border-muted bg-background shadow-popover rounded-xl border px-1 py-1.5 outline-hidden focus-visible:outline-hidden"
                 sideOffset={8}
               >
                 <DropdownMenu.Item
@@ -348,7 +356,14 @@
                     onclick={handleDetachPlugin}
                   >
                     <AppWindow class="text-foreground-alt mr-2 size-5" />
-                    <span>分离窗口</span>
+                    <span class="mr-2">分离窗口</span>
+                    {#if $detachWindowShortcut}
+                      <kbd
+                        class=" rounded-button border-dark-10 bg-background-alt text-muted-foreground shadow-kbd ml-auto inline-flex items-center justify-center border px-1 text-xs uppercase"
+                      >
+                        {$detachWindowShortcut}
+                      </kbd>
+                    {/if}
                   </button>
                 </DropdownMenu.Item>
                 <DropdownMenu.Item
@@ -359,9 +374,9 @@
                     onclick={handleClosePlugin}
                   >
                     <X class="text-foreground-alt mr-2 size-5" />
-                    <span>关闭插件</span>
+                    <span class="mr-2">关闭插件</span>
                     <kbd
-                      class="rounded-button border-dark-10 bg-background-alt text-muted-foreground shadow-kbd ml-auto inline-flex items-center justify-center border px-1 text-xs"
+                      class=" rounded-button border-dark-10 bg-background-alt text-muted-foreground shadow-kbd ml-auto inline-flex items-center justify-center border px-1 text-xs"
                     >
                       ESC
                     </kbd>
