@@ -65,7 +65,6 @@
     }
   };
 
-
   const unsubscribe = theme.subscribe((value) => {
     currentTheme = value;
   });
@@ -83,7 +82,6 @@
       console.error("Failed to get tray visibility state:", e);
     }
   });
-
 
   onDestroy(unsubscribe);
 </script>
@@ -145,7 +143,11 @@
   </SetItem>
   <SetItem title="快捷键">
     {#snippet content()}
-      <ShortcutInput bind:value={shortcut} onSave={() => invoke("set_toggle_shortcut", { shortcutStr: shortcut })} />
+      <ShortcutInput
+        bind:value={shortcut}
+        onSave={() => invoke("set_toggle_shortcut", { shortcutStr: shortcut })}
+        showPresets={true}
+      />
     {/snippet}
   </SetItem>
 
