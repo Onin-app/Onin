@@ -108,6 +108,66 @@ pub struct LoadedPlugin {
     #[serde(flatten)]
     pub manifest: PluginManifest,
     pub dir_name: String,
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
+}
+
+fn default_enabled() -> bool {
+    true
+}
+
+// 插件状态持久化结构
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct PluginStates {
+    states: HashMap<String, bool>, // plugin_id -> enabled
+}
+
+// 获取插件状态文件路径
+fn get_plugin_states_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    Ok(data_dir.join("plugin_states.json"))
+}
+
+// 加载插件状态
+fn load_plugin_states(app: &tauri::AppHandle) -> HashMap<String, bool> {
+    match get_plugin_states_path(app) {
+        Ok(path) => {
+            if path.exists() {
+                match std::fs::read_to_string(&path) {
+                    Ok(content) => {
+                        match serde_json::from_str::<PluginStates>(&content) {
+                            Ok(plugin_states) => {
+                                println!("[plugin_manager] Loaded plugin states: {:?}", plugin_states.states);
+                                return plugin_states.states;
+                            }
+                            Err(e) => {
+                                eprintln!("[plugin_manager] Failed to parse plugin states: {}", e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("[plugin_manager] Failed to read plugin states file: {}", e);
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("[plugin_manager] Failed to get plugin states path: {}", e);
+        }
+    }
+    HashMap::new()
+}
+
+// 保存插件状态
+fn save_plugin_states(app: &tauri::AppHandle, states: &HashMap<String, bool>) -> Result<(), String> {
+    let path = get_plugin_states_path(app)?;
+    let plugin_states = PluginStates {
+        states: states.clone(),
+    };
+    let content = serde_json::to_string_pretty(&plugin_states).map_err(|e| e.to_string())?;
+    std::fs::write(path, content).map_err(|e| e.to_string())?;
+    println!("[plugin_manager] Saved plugin states: {:?}", states);
+    Ok(())
 }
 
 fn load_plugins_internal(
@@ -129,6 +189,9 @@ fn load_plugins_internal(
         return Ok(Vec::new());
     }
 
+    // 加载插件状态
+    let plugin_states = load_plugin_states(app);
+
     let mut store_lock = store.0.lock().unwrap();
     if clear_existing {
         store_lock.clear(); // Clear old plugins
@@ -148,14 +211,18 @@ fn load_plugins_internal(
 
                 let dir_name = path.file_name().unwrap().to_str().unwrap().to_string();
 
+                // 从持久化状态中获取启用状态，如果没有则默认为 true
+                let enabled = plugin_states.get(&manifest.id).copied().unwrap_or(true);
+
                 let loaded_plugin = LoadedPlugin {
                     manifest: manifest.clone(),
                     dir_name,
+                    enabled,
                 };
 
                 println!(
-                    "[plugin_manager] Loaded plugin: {} from {}",
-                    manifest.name, loaded_plugin.dir_name
+                    "[plugin_manager] Loaded plugin: {} from {} (enabled: {})",
+                    manifest.name, loaded_plugin.dir_name, enabled
                 );
                 store_lock.insert(manifest.id.clone(), loaded_plugin);
             }
@@ -212,6 +279,44 @@ pub async fn refresh_plugins(
     }
     
     result
+}
+
+#[tauri::command]
+pub fn toggle_plugin(
+    app: tauri::AppHandle,
+    store: State<'_, PluginStore>,
+    plugin_id: String,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut store_lock = store.0.lock().unwrap();
+    
+    if let Some(plugin) = store_lock.get_mut(&plugin_id) {
+        plugin.enabled = enabled;
+        println!(
+            "[plugin_manager] Plugin {} is now {}",
+            plugin_id,
+            if enabled { "enabled" } else { "disabled" }
+        );
+        
+        // 收集所有插件的状态
+        let mut states = HashMap::new();
+        for (id, plugin) in store_lock.iter() {
+            states.insert(id.clone(), plugin.enabled);
+        }
+        
+        // 释放锁后再保存状态
+        drop(store_lock);
+        
+        // 持久化保存状态
+        if let Err(e) = save_plugin_states(&app, &states) {
+            eprintln!("[plugin_manager] Failed to save plugin states: {}", e);
+            return Err(format!("Failed to save plugin state: {}", e));
+        }
+        
+        Ok(())
+    } else {
+        Err(format!("Plugin not found: {}", plugin_id))
+    }
 }
 
 #[tauri::command]
@@ -283,6 +388,11 @@ pub fn execute_plugin_entry(
         store_lock.get(&plugin_id).cloned()
     }
     .ok_or_else(|| "Plugin not found".to_string())?;
+    
+    // 检查插件是否启用
+    if !plugin.enabled {
+        return Err("Plugin is disabled".to_string());
+    }
 
     let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let plugin_dir = data_dir.join("plugins").join(&plugin.dir_name);

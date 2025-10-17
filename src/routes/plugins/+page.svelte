@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import { get } from "svelte/store";
-  import { Button, Tabs } from "bits-ui";
+  import { Button, Tabs, Switch } from "bits-ui";
   import { invoke } from "@tauri-apps/api/core";
   import {
     ArrowLeft,
@@ -14,8 +14,6 @@
     Gear,
     Trash,
     Package,
-    ToggleLeft,
-    ToggleRight,
     Star,
     Download,
     GithubLogo,
@@ -76,13 +74,18 @@
     try {
       console.log("正在刷新插件...");
       const result = await invoke("refresh_plugins");
-      plugins = result as PluginManifest[];
+      plugins = (result as PluginManifest[]).map((plugin) => ({
+        ...plugin,
+        // Mock 数据
+        stars: plugin.stars ?? Math.floor(Math.random() * 1000),
+        downloads: plugin.downloads ?? Math.floor(Math.random() * 10000),
+      }));
       console.log("插件刷新成功:", plugins);
 
       await invoke("show_notification", {
         options: {
-          title: "插件管理",
-          body: `成功刷新 ${plugins.length} 个插件`,
+          title: "刷新成功",
+          body: `已刷新 ${plugins.length} 个插件`,
         },
       });
     } catch (error) {
@@ -90,8 +93,8 @@
 
       await invoke("show_notification", {
         options: {
-          title: "插件管理",
-          body: "刷新插件失败，请查看控制台了解详情",
+          title: "刷新失败",
+          body: "无法刷新插件列表，请重试",
         },
       });
     }
@@ -111,8 +114,44 @@
   };
 
   const togglePlugin = async (pluginId: string, enabled: boolean) => {
-    console.log(`Toggle plugin ${pluginId} to ${enabled}`);
-    // TODO: 实现插件启用/禁用功能
+    // 找到插件名称
+    const plugin = plugins.find((p) => p.id === pluginId);
+    const pluginName = plugin?.name || pluginId;
+
+    try {
+      await invoke("toggle_plugin", { pluginId, enabled });
+
+      // 更新本地状态
+      plugins = plugins.map((p) => (p.id === pluginId ? { ...p, enabled } : p));
+
+      console.log(
+        `Plugin ${pluginId} is now ${enabled ? "enabled" : "disabled"}`,
+      );
+
+      // 刷新命令列表，使搜索框和指令设置中的插件命令也更新
+      try {
+        await invoke("refresh_commands");
+        console.log("Commands refreshed after plugin toggle");
+      } catch (refreshError) {
+        console.error("Failed to refresh commands:", refreshError);
+      }
+
+      await invoke("show_notification", {
+        options: {
+          title: enabled ? "插件已启用" : "插件已禁用",
+          body: `${pluginName} ${enabled ? "已启用" : "已禁用"}`,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to toggle plugin:", error);
+
+      await invoke("show_notification", {
+        options: {
+          title: "操作失败",
+          body: `无法${enabled ? "启用" : "禁用"}插件 ${pluginName}`,
+        },
+      });
+    }
   };
 
   const uninstallPlugin = async (pluginId: string) => {
@@ -222,7 +261,9 @@
                   <!-- 右侧信息 -->
                   <div class="flex min-w-0 flex-1 flex-col">
                     <div class="mb-1 flex items-start justify-between gap-2">
-                      <h3 class="truncate text-base font-semibold leading-tight">
+                      <h3
+                        class="truncate text-base leading-tight font-semibold"
+                      >
                         {plugin.name}
                       </h3>
                       <Button.Root
@@ -245,7 +286,9 @@
                 </div>
 
                 <!-- 作者和 ID -->
-                <div class="mb-2 flex items-center gap-2 text-xs text-neutral-400">
+                <div
+                  class="mb-2 flex items-center gap-2 text-xs text-neutral-400"
+                >
                   {#if plugin.author}
                     <span class="truncate">{plugin.author}</span>
                   {/if}
@@ -255,7 +298,9 @@
                 </div>
 
                 <!-- 底部：统计和操作 -->
-                <div class="flex items-center justify-between border-t border-neutral-200 pt-2 dark:border-neutral-700">
+                <div
+                  class="flex items-center justify-between border-t border-neutral-200 pt-2 dark:border-neutral-700"
+                >
                   <!-- 左侧：收藏和下载数 -->
                   <div class="flex items-center gap-3 text-xs text-neutral-500">
                     <div class="flex items-center gap-1">
@@ -270,50 +315,42 @@
 
                   <!-- 右侧：操作按钮 -->
                   <div class="flex items-center gap-1">
-                    {#if plugin.enabled !== false}
-                      <!-- 已安装：显示启用/禁用、设置、卸载 -->
-                      <Button.Root
-                        class="rounded px-2 py-1 text-xs transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                        onclick={(e: MouseEvent) => {
-                          e.stopPropagation();
-                          togglePlugin(plugin.id, false);
-                        }}
-                        aria-label="禁用插件"
-                      >
-                        <ToggleRight class="h-4 w-4 text-green-600 dark:text-green-500" />
-                      </Button.Root>
-                      <Button.Root
-                        class="rounded px-2 py-1 text-xs transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                        onclick={(e: MouseEvent) => {
-                          e.stopPropagation();
-                          console.log("Settings for", plugin.id);
-                        }}
-                        aria-label="插件设置"
-                      >
-                        <Gear class="h-4 w-4" />
-                      </Button.Root>
-                      <Button.Root
-                        class="rounded px-2 py-1 text-xs transition-colors hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
-                        onclick={(e: MouseEvent) => {
-                          e.stopPropagation();
-                          uninstallPlugin(plugin.id);
-                        }}
-                        aria-label="卸载插件"
-                      >
-                        <Trash class="h-4 w-4" />
-                      </Button.Root>
-                    {:else}
-                      <!-- 已禁用：显示启用按钮 -->
-                      <Button.Root
-                        class="rounded bg-neutral-900 px-3 py-1 text-xs font-medium text-white hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200"
-                        onclick={(e: MouseEvent) => {
-                          e.stopPropagation();
-                          togglePlugin(plugin.id, true);
-                        }}
-                      >
-                        启用
-                      </Button.Root>
-                    {/if}
+                    <!-- 启用/禁用开关 -->
+                    <Switch.Root
+                      checked={plugin.enabled !== false}
+                      onCheckedChange={(checked) => {
+                        togglePlugin(plugin.id, checked);
+                      }}
+                      class="focus-visible:ring-foreground focus-visible:ring-offset-background data-[state=checked]:bg-foreground data-[state=unchecked]:bg-dark-10 data-[state=unchecked]:shadow-mini-inset dark:data-[state=checked]:bg-foreground peer inline-flex h-[20px] min-h-[20px] w-[36px] shrink-0 cursor-pointer items-center rounded-full px-[2px] transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Switch.Thumb
+                        class="bg-background data-[state=unchecked]:shadow-mini dark:border-background/30 dark:bg-foreground dark:shadow-popover pointer-events-none block size-[16px] shrink-0 rounded-full transition-transform data-[state=checked]:translate-x-[14px] data-[state=unchecked]:translate-x-0 dark:border dark:data-[state=unchecked]:border"
+                      />
+                    </Switch.Root>
+
+                    <!-- 设置按钮 -->
+                    <Button.Root
+                      class="rounded px-2 py-1 text-xs transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                      onclick={(e: MouseEvent) => {
+                        e.stopPropagation();
+                        console.log("Settings for", plugin.id);
+                      }}
+                      aria-label="插件设置"
+                    >
+                      <Gear class="h-4 w-4" />
+                    </Button.Root>
+
+                    <!-- 卸载按钮 -->
+                    <Button.Root
+                      class="rounded px-2 py-1 text-xs transition-colors hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                      onclick={(e: MouseEvent) => {
+                        e.stopPropagation();
+                        uninstallPlugin(plugin.id);
+                      }}
+                      aria-label="卸载插件"
+                    >
+                      <Trash class="h-4 w-4" />
+                    </Button.Root>
                   </div>
                 </div>
               </div>

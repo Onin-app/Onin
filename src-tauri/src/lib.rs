@@ -162,6 +162,7 @@ pub fn run() {
             plugin_manager::refresh_plugins,
             plugin_manager::open_plugin_in_window,
             plugin_manager::execute_plugin_entry,
+            plugin_manager::toggle_plugin,
             // 注册 notification 命令
             plugin_api::notification::show_notification,
             plugin_api::command::execute_plugin_command,

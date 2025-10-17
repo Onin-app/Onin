@@ -234,10 +234,15 @@ fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
     match plugin_manager::load_plugins(app.clone(), plugin_store) {
         Ok(plugins) => {
             let mut commands = Vec::new();
-            
+
             for plugin in plugins {
+                // 跳过禁用的插件
+                if !plugin.enabled {
+                    continue;
+                }
+
                 let safe_plugin_id = sanitize_command_name_part(&plugin.manifest.id);
-                
+
                 // 1. 为插件本身创建一个Command（用于打开插件）
                 #[allow(deprecated)]
                 commands.push(Command {
@@ -254,11 +259,12 @@ fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
                     action: CommandAction::Plugin(plugin.manifest.id.clone()),
                     origin: None,
                 });
-                
+
                 // 2. 为每个插件的功能指令创建Command
                 for cmd in &plugin.manifest.commands {
                     let safe_cmd_code = sanitize_command_name_part(&cmd.code);
-                    let keywords: Vec<CommandKeyword> = cmd.keywords
+                    let keywords: Vec<CommandKeyword> = cmd
+                        .keywords
                         .iter()
                         .map(|kw| CommandKeyword {
                             name: kw.name.clone(),
@@ -266,7 +272,7 @@ fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
                             is_default: Some(true),
                         })
                         .collect();
-                    
+
                     commands.push(Command {
                         name: format!("plugin_cmd_{}_{}", safe_plugin_id, safe_cmd_code),
                         title: cmd.name.clone(),
@@ -282,9 +288,9 @@ fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
                     });
                 }
             }
-            
+
             commands
-        },
+        }
         Err(e) => {
             eprintln!("Failed to load plugins as commands: {}", e);
             vec![]
@@ -300,7 +306,7 @@ pub fn get_plugin_commands(
     match plugin_manager::load_plugins(app.clone(), plugin_store) {
         Ok(plugins) => plugins
             .into_iter()
-            .filter(|plugin| !plugin.manifest.commands.is_empty())
+            .filter(|plugin| plugin.enabled && !plugin.manifest.commands.is_empty())
             .map(|plugin| (plugin.manifest.name, plugin.manifest.commands))
             .collect(),
         Err(e) => {
@@ -311,14 +317,12 @@ pub fn get_plugin_commands(
 }
 
 // 获取插件ID到名称的映射
-pub fn get_plugin_id_name_mapping(
-    app: &AppHandle,
-) -> Vec<(String, String)> {
+pub fn get_plugin_id_name_mapping(app: &AppHandle) -> Vec<(String, String)> {
     let plugin_store: tauri::State<plugin_manager::PluginStore> = app.state();
     match plugin_manager::load_plugins(app.clone(), plugin_store) {
         Ok(plugins) => plugins
             .into_iter()
-            .filter(|plugin| !plugin.manifest.commands.is_empty())
+            .filter(|plugin| plugin.enabled && !plugin.manifest.commands.is_empty())
             .map(|plugin| (plugin.manifest.name.clone(), plugin.manifest.id.clone()))
             .collect(),
         Err(e) => {
@@ -336,8 +340,6 @@ pub async fn get_plugin_commands_list(
 }
 
 #[tauri::command]
-pub async fn get_plugin_id_mapping(
-    app: AppHandle,
-) -> Vec<(String, String)> {
+pub async fn get_plugin_id_mapping(app: AppHandle) -> Vec<(String, String)> {
     get_plugin_id_name_mapping(&app)
 }
