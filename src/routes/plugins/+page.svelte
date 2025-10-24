@@ -18,6 +18,8 @@
     Download,
     GithubLogo,
   } from "phosphor-svelte";
+  import PluginSettings from "$lib/components/plugin/PluginSettings.svelte";
+  import type { PluginSettingsSchema } from "$lib/types/plugin-settings";
 
   interface PluginManifest {
     id: string;
@@ -29,22 +31,23 @@
     downloads?: number;
     stars?: number;
     enabled?: boolean;
+    settings?: PluginSettingsSchema;
   }
 
   import { goto } from "$app/navigation";
   import { escapeHandler } from "$lib/stores/escapeHandler";
+  import { listen } from "@tauri-apps/api/event";
 
   let searchQuery = $state("");
   let activeTab = $state("installed");
   let plugins: PluginManifest[] = $state([]);
+  let currentSettingsPlugin: PluginManifest | null = $state(null);
 
   const handleEsc = () => {
     goto("/");
   };
 
-  onMount(async () => {
-    escapeHandler.set(handleEsc);
-
+  async function loadPlugins() {
     try {
       const result = await invoke("load_plugins");
       plugins = (result as PluginManifest[]).map((plugin) => ({
@@ -58,6 +61,40 @@
     } catch (error) {
       console.error("Failed to load plugins via invoke:", error);
     }
+  }
+
+  onMount(async () => {
+    escapeHandler.set(handleEsc);
+    await loadPlugins();
+
+    // Listen for settings schema registration events
+    listen<string>(
+      "plugin-settings-schema-registered",
+      async (event) => {
+        const pluginId = event.payload;
+        console.log("[Plugins Page] Settings schema registered for plugin:", pluginId);
+
+        // Refresh the specific plugin to get updated schema
+        try {
+          const updatedPlugin = await invoke<PluginManifest>(
+            "get_plugin_with_schema",
+            { pluginId },
+          );
+          
+          console.log("[Plugins Page] Updated plugin data:", updatedPlugin);
+          console.log("[Plugins Page] Has settings:", updatedPlugin.settings);
+          console.log("[Plugins Page] Settings fields:", updatedPlugin.settings?.fields);
+          
+          plugins = plugins.map((p) =>
+            p.id === pluginId ? { ...p, ...updatedPlugin } : p,
+          );
+          
+          console.log("[Plugins Page] Plugins list updated");
+        } catch (error) {
+          console.error("[Plugins Page] Failed to refresh plugin schema:", error);
+        }
+      },
+    );
   });
 
   onDestroy(() => {
@@ -159,6 +196,14 @@
     // TODO: 实现插件卸载功能
   };
 
+  const openPluginSettings = (plugin: PluginManifest) => {
+    currentSettingsPlugin = plugin;
+  };
+
+  const closePluginSettings = () => {
+    currentSettingsPlugin = null;
+  };
+
   const filteredPlugins = $derived(
     plugins.filter((plugin) =>
       plugin.name.toLowerCase().includes(searchQuery.toLowerCase()),
@@ -166,26 +211,34 @@
   );
 </script>
 
-<main
-  class="flex h-[100vh] w-full flex-col bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100"
-  data-tauri-drag-region
->
-  <!-- Header -->
-  <div
-    class="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-700"
+{#if currentSettingsPlugin && currentSettingsPlugin.settings}
+  <PluginSettings
+    pluginId={currentSettingsPlugin.id}
+    pluginName={currentSettingsPlugin.name}
+    schema={currentSettingsPlugin.settings}
+    onback={closePluginSettings}
+  />
+{:else}
+  <main
+    class="flex h-[100vh] w-full flex-col bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100"
+    data-tauri-drag-region
   >
-    <div class="flex items-center gap-2">
-      <Button.Root
-        class="rounded p-1.5 hover:bg-neutral-200 dark:hover:bg-neutral-700"
-        onclick={handleBackToSettings}
-        aria-label="返回设置"
-      >
-        <ArrowLeft class="h-5 w-5" />
-      </Button.Root>
-      <h2 class="text-lg font-semibold">插件管理</h2>
-    </div>
+    <!-- Header -->
+    <div
+      class="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-700"
+    >
+      <div class="flex items-center gap-2">
+        <Button.Root
+          class="rounded p-1.5 hover:bg-neutral-200 dark:hover:bg-neutral-700"
+          onclick={handleBackToSettings}
+          aria-label="返回设置"
+        >
+          <ArrowLeft class="h-5 w-5" />
+        </Button.Root>
+        <h2 class="text-lg font-semibold">插件管理</h2>
+      </div>
 
-    <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2">
       <!-- 搜索框 -->
       <div class="relative">
         <MagnifyingGlass
@@ -208,20 +261,20 @@
         刷新
       </Button.Root>
 
-      <!-- 手动导入插件按钮 -->
-      <Button.Root
-        class="inline-flex h-8 items-center justify-center rounded bg-neutral-900 px-3 text-sm font-medium text-white hover:bg-neutral-800 active:scale-[0.98] dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200"
-        onclick={handleImportPlugin}
-      >
-        <Plus class="mr-1.5 h-3.5 w-3.5" />
-        导入插件
-      </Button.Root>
+        <!-- 手动导入插件按钮 -->
+        <Button.Root
+          class="inline-flex h-8 items-center justify-center rounded bg-neutral-900 px-3 text-sm font-medium text-white hover:bg-neutral-800 active:scale-[0.98] dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200"
+          onclick={handleImportPlugin}
+        >
+          <Plus class="mr-1.5 h-3.5 w-3.5" />
+          导入插件
+        </Button.Root>
+      </div>
     </div>
-  </div>
 
-  <!-- Tabs Content -->
-  <div class="flex-1 overflow-hidden px-4 py-3">
-    <Tabs.Root bind:value={activeTab} class="flex h-full flex-col">
+    <!-- Tabs Content -->
+    <div class="flex-1 overflow-hidden px-4 py-3">
+      <Tabs.Root bind:value={activeTab} class="flex h-full flex-col">
       <Tabs.List
         class="mb-3 inline-flex items-center gap-1 border-b border-neutral-200 dark:border-neutral-700"
       >
@@ -329,16 +382,18 @@
                     </Switch.Root>
 
                     <!-- 设置按钮 -->
-                    <Button.Root
-                      class="rounded px-2 py-1 text-xs transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                      onclick={(e: MouseEvent) => {
-                        e.stopPropagation();
-                        console.log("Settings for", plugin.id);
-                      }}
-                      aria-label="插件设置"
-                    >
-                      <Gear class="h-4 w-4" />
-                    </Button.Root>
+                    {#if plugin.settings && plugin.settings.fields.length > 0}
+                      <Button.Root
+                        class="rounded px-2 py-1 text-xs transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                        onclick={(e: MouseEvent) => {
+                          e.stopPropagation();
+                          openPluginSettings(plugin);
+                        }}
+                        aria-label="插件设置"
+                      >
+                        <Gear class="h-4 w-4" />
+                      </Button.Root>
+                    {/if}
 
                     <!-- 卸载按钮 -->
                     <Button.Root
@@ -376,6 +431,7 @@
           <p class="mt-2 text-sm">敬请期待更多精彩插件</p>
         </div>
       </Tabs.Content>
-    </Tabs.Root>
-  </div>
-</main>
+      </Tabs.Root>
+    </div>
+  </main>
+{/if}

@@ -33,7 +33,8 @@
  *   notification, 
  *   dialog, 
  *   clipboard, 
- *   command 
+ *   command,
+ *   settings
  * } from 'baize-plugin-sdk';
  * 
  * // HTTP requests
@@ -68,6 +69,7 @@ import { command } from './api/command';
 import { fs } from './api/fs';
 import { dialog } from './api/dialog';
 import { clipboard } from './api/clipboard';
+import { settings } from './api/settings';
 
 import { invoke, listen } from './core/ipc';
 import { debug } from './utils/debug'
@@ -82,6 +84,7 @@ import type * as Errors from './types/errors';
 import type * as Retry from './utils/retry';
 import type * as Fs from './api/fs';
 import type * as Dialog from './api/dialog';
+import type * as Settings from './api/settings';
 
 /**
  * Contains all available type definitions for the SDK
@@ -120,8 +123,10 @@ const types = {
   Retry: {} as typeof Retry,
   Fs: {} as typeof Fs,
   Dialog: {} as typeof Dialog,
+  Settings: {} as typeof Settings,
 };
 
+// Export all APIs
 export {
   http,
   storage,
@@ -130,6 +135,7 @@ export {
   fs,
   dialog,
   clipboard,
+  settings,
   invoke,
   listen,
   debug,
@@ -137,3 +143,37 @@ export {
   retry,
   types,
 };
+
+// Export commonly used types directly for convenience
+export type {
+  // Settings types
+  SettingField,
+  TextSettingField,
+  PasswordSettingField,
+  TextareaSettingField,
+  NumberSettingField,
+  ColorSettingField,
+  DateSettingField,
+  TimeSettingField,
+  DatetimeSettingField,
+  SliderSettingField,
+  SwitchSettingField,
+  RadioSettingField,
+  SelectSettingField,
+  MultiSelectSettingField,
+  ButtonSettingField,
+  SettingOption,
+  JsonValue,
+  SettingsValues,
+  // Legacy type (deprecated)
+  SettingSchemaDesc,
+} from './api/settings';
+
+// Error types
+export type { PluginError, ErrorCode } from './types/errors';
+
+// File system types
+export type { FileInfo } from './api/fs';
+
+// Dialog types
+export type { DialogFilter, OpenDialogOptions, SaveDialogOptions } from './api/dialog';

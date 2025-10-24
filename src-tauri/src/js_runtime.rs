@@ -51,10 +51,10 @@ async fn op_invoke(
 
     let app_handle = state.borrow().borrow::<AppHandle>().clone();
     let plugin_id = state.borrow().borrow::<String>().clone();
-    
+
     // 设置当前插件ID到线程本地存储
-    crate::plugin_api::storage::set_current_plugin_id(plugin_id);
-    
+    crate::plugin_api::storage::set_current_plugin_id(plugin_id.clone());
+
     let result = match method.as_str() {
         "show_notification" => {
             // 首先，尝试直接从 Value 反序列化
@@ -80,7 +80,9 @@ async fn op_invoke(
             match final_options {
                 Ok(options) => {
                     match plugin_api::notification::show_notification(app_handle, options) {
-                        Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
+                        Ok(_) => InvokeResult::Ok {
+                            value: serde_json::Value::Null,
+                        },
                         Err(e) => InvokeResult::Err { error: e },
                     }
                 }
@@ -101,17 +103,15 @@ async fn op_invoke(
                 arg.clone()
             };
 
-            let options_result = serde_json::from_value::<
-                plugin_api::request::RequestOptions,
-            >(request_options.clone());
+            let options_result = serde_json::from_value::<plugin_api::request::RequestOptions>(
+                request_options.clone(),
+            );
 
             match options_result {
-                Ok(options) => {
-                    match plugin_api::request::make_request(app_handle, options).await {
-                        Ok(response) => InvokeResult::Ok { value: response },
-                        Err(e) => InvokeResult::Err { error: e },
-                    }
-                }
+                Ok(options) => match plugin_api::request::make_request(app_handle, options).await {
+                    Ok(response) => InvokeResult::Ok { value: response },
+                    Err(e) => InvokeResult::Err { error: e },
+                },
                 Err(e) => InvokeResult::Err {
                     error: format!("Invalid argument for plugin_request: {}", e),
                 },
@@ -121,84 +121,145 @@ async fn op_invoke(
         "plugin_storage_set" => {
             let key = match arg.get("key").and_then(|v| v.as_str()) {
                 Some(k) => k.to_string(),
-                None => return InvokeResult::Err { error: "key is required".to_string() },
+                None => {
+                    return InvokeResult::Err {
+                        error: "key is required".to_string(),
+                    }
+                }
             };
             let value = match arg.get("value") {
                 Some(v) => v.clone(),
-                None => return InvokeResult::Err { error: "value is required".to_string() },
+                None => {
+                    return InvokeResult::Err {
+                        error: "value is required".to_string(),
+                    }
+                }
             };
-            
+
             match plugin_api::storage::plugin_storage_set(app_handle, key, value).await {
-                Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
-                Err(e) => InvokeResult::Err { error: format!("Storage error: {:?}", e) },
+                Ok(_) => InvokeResult::Ok {
+                    value: serde_json::Value::Null,
+                },
+                Err(e) => InvokeResult::Err {
+                    error: format!("Storage error: {:?}", e),
+                },
             }
         }
 
         "plugin_storage_get" => {
             let key = match arg.get("key").and_then(|v| v.as_str()) {
                 Some(k) => k.to_string(),
-                None => return InvokeResult::Err { error: "key is required".to_string() },
+                None => {
+                    return InvokeResult::Err {
+                        error: "key is required".to_string(),
+                    }
+                }
             };
-            
+
             match plugin_api::storage::plugin_storage_get(app_handle, key).await {
-                Ok(value) => InvokeResult::Ok { value: value.unwrap_or(serde_json::Value::Null) },
-                Err(e) => InvokeResult::Err { error: format!("Storage error: {:?}", e) },
+                Ok(value) => InvokeResult::Ok {
+                    value: value.unwrap_or(serde_json::Value::Null),
+                },
+                Err(e) => InvokeResult::Err {
+                    error: format!("Storage error: {:?}", e),
+                },
             }
         }
 
         "plugin_storage_remove" => {
             let key = match arg.get("key").and_then(|v| v.as_str()) {
                 Some(k) => k.to_string(),
-                None => return InvokeResult::Err { error: "key is required".to_string() },
+                None => {
+                    return InvokeResult::Err {
+                        error: "key is required".to_string(),
+                    }
+                }
             };
-            
+
             match plugin_api::storage::plugin_storage_remove(app_handle, key).await {
-                Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
-                Err(e) => InvokeResult::Err { error: format!("Storage error: {:?}", e) },
+                Ok(_) => InvokeResult::Ok {
+                    value: serde_json::Value::Null,
+                },
+                Err(e) => InvokeResult::Err {
+                    error: format!("Storage error: {:?}", e),
+                },
             }
         }
 
         "plugin_storage_clear" => {
             match plugin_api::storage::plugin_storage_clear(app_handle).await {
-                Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
-                Err(e) => InvokeResult::Err { error: format!("Storage error: {:?}", e) },
+                Ok(_) => InvokeResult::Ok {
+                    value: serde_json::Value::Null,
+                },
+                Err(e) => InvokeResult::Err {
+                    error: format!("Storage error: {:?}", e),
+                },
             }
         }
 
-        "plugin_storage_keys" => {
-            match plugin_api::storage::plugin_storage_keys(app_handle).await {
-                Ok(keys) => InvokeResult::Ok { value: serde_json::json!(keys) },
-                Err(e) => InvokeResult::Err { error: format!("Storage error: {:?}", e) },
-            }
-        }
+        "plugin_storage_keys" => match plugin_api::storage::plugin_storage_keys(app_handle).await {
+            Ok(keys) => InvokeResult::Ok {
+                value: serde_json::json!(keys),
+            },
+            Err(e) => InvokeResult::Err {
+                error: format!("Storage error: {:?}", e),
+            },
+        },
 
         "plugin_storage_set_items" => {
             let items = match arg.get("items") {
                 Some(items_value) => match items_value.as_object() {
                     Some(obj) => obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
-                    None => return InvokeResult::Err { error: "items must be an object".to_string() },
+                    None => {
+                        return InvokeResult::Err {
+                            error: "items must be an object".to_string(),
+                        }
+                    }
                 },
-                None => return InvokeResult::Err { error: "items is required".to_string() },
+                None => {
+                    return InvokeResult::Err {
+                        error: "items is required".to_string(),
+                    }
+                }
             };
-            
+
             match plugin_api::storage::plugin_storage_set_items(app_handle, items).await {
-                Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
-                Err(e) => InvokeResult::Err { error: format!("Storage error: {:?}", e) },
+                Ok(_) => InvokeResult::Ok {
+                    value: serde_json::Value::Null,
+                },
+                Err(e) => InvokeResult::Err {
+                    error: format!("Storage error: {:?}", e),
+                },
             }
         }
 
         "plugin_storage_get_items" => {
             let keys = match arg.get("keys") {
                 Some(keys_value) => match keys_value.as_array() {
-                    Some(arr) => arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect(),
-                    None => return InvokeResult::Err { error: "keys must be an array".to_string() },
+                    Some(arr) => arr
+                        .iter()
+                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                        .collect(),
+                    None => {
+                        return InvokeResult::Err {
+                            error: "keys must be an array".to_string(),
+                        }
+                    }
                 },
-                None => return InvokeResult::Err { error: "keys is required".to_string() },
+                None => {
+                    return InvokeResult::Err {
+                        error: "keys is required".to_string(),
+                    }
+                }
             };
-            
+
             match plugin_api::storage::plugin_storage_get_items(app_handle, keys).await {
-                Ok(items) => InvokeResult::Ok { value: serde_json::json!(items) },
-                Err(e) => InvokeResult::Err { error: format!("Storage error: {:?}", e) },
+                Ok(items) => InvokeResult::Ok {
+                    value: serde_json::json!(items),
+                },
+                Err(e) => InvokeResult::Err {
+                    error: format!("Storage error: {:?}", e),
+                },
             }
         }
 
@@ -206,148 +267,249 @@ async fn op_invoke(
         "plugin_fs_read_file" => {
             let path = match arg.get("path").and_then(|v| v.as_str()) {
                 Some(p) => p.to_string(),
-                None => return InvokeResult::Err { error: "path is required".to_string() },
+                None => {
+                    return InvokeResult::Err {
+                        error: "path is required".to_string(),
+                    }
+                }
             };
-            
+
             match plugin_api::fs::plugin_fs_read_file(app_handle, path).await {
-                Ok(content) => InvokeResult::Ok { value: serde_json::json!(content) },
-                Err(e) => InvokeResult::Err { error: format!("File system error: {:?}", e) },
+                Ok(content) => InvokeResult::Ok {
+                    value: serde_json::json!(content),
+                },
+                Err(e) => InvokeResult::Err {
+                    error: format!("File system error: {:?}", e),
+                },
             }
         }
 
         "plugin_fs_write_file" => {
             let path = match arg.get("path").and_then(|v| v.as_str()) {
                 Some(p) => p.to_string(),
-                None => return InvokeResult::Err { error: "path is required".to_string() },
+                None => {
+                    return InvokeResult::Err {
+                        error: "path is required".to_string(),
+                    }
+                }
             };
             let content = match arg.get("content").and_then(|v| v.as_str()) {
                 Some(c) => c.to_string(),
-                None => return InvokeResult::Err { error: "content is required".to_string() },
+                None => {
+                    return InvokeResult::Err {
+                        error: "content is required".to_string(),
+                    }
+                }
             };
-            
+
             match plugin_api::fs::plugin_fs_write_file(app_handle, path, content).await {
-                Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
-                Err(e) => InvokeResult::Err { error: format!("File system error: {:?}", e) },
+                Ok(_) => InvokeResult::Ok {
+                    value: serde_json::Value::Null,
+                },
+                Err(e) => InvokeResult::Err {
+                    error: format!("File system error: {:?}", e),
+                },
             }
         }
 
         "plugin_fs_exists" => {
             let path = match arg.get("path").and_then(|v| v.as_str()) {
                 Some(p) => p.to_string(),
-                None => return InvokeResult::Err { error: "path is required".to_string() },
+                None => {
+                    return InvokeResult::Err {
+                        error: "path is required".to_string(),
+                    }
+                }
             };
-            
+
             match plugin_api::fs::plugin_fs_exists(app_handle, path).await {
-                Ok(exists) => InvokeResult::Ok { value: serde_json::json!(exists) },
-                Err(e) => InvokeResult::Err { error: format!("File system error: {:?}", e) },
+                Ok(exists) => InvokeResult::Ok {
+                    value: serde_json::json!(exists),
+                },
+                Err(e) => InvokeResult::Err {
+                    error: format!("File system error: {:?}", e),
+                },
             }
         }
 
         "plugin_fs_create_dir" => {
             let path = match arg.get("path").and_then(|v| v.as_str()) {
                 Some(p) => p.to_string(),
-                None => return InvokeResult::Err { error: "path is required".to_string() },
+                None => {
+                    return InvokeResult::Err {
+                        error: "path is required".to_string(),
+                    }
+                }
             };
-            let recursive = arg.get("recursive").and_then(|v| v.as_bool()).unwrap_or(true);
-            
+            let recursive = arg
+                .get("recursive")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true);
+
             match plugin_api::fs::plugin_fs_create_dir(app_handle, path, recursive).await {
-                Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
-                Err(e) => InvokeResult::Err { error: format!("File system error: {:?}", e) },
+                Ok(_) => InvokeResult::Ok {
+                    value: serde_json::Value::Null,
+                },
+                Err(e) => InvokeResult::Err {
+                    error: format!("File system error: {:?}", e),
+                },
             }
         }
 
         "plugin_fs_list_dir" => {
             let path = match arg.get("path").and_then(|v| v.as_str()) {
                 Some(p) => p.to_string(),
-                None => return InvokeResult::Err { error: "path is required".to_string() },
+                None => {
+                    return InvokeResult::Err {
+                        error: "path is required".to_string(),
+                    }
+                }
             };
-            
+
             match plugin_api::fs::plugin_fs_list_dir(app_handle, path).await {
-                Ok(files) => InvokeResult::Ok { value: serde_json::json!(files) },
-                Err(e) => InvokeResult::Err { error: format!("File system error: {:?}", e) },
+                Ok(files) => InvokeResult::Ok {
+                    value: serde_json::json!(files),
+                },
+                Err(e) => InvokeResult::Err {
+                    error: format!("File system error: {:?}", e),
+                },
             }
         }
 
         "plugin_fs_delete_file" => {
             let path = match arg.get("path").and_then(|v| v.as_str()) {
                 Some(p) => p.to_string(),
-                None => return InvokeResult::Err { error: "path is required".to_string() },
+                None => {
+                    return InvokeResult::Err {
+                        error: "path is required".to_string(),
+                    }
+                }
             };
-            
+
             match plugin_api::fs::plugin_fs_delete_file(app_handle, path).await {
-                Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
-                Err(e) => InvokeResult::Err { error: format!("File system error: {:?}", e) },
+                Ok(_) => InvokeResult::Ok {
+                    value: serde_json::Value::Null,
+                },
+                Err(e) => InvokeResult::Err {
+                    error: format!("File system error: {:?}", e),
+                },
             }
         }
 
         "plugin_fs_delete_dir" => {
             let path = match arg.get("path").and_then(|v| v.as_str()) {
                 Some(p) => p.to_string(),
-                None => return InvokeResult::Err { error: "path is required".to_string() },
+                None => {
+                    return InvokeResult::Err {
+                        error: "path is required".to_string(),
+                    }
+                }
             };
-            let recursive = arg.get("recursive").and_then(|v| v.as_bool()).unwrap_or(false);
-            
+            let recursive = arg
+                .get("recursive")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+
             match plugin_api::fs::plugin_fs_delete_dir(app_handle, path, recursive).await {
-                Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
-                Err(e) => InvokeResult::Err { error: format!("File system error: {:?}", e) },
+                Ok(_) => InvokeResult::Ok {
+                    value: serde_json::Value::Null,
+                },
+                Err(e) => InvokeResult::Err {
+                    error: format!("File system error: {:?}", e),
+                },
             }
         }
 
         "plugin_fs_get_file_info" => {
             let path = match arg.get("path").and_then(|v| v.as_str()) {
                 Some(p) => p.to_string(),
-                None => return InvokeResult::Err { error: "path is required".to_string() },
+                None => {
+                    return InvokeResult::Err {
+                        error: "path is required".to_string(),
+                    }
+                }
             };
-            
+
             match plugin_api::fs::plugin_fs_get_file_info(app_handle, path).await {
-                Ok(info) => InvokeResult::Ok { value: serde_json::json!(info) },
-                Err(e) => InvokeResult::Err { error: format!("File system error: {:?}", e) },
+                Ok(info) => InvokeResult::Ok {
+                    value: serde_json::json!(info),
+                },
+                Err(e) => InvokeResult::Err {
+                    error: format!("File system error: {:?}", e),
+                },
             }
         }
 
         "plugin_fs_copy_file" => {
             let source_path = match arg.get("sourcePath").and_then(|v| v.as_str()) {
                 Some(p) => p.to_string(),
-                None => return InvokeResult::Err { error: "sourcePath is required".to_string() },
+                None => {
+                    return InvokeResult::Err {
+                        error: "sourcePath is required".to_string(),
+                    }
+                }
             };
             let dest_path = match arg.get("destPath").and_then(|v| v.as_str()) {
                 Some(p) => p.to_string(),
-                None => return InvokeResult::Err { error: "destPath is required".to_string() },
+                None => {
+                    return InvokeResult::Err {
+                        error: "destPath is required".to_string(),
+                    }
+                }
             };
-            
+
             match plugin_api::fs::plugin_fs_copy_file(app_handle, source_path, dest_path).await {
-                Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
-                Err(e) => InvokeResult::Err { error: format!("File system error: {:?}", e) },
+                Ok(_) => InvokeResult::Ok {
+                    value: serde_json::Value::Null,
+                },
+                Err(e) => InvokeResult::Err {
+                    error: format!("File system error: {:?}", e),
+                },
             }
         }
 
         "plugin_fs_move_file" => {
             let source_path = match arg.get("sourcePath").and_then(|v| v.as_str()) {
                 Some(p) => p.to_string(),
-                None => return InvokeResult::Err { error: "sourcePath is required".to_string() },
+                None => {
+                    return InvokeResult::Err {
+                        error: "sourcePath is required".to_string(),
+                    }
+                }
             };
             let dest_path = match arg.get("destPath").and_then(|v| v.as_str()) {
                 Some(p) => p.to_string(),
-                None => return InvokeResult::Err { error: "destPath is required".to_string() },
+                None => {
+                    return InvokeResult::Err {
+                        error: "destPath is required".to_string(),
+                    }
+                }
             };
-            
+
             match plugin_api::fs::plugin_fs_move_file(app_handle, source_path, dest_path).await {
-                Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
-                Err(e) => InvokeResult::Err { error: format!("File system error: {:?}", e) },
+                Ok(_) => InvokeResult::Ok {
+                    value: serde_json::Value::Null,
+                },
+                Err(e) => InvokeResult::Err {
+                    error: format!("File system error: {:?}", e),
+                },
             }
         }
 
-                // Dialog API
+        // Dialog API
         "plugin_dialog_message" => {
-            let options_result = serde_json::from_value::<
-                plugin_api::dialog::MessageDialogOptions,
-            >(arg.clone());
-            
+            let options_result =
+                serde_json::from_value::<plugin_api::dialog::MessageDialogOptions>(arg.clone());
+
             match options_result {
                 Ok(options) => {
                     match plugin_api::dialog::plugin_dialog_message(app_handle, options).await {
-                        Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
-                        Err(e) => InvokeResult::Err { error: format!("Dialog error: {:?}", e) },
+                        Ok(_) => InvokeResult::Ok {
+                            value: serde_json::Value::Null,
+                        },
+                        Err(e) => InvokeResult::Err {
+                            error: format!("Dialog error: {:?}", e),
+                        },
                     }
                 }
                 Err(e) => InvokeResult::Err {
@@ -357,15 +519,18 @@ async fn op_invoke(
         }
 
         "plugin_dialog_confirm" => {
-            let options_result = serde_json::from_value::<
-                plugin_api::dialog::ConfirmDialogOptions,
-            >(arg.clone());
-            
+            let options_result =
+                serde_json::from_value::<plugin_api::dialog::ConfirmDialogOptions>(arg.clone());
+
             match options_result {
                 Ok(options) => {
                     match plugin_api::dialog::plugin_dialog_confirm(app_handle, options).await {
-                        Ok(result) => InvokeResult::Ok { value: serde_json::json!(result) },
-                        Err(e) => InvokeResult::Err { error: format!("Dialog error: {:?}", e) },
+                        Ok(result) => InvokeResult::Ok {
+                            value: serde_json::json!(result),
+                        },
+                        Err(e) => InvokeResult::Err {
+                            error: format!("Dialog error: {:?}", e),
+                        },
                     }
                 }
                 Err(e) => InvokeResult::Err {
@@ -375,15 +540,18 @@ async fn op_invoke(
         }
 
         "plugin_dialog_open" => {
-            let options_result = serde_json::from_value::<
-                plugin_api::dialog::OpenDialogOptions,
-            >(arg.clone());
-            
+            let options_result =
+                serde_json::from_value::<plugin_api::dialog::OpenDialogOptions>(arg.clone());
+
             match options_result {
                 Ok(options) => {
                     match plugin_api::dialog::plugin_dialog_open(app_handle, options).await {
-                        Ok(result) => InvokeResult::Ok { value: result.unwrap_or(serde_json::Value::Null) },
-                        Err(e) => InvokeResult::Err { error: format!("Dialog error: {:?}", e) },
+                        Ok(result) => InvokeResult::Ok {
+                            value: result.unwrap_or(serde_json::Value::Null),
+                        },
+                        Err(e) => InvokeResult::Err {
+                            error: format!("Dialog error: {:?}", e),
+                        },
                     }
                 }
                 Err(e) => InvokeResult::Err {
@@ -393,15 +561,20 @@ async fn op_invoke(
         }
 
         "plugin_dialog_save" => {
-            let options_result = serde_json::from_value::<
-                plugin_api::dialog::SaveDialogOptions,
-            >(arg.clone());
-            
+            let options_result =
+                serde_json::from_value::<plugin_api::dialog::SaveDialogOptions>(arg.clone());
+
             match options_result {
                 Ok(options) => {
                     match plugin_api::dialog::plugin_dialog_save(app_handle, options).await {
-                        Ok(result) => InvokeResult::Ok { value: result.map(serde_json::Value::String).unwrap_or(serde_json::Value::Null) },
-                        Err(e) => InvokeResult::Err { error: format!("Dialog error: {:?}", e) },
+                        Ok(result) => InvokeResult::Ok {
+                            value: result
+                                .map(serde_json::Value::String)
+                                .unwrap_or(serde_json::Value::Null),
+                        },
+                        Err(e) => InvokeResult::Err {
+                            error: format!("Dialog error: {:?}", e),
+                        },
                     }
                 }
                 Err(e) => InvokeResult::Err {
@@ -413,21 +586,32 @@ async fn op_invoke(
         // Clipboard API
         "plugin_clipboard_read_text" => {
             match plugin_api::clipboard::plugin_clipboard_read_text(app_handle).await {
-                Ok(text) => InvokeResult::Ok { value: text.map(serde_json::Value::String).unwrap_or(serde_json::Value::Null) },
-                Err(e) => InvokeResult::Err { error: format!("Clipboard error: {:?}", e) },
+                Ok(text) => InvokeResult::Ok {
+                    value: text
+                        .map(serde_json::Value::String)
+                        .unwrap_or(serde_json::Value::Null),
+                },
+                Err(e) => InvokeResult::Err {
+                    error: format!("Clipboard error: {:?}", e),
+                },
             }
         }
 
         "plugin_clipboard_write_text" => {
-            let options_result = serde_json::from_value::<
-                plugin_api::clipboard::WriteTextOptions,
-            >(arg.clone());
-            
+            let options_result =
+                serde_json::from_value::<plugin_api::clipboard::WriteTextOptions>(arg.clone());
+
             match options_result {
                 Ok(options) => {
-                    match plugin_api::clipboard::plugin_clipboard_write_text(app_handle, options).await {
-                        Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
-                        Err(e) => InvokeResult::Err { error: format!("Clipboard error: {:?}", e) },
+                    match plugin_api::clipboard::plugin_clipboard_write_text(app_handle, options)
+                        .await
+                    {
+                        Ok(_) => InvokeResult::Ok {
+                            value: serde_json::Value::Null,
+                        },
+                        Err(e) => InvokeResult::Err {
+                            error: format!("Clipboard error: {:?}", e),
+                        },
                     }
                 }
                 Err(e) => InvokeResult::Err {
@@ -438,21 +622,32 @@ async fn op_invoke(
 
         "plugin_clipboard_read_image" => {
             match plugin_api::clipboard::plugin_clipboard_read_image(app_handle).await {
-                Ok(image) => InvokeResult::Ok { value: image.map(serde_json::Value::String).unwrap_or(serde_json::Value::Null) },
-                Err(e) => InvokeResult::Err { error: format!("Clipboard error: {:?}", e) },
+                Ok(image) => InvokeResult::Ok {
+                    value: image
+                        .map(serde_json::Value::String)
+                        .unwrap_or(serde_json::Value::Null),
+                },
+                Err(e) => InvokeResult::Err {
+                    error: format!("Clipboard error: {:?}", e),
+                },
             }
         }
 
         "plugin_clipboard_write_image" => {
-            let options_result = serde_json::from_value::<
-                plugin_api::clipboard::WriteImageOptions,
-            >(arg.clone());
-            
+            let options_result =
+                serde_json::from_value::<plugin_api::clipboard::WriteImageOptions>(arg.clone());
+
             match options_result {
                 Ok(options) => {
-                    match plugin_api::clipboard::plugin_clipboard_write_image(app_handle, options).await {
-                        Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
-                        Err(e) => InvokeResult::Err { error: format!("Clipboard error: {:?}", e) },
+                    match plugin_api::clipboard::plugin_clipboard_write_image(app_handle, options)
+                        .await
+                    {
+                        Ok(_) => InvokeResult::Ok {
+                            value: serde_json::Value::Null,
+                        },
+                        Err(e) => InvokeResult::Err {
+                            error: format!("Clipboard error: {:?}", e),
+                        },
                     }
                 }
                 Err(e) => InvokeResult::Err {
@@ -463,8 +658,74 @@ async fn op_invoke(
 
         "plugin_clipboard_clear" => {
             match plugin_api::clipboard::plugin_clipboard_clear(app_handle).await {
-                Ok(_) => InvokeResult::Ok { value: serde_json::Value::Null },
-                Err(e) => InvokeResult::Err { error: format!("Clipboard error: {:?}", e) },
+                Ok(_) => InvokeResult::Ok {
+                    value: serde_json::Value::Null,
+                },
+                Err(e) => InvokeResult::Err {
+                    error: format!("Clipboard error: {:?}", e),
+                },
+            }
+        }
+
+        "register_plugin_settings_schema" => {
+            println!("[js_runtime] Handling register_plugin_settings_schema");
+
+            // 从 arg 中提取 pluginId 和 schema
+            let plugin_id_from_arg = match arg.get("pluginId").and_then(|v| v.as_str()) {
+                Some(id) => id.to_string(),
+                None => {
+                    return InvokeResult::Err {
+                        error: "Missing pluginId in register_plugin_settings_schema".to_string(),
+                    };
+                }
+            };
+
+            // 🔒 安全检查：验证插件只能注册自己的设置
+            if plugin_id_from_arg != plugin_id {
+                eprintln!(
+                    "[js_runtime] Security violation: Plugin '{}' attempted to register settings for plugin '{}'",
+                    plugin_id, plugin_id_from_arg
+                );
+                return InvokeResult::Err {
+                    error: format!(
+                        "Permission denied: Plugin can only register its own settings (expected: {}, got: {})",
+                        plugin_id, plugin_id_from_arg
+                    ),
+                };
+            }
+
+            let schema_value = match arg.get("schema") {
+                Some(s) => s.clone(),
+                None => {
+                    return InvokeResult::Err {
+                        error: "Missing schema in register_plugin_settings_schema".to_string(),
+                    };
+                }
+            };
+
+            // 反序列化 schema
+            let schema: crate::plugin_manager::PluginSettingsSchema =
+                match serde_json::from_value(schema_value) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        return InvokeResult::Err {
+                            error: format!("Failed to deserialize schema: {}", e),
+                        };
+                    }
+                };
+
+            // 调用 plugin_manager 的函数
+            let store = app_handle.state::<crate::plugin_manager::PluginStore>();
+            match crate::plugin_manager::register_plugin_settings_schema(
+                app_handle.clone(),
+                store,
+                plugin_id_from_arg,
+                schema,
+            ) {
+                Ok(_) => InvokeResult::Ok {
+                    value: serde_json::Value::Null,
+                },
+                Err(e) => InvokeResult::Err { error: e },
             }
         }
 
@@ -472,10 +733,10 @@ async fn op_invoke(
             error: "unknown method".to_string(),
         },
     };
-    
+
     // 清除当前插件ID
     crate::plugin_api::storage::clear_current_plugin_id();
-    
+
     result
 }
 
@@ -497,7 +758,10 @@ pub fn create_runtime(app_handle: &AppHandle) -> Result<JsRuntime, String> {
     create_runtime_with_plugin_id(app_handle, "")
 }
 
-pub fn create_runtime_with_plugin_id(app_handle: &AppHandle, plugin_id: &str) -> Result<JsRuntime, String> {
+pub fn create_runtime_with_plugin_id(
+    app_handle: &AppHandle,
+    plugin_id: &str,
+) -> Result<JsRuntime, String> {
     let ext = baize_plugin_api::init(app_handle.clone(), plugin_id.to_string());
 
     let mut runtime = JsRuntime::new(RuntimeOptions {
@@ -640,7 +904,10 @@ impl PluginRuntimeManager {
     ) -> Result<(), String> {
         // 如果插件已经存在，先清除它（支持热重载）
         if runtimes.contains_key(plugin_id) {
-            println!("[Plugin] Clearing existing runtime for plugin: {}", plugin_id);
+            println!(
+                "[Plugin] Clearing existing runtime for plugin: {}",
+                plugin_id
+            );
             runtimes.remove(plugin_id);
         }
 
@@ -675,9 +942,7 @@ impl PluginRuntimeManager {
         Ok(())
     }
 
-    fn handle_clear_all_plugins(
-        runtimes: &mut HashMap<String, JsRuntime>,
-    ) -> Result<(), String> {
+    fn handle_clear_all_plugins(runtimes: &mut HashMap<String, JsRuntime>) -> Result<(), String> {
         let count = runtimes.len();
         runtimes.clear();
         println!("[Plugin] Cleared all {} plugin runtimes", count);
@@ -822,12 +1087,31 @@ pub async fn clear_all_plugin_runtimes() -> Result<(), String> {
     manager.clear_all_plugins().await
 }
 
-pub async fn execute_js(app_handle: &AppHandle, js_code: &str) -> Result<(), String> {
+pub async fn execute_js(
+    app_handle: &AppHandle,
+    js_code: &str,
+    plugin_id: Option<&str>,
+) -> Result<(), String> {
     let mut runtime = create_runtime(app_handle)?;
 
+    // 如果提供了 plugin_id，注入到全局上下文
+    if let Some(id) = plugin_id {
+        println!("[js_runtime] Injecting plugin ID: {}", id);
+        let inject_code = format!("globalThis.__PLUGIN_ID__ = '{}';", id);
+        runtime
+            .execute_script("<inject_plugin_id>", inject_code)
+            .map_err(|e| format!("Failed to inject plugin ID: {}", e))?;
+        println!("[js_runtime] Plugin ID injected successfully");
+    }
+
+    // 将代码包装为异步 IIFE，支持顶层 await
+    let wrapped_code = format!(
+        "(async () => {{\n{}\n}})().catch(err => console.error('Plugin error:', err));",
+        js_code
+    );
+
     // 执行插件代码
-    let js_code_owned = js_code.to_string();
-    let result = runtime.execute_script("<plugin>", js_code_owned);
+    let result = runtime.execute_script("<plugin>", wrapped_code);
     match result {
         Ok(_) => runtime
             .run_event_loop(PollEventLoopOptions::default())

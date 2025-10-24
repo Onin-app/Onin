@@ -163,6 +163,10 @@ pub fn run() {
             plugin_manager::open_plugin_in_window,
             plugin_manager::execute_plugin_entry,
             plugin_manager::toggle_plugin,
+            plugin_manager::register_plugin_settings_schema,
+            plugin_manager::get_plugin_settings,
+            plugin_manager::save_plugin_settings,
+            plugin_manager::get_plugin_with_schema,
             // 注册 notification 命令
             plugin_api::notification::show_notification,
             plugin_api::command::execute_plugin_command,
