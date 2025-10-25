@@ -47,9 +47,11 @@
     goto("/");
   };
 
-  async function loadPlugins() {
+  async function loadPlugins(forceReload = false) {
     try {
-      const result = await invoke("load_plugins");
+      // 使用 get_loaded_plugins 而不是 load_plugins，避免重复初始化
+      const command = forceReload ? "load_plugins" : "get_loaded_plugins";
+      const result = await invoke(command);
       plugins = (result as PluginManifest[]).map((plugin) => ({
         ...plugin,
         // Mock 数据
@@ -65,7 +67,8 @@
 
   onMount(async () => {
     escapeHandler.set(handleEsc);
-    await loadPlugins();
+    // 只获取已加载的插件，不重新初始化
+    await loadPlugins(false);
 
     // Listen for settings schema registration events
     listen<string>(
@@ -110,6 +113,7 @@
   const handleRefreshPlugins = async () => {
     try {
       console.log("正在刷新插件...");
+      // 使用 refresh_plugins 重新加载和初始化所有插件
       const result = await invoke("refresh_plugins");
       plugins = (result as PluginManifest[]).map((plugin) => ({
         ...plugin,

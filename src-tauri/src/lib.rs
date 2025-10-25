@@ -63,7 +63,7 @@ pub fn run() {
             }
         });
     }
-    
+
     #[cfg(target_os = "macos")]
     {
         eprintln!("[INFO] rdev listener disabled on macOS to prevent crashes");
@@ -73,7 +73,9 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(plugin_manager::PluginStore(Default::default()))
-        .manage(plugin_api::command::CommandExecutionStore(Default::default()))
+        .manage(plugin_api::command::CommandExecutionStore(
+            Default::default(),
+        ))
         .manage(plugin_api::command::PluginLoadedState(Default::default()))
         .register_uri_scheme_protocol("plugin", plugin_manager::handle_plugin_protocol)
         .plugin(tauri_plugin_dialog::init())
@@ -108,15 +110,15 @@ pub fn run() {
                         if event.state() != ShortcutState::Pressed {
                             return;
                         }
-                        
+
                         // 安全的快捷键处理逻辑
                         println!("Shortcut event: {:?}, state: {:?}", shortcut, event.state());
-                        
+
                         // 使用 try-catch 包装快捷键处理，防止崩溃
                         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                             shortcut_manager::handle_global_shortcut(app, shortcut, event.state());
                         }));
-                        
+
                         if let Err(e) = result {
                             eprintln!("Error in shortcut handler: {:?}", e);
                         }
@@ -159,6 +161,7 @@ pub fn run() {
             system_commands::get_basic_commands,
             // 注册插件相关命令
             plugin_manager::load_plugins,
+            plugin_manager::get_loaded_plugins,
             plugin_manager::refresh_plugins,
             plugin_manager::open_plugin_in_window,
             plugin_manager::execute_plugin_entry,

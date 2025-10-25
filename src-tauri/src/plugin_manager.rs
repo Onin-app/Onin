@@ -362,6 +362,13 @@ pub fn load_plugins(
 }
 
 #[tauri::command]
+pub fn get_loaded_plugins(store: State<PluginStore>) -> Result<Vec<LoadedPlugin>, String> {
+    let store_lock = store.0.lock().unwrap();
+    let plugins = store_lock.values().cloned().collect();
+    Ok(plugins)
+}
+
+#[tauri::command]
 pub async fn refresh_plugins(
     app: tauri::AppHandle,
     store: State<'_, PluginStore>,
