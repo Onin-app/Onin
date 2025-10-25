@@ -265,6 +265,8 @@ fn load_plugins_internal(
         println!("[plugin_manager] Cleared existing plugins from store.");
     }
 
+    let mut plugins_to_init = Vec::new();
+
     for entry in std::fs::read_dir(plugins_dir).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
         let path = entry.path();
@@ -283,7 +285,7 @@ fn load_plugins_internal(
 
                 let loaded_plugin = LoadedPlugin {
                     manifest: manifest.clone(),
-                    dir_name,
+                    dir_name: dir_name.clone(),
                     enabled,
                     settings: None, // Settings will be registered dynamically via JavaScript
                 };
@@ -292,6 +294,21 @@ fn load_plugins_internal(
                     "[plugin_manager] Loaded plugin: {} from {} (enabled: {})",
                     manifest.name, loaded_plugin.dir_name, enabled
                 );
+                
+                // 自动执行 entry 文件进行初始化（如果是 .js 文件）
+                let entry_path = path.join(&manifest.entry);
+                if entry_path.is_file() {
+                    if let Some(extension) = Path::new(&manifest.entry)
+                        .extension()
+                        .and_then(|s| s.to_str())
+                    {
+                        if extension == "js" {
+                            // JS 文件自动执行以注册设置和命令
+                            plugins_to_init.push((manifest.id.clone(), entry_path, dir_name.clone()));
+                        }
+                    }
+                }
+                
                 store_lock.insert(manifest.id.clone(), loaded_plugin);
             }
         }
@@ -299,6 +316,40 @@ fn load_plugins_internal(
 
     let plugins = store_lock.values().cloned().collect();
     println!("[plugin_manager] Loaded {} plugins.", store_lock.len());
+    
+    // 释放锁后执行初始化脚本
+    drop(store_lock);
+    
+    // 执行所有插件的初始化脚本
+    if !plugins_to_init.is_empty() {
+        println!("[plugin_manager] Initializing {} plugins", plugins_to_init.len());
+        let app_clone = app.clone();
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+
+            rt.block_on(async {
+                for (plugin_id, entry_path, _dir_name) in plugins_to_init {
+                    println!("[plugin_manager] Initializing plugin: {}", plugin_id);
+                    match std::fs::read_to_string(&entry_path) {
+                        Ok(js_code) => {
+                            if let Err(e) = js_runtime::execute_js(&app_clone, &js_code, Some(&plugin_id)).await {
+                                eprintln!("[plugin_manager] Failed to initialize plugin {}: {}", plugin_id, e);
+                            } else {
+                                println!("[plugin_manager] Successfully initialized plugin {}", plugin_id);
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("[plugin_manager] Failed to read entry file for {}: {}", plugin_id, e);
+                        }
+                    }
+                }
+            });
+        });
+    }
+    
     Ok(plugins)
 }
 

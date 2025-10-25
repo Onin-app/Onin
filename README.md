@@ -55,43 +55,94 @@ pnpm tauri build
 
 Baize 支持两种类型的插件：
 
+### 插件生命周期
+
+插件的 entry 文件（.js）在加载时自动执行，可以使用生命周期 API 注册设置和命令：
+
+```json
+{
+  "id": "com.example.myplugin",
+  "name": "我的插件",
+  "entry": "index.js"
+}
+```
+
+**index.js** - 在插件加载时自动执行（类似 Vue 的 onMounted）：
+```javascript
+import { lifecycle, settings, command } from 'baize-plugin-sdk';
+
+// 🎯 使用 lifecycle.onLoad() 注册初始化逻辑
+lifecycle.onLoad(async () => {
+  // 注册设置（无需用户执行插件即可显示设置按钮）
+  await settings.useSettingsSchema([
+    {
+      key: 'apiKey',
+      label: 'API 密钥',
+      type: 'password',
+      required: true
+    }
+  ]);
+
+  // 注册命令处理器
+  command.register(async (cmd, args) => {
+    if (cmd === 'get-status') {
+      return { status: 'ready' };
+    }
+  });
+});
+
+// 执行所有 onLoad 回调
+await lifecycle._executeLoadCallbacks();
+```
+
 ### Headless 插件
 
 适合纯逻辑处理，无需 UI 界面的场景。
 
-```typescript
-import baize from '@baize/plugin-sdk';
+```javascript
+// index.js
+import { lifecycle, command, notification } from 'baize-plugin-sdk';
 
-// 注册命令处理器
-baize.registerCommandHandler(async (command, args) => {
-  switch (command) {
-    case 'hello':
-      return `Hello, ${args?.name || 'World'}!`;
-    default:
-      throw new Error(`Unknown command: ${command}`);
-  }
+lifecycle.onLoad(async () => {
+  command.register(async (cmd, args) => {
+    if (cmd === 'hello') {
+      await notification.show({
+        title: 'Hello',
+        body: `Hello, ${args?.name || 'World'}!`
+      });
+    }
+  });
 });
+
+// onLoad 回调会自动执行
 ```
 
-### Webview 插件
+### UI 插件
 
 适合需要复杂 UI 交互的场景。
 
 ```html
+<!-- index.html -->
 <!DOCTYPE html>
 <html>
 <head>
-    <script type="module">
-        import baize from '@baize/plugin-sdk';
-        
-        await baize.registerCommandHandler(async (command, args) => {
-            // 处理命令逻辑
-            return 'Command executed';
-        });
-    </script>
+  <title>My Plugin</title>
 </head>
 <body>
-    <h1>My Plugin</h1>
+  <h1>My Plugin</h1>
+  <button onclick="doSomething()">执行操作</button>
+  
+  <script type="module">
+    import { settings, notification } from 'baize-plugin-sdk';
+    
+    window.doSomething = async () => {
+      const config = await settings.getAll();
+      await notification.show({
+        title: 'Success',
+        body: 'Operation completed!'
+      });
+    };
+  </script>
 </body>
 </html>
 ```
@@ -105,7 +156,6 @@ baize.registerCommandHandler(async (command, args) => {
   "version": "1.0.0",
   "description": "示例插件",
   "entry": "index.js",
-  "type": "headless",
   "commands": [
     {
       "code": "hello",
@@ -132,7 +182,10 @@ baize.registerCommandHandler(async (command, args) => {
 }
 ```
 
-更多插件开发文档请参考 [PLUGIN_COMMAND_USAGE.md](./PLUGIN_COMMAND_USAGE.md)
+更多插件开发文档：
+- [插件生命周期系统](./PLUGIN_LIFECYCLE.md)
+- [插件命令使用](./PLUGIN_COMMAND_USAGE.md)
+- [插件 SDK 文档](./plugins-sdk/README.md)
 
 ## 项目结构
 

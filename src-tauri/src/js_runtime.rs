@@ -1092,23 +1092,23 @@ pub async fn execute_js(
     js_code: &str,
     plugin_id: Option<&str>,
 ) -> Result<(), String> {
-    let mut runtime = create_runtime(app_handle)?;
-
-    // 如果提供了 plugin_id，注入到全局上下文
-    if let Some(id) = plugin_id {
-        println!("[js_runtime] Injecting plugin ID: {}", id);
-        let inject_code = format!("globalThis.__PLUGIN_ID__ = '{}';", id);
-        runtime
-            .execute_script("<inject_plugin_id>", inject_code)
-            .map_err(|e| format!("Failed to inject plugin ID: {}", e))?;
-        println!("[js_runtime] Plugin ID injected successfully");
-    }
+    // 使用 plugin_id 创建运行时，这样 OpState 中就有正确的 plugin_id
+    let plugin_id_str = plugin_id.unwrap_or("");
+    let mut runtime = create_runtime_with_plugin_id(app_handle, plugin_id_str)?;
 
     // 将代码包装为异步 IIFE，支持顶层 await
-    let wrapped_code = format!(
-        "(async () => {{\n{}\n}})().catch(err => console.error('Plugin error:', err));",
-        js_code
-    );
+    // 如果提供了 plugin_id，在包装代码内部注入
+    let wrapped_code = if let Some(id) = plugin_id {
+        format!(
+            "(async () => {{\n  globalThis.__PLUGIN_ID__ = '{}';\n{}\n}})().catch(err => console.error('Plugin error:', err));",
+            id, js_code
+        )
+    } else {
+        format!(
+            "(async () => {{\n{}\n}})().catch(err => console.error('Plugin error:', err));",
+            js_code
+        )
+    };
 
     // 执行插件代码
     let result = runtime.execute_script("<plugin>", wrapped_code);

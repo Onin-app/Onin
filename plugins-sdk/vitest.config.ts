@@ -4,20 +4,12 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    setupFiles: ['tests/setup.ts'],
-    include: ['tests/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+    include: ['src/**/*.test.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      exclude: [
-        'node_modules/',
-        'dist/',
-        'examples/',
-        'tests/',
-        '**/*.d.ts',
-        'vite.config.ts',
-        'vitest.config.ts'
-      ]
-    }
-  }
+      include: ['src/**/*.ts'],
+      exclude: ['src/**/*.test.ts', 'src/**/__tests__/**'],
+    },
+  },
 });

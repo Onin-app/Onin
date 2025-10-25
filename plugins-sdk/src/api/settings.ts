@@ -251,7 +251,8 @@ async function useSettingsSchema(schema: SettingField[]): Promise<void> {
     if (error && typeof error === 'object' && error !== null && 'name' in error && error.name === 'PluginError') {
       throw error;
     }
-    throw createError.common.unknown(`Failed to register settings schema: ${error}`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw createError.common.unknown(`Failed to register settings schema: ${errorMessage}`);
   }
 }
 
