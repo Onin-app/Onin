@@ -237,6 +237,77 @@ fn save_plugin_states(
     Ok(())
 }
 
+// 获取系统保护路径（使用系统 API 动态获取）
+fn get_system_protected_paths() -> Vec<std::path::PathBuf> {
+    let mut paths = Vec::new();
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::env;
+
+        // 获取 Windows 系统目录
+        if let Ok(windows_dir) = env::var("SystemRoot") {
+            paths.push(std::path::PathBuf::from(windows_dir));
+        }
+
+        // 获取 Program Files 目录
+        if let Ok(program_files) = env::var("ProgramFiles") {
+            paths.push(std::path::PathBuf::from(program_files));
+        }
+
+        // 获取 Program Files (x86) 目录
+        if let Ok(program_files_x86) = env::var("ProgramFiles(x86)") {
+            paths.push(std::path::PathBuf::from(program_files_x86));
+        }
+
+        // 获取 System32 目录
+        if let Ok(system_root) = env::var("SystemRoot") {
+            paths.push(std::path::PathBuf::from(system_root).join("System32"));
+        }
+
+        // 获取 Windows 驱动目录
+        if let Ok(system_root) = env::var("SystemRoot") {
+            paths.push(std::path::PathBuf::from(system_root).join("SysWOW64"));
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        // macOS 系统目录
+        paths.push(std::path::PathBuf::from("/System"));
+        paths.push(std::path::PathBuf::from("/Library"));
+        paths.push(std::path::PathBuf::from("/Applications"));
+        paths.push(std::path::PathBuf::from("/usr"));
+        paths.push(std::path::PathBuf::from("/bin"));
+        paths.push(std::path::PathBuf::from("/sbin"));
+        paths.push(std::path::PathBuf::from("/var"));
+        paths.push(std::path::PathBuf::from("/private"));
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        // Linux 系统目录
+        paths.push(std::path::PathBuf::from("/usr"));
+        paths.push(std::path::PathBuf::from("/bin"));
+        paths.push(std::path::PathBuf::from("/sbin"));
+        paths.push(std::path::PathBuf::from("/lib"));
+        paths.push(std::path::PathBuf::from("/lib64"));
+        paths.push(std::path::PathBuf::from("/boot"));
+        paths.push(std::path::PathBuf::from("/sys"));
+        paths.push(std::path::PathBuf::from("/proc"));
+        paths.push(std::path::PathBuf::from("/dev"));
+        paths.push(std::path::PathBuf::from("/etc"));
+        paths.push(std::path::PathBuf::from("/var"));
+        paths.push(std::path::PathBuf::from("/root"));
+    }
+
+    // 规范化所有路径（如果可能）
+    paths
+        .into_iter()
+        .filter_map(|p| p.canonicalize().ok())
+        .collect()
+}
+
 fn load_plugins_internal(
     app: &tauri::AppHandle,
     store: &State<PluginStore>,
@@ -294,7 +365,7 @@ fn load_plugins_internal(
                     "[plugin_manager] Loaded plugin: {} from {} (enabled: {})",
                     manifest.name, loaded_plugin.dir_name, enabled
                 );
-                
+
                 // 自动执行 entry 文件进行初始化（如果是 .js 文件）
                 let entry_path = path.join(&manifest.entry);
                 if entry_path.is_file() {
@@ -304,11 +375,15 @@ fn load_plugins_internal(
                     {
                         if extension == "js" {
                             // JS 文件自动执行以注册设置和命令
-                            plugins_to_init.push((manifest.id.clone(), entry_path, dir_name.clone()));
+                            plugins_to_init.push((
+                                manifest.id.clone(),
+                                entry_path,
+                                dir_name.clone(),
+                            ));
                         }
                     }
                 }
-                
+
                 store_lock.insert(manifest.id.clone(), loaded_plugin);
             }
         }
@@ -316,13 +391,16 @@ fn load_plugins_internal(
 
     let plugins = store_lock.values().cloned().collect();
     println!("[plugin_manager] Loaded {} plugins.", store_lock.len());
-    
+
     // 释放锁后执行初始化脚本
     drop(store_lock);
-    
+
     // 执行所有插件的初始化脚本
     if !plugins_to_init.is_empty() {
-        println!("[plugin_manager] Initializing {} plugins", plugins_to_init.len());
+        println!(
+            "[plugin_manager] Initializing {} plugins",
+            plugins_to_init.len()
+        );
         let app_clone = app.clone();
         std::thread::spawn(move || {
             let rt = tokio::runtime::Builder::new_current_thread()
@@ -335,21 +413,32 @@ fn load_plugins_internal(
                     println!("[plugin_manager] Initializing plugin: {}", plugin_id);
                     match std::fs::read_to_string(&entry_path) {
                         Ok(js_code) => {
-                            if let Err(e) = js_runtime::execute_js(&app_clone, &js_code, Some(&plugin_id)).await {
-                                eprintln!("[plugin_manager] Failed to initialize plugin {}: {}", plugin_id, e);
+                            if let Err(e) =
+                                js_runtime::execute_js(&app_clone, &js_code, Some(&plugin_id)).await
+                            {
+                                eprintln!(
+                                    "[plugin_manager] Failed to initialize plugin {}: {}",
+                                    plugin_id, e
+                                );
                             } else {
-                                println!("[plugin_manager] Successfully initialized plugin {}", plugin_id);
+                                println!(
+                                    "[plugin_manager] Successfully initialized plugin {}",
+                                    plugin_id
+                                );
                             }
                         }
                         Err(e) => {
-                            eprintln!("[plugin_manager] Failed to read entry file for {}: {}", plugin_id, e);
+                            eprintln!(
+                                "[plugin_manager] Failed to read entry file for {}: {}",
+                                plugin_id, e
+                            );
                         }
                     }
                 }
             });
         });
     }
-    
+
     Ok(plugins)
 }
 
@@ -934,6 +1023,306 @@ fn inject_tauri_bridge(html: &str, plugin_id: &str) -> String {
     } else {
         format!("{}{}", tauri_init_script, html)
     }
+}
+
+#[tauri::command]
+pub fn import_plugin(
+    app: tauri::AppHandle,
+    store: State<'_, PluginStore>,
+    source_path: String,
+) -> Result<LoadedPlugin, String> {
+    println!("[plugin_manager] Importing plugin from: {}", source_path);
+
+    // 1. 验证源路径
+    let source = std::path::PathBuf::from(&source_path);
+    if !source.exists() || !source.is_dir() {
+        return Err("Invalid plugin directory".to_string());
+    }
+
+    // 安全检查：规范化路径，防止路径遍历攻击
+    let source = source
+        .canonicalize()
+        .map_err(|e| format!("Failed to resolve plugin path: {}", e))?;
+
+    // 安全检查：禁止导入系统敏感目录
+    let forbidden_paths = get_system_protected_paths();
+
+    for forbidden in &forbidden_paths {
+        if source.starts_with(forbidden) {
+            return Err(format!(
+                "Cannot import plugins from system directory: {:?}",
+                forbidden
+            ));
+        }
+    }
+
+    // 2. 验证 manifest.json 是否存在
+    let manifest_path = source.join("manifest.json");
+    if !manifest_path.exists() {
+        return Err("manifest.json not found in plugin directory".to_string());
+    }
+
+    // 3. 读取并解析 manifest
+    let manifest_content = std::fs::read_to_string(&manifest_path)
+        .map_err(|e| format!("Failed to read manifest: {}", e))?;
+    let manifest: PluginManifest = serde_json::from_str(&manifest_content)
+        .map_err(|e| format!("Invalid manifest format: {}", e))?;
+
+    println!(
+        "[plugin_manager] Plugin manifest loaded: {} ({})",
+        manifest.name, manifest.id
+    );
+
+    // 安全检查：验证插件 ID 格式（防止特殊字符导致路径问题）
+    if manifest.id.contains("..") || manifest.id.contains("/") || manifest.id.contains("\\") {
+        return Err("Invalid plugin ID: contains illegal characters".to_string());
+    }
+
+    // 检查插件是否已存在
+    let (plugin_exists, existing_plugin_name) = {
+        let store_lock = store.0.lock().unwrap();
+        if let Some(existing) = store_lock.get(&manifest.id) {
+            (true, Some(existing.manifest.name.clone()))
+        } else {
+            (false, None)
+        }
+    };
+
+    if plugin_exists {
+        let plugin_name = existing_plugin_name.unwrap_or_else(|| manifest.id.clone());
+        return Err(format!(
+            "插件 '{}' (ID: {}) 已存在。\n请先卸载现有插件，然后再导入新版本。",
+            plugin_name, manifest.id
+        ));
+    }
+
+    // 4. 获取插件目录
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let plugins_dir = data_dir.join("plugins");
+
+    // 确保 plugins 目录存在
+    if !plugins_dir.exists() {
+        std::fs::create_dir_all(&plugins_dir)
+            .map_err(|e| format!("Failed to create plugins directory: {}", e))?;
+    }
+
+    // 5. 创建符号链接
+    let plugin_link_path = plugins_dir.join(&manifest.id);
+
+    // 如果已存在，先删除
+    if plugin_link_path.exists() {
+        println!(
+            "[plugin_manager] Removing existing plugin link: {:?}",
+            plugin_link_path
+        );
+        #[cfg(windows)]
+        {
+            // Windows 上需要区分目录和文件的符号链接
+            let metadata = std::fs::symlink_metadata(&plugin_link_path)
+                .map_err(|e| format!("Failed to get symlink metadata: {}", e))?;
+            if metadata.is_dir() {
+                std::fs::remove_dir(&plugin_link_path)
+                    .map_err(|e| format!("Failed to remove existing plugin link: {}", e))?;
+            } else {
+                std::fs::remove_file(&plugin_link_path)
+                    .map_err(|e| format!("Failed to remove existing plugin link: {}", e))?;
+            }
+        }
+        #[cfg(not(windows))]
+        {
+            std::fs::remove_file(&plugin_link_path)
+                .map_err(|e| format!("Failed to remove existing plugin link: {}", e))?;
+        }
+    }
+
+    // 创建符号链接
+    #[cfg(windows)]
+    {
+        match std::os::windows::fs::symlink_dir(&source, &plugin_link_path) {
+            Ok(_) => {}
+            Err(e) => {
+                // Windows 符号链接失败时提供详细的错误信息
+                let error_msg = if e.raw_os_error() == Some(1314) {
+                    "Failed to create symlink: Insufficient privileges.\n\n\
+                     Please enable Developer Mode:\n\
+                     1. Open Settings > Update & Security > For developers\n\
+                     2. Enable 'Developer Mode'\n\
+                     3. Restart the application\n\n\
+                     Or run the application as Administrator."
+                } else {
+                    &format!("Failed to create symlink: {}.\n\
+                             On Windows, you may need administrator privileges or Developer Mode enabled.", e)
+                };
+                return Err(error_msg.to_string());
+            }
+        }
+    }
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(&source, &plugin_link_path)
+            .map_err(|e| format!("Failed to create symlink: {}", e))?;
+    }
+
+    println!(
+        "[plugin_manager] Created symlink: {:?} -> {:?}",
+        plugin_link_path, source
+    );
+
+    // 6. 加载插件到 store
+    let plugin_states = load_plugin_states(&app);
+    let enabled = plugin_states.get(&manifest.id).copied().unwrap_or(true);
+
+    let loaded_plugin = LoadedPlugin {
+        manifest: manifest.clone(),
+        dir_name: manifest.id.clone(),
+        enabled,
+        settings: None,
+    };
+
+    // 7. 添加到 store
+    {
+        let mut store_lock = store.0.lock().unwrap();
+        store_lock.insert(manifest.id.clone(), loaded_plugin.clone());
+    }
+
+    println!("[plugin_manager] Plugin added to store: {}", manifest.id);
+
+    // 8. 初始化插件（如果是 JS 文件）
+    let entry_path = source.join(&manifest.entry);
+    if entry_path.is_file() {
+        if let Some(extension) = std::path::Path::new(&manifest.entry)
+            .extension()
+            .and_then(|s| s.to_str())
+        {
+            if extension == "js" {
+                println!("[plugin_manager] Initializing JS plugin: {}", manifest.id);
+                let app_clone = app.clone();
+                let plugin_id = manifest.id.clone();
+                let plugin_name = manifest.name.clone();
+                std::thread::spawn(move || {
+                    let rt = tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                        .unwrap();
+
+                    rt.block_on(async {
+                        match std::fs::read_to_string(&entry_path) {
+                            Ok(js_code) => {
+                                match js_runtime::execute_js(&app_clone, &js_code, Some(&plugin_id)).await {
+                                    Ok(_) => {
+                                        println!("[plugin_manager] Successfully initialized imported plugin {}", plugin_id);
+                                        // 通知前端初始化成功
+                                        let _ = app_clone.emit("plugin-init-success", &plugin_id);
+                                    }
+                                    Err(e) => {
+                                        eprintln!("[plugin_manager] Failed to initialize imported plugin {}: {}", plugin_id, e);
+                                        // 通知前端初始化失败
+                                        #[derive(serde::Serialize, Clone)]
+                                        struct PluginInitError {
+                                            plugin_id: String,
+                                            plugin_name: String,
+                                            error: String,
+                                        }
+                                        let _ = app_clone.emit("plugin-init-error", PluginInitError {
+                                            plugin_id: plugin_id.clone(),
+                                            plugin_name: plugin_name.clone(),
+                                            error: e.to_string(),
+                                        });
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("[plugin_manager] Failed to read entry file for {}: {}", plugin_id, e);
+                                #[derive(serde::Serialize, Clone)]
+                                struct PluginInitError {
+                                    plugin_id: String,
+                                    plugin_name: String,
+                                    error: String,
+                                }
+                                let _ = app_clone.emit("plugin-init-error", PluginInitError {
+                                    plugin_id,
+                                    plugin_name,
+                                    error: format!("Failed to read entry file: {}", e),
+                                });
+                            }
+                        }
+                    });
+                });
+            }
+        }
+    }
+
+    println!(
+        "[plugin_manager] Successfully imported plugin: {}",
+        manifest.name
+    );
+    Ok(loaded_plugin)
+}
+
+#[tauri::command]
+pub fn uninstall_plugin(
+    app: tauri::AppHandle,
+    store: State<'_, PluginStore>,
+    plugin_id: String,
+) -> Result<(), String> {
+    println!("[plugin_manager] Uninstalling plugin: {}", plugin_id);
+
+    // 1. 从 store 中移除
+    {
+        let mut store_lock = store.0.lock().unwrap();
+        if store_lock.remove(&plugin_id).is_none() {
+            return Err(format!("Plugin not found: {}", plugin_id));
+        }
+    }
+
+    println!("[plugin_manager] Plugin removed from store: {}", plugin_id);
+
+    // 2. 删除符号链接
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let plugin_link_path = data_dir.join("plugins").join(&plugin_id);
+
+    if plugin_link_path.exists() {
+        println!(
+            "[plugin_manager] Removing plugin link: {:?}",
+            plugin_link_path
+        );
+        #[cfg(windows)]
+        {
+            let metadata = std::fs::symlink_metadata(&plugin_link_path)
+                .map_err(|e| format!("Failed to get symlink metadata: {}", e))?;
+            if metadata.is_dir() {
+                std::fs::remove_dir(&plugin_link_path)
+                    .map_err(|e| format!("Failed to remove plugin link: {}", e))?;
+            } else {
+                std::fs::remove_file(&plugin_link_path)
+                    .map_err(|e| format!("Failed to remove plugin link: {}", e))?;
+            }
+        }
+        #[cfg(not(windows))]
+        {
+            std::fs::remove_file(&plugin_link_path)
+                .map_err(|e| format!("Failed to remove plugin link: {}", e))?;
+        }
+    }
+
+    // 3. 清理插件状态
+    let plugin_states = load_plugin_states(&app);
+    let mut new_states = plugin_states.clone();
+    new_states.remove(&plugin_id);
+    save_plugin_states(&app, &new_states)?;
+
+    // 4. 清理插件设置
+    if let Ok(settings_path) = get_plugin_settings_path(&app, &plugin_id) {
+        if settings_path.exists() {
+            let _ = std::fs::remove_file(settings_path);
+        }
+    }
+
+    println!(
+        "[plugin_manager] Successfully uninstalled plugin: {}",
+        plugin_id
+    );
+    Ok(())
 }
 
 pub fn handle_plugin_protocol<R: tauri::Runtime>(

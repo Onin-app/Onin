@@ -98,6 +98,30 @@
         }
       },
     );
+
+    // Listen for plugin initialization errors
+    listen<{ plugin_id: string; plugin_name: string; error: string }>(
+      "plugin-init-error",
+      async (event) => {
+        const { plugin_name, error } = event.payload;
+        console.error("[Plugins Page] Plugin init error:", event.payload);
+
+        await invoke("show_notification", {
+          options: {
+            title: "插件初始化失败",
+            body: `${plugin_name}: ${error}`,
+          },
+        });
+      },
+    );
+
+    // Listen for plugin initialization success
+    listen<string>(
+      "plugin-init-success",
+      (event) => {
+        console.log("[Plugins Page] Plugin initialized successfully:", event.payload);
+      },
+    );
   });
 
   onDestroy(() => {
@@ -141,8 +165,50 @@
     }
   };
 
-  const handleImportPlugin = () => {
-    console.log("手动导入插件");
+  const handleImportPlugin = async () => {
+    try {
+      // 使用 Tauri 的文件对话框选择插件目录
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: "选择插件目录",
+      });
+
+      if (!selected) {
+        console.log("用户取消了选择");
+        return;
+      }
+
+      console.log("选择的插件目录:", selected);
+
+      // 调用后端导入插件
+      const result = await invoke<PluginManifest>("import_plugin", {
+        sourcePath: selected,
+      });
+
+      console.log("插件导入成功:", result);
+
+      // 刷新插件列表
+      await loadPlugins(false);
+
+      await invoke("show_notification", {
+        options: {
+          title: "导入成功",
+          body: `插件 ${result.name} 已成功导入`,
+        },
+      });
+    } catch (error) {
+      console.error("导入插件失败:", error);
+
+      await invoke("show_notification", {
+        options: {
+          title: "导入失败",
+          body: String(error),
+        },
+      });
+    }
   };
 
   const executePlugin = async (pluginId: string) => {
@@ -196,8 +262,41 @@
   };
 
   const uninstallPlugin = async (pluginId: string) => {
-    console.log(`Uninstall plugin ${pluginId}`);
-    // TODO: 实现插件卸载功能
+    const plugin = plugins.find((p) => p.id === pluginId);
+    const pluginName = plugin?.name || pluginId;
+
+    try {
+      await invoke("uninstall_plugin", { pluginId });
+
+      // 更新本地状态
+      plugins = plugins.filter((p) => p.id !== pluginId);
+
+      console.log(`Plugin ${pluginId} uninstalled`);
+
+      // 刷新命令列表
+      try {
+        await invoke("refresh_commands");
+        console.log("Commands refreshed after plugin uninstall");
+      } catch (refreshError) {
+        console.error("Failed to refresh commands:", refreshError);
+      }
+
+      await invoke("show_notification", {
+        options: {
+          title: "卸载成功",
+          body: `插件 ${pluginName} 已卸载`,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to uninstall plugin:", error);
+
+      await invoke("show_notification", {
+        options: {
+          title: "卸载失败",
+          body: `无法卸载插件 ${pluginName}: ${error}`,
+        },
+      });
+    }
   };
 
   const openPluginSettings = (plugin: PluginManifest) => {

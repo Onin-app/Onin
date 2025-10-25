@@ -170,6 +170,8 @@ pub fn run() {
             plugin_manager::get_plugin_settings,
             plugin_manager::save_plugin_settings,
             plugin_manager::get_plugin_with_schema,
+            plugin_manager::import_plugin,
+            plugin_manager::uninstall_plugin,
             // 注册 notification 命令
             plugin_api::notification::show_notification,
             plugin_api::command::execute_plugin_command,
