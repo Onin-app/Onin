@@ -220,11 +220,19 @@ pub fn run() {
                 }
             }
 
-            // Initialize the command manager asynchronously
+            // Initialize plugins and command manager asynchronously
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
+                // 1. 先加载插件
+                let plugin_store = app_handle.state::<plugin_manager::PluginStore>();
+                if let Err(e) = plugin_manager::load_plugins(app_handle.clone(), plugin_store) {
+                    eprintln!("[ERROR] Failed to load plugins on startup: {}", e);
+                }
+                
+                // 2. 再初始化命令管理器（此时插件已经加载到 PluginStore 中）
                 command_manager::init(&app_handle).await;
-                // Initialize plugin runtime manager
+                
+                // 3. 初始化插件运行时管理器
                 js_runtime::init_plugin_runtime_manager(app_handle.clone()).await;
             });
 

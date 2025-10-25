@@ -231,7 +231,8 @@ fn sanitize_command_name_part(s: &str) -> String {
 
 fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
     let plugin_store: tauri::State<plugin_manager::PluginStore> = app.state();
-    match plugin_manager::load_plugins(app.clone(), plugin_store) {
+    // 直接从 PluginStore 读取已加载的插件，避免重复初始化
+    match plugin_manager::get_loaded_plugins(plugin_store) {
         Ok(plugins) => {
             let mut commands = Vec::new();
 
@@ -303,7 +304,8 @@ pub fn get_plugin_commands(
     app: &AppHandle,
 ) -> Vec<(String, Vec<plugin_manager::PluginCommandManifest>)> {
     let plugin_store: tauri::State<plugin_manager::PluginStore> = app.state();
-    match plugin_manager::load_plugins(app.clone(), plugin_store) {
+    // 直接从 PluginStore 读取已加载的插件，避免重复初始化
+    match plugin_manager::get_loaded_plugins(plugin_store) {
         Ok(plugins) => plugins
             .into_iter()
             .filter(|plugin| plugin.enabled && !plugin.manifest.commands.is_empty())
@@ -319,7 +321,8 @@ pub fn get_plugin_commands(
 // 获取插件ID到名称的映射
 pub fn get_plugin_id_name_mapping(app: &AppHandle) -> Vec<(String, String)> {
     let plugin_store: tauri::State<plugin_manager::PluginStore> = app.state();
-    match plugin_manager::load_plugins(app.clone(), plugin_store) {
+    // 直接从 PluginStore 读取已加载的插件，避免重复初始化
+    match plugin_manager::get_loaded_plugins(plugin_store) {
         Ok(plugins) => plugins
             .into_iter()
             .filter(|plugin| plugin.enabled && !plugin.manifest.commands.is_empty())
