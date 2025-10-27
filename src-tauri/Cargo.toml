@@ -62,6 +62,7 @@ uuid = { version = "1.0", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 reqwest = { version = "0.12", features = ["json"] }
 url = "2.5"
+tauri-plugin-os = "2"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"

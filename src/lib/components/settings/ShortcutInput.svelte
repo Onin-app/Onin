@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Button } from "bits-ui";
+  import { platform } from "@tauri-apps/plugin-os";
 
   let {
     value = $bindable(""),
@@ -9,21 +10,125 @@
   } = $props();
   let previousShortcut = "";
 
-  // 预设的快捷键选项（用户无法通过键盘录入的）
-  const presetShortcuts = [
-    { label: "Alt+Space", value: "Alt+Space" },
-    { label: "Ctrl+Space", value: "Ctrl+Space" },
-  ];
+  // 立即初始化平台信息，不要等到 onMount
+  let currentPlatform = "";
+  try {
+    if (typeof window !== "undefined" && (window as any).__TAURI__) {
+      currentPlatform = platform();
+    } else {
+      // 在浏览器环境中，使用 navigator 来检测平台
+      const userAgent = navigator.userAgent.toLowerCase();
+      if (userAgent.includes("mac")) {
+        currentPlatform = "macos";
+      } else if (userAgent.includes("win")) {
+        currentPlatform = "windows";
+      } else {
+        currentPlatform = "linux";
+      }
+    }
+  } catch (error) {
+    console.error("Error detecting platform:", error);
+    // 使用 navigator.platform 作为后备方案
+    const navPlatform = navigator.platform.toLowerCase();
+    if (navPlatform.includes("mac")) {
+      currentPlatform = "macos";
+    } else if (navPlatform.includes("win")) {
+      currentPlatform = "windows";
+    } else {
+      // Linux 或其他类 Unix 系统
+      currentPlatform = "linux";
+    }
+  }
+
+  // 根据平台获取预设快捷键选项
+  const getPresetShortcuts = (platformName: string) => {
+    const isMac = platformName === "macos";
+    return [
+      {
+        label: isMac ? "⌥+Space" : "Alt+Space",
+        value: "Alt+Space",
+      },
+      {
+        label: isMac ? "⌘+Space" : "Ctrl+Space",
+        value: "CommandOrControl+Space",
+      },
+    ];
+  };
+
+  // 将快捷键转换为用户友好的显示格式（输入框用文字）
+  const formatShortcutForDisplay = (shortcut: string) => {
+    if (!shortcut) return "";
+
+    const isMac = currentPlatform === "macos";
+    const parts = shortcut.split("+");
+
+    const displayParts = parts.map((part) => {
+      const trimmedPart = part.trim();
+      const lowerPart = trimmedPart.toLowerCase();
+      switch (lowerPart) {
+        case "commandorcontrol":
+          return isMac ? "Command" : "Ctrl";
+        case "ctrl":
+        case "control":
+          return "Control";
+        case "alt":
+        case "option":
+          return isMac ? "Option" : "Alt";
+        case "shift":
+          return "Shift";
+        case "super":
+        case "cmd":
+        case "command":
+          return "Command";
+        case "win":
+          return "Win";
+        case "space":
+          return "Space";
+        default:
+          // 保持首字母大写
+          return (
+            trimmedPart.charAt(0).toUpperCase() +
+            trimmedPart.slice(1).toLowerCase()
+          );
+      }
+    });
+
+    return displayParts.join("+");
+  };
+
+  let presetShortcuts = $state<{ label: string; value: string }[]>(
+    getPresetShortcuts(currentPlatform),
+  );
 
   const handleKeydown = (e: KeyboardEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
     const parts: string[] = [];
-    if (e.ctrlKey) parts.push("Ctrl");
+    const isMac = currentPlatform === "macos";
+
+    // 处理修饰键的逻辑：
+    // 1. 在 macOS 上，Cmd 键映射为 CommandOrControl
+    // 2. 在其他平台上，Ctrl 键映射为 CommandOrControl
+    // 3. 如果同时按下了其他修饰键（如 macOS 上的 Ctrl），也要记录
+
+    // 主修饰键（跨平台）
+    if ((e.metaKey && isMac) || (e.ctrlKey && !isMac)) {
+      parts.push("CommandOrControl");
+    }
+
+    // 额外的修饰键
+    // 在 macOS 上，如果按下了 Ctrl，单独记录（即使同时按下了 Cmd）
+    if (e.ctrlKey && isMac) {
+      parts.push("Control");
+    }
+    // 在非 macOS 上，如果按下了 Meta/Super 键，单独记录（即使同时按下了 Ctrl）
+    if (e.metaKey && !isMac) {
+      parts.push("Super");
+    }
+
     if (e.altKey) parts.push("Alt");
     if (e.shiftKey) parts.push("Shift");
-    if (e.metaKey) parts.push("Super");
 
     const key = e.key;
 
@@ -48,11 +153,22 @@
   };
 
   const handleBlur = () => {
-    const modifiers = ["Ctrl", "Alt", "Shift", "Super"];
+    const modifiers = [
+      "commandorcontrol",
+      "control",
+      "alt",
+      "shift",
+      "super",
+      "command",
+      "cmd",
+    ];
     const parts = value.split("+");
     const lastPart = parts[parts.length - 1];
 
-    if (!value || (parts.length > 0 && modifiers.includes(lastPart))) {
+    if (
+      !value ||
+      (parts.length > 0 && modifiers.includes(lastPart.toLowerCase()))
+    ) {
       value = previousShortcut;
     }
     onSave();
@@ -68,7 +184,7 @@
   <input
     type="text"
     readonly
-    bind:value
+    value={formatShortcutForDisplay(value)}
     onkeydown={handleKeydown}
     onfocus={handleFocus}
     onblur={handleBlur}

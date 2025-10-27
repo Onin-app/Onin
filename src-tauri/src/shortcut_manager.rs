@@ -200,24 +200,37 @@ fn check_accessibility_permissions() -> bool {
 
 // Helper function to normalize shortcut strings for comparison
 fn normalize_shortcut_string(shortcut_str: &str) -> String {
-    let mut parts: Vec<&str> = shortcut_str.split('+').collect();
+    let parts: Vec<&str> = shortcut_str.split('+').collect();
     let mut modifiers = Vec::new();
     let mut key = String::new();
 
-    for part in parts.iter_mut() {
-        let lower_part = part.to_lowercase();
+    for part in parts.iter() {
+        // Trim whitespace from each part
+        let trimmed_part = part.trim();
+        if trimmed_part.is_empty() {
+            continue;
+        }
+        
+        let lower_part = trimmed_part.to_lowercase();
         match lower_part.as_str() {
             "ctrl" | "control" => modifiers.push("ctrl"),
             "alt" => modifiers.push("alt"),
             "shift" => modifiers.push("shift"),
             "cmd" | "command" | "meta" | "super" => modifiers.push("cmd"),
+            "commandorcontrol" => {
+                // CommandOrControl maps to cmd on macOS, ctrl on other platforms
+                #[cfg(target_os = "macos")]
+                modifiers.push("cmd");
+                #[cfg(not(target_os = "macos"))]
+                modifiers.push("ctrl");
+            }
             _ => {
                 // Handle cases like "KeyN" -> "N" or "B" -> "B"
-                let mut key_part = *part;
+                let mut key_part = trimmed_part;
                 if key_part.starts_with("Key") && key_part.len() > 3 {
                     key_part = &key_part[3..];
                 }
-                key = key_part.to_string().to_uppercase();
+                key = key_part.to_uppercase();
             }
         }
     }
