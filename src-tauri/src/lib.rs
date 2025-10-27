@@ -207,6 +207,10 @@ pub fn run() {
             plugin_api::clipboard::plugin_clipboard_read_image,
             plugin_api::clipboard::plugin_clipboard_write_image,
             plugin_api::clipboard::plugin_clipboard_clear,
+            // 注册定时任务命令
+            plugin_api::scheduler::schedule_task,
+            plugin_api::scheduler::cancel_task,
+            plugin_api::scheduler::list_tasks,
             // Command manager commands
             command_manager::get_commands,
             command_manager::update_command,
@@ -219,6 +223,20 @@ pub fn run() {
             if let Ok(app_data_dir) = app.path().app_data_dir() {
                 if let Err(e) = std::fs::create_dir_all(&app_data_dir) {
                     eprintln!("Failed to create app data directory: {}", e);
+                }
+            }
+
+            // Initialize scheduler state
+            let scheduler_state = tauri::async_runtime::block_on(async {
+                plugin_api::scheduler::SchedulerState::new().await
+            });
+            
+            match scheduler_state {
+                Ok(state) => {
+                    app.manage(state);
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to initialize scheduler: {}", e);
                 }
             }
 
@@ -236,6 +254,11 @@ pub fn run() {
                 
                 // 3. 初始化插件运行时管理器
                 js_runtime::init_plugin_runtime_manager(app_handle.clone()).await;
+                
+                // 4. 初始化调度器
+                if let Err(e) = plugin_api::scheduler::init_scheduler(&app_handle).await {
+                    eprintln!("[ERROR] Failed to initialize scheduler: {}", e);
+                }
             });
 
             // 托管自定义启动项管理器

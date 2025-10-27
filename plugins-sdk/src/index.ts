@@ -71,6 +71,7 @@ import { dialog } from './api/dialog';
 import { clipboard } from './api/clipboard';
 import { settings } from './api/settings';
 import { lifecycle } from './api/lifecycle';
+import { scheduler } from './api/scheduler';
 
 import { invoke, listen } from './core/ipc';
 import { debug } from './utils/debug'
@@ -138,6 +139,7 @@ export {
   clipboard,
   settings,
   lifecycle,
+  scheduler,
   invoke,
   listen,
   debug,

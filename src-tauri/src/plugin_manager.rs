@@ -70,6 +70,14 @@ pub struct CommandPermission {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SchedulerPermission {
+    #[serde(default)]
+    pub enable: bool,
+    #[serde(default, rename = "maxTasks")]
+    pub max_tasks: Option<usize>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PluginPermissions {
     #[serde(default)]
     pub http: Option<HttpPermission>,
@@ -79,6 +87,8 @@ pub struct PluginPermissions {
     pub notification: Option<NotificationPermission>,
     #[serde(default)]
     pub command: Option<CommandPermission>,
+    #[serde(default)]
+    pub scheduler: Option<SchedulerPermission>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
