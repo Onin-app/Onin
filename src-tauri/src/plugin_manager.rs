@@ -108,6 +108,10 @@ pub struct PluginManifest {
     /// - "window": Open in new webview window
     #[serde(default = "default_display_mode")]
     pub display_mode: String,
+    /// Auto detach to separate window when executing
+    /// If true, HTML plugins will always open in a separate window
+    #[serde(default)]
+    pub auto_detach: bool,
 }
 
 fn default_display_mode() -> String {
@@ -175,8 +179,15 @@ fn default_enabled() -> bool {
 
 // 插件状态持久化结构
 #[derive(Serialize, Deserialize, Debug, Clone)]
+struct PluginState {
+    pub enabled: bool,
+    #[serde(default)]
+    pub auto_detach: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct PluginStates {
-    states: HashMap<String, bool>, // plugin_id -> enabled
+    states: HashMap<String, PluginState>, // plugin_id -> state
 }
 
 // 获取插件状态文件路径
@@ -202,7 +213,7 @@ fn get_plugin_settings_path(
 }
 
 // 加载插件状态
-fn load_plugin_states(app: &tauri::AppHandle) -> HashMap<String, bool> {
+fn load_plugin_states(app: &tauri::AppHandle) -> HashMap<String, PluginState> {
     match get_plugin_states_path(app) {
         Ok(path) => {
             if path.exists() {
@@ -235,7 +246,7 @@ fn load_plugin_states(app: &tauri::AppHandle) -> HashMap<String, bool> {
 // 保存插件状态
 fn save_plugin_states(
     app: &tauri::AppHandle,
-    states: &HashMap<String, bool>,
+    states: &HashMap<String, PluginState>,
 ) -> Result<(), String> {
     let path = get_plugin_states_path(app)?;
     let plugin_states = PluginStates {
@@ -361,11 +372,18 @@ fn load_plugins_internal(
 
                 let dir_name = path.file_name().unwrap().to_str().unwrap().to_string();
 
-                // 从持久化状态中获取启用状态，如果没有则默认为 true
-                let enabled = plugin_states.get(&manifest.id).copied().unwrap_or(true);
+                // 从持久化状态中获取启用状态和 auto_detach，如果没有则使用默认值
+                let (enabled, auto_detach) = if let Some(state) = plugin_states.get(&manifest.id) {
+                    (state.enabled, state.auto_detach)
+                } else {
+                    (true, manifest.auto_detach)
+                };
+
+                let mut manifest_with_state = manifest.clone();
+                manifest_with_state.auto_detach = auto_detach;
 
                 let loaded_plugin = LoadedPlugin {
-                    manifest: manifest.clone(),
+                    manifest: manifest_with_state,
                     dir_name: dir_name.clone(),
                     enabled,
                     settings: None, // Settings will be registered dynamically via JavaScript
@@ -532,7 +550,50 @@ pub fn toggle_plugin(
         // 收集所有插件的状态
         let mut states = HashMap::new();
         for (id, plugin) in store_lock.iter() {
-            states.insert(id.clone(), plugin.enabled);
+            states.insert(id.clone(), PluginState {
+                enabled: plugin.enabled,
+                auto_detach: plugin.manifest.auto_detach,
+            });
+        }
+
+        // 释放锁后再保存状态
+        drop(store_lock);
+
+        // 持久化保存状态
+        if let Err(e) = save_plugin_states(&app, &states) {
+            eprintln!("[plugin_manager] Failed to save plugin states: {}", e);
+            return Err(format!("Failed to save plugin state: {}", e));
+        }
+
+        Ok(())
+    } else {
+        Err(format!("Plugin not found: {}", plugin_id))
+    }
+}
+
+#[tauri::command]
+pub fn toggle_plugin_auto_detach(
+    app: tauri::AppHandle,
+    store: State<'_, PluginStore>,
+    plugin_id: String,
+    auto_detach: bool,
+) -> Result<(), String> {
+    let mut store_lock = store.0.lock().unwrap();
+
+    if let Some(plugin) = store_lock.get_mut(&plugin_id) {
+        plugin.manifest.auto_detach = auto_detach;
+        println!(
+            "[plugin_manager] Plugin {} auto_detach is now {}",
+            plugin_id, auto_detach
+        );
+
+        // 收集所有插件的状态
+        let mut states = HashMap::new();
+        for (id, plugin) in store_lock.iter() {
+            states.insert(id.clone(), PluginState {
+                enabled: plugin.enabled,
+                auto_detach: plugin.manifest.auto_detach,
+            });
         }
 
         // 释放锁后再保存状态
@@ -788,11 +849,16 @@ pub fn execute_plugin_entry(
                 Ok(())
             }
             "html" => {
-                // UI plugin - check display mode
-                let display_mode = plugin.manifest.display_mode.as_str();
+                // UI plugin - check auto_detach first, then display mode
+                let should_open_in_window = plugin.manifest.auto_detach 
+                    || plugin.manifest.display_mode.as_str() == "window";
 
-                match display_mode {
-                    "window" => {
+                println!(
+                    "[plugin_manager] Plugin {} - auto_detach: {}, display_mode: {}, should_open_in_window: {}",
+                    plugin.manifest.id, plugin.manifest.auto_detach, plugin.manifest.display_mode, should_open_in_window
+                );
+
+                if should_open_in_window {
                         // Open in new webview window
                         let app_clone = app.clone();
                         tauri::async_runtime::spawn(async move {
@@ -827,8 +893,7 @@ pub fn execute_plugin_entry(
                             }
                         });
                         Ok(())
-                    }
-                    "inline" | _ => {
+                } else {
                         // Display inline - read and inline all resources (CSS, JS) into HTML
                         let html_content = std::fs::read_to_string(&entry_path)
                             .map_err(|e| format!("Failed to read plugin HTML: {}", e))?;
@@ -878,7 +943,6 @@ pub fn execute_plugin_entry(
                             })?;
 
                         Ok(())
-                    }
                 }
             }
             _ => Err(format!("Unsupported plugin entry type: {}", extension)),
@@ -1180,10 +1244,17 @@ pub fn import_plugin(
 
     // 6. 加载插件到 store
     let plugin_states = load_plugin_states(&app);
-    let enabled = plugin_states.get(&manifest.id).copied().unwrap_or(true);
+    let (enabled, auto_detach) = if let Some(state) = plugin_states.get(&manifest.id) {
+        (state.enabled, state.auto_detach)
+    } else {
+        (true, manifest.auto_detach)
+    };
+
+    let mut manifest_with_state = manifest.clone();
+    manifest_with_state.auto_detach = auto_detach;
 
     let loaded_plugin = LoadedPlugin {
-        manifest: manifest.clone(),
+        manifest: manifest_with_state,
         dir_name: manifest.id.clone(),
         enabled,
         settings: None,

@@ -166,6 +166,7 @@ pub fn run() {
             plugin_manager::open_plugin_in_window,
             plugin_manager::execute_plugin_entry,
             plugin_manager::toggle_plugin,
+            plugin_manager::toggle_plugin_auto_detach,
             plugin_manager::register_plugin_settings_schema,
             plugin_manager::get_plugin_settings,
             plugin_manager::save_plugin_settings,

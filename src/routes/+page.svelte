@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import { get } from "svelte/store";
-  import { DropdownMenu, ScrollArea } from "bits-ui";
+  import { DropdownMenu, ScrollArea, Separator } from "bits-ui";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
@@ -10,6 +10,9 @@
     AppWindow,
     DotsThreeVertical,
     X,
+    PuzzlePiece,
+    CaretRight,
+    Check,
   } from "phosphor-svelte";
 
   import { goto } from "$app/navigation";
@@ -34,6 +37,7 @@
   let showPluginInline = $state<boolean>(false);
   let currentPluginHtml = $state<string>("");
   let currentPluginId = $state<string>("");
+  let currentPluginAutoDetach = $state<boolean>(false);
 
   // Refresh state
   let isRefreshing = $state<boolean>(false);
@@ -137,10 +141,31 @@
       plugin_id: string;
       plugin_name: string;
       html_content: string;
-    }>("show_plugin_inline", (event) => {
+    }>("show_plugin_inline", async (event) => {
+      console.log(
+        "Received show_plugin_inline event for:",
+        event.payload.plugin_id,
+      );
       showPluginInline = true;
       currentPluginHtml = event.payload.html_content;
       currentPluginId = event.payload.plugin_id;
+
+      // Fetch plugin auto_detach state
+      try {
+        const plugin = await invoke<any>("get_plugin_with_schema", {
+          pluginId: event.payload.plugin_id,
+        });
+        console.log("Plugin data received:", plugin);
+        // LoadedPlugin uses #[serde(flatten)] so manifest fields are at top level
+        currentPluginAutoDetach = plugin?.auto_detach ?? false;
+        console.log(
+          `Plugin ${event.payload.plugin_id} auto_detach state:`,
+          currentPluginAutoDetach,
+        );
+      } catch (error) {
+        console.error("Failed to get plugin auto_detach state:", error);
+        currentPluginAutoDetach = false;
+      }
     });
 
     // Listen for detach window shortcut event
@@ -274,6 +299,55 @@
     showPluginInline = false;
     currentPluginHtml = "";
     currentPluginId = "";
+    currentPluginAutoDetach = false;
+  };
+
+  const handleToggleAutoDetach = async (
+    event: boolean | { detail: { checked: boolean } },
+  ) => {
+    let checked: boolean;
+
+    // 检查是否是事件对象还是直接的布尔值
+    if (typeof event === "object" && "detail" in event) {
+      checked = event.detail.checked;
+    } else {
+      checked = event as boolean;
+    }
+
+    if (!currentPluginId) {
+      console.error("No current plugin ID");
+      return;
+    }
+
+    // 保存之前的状态以备回滚
+    const previousState = currentPluginAutoDetach;
+
+    try {
+      // 先更新本地状态以提供即时反馈
+      currentPluginAutoDetach = checked;
+
+      await invoke("toggle_plugin_auto_detach", {
+        pluginId: currentPluginId,
+        autoDetach: checked,
+      });
+
+      await invoke("show_notification", {
+        options: {
+          title: checked ? "已启用自动分离" : "已禁用自动分离",
+          body: `插件将${checked ? "自动" : "不再自动"}在独立窗口中打开`,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to toggle auto detach:", error);
+      // 如果保存失败，恢复原状态
+      currentPluginAutoDetach = previousState;
+      await invoke("show_notification", {
+        options: {
+          title: "操作失败",
+          body: "无法切换自动分离设置",
+        },
+      });
+    }
   };
 
   const handleDetachPlugin = async () => {
@@ -382,6 +456,23 @@
                     </kbd>
                   </button>
                 </DropdownMenu.Item>
+                <DropdownMenu.CheckboxItem
+                  bind:checked={currentPluginAutoDetach}
+                  class="rounded-button data-highlighted:bg-muted flex h-10 items-center py-3 pr-1.5 pl-3 text-sm font-medium ring-0! ring-transparent! select-none focus-visible:outline-none cursor-pointer"
+                  onCheckedChange={handleToggleAutoDetach}
+                >
+                  {#snippet children({ checked })}
+                    <div class="flex items-center pr-4">
+                      <PuzzlePiece class="text-foreground-alt mr-2 size-5" />
+                      自动分离为独立窗口
+                    </div>
+                    <div class="ml-auto flex items-center gap-px">
+                      {#if checked}
+                        <Check class="size-4" />
+                      {/if}
+                    </div>
+                  {/snippet}
+                </DropdownMenu.CheckboxItem>
               </DropdownMenu.Content>
             </DropdownMenu.Portal>
           </DropdownMenu.Root>
