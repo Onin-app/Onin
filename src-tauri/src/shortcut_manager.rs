@@ -293,7 +293,36 @@ pub fn handle_global_shortcut(
         // 安全地执行快捷键动作
         execute_shortcut_action(app, app_shortcut);
     } else {
-        println!("No matching shortcut found for: {}", triggered_shortcut);
+        // 特殊处理：检查是否是 ESC 键
+        if triggered_shortcut.to_uppercase() == "ESCAPE" {
+            println!("ESC key detected, checking for active plugin window");
+            
+            // 检查是否有活跃的插件窗口
+            if let Some(active_window_state) = app.try_state::<crate::plugin_manager::ActivePluginWindow>() {
+                if let Ok(active) = active_window_state.0.lock() {
+                    if let Some(window_label) = active.as_ref() {
+                        println!("Active plugin window found: {}, minimizing it", window_label);
+                        if let Some(window) = app.get_webview_window(window_label) {
+                            if let Err(e) = window.minimize() {
+                                eprintln!("Failed to minimize plugin window: {}", e);
+                            }
+                            return; // 处理完插件窗口后直接返回
+                        }
+                    }
+                }
+            }
+            
+            // 如果没有活跃的插件窗口，则隐藏主窗口
+            println!("No active plugin window, hiding main window");
+            if let Some(window) = app.get_webview_window("main") {
+                let state: State<crate::window_manager::WindowState> = app.state();
+                state.hiding_initiated_by_command.store(true, std::sync::atomic::Ordering::Relaxed);
+                let _ = window.hide();
+                let _ = window.emit("window_visibility", &false);
+            }
+        } else {
+            println!("No matching shortcut found for: {}", triggered_shortcut);
+        }
     }
 }
 

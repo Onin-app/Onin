@@ -73,6 +73,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(plugin_manager::PluginStore(Default::default()))
+        .manage(plugin_manager::ActivePluginWindow(Mutex::new(None)))
         .manage(plugin_api::command::CommandExecutionStore(
             Default::default(),
         ))
@@ -173,6 +174,14 @@ pub fn run() {
             plugin_manager::get_plugin_with_schema,
             plugin_manager::import_plugin,
             plugin_manager::uninstall_plugin,
+            // 插件窗口控制命令
+            plugin_manager::plugin_close_window,
+            plugin_manager::plugin_minimize_window,
+            plugin_manager::plugin_maximize_window,
+            plugin_manager::plugin_unmaximize_window,
+            plugin_manager::plugin_is_maximized,
+            plugin_manager::plugin_show_window,
+            plugin_manager::plugin_set_focus,
             // 注册 notification 命令
             plugin_api::notification::show_notification,
             plugin_api::command::execute_plugin_command,
