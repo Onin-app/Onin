@@ -553,10 +553,13 @@ pub fn toggle_plugin(
         // 收集所有插件的状态
         let mut states = HashMap::new();
         for (id, plugin) in store_lock.iter() {
-            states.insert(id.clone(), PluginState {
-                enabled: plugin.enabled,
-                auto_detach: plugin.manifest.auto_detach,
-            });
+            states.insert(
+                id.clone(),
+                PluginState {
+                    enabled: plugin.enabled,
+                    auto_detach: plugin.manifest.auto_detach,
+                },
+            );
         }
 
         // 释放锁后再保存状态
@@ -593,10 +596,13 @@ pub fn toggle_plugin_auto_detach(
         // 收集所有插件的状态
         let mut states = HashMap::new();
         for (id, plugin) in store_lock.iter() {
-            states.insert(id.clone(), PluginState {
-                enabled: plugin.enabled,
-                auto_detach: plugin.manifest.auto_detach,
-            });
+            states.insert(
+                id.clone(),
+                PluginState {
+                    enabled: plugin.enabled,
+                    auto_detach: plugin.manifest.auto_detach,
+                },
+            );
         }
 
         // 释放锁后再保存状态
@@ -806,200 +812,250 @@ pub fn open_plugin_in_window(
     // Force open in window mode
     let app_clone = app.clone();
     tauri::async_runtime::spawn(async move {
-        let window_label = format!("plugin_{}", plugin.manifest.id.replace('.', "_"));
-
-        if let Some(window) = app_clone.get_webview_window(&window_label) {
-            // 检查窗口是否被最小化，如果是则先取消最小化
-            if let Ok(is_minimized) = window.is_minimized() {
-                if is_minimized {
-                    if let Err(e) = window.unminimize() {
-                        eprintln!("Failed to unminimize plugin window: {}", e);
-                    }
-                }
-            }
-            // 显示窗口（如果被隐藏）
-            if let Err(e) = window.show() {
-                eprintln!("Failed to show plugin window: {}", e);
-            }
-            // 聚焦窗口
-            if let Err(e) = window.set_focus() {
-                eprintln!("Failed to focus plugin window: {}", e);
-            }
-            return;
-        }
-
-        // 使用自定义协议来加载插件文件
-        let plugin_url = format!(
-            "plugin://localhost/{}/{}",
-            plugin.dir_name, plugin.manifest.entry
-        );
-        println!(
-            "[plugin_manager] Loading plugin in window from: {}",
-            plugin_url
-        );
-
-        // 创建窗口菜单
-        use tauri::menu::{Menu, MenuItemBuilder};
-        let menu_result = (|| -> Result<Menu<tauri::Wry>, tauri::Error> {
-            let back_to_inline = MenuItemBuilder::with_id("back_to_inline", "切换到主窗口模式")
-                .build(&app_clone)?;
-            Menu::with_items(&app_clone, &[&back_to_inline])
-        })();
-
-        let mut builder = WebviewWindowBuilder::new(
-            &app_clone,
-            window_label.clone(),
-            tauri::WebviewUrl::External(plugin_url.parse().unwrap()),
-        )
-        .title(plugin.manifest.name)
-        .inner_size(800.0, 600.0)
-        .resizable(true)
-        .decorations(false); // 隐藏系统标题栏
-
-        // 如果菜单创建成功，添加到窗口
-        if let Ok(menu) = menu_result {
-            builder = builder.menu(menu);
-        }
-
-        match builder.build() {
-            Ok(window) => {
-                let plugin_id_for_menu = plugin.manifest.id.clone();
-                let app_for_menu = app_clone.clone();
-                
-                // 监听窗口事件，用于注册/注销 ESC 快捷键
-                use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
-                use std::str::FromStr;
-                
-                let esc_shortcut = Shortcut::from_str("escape").unwrap();
-                let app_for_window_event = app_clone.clone();
-                let window_label_for_tracking = window.label().to_string();
-                
-                // 设置窗口焦点
-                if let Err(e) = window.set_focus() {
-                    eprintln!("Failed to set focus on plugin window: {}", e);
-                }
-                
-                // 立即记录活跃窗口并注册 ESC 快捷键
-                let app_for_immediate = app_clone.clone();
-                let label_for_immediate = window_label_for_tracking.clone();
-                tauri::async_runtime::spawn(async move {
-                    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-                    
-                    // 记录活跃窗口
-                    if let Some(active_window_state) = app_for_immediate.try_state::<ActivePluginWindow>() {
-                        if let Ok(mut active) = active_window_state.0.lock() {
-                            *active = Some(label_for_immediate.clone());
-                            println!("[plugin_manager] Set active plugin window: {}", label_for_immediate);
-                        }
-                    }
-                    
-                    // 注册 ESC 快捷键
-                    println!("[plugin_manager] Registering ESC shortcut for plugin window");
-                    let _ = app_for_immediate.global_shortcut().unregister(esc_shortcut);
-                    if let Err(e) = app_for_immediate.global_shortcut().register(esc_shortcut) {
-                        eprintln!("[plugin_manager] Failed to register ESC shortcut: {}", e);
-                    } else {
-                        println!("[plugin_manager] ESC shortcut registered successfully");
-                    }
-                });
-                
-                let label_for_event = window_label_for_tracking.clone();
-                window.on_window_event(move |event| {
-                    match event {
-                        tauri::WindowEvent::Focused(true) => {
-                            println!("[plugin_manager] Plugin window focused: {}", label_for_event);
-                            
-                            // 记录活跃窗口
-                            if let Some(active_window_state) = app_for_window_event.try_state::<ActivePluginWindow>() {
-                                if let Ok(mut active) = active_window_state.0.lock() {
-                                    *active = Some(label_for_event.clone());
-                                    println!("[plugin_manager] Updated active plugin window: {}", label_for_event);
-                                }
-                            }
-                            
-                            // 重新注册 ESC 快捷键
-                            let _ = app_for_window_event.global_shortcut().unregister(esc_shortcut);
-                            if let Err(e) = app_for_window_event.global_shortcut().register(esc_shortcut) {
-                                eprintln!("[plugin_manager] Failed to register ESC shortcut: {}", e);
-                            } else {
-                                println!("[plugin_manager] ESC shortcut registered successfully");
-                            }
-                        }
-                        tauri::WindowEvent::Focused(false) => {
-                            println!("[plugin_manager] Plugin window unfocused: {}", label_for_event);
-                            
-                            // 清除活跃窗口记录
-                            if let Some(active_window_state) = app_for_window_event.try_state::<ActivePluginWindow>() {
-                                if let Ok(mut active) = active_window_state.0.lock() {
-                                    if active.as_ref() == Some(&label_for_event) {
-                                        *active = None;
-                                        println!("[plugin_manager] Cleared active plugin window");
-                                    }
-                                }
-                            }
-                            
-                            // 注销 ESC 快捷键
-                            if let Err(e) = app_for_window_event.global_shortcut().unregister(esc_shortcut) {
-                                eprintln!("Failed to unregister ESC shortcut: {}", e);
-                            }
-                        }
-                        tauri::WindowEvent::CloseRequested { .. } => {
-                            println!("[plugin_manager] Plugin window closing: {}", label_for_event);
-                            
-                            // 清除活跃窗口记录
-                            if let Some(active_window_state) = app_for_window_event.try_state::<ActivePluginWindow>() {
-                                if let Ok(mut active) = active_window_state.0.lock() {
-                                    if active.as_ref() == Some(&label_for_event) {
-                                        *active = None;
-                                    }
-                                }
-                            }
-                            
-                            let _ = app_for_window_event.global_shortcut().unregister(esc_shortcut);
-                        }
-                        _ => {}
-                    }
-                });
-                
-                // 监听菜单事件
-                window.on_menu_event(move |window, event| {
-                    if event.id().as_ref() == "back_to_inline" {
-                        println!("[plugin_manager] Switching plugin {} back to inline mode", plugin_id_for_menu);
-                        
-                        // 关闭当前窗口
-                        if let Err(e) = window.close() {
-                            eprintln!("Failed to close plugin window: {}", e);
-                        }
-                        
-                        // 切换插件的 auto_detach 为 false
-                        if let Err(e) = toggle_plugin_auto_detach(
-                            app_for_menu.clone(),
-                            app_for_menu.state::<PluginStore>(),
-                            plugin_id_for_menu.clone(),
-                            false, // 设置为 false，切换回主窗口模式
-                        ) {
-                            eprintln!("Failed to toggle plugin auto_detach: {}", e);
-                        }
-                        
-                        // 显示主窗口
-                        if let Some(main_window) = app_for_menu.get_webview_window("main") {
-                            if let Err(e) = main_window.show() {
-                                eprintln!("Failed to show main window: {}", e);
-                            }
-                            if let Err(e) = main_window.set_focus() {
-                                eprintln!("Failed to focus main window: {}", e);
-                            }
-                        }
-                    }
-                });
-            }
-            Err(e) => {
-                eprintln!("Failed to build plugin window: {}", e);
-            }
+        if let Err(e) = create_or_show_plugin_window(app_clone, &plugin).await {
+            eprintln!("Failed to create or show plugin window: {}", e);
         }
     });
 
     Ok(())
+}
+
+/// 创建或显示插件窗口的共享函数
+async fn create_or_show_plugin_window(
+    app: tauri::AppHandle,
+    plugin: &LoadedPlugin,
+) -> Result<(), String> {
+    let window_label = format!("plugin_{}", plugin.manifest.id.replace('.', "_"));
+
+    // 如果窗口已存在，显示并聚焦
+    if let Some(window) = app.get_webview_window(&window_label) {
+        // 检查窗口是否被最小化，如果是则先取消最小化
+        if let Ok(is_minimized) = window.is_minimized() {
+            if is_minimized {
+                if let Err(e) = window.unminimize() {
+                    eprintln!("Failed to unminimize plugin window: {}", e);
+                }
+            }
+        }
+        // 显示窗口（如果被隐藏）
+        if let Err(e) = window.show() {
+            eprintln!("Failed to show plugin window: {}", e);
+        }
+        // 聚焦窗口
+        if let Err(e) = window.set_focus() {
+            eprintln!("Failed to focus plugin window: {}", e);
+        }
+        return Ok(());
+    }
+
+    // 使用自定义协议来加载插件文件
+    let plugin_url = format!(
+        "plugin://localhost/{}/{}",
+        plugin.dir_name, plugin.manifest.entry
+    );
+    println!(
+        "[plugin_manager] Loading plugin in window from: {}",
+        plugin_url
+    );
+
+    // 创建窗口菜单
+    use tauri::menu::{Menu, MenuItemBuilder};
+    let menu_result = (|| -> Result<Menu<tauri::Wry>, tauri::Error> {
+        let back_to_inline =
+            MenuItemBuilder::with_id("back_to_inline", "切换到主窗口模式").build(&app)?;
+        Menu::with_items(&app, &[&back_to_inline])
+    })();
+
+    let mut builder = WebviewWindowBuilder::new(
+        &app,
+        window_label.clone(),
+        tauri::WebviewUrl::External(plugin_url.parse().unwrap()),
+    )
+    .title(plugin.manifest.name.clone())
+    .inner_size(800.0, 600.0)
+    .resizable(true)
+    .decorations(false); // 隐藏系统标题栏
+
+    // 如果菜单创建成功，添加到窗口
+    if let Ok(menu) = menu_result {
+        builder = builder.menu(menu);
+    }
+
+    match builder.build() {
+        Ok(window) => {
+            let plugin_id_for_menu = plugin.manifest.id.clone();
+            let app_for_menu = app.clone();
+
+            // 监听窗口事件，用于注册/注销 ESC 快捷键
+            use std::str::FromStr;
+            use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
+
+            let esc_shortcut = Shortcut::from_str("escape").unwrap();
+            let app_for_window_event = app.clone();
+            let window_label_for_tracking = window.label().to_string();
+
+            // 设置窗口焦点
+            if let Err(e) = window.set_focus() {
+                eprintln!("Failed to set focus on plugin window: {}", e);
+            }
+
+            // 立即记录活跃窗口并注册 ESC 快捷键
+            let app_for_immediate = app.clone();
+            let label_for_immediate = window_label_for_tracking.clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+                // 记录活跃窗口
+                if let Some(active_window_state) =
+                    app_for_immediate.try_state::<ActivePluginWindow>()
+                {
+                    if let Ok(mut active) = active_window_state.0.lock() {
+                        *active = Some(label_for_immediate.clone());
+                        println!(
+                            "[plugin_manager] Set active plugin window: {}",
+                            label_for_immediate
+                        );
+                    }
+                }
+
+                // 注册 ESC 快捷键
+                println!("[plugin_manager] Registering ESC shortcut for plugin window");
+                let _ = app_for_immediate.global_shortcut().unregister(esc_shortcut);
+                if let Err(e) = app_for_immediate.global_shortcut().register(esc_shortcut) {
+                    eprintln!("[plugin_manager] Failed to register ESC shortcut: {}", e);
+                } else {
+                    println!("[plugin_manager] ESC shortcut registered successfully");
+                }
+            });
+
+            let label_for_event = window_label_for_tracking.clone();
+            window.on_window_event(move |event| {
+                match event {
+                    tauri::WindowEvent::Focused(true) => {
+                        println!(
+                            "[plugin_manager] Plugin window focused: {}",
+                            label_for_event
+                        );
+
+                        // 记录活跃窗口
+                        if let Some(active_window_state) =
+                            app_for_window_event.try_state::<ActivePluginWindow>()
+                        {
+                            if let Ok(mut active) = active_window_state.0.lock() {
+                                *active = Some(label_for_event.clone());
+                                println!(
+                                    "[plugin_manager] Updated active plugin window: {}",
+                                    label_for_event
+                                );
+                            }
+                        }
+
+                        // 重新注册 ESC 快捷键
+                        let _ = app_for_window_event
+                            .global_shortcut()
+                            .unregister(esc_shortcut);
+                        if let Err(e) = app_for_window_event
+                            .global_shortcut()
+                            .register(esc_shortcut)
+                        {
+                            eprintln!("[plugin_manager] Failed to register ESC shortcut: {}", e);
+                        } else {
+                            println!("[plugin_manager] ESC shortcut registered successfully");
+                        }
+                    }
+                    tauri::WindowEvent::Focused(false) => {
+                        println!(
+                            "[plugin_manager] Plugin window unfocused: {}",
+                            label_for_event
+                        );
+
+                        // 清除活跃窗口记录
+                        if let Some(active_window_state) =
+                            app_for_window_event.try_state::<ActivePluginWindow>()
+                        {
+                            if let Ok(mut active) = active_window_state.0.lock() {
+                                if active.as_ref() == Some(&label_for_event) {
+                                    *active = None;
+                                    println!("[plugin_manager] Cleared active plugin window");
+                                }
+                            }
+                        }
+
+                        // 注销 ESC 快捷键
+                        if let Err(e) = app_for_window_event
+                            .global_shortcut()
+                            .unregister(esc_shortcut)
+                        {
+                            eprintln!("Failed to unregister ESC shortcut: {}", e);
+                        }
+                    }
+                    tauri::WindowEvent::CloseRequested { .. } => {
+                        println!(
+                            "[plugin_manager] Plugin window closing: {}",
+                            label_for_event
+                        );
+
+                        // 清除活跃窗口记录
+                        if let Some(active_window_state) =
+                            app_for_window_event.try_state::<ActivePluginWindow>()
+                        {
+                            if let Ok(mut active) = active_window_state.0.lock() {
+                                if active.as_ref() == Some(&label_for_event) {
+                                    *active = None;
+                                }
+                            }
+                        }
+
+                        let _ = app_for_window_event
+                            .global_shortcut()
+                            .unregister(esc_shortcut);
+                    }
+                    _ => {}
+                }
+            });
+
+            // 监听菜单事件
+            window.on_menu_event(move |window, event| {
+                if event.id().as_ref() == "back_to_inline" {
+                    println!(
+                        "[plugin_manager] Switching plugin {} back to inline mode",
+                        plugin_id_for_menu
+                    );
+
+                    // 关闭当前窗口
+                    if let Err(e) = window.close() {
+                        eprintln!("Failed to close plugin window: {}", e);
+                    }
+
+                    // 切换插件的 auto_detach 为 false
+                    if let Err(e) = toggle_plugin_auto_detach(
+                        app_for_menu.clone(),
+                        app_for_menu.state::<PluginStore>(),
+                        plugin_id_for_menu.clone(),
+                        false, // 设置为 false，切换回主窗口模式
+                    ) {
+                        eprintln!("Failed to toggle plugin auto_detach: {}", e);
+                    }
+
+                    // 显示主窗口
+                    if let Some(main_window) = app_for_menu.get_webview_window("main") {
+                        if let Err(e) = main_window.show() {
+                            eprintln!("Failed to show main window: {}", e);
+                        }
+                        if let Err(e) = main_window.set_focus() {
+                            eprintln!("Failed to focus main window: {}", e);
+                        }
+                    }
+                }
+            });
+
+            Ok(())
+        }
+        Err(e) => {
+            eprintln!("Failed to build plugin window: {}", e);
+            Err(format!("Failed to build plugin window: {}", e))
+        }
+    }
 }
 
 #[tauri::command]
@@ -1077,7 +1133,7 @@ pub fn execute_plugin_entry(
             }
             "html" => {
                 // UI plugin - check auto_detach first, then display mode
-                let should_open_in_window = plugin.manifest.auto_detach 
+                let should_open_in_window = plugin.manifest.auto_detach
                     || plugin.manifest.display_mode.as_str() == "window";
 
                 println!(
@@ -1086,250 +1142,62 @@ pub fn execute_plugin_entry(
                 );
 
                 if should_open_in_window {
-                        // Open in new webview window
-                        let app_clone = app.clone();
-                        tauri::async_runtime::spawn(async move {
-                            let window_label =
-                                format!("plugin_{}", plugin.manifest.id.replace('.', "_"));
-
-                            if let Some(window) = app_clone.get_webview_window(&window_label) {
-                                // 检查窗口是否被最小化，如果是则先取消最小化
-                                if let Ok(is_minimized) = window.is_minimized() {
-                                    if is_minimized {
-                                        if let Err(e) = window.unminimize() {
-                                            eprintln!("Failed to unminimize plugin window: {}", e);
-                                        }
-                                    }
-                                }
-                                // 显示窗口（如果被隐藏）
-                                if let Err(e) = window.show() {
-                                    eprintln!("Failed to show plugin window: {}", e);
-                                }
-                                // 聚焦窗口
-                                if let Err(e) = window.set_focus() {
-                                    eprintln!("Failed to focus plugin window: {}", e);
-                                }
-                                return;
-                            }
-
-                            // 使用自定义协议来加载插件文件
-                            let plugin_url = format!(
-                                "plugin://localhost/{}/{}",
-                                plugin.dir_name, plugin.manifest.entry
-                            );
-                            println!("[plugin_manager] Loading plugin from: {}", plugin_url);
-
-                            // 创建窗口菜单
-                            use tauri::menu::{Menu, MenuItemBuilder};
-                            let menu_result = (|| -> Result<Menu<tauri::Wry>, tauri::Error> {
-                                let back_to_inline = MenuItemBuilder::with_id("back_to_inline", "切换到主窗口模式")
-                                    .build(&app_clone)?;
-                                Menu::with_items(&app_clone, &[&back_to_inline])
-                            })();
-
-                            let mut builder = WebviewWindowBuilder::new(
-                                &app_clone,
-                                window_label.clone(),
-                                tauri::WebviewUrl::External(plugin_url.parse().unwrap()),
-                            )
-                            .title(plugin.manifest.name.clone())
-                            .inner_size(800.0, 600.0)
-                            .resizable(true)
-                            .decorations(false); // 隐藏系统标题栏
-
-                            // 如果菜单创建成功，添加到窗口
-                            if let Ok(menu) = menu_result {
-                                builder = builder.menu(menu);
-                            }
-
-                            match builder.build() {
-                                Ok(window) => {
-                                    let plugin_id_for_menu = plugin.manifest.id.clone();
-                                    let app_for_menu = app_clone.clone();
-                                    
-                                    // 监听窗口事件，用于注册/注销 ESC 快捷键
-                                    use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
-                                    use std::str::FromStr;
-                                    
-                                    let esc_shortcut = Shortcut::from_str("escape").unwrap();
-                                    let app_for_window_event = app_clone.clone();
-                                    let window_label_for_tracking = window.label().to_string();
-                                    
-                                    // 设置窗口焦点
-                                    if let Err(e) = window.set_focus() {
-                                        eprintln!("Failed to set focus on plugin window: {}", e);
-                                    }
-                                    
-                                    // 立即记录活跃窗口并注册 ESC 快捷键
-                                    let app_for_immediate = app_clone.clone();
-                                    let label_for_immediate = window_label_for_tracking.clone();
-                                    tauri::async_runtime::spawn(async move {
-                                        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-                                        
-                                        // 记录活跃窗口
-                                        if let Some(active_window_state) = app_for_immediate.try_state::<ActivePluginWindow>() {
-                                            if let Ok(mut active) = active_window_state.0.lock() {
-                                                *active = Some(label_for_immediate.clone());
-                                                println!("[plugin_manager] Set active plugin window: {}", label_for_immediate);
-                                            }
-                                        }
-                                        
-                                        // 注册 ESC 快捷键
-                                        println!("[plugin_manager] Registering ESC shortcut for plugin window");
-                                        let _ = app_for_immediate.global_shortcut().unregister(esc_shortcut);
-                                        if let Err(e) = app_for_immediate.global_shortcut().register(esc_shortcut) {
-                                            eprintln!("[plugin_manager] Failed to register ESC shortcut: {}", e);
-                                        } else {
-                                            println!("[plugin_manager] ESC shortcut registered successfully");
-                                        }
-                                    });
-                                    
-                                    let label_for_event = window_label_for_tracking.clone();
-                                    window.on_window_event(move |event| {
-                                        match event {
-                                            tauri::WindowEvent::Focused(true) => {
-                                                println!("[plugin_manager] Plugin window focused: {}", label_for_event);
-                                                
-                                                // 记录活跃窗口
-                                                if let Some(active_window_state) = app_for_window_event.try_state::<ActivePluginWindow>() {
-                                                    if let Ok(mut active) = active_window_state.0.lock() {
-                                                        *active = Some(label_for_event.clone());
-                                                        println!("[plugin_manager] Updated active plugin window: {}", label_for_event);
-                                                    }
-                                                }
-                                                
-                                                // 重新注册 ESC 快捷键
-                                                let _ = app_for_window_event.global_shortcut().unregister(esc_shortcut);
-                                                if let Err(e) = app_for_window_event.global_shortcut().register(esc_shortcut) {
-                                                    eprintln!("[plugin_manager] Failed to register ESC shortcut: {}", e);
-                                                } else {
-                                                    println!("[plugin_manager] ESC shortcut registered successfully");
-                                                }
-                                            }
-                                            tauri::WindowEvent::Focused(false) => {
-                                                println!("[plugin_manager] Plugin window unfocused: {}", label_for_event);
-                                                
-                                                // 清除活跃窗口记录
-                                                if let Some(active_window_state) = app_for_window_event.try_state::<ActivePluginWindow>() {
-                                                    if let Ok(mut active) = active_window_state.0.lock() {
-                                                        if active.as_ref() == Some(&label_for_event) {
-                                                            *active = None;
-                                                            println!("[plugin_manager] Cleared active plugin window");
-                                                        }
-                                                    }
-                                                }
-                                                
-                                                // 注销 ESC 快捷键
-                                                if let Err(e) = app_for_window_event.global_shortcut().unregister(esc_shortcut) {
-                                                    eprintln!("Failed to unregister ESC shortcut: {}", e);
-                                                }
-                                            }
-                                            tauri::WindowEvent::CloseRequested { .. } => {
-                                                println!("[plugin_manager] Plugin window closing: {}", label_for_event);
-                                                
-                                                // 清除活跃窗口记录
-                                                if let Some(active_window_state) = app_for_window_event.try_state::<ActivePluginWindow>() {
-                                                    if let Ok(mut active) = active_window_state.0.lock() {
-                                                        if active.as_ref() == Some(&label_for_event) {
-                                                            *active = None;
-                                                        }
-                                                    }
-                                                }
-                                                
-                                                let _ = app_for_window_event.global_shortcut().unregister(esc_shortcut);
-                                            }
-                                            _ => {}
-                                        }
-                                    });
-                                    
-                                    // 监听菜单事件
-                                    window.on_menu_event(move |window, event| {
-                                        if event.id().as_ref() == "back_to_inline" {
-                                            println!("[plugin_manager] Switching plugin {} back to inline mode", plugin_id_for_menu);
-                                            
-                                            // 关闭当前窗口
-                                            if let Err(e) = window.close() {
-                                                eprintln!("Failed to close plugin window: {}", e);
-                                            }
-                                            
-                                            // 切换插件的 auto_detach 为 false
-                                            if let Err(e) = toggle_plugin_auto_detach(
-                                                app_for_menu.clone(),
-                                                app_for_menu.state::<PluginStore>(),
-                                                plugin_id_for_menu.clone(),
-                                                false, // 设置为 false，切换回主窗口模式
-                                            ) {
-                                                eprintln!("Failed to toggle plugin auto_detach: {}", e);
-                                            }
-                                            
-                                            // 显示主窗口
-                                            if let Some(main_window) = app_for_menu.get_webview_window("main") {
-                                                if let Err(e) = main_window.show() {
-                                                    eprintln!("Failed to show main window: {}", e);
-                                                }
-                                                if let Err(e) = main_window.set_focus() {
-                                                    eprintln!("Failed to focus main window: {}", e);
-                                                }
-                                            }
-                                        }
-                                    });
-                                }
-                                Err(e) => {
-                                    eprintln!("Failed to build plugin window: {}", e);
-                                }
-                            }
-                        });
-                        Ok(())
+                    // Open in new webview window
+                    let app_clone = app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        if let Err(e) = create_or_show_plugin_window(app_clone, &plugin).await {
+                            eprintln!("Failed to create or show plugin window: {}", e);
+                        }
+                    });
+                    Ok(())
                 } else {
-                        // Display inline - read and inline all resources (CSS, JS) into HTML
-                        let html_content = std::fs::read_to_string(&entry_path)
-                            .map_err(|e| format!("Failed to read plugin HTML: {}", e))?;
+                    // Display inline - read and inline all resources (CSS, JS) into HTML
+                    let html_content = std::fs::read_to_string(&entry_path)
+                        .map_err(|e| format!("Failed to read plugin HTML: {}", e))?;
 
-                        let html_dir = entry_path.parent().unwrap_or(&plugin_dir);
+                    let html_dir = entry_path.parent().unwrap_or(&plugin_dir);
 
-                        // Inline all CSS and JS resources
-                        let mut modified_html = inline_resources(&html_content, html_dir);
+                    // Inline all CSS and JS resources
+                    let mut modified_html = inline_resources(&html_content, html_dir);
 
-                        // Inject Tauri API bridge and plugin ID
-                        modified_html = inject_tauri_bridge(&modified_html, &plugin.manifest.id);
+                    // Inject Tauri API bridge and plugin ID
+                    modified_html = inject_tauri_bridge(&modified_html, &plugin.manifest.id);
 
-                        // Send to frontend
-                        let main_window = app
-                            .get_webview_window("main")
-                            .ok_or_else(|| "Main window not found".to_string())?;
+                    // Send to frontend
+                    let main_window = app
+                        .get_webview_window("main")
+                        .ok_or_else(|| "Main window not found".to_string())?;
 
-                        // 特殊处理：当通过快捷键触发内联插件时，需要显示主窗口
-                        // 这是因为内联插件默认在主窗口中显示，如果主窗口隐藏，用户将看不到任何反馈
-                        // 即使用户为主窗口显示/隐藏绑定了其他快捷键，这里也需要确保窗口可见
-                        if let Ok(false) = main_window.is_visible() {
-                            if let Err(e) = main_window.show() {
-                                eprintln!("[plugin_manager] Warning: Failed to show main window for inline plugin: {}", e);
-                            }
-                            if let Err(e) = main_window.set_focus() {
-                                eprintln!("[plugin_manager] Warning: Failed to focus main window for inline plugin: {}", e);
-                            }
+                    // 特殊处理：当通过快捷键触发内联插件时，需要显示主窗口
+                    // 这是因为内联插件默认在主窗口中显示，如果主窗口隐藏，用户将看不到任何反馈
+                    // 即使用户为主窗口显示/隐藏绑定了其他快捷键，这里也需要确保窗口可见
+                    if let Ok(false) = main_window.is_visible() {
+                        if let Err(e) = main_window.show() {
+                            eprintln!("[plugin_manager] Warning: Failed to show main window for inline plugin: {}", e);
                         }
-
-                        #[derive(Serialize, Clone)]
-                        struct PluginInlinePayload {
-                            plugin_id: String,
-                            plugin_name: String,
-                            html_content: String,
+                        if let Err(e) = main_window.set_focus() {
+                            eprintln!("[plugin_manager] Warning: Failed to focus main window for inline plugin: {}", e);
                         }
+                    }
 
-                        let payload = PluginInlinePayload {
-                            plugin_id: plugin.manifest.id.clone(),
-                            plugin_name: plugin.manifest.name.clone(),
-                            html_content: modified_html,
-                        };
+                    #[derive(Serialize, Clone)]
+                    struct PluginInlinePayload {
+                        plugin_id: String,
+                        plugin_name: String,
+                        html_content: String,
+                    }
 
-                        main_window
-                            .emit("show_plugin_inline", payload)
-                            .map_err(|e| {
-                                format!("Failed to emit show_plugin_inline event: {}", e)
-                            })?;
+                    let payload = PluginInlinePayload {
+                        plugin_id: plugin.manifest.id.clone(),
+                        plugin_name: plugin.manifest.name.clone(),
+                        html_content: modified_html,
+                    };
 
-                        Ok(())
+                    main_window
+                        .emit("show_plugin_inline", payload)
+                        .map_err(|e| format!("Failed to emit show_plugin_inline event: {}", e))?;
+
+                    Ok(())
                 }
             }
             _ => Err(format!("Unsupported plugin entry type: {}", extension)),
