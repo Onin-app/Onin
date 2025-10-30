@@ -171,6 +171,9 @@
 
   const handleImportPlugin = async () => {
     try {
+      // 锁定窗口关闭，防止文件对话框打开时窗口自动隐藏
+      await invoke("acquire_window_close_lock");
+
       // 使用 Tauri 的文件对话框选择插件目录
       const { open } = await import("@tauri-apps/plugin-dialog");
 
@@ -179,6 +182,9 @@
         multiple: false,
         title: "选择插件目录",
       });
+
+      // 释放窗口关闭锁
+      await invoke("release_window_close_lock");
 
       if (!selected) {
         console.log("用户取消了选择");
@@ -205,6 +211,13 @@
       });
     } catch (error) {
       console.error("导入插件失败:", error);
+
+      // 确保在错误情况下也释放锁
+      try {
+        await invoke("release_window_close_lock");
+      } catch (unlockError) {
+        console.error("释放窗口锁失败:", unlockError);
+      }
 
       await invoke("show_notification", {
         options: {
