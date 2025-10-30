@@ -827,23 +827,31 @@ async fn create_or_show_plugin_window(
 ) -> Result<(), String> {
     let window_label = format!("plugin_{}", plugin.manifest.id.replace('.', "_"));
 
-    // 如果窗口已存在，显示并聚焦
+    // 如果窗口已存在，切换显示状态
     if let Some(window) = app.get_webview_window(&window_label) {
-        // 检查窗口是否被最小化，如果是则先取消最小化
-        if let Ok(is_minimized) = window.is_minimized() {
+        // 检查窗口是否被最小化
+        let is_minimized = window.is_minimized().unwrap_or(false);
+        // 检查窗口是否可见
+        let is_visible = window.is_visible().unwrap_or(false);
+        
+        if is_minimized || !is_visible {
+            // 窗口被最小化或隐藏，显示并聚焦
             if is_minimized {
                 if let Err(e) = window.unminimize() {
                     eprintln!("Failed to unminimize plugin window: {}", e);
                 }
             }
-        }
-        // 显示窗口（如果被隐藏）
-        if let Err(e) = window.show() {
-            eprintln!("Failed to show plugin window: {}", e);
-        }
-        // 聚焦窗口
-        if let Err(e) = window.set_focus() {
-            eprintln!("Failed to focus plugin window: {}", e);
+            if let Err(e) = window.show() {
+                eprintln!("Failed to show plugin window: {}", e);
+            }
+            if let Err(e) = window.set_focus() {
+                eprintln!("Failed to focus plugin window: {}", e);
+            }
+        } else {
+            // 窗口已显示，最小化它
+            if let Err(e) = window.minimize() {
+                eprintln!("Failed to minimize plugin window: {}", e);
+            }
         }
         return Ok(());
     }
