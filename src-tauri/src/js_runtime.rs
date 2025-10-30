@@ -1087,6 +1087,11 @@ pub async fn clear_all_plugin_runtimes() -> Result<(), String> {
     manager.clear_all_plugins().await
 }
 
+pub async fn clear_plugin_runtime(plugin_id: &str) -> Result<(), String> {
+    let manager = get_plugin_runtime_manager().await?;
+    manager.clear_plugin(plugin_id.to_string()).await
+}
+
 pub async fn execute_js(
     app_handle: &AppHandle,
     js_code: &str,

@@ -1615,17 +1615,19 @@ pub fn uninstall_plugin(
 ) -> Result<(), String> {
     println!("[plugin_manager] Uninstalling plugin: {}", plugin_id);
 
-    // 1. 从 store 中移除
-    {
+    // 1. 从 store 中移除（如果存在）
+    let plugin_was_in_store = {
         let mut store_lock = store.0.lock().unwrap();
-        if store_lock.remove(&plugin_id).is_none() {
-            return Err(format!("Plugin not found: {}", plugin_id));
-        }
+        store_lock.remove(&plugin_id).is_some()
+    };
+
+    if plugin_was_in_store {
+        println!("[plugin_manager] Plugin removed from store: {}", plugin_id);
+    } else {
+        println!("[plugin_manager] Plugin not found in store, will try to clean up files: {}", plugin_id);
     }
 
-    println!("[plugin_manager] Plugin removed from store: {}", plugin_id);
-
-    // 2. 删除符号链接
+    // 2. 删除符号链接（即使插件不在 store 中也尝试删除）
     let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let plugin_link_path = data_dir.join("plugins").join(&plugin_id);
 
@@ -1636,14 +1638,45 @@ pub fn uninstall_plugin(
         );
         #[cfg(windows)]
         {
+            // 在 Windows 上，使用 symlink_metadata 检查是否为符号链接
             let metadata = std::fs::symlink_metadata(&plugin_link_path)
                 .map_err(|e| format!("Failed to get symlink metadata: {}", e))?;
-            if metadata.is_dir() {
-                std::fs::remove_dir(&plugin_link_path)
-                    .map_err(|e| format!("Failed to remove plugin link: {}", e))?;
+            
+            let file_type = metadata.file_type();
+            let is_symlink = file_type.is_symlink();
+            
+            println!("[plugin_manager] Symlink metadata - is_dir: {}, is_file: {}, is_symlink: {}", 
+                metadata.is_dir(), file_type.is_file(), is_symlink);
+            
+            // 对于符号链接，Windows 需要根据链接类型使用不同的删除方法
+            if is_symlink {
+                // 在 Windows 上，目录符号链接的 is_dir() 可能返回 false（如果目标不存在）
+                // 我们先尝试作为目录删除，如果失败再尝试作为文件删除
+                println!("[plugin_manager] Attempting to remove symlink (trying directory first)...");
+                match std::fs::remove_dir(&plugin_link_path) {
+                    Ok(_) => {
+                        println!("[plugin_manager] Successfully removed directory symlink");
+                    }
+                    Err(e) => {
+                        println!("[plugin_manager] Failed to remove as directory ({}), trying as file...", e);
+                        std::fs::remove_file(&plugin_link_path)
+                            .map_err(|e2| format!("Failed to remove plugin link as both directory and file. Dir error: {}, File error: {}", e, e2))?;
+                        println!("[plugin_manager] Successfully removed file symlink");
+                    }
+                }
             } else {
-                std::fs::remove_file(&plugin_link_path)
-                    .map_err(|e| format!("Failed to remove plugin link: {}", e))?;
+                // 不是符号链接，可能是实际的目录或文件
+                if metadata.is_dir() {
+                    println!("[plugin_manager] Removing actual directory (not a symlink)...");
+                    std::fs::remove_dir_all(&plugin_link_path)
+                        .map_err(|e| format!("Failed to remove plugin directory: {}", e))?;
+                    println!("[plugin_manager] Successfully removed directory");
+                } else {
+                    println!("[plugin_manager] Removing actual file (not a symlink)...");
+                    std::fs::remove_file(&plugin_link_path)
+                        .map_err(|e| format!("Failed to remove plugin file: {}", e))?;
+                    println!("[plugin_manager] Successfully removed file");
+                }
             }
         }
         #[cfg(not(windows))]
@@ -1651,19 +1684,48 @@ pub fn uninstall_plugin(
             std::fs::remove_file(&plugin_link_path)
                 .map_err(|e| format!("Failed to remove plugin link: {}", e))?;
         }
+    } else {
+        println!("[plugin_manager] Plugin link does not exist: {:?}", plugin_link_path);
     }
 
     // 3. 清理插件状态
+    println!("[plugin_manager] Cleaning plugin states...");
     let plugin_states = load_plugin_states(&app);
     let mut new_states = plugin_states.clone();
     new_states.remove(&plugin_id);
     save_plugin_states(&app, &new_states)?;
+    println!("[plugin_manager] Plugin states cleaned");
 
     // 4. 清理插件设置
+    println!("[plugin_manager] Cleaning plugin settings...");
     if let Ok(settings_path) = get_plugin_settings_path(&app, &plugin_id) {
         if settings_path.exists() {
-            let _ = std::fs::remove_file(settings_path);
+            match std::fs::remove_file(&settings_path) {
+                Ok(_) => println!("[plugin_manager] Plugin settings removed: {:?}", settings_path),
+                Err(e) => eprintln!("[plugin_manager] Warning: Failed to remove settings file: {}", e),
+            }
+        } else {
+            println!("[plugin_manager] No settings file to remove");
         }
+    }
+
+    // 5. 清理 JavaScript 运行时
+    println!("[plugin_manager] Cleaning JavaScript runtime...");
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| format!("Failed to create runtime: {}", e))?;
+    
+    rt.block_on(async {
+        if let Err(e) = crate::js_runtime::clear_plugin_runtime(&plugin_id).await {
+            eprintln!("[plugin_manager] Warning: Failed to clear JS runtime for {}: {}", plugin_id, e);
+        } else {
+            println!("[plugin_manager] JavaScript runtime cleaned");
+        }
+    });
+
+    if !plugin_was_in_store && !plugin_link_path.exists() {
+        return Err(format!("Plugin not found: {}", plugin_id));
     }
 
     println!(
