@@ -1,7 +1,9 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import { get } from "svelte/store";
-  import { DropdownMenu, ScrollArea, Separator } from "bits-ui";
+  import autoAnimate from "@formkit/auto-animate";
+  import type { Action } from "svelte/action";
+  import { DropdownMenu, ScrollArea } from "bits-ui";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
@@ -15,7 +17,6 @@
     Check,
     CaretLeft,
   } from "phosphor-svelte";
-
   import { goto } from "$app/navigation";
   import { fuzzyMatch } from "$lib/utils/fuzzyMatch";
   import { Theme, type LaunchableItem } from "$lib/type";
@@ -27,6 +28,14 @@
   import FileAttachment from "$lib/components/FileAttachment.svelte";
 
   import "../index.css";
+
+  // AutoAnimate action for file attachments
+  const animate: Action<HTMLElement> = (node) => {
+    autoAnimate(node, {
+      duration: 200,
+      easing: "ease-in-out",
+    });
+  };
 
   let inputValue = $state<string>("");
   let originAppList = $state<LaunchableItem[]>([]);
@@ -468,10 +477,10 @@
         aria-label="输入区域"
       >
         {#if attachedFiles.length > 0}
-          <div class="flex flex-wrap items-center gap-1.5">
+          <div use:animate class="flex flex-wrap items-center gap-1.5">
             {#if showAllFiles}
               <!-- 展开模式：显示所有文件 -->
-              {#each attachedFiles as file, index}
+              {#each attachedFiles as file, index (file.name + index)}
                 <FileAttachment {file} onRemove={() => removeFile(index)} />
               {/each}
             {:else}
@@ -614,56 +623,58 @@
         <ScrollArea.Root class="h-full w-full rounded-[10px] border px-2 py-2">
           <ScrollArea.Viewport class="h-full w-full">
             <!-- App list display area -->
-            <div class="ajp-list overflow-auto">
-              {#each appList as app, index}
-                <button
-                  role="option"
-                  aria-selected={selectedIndex === index}
-                  class="flex w-full rounded p-2 text-left text-2xl {selectedIndex !==
-                  index
-                    ? 'hover:bg-neutral-200 dark:hover:bg-neutral-700'
-                    : ''} {selectedIndex === index
-                    ? 'bg-neutral-300 dark:bg-neutral-600'
-                    : ''}"
-                  onclick={() => openApp(app)}
-                >
-                  {#if app.icon}
-                    {#if app.icon_type === "Base64"}
-                      <img
-                        src={`data:image/png;base64,${app.icon}`}
-                        class="mr-2 inline-block h-8 w-8"
-                        alt=""
-                      />
-                    {:else}
-                      <!-- 所有其他情况使用 Phosphor 图标 -->
-                      <div
-                        class="mr-2 flex h-8 w-8 items-center justify-center rounded-md bg-gray-200 dark:bg-gray-700"
-                      >
-                        <PhosphorIcon icon={app.icon} class="h-6 w-6" />
+            <div class="app-list">
+              <div use:animate>
+                {#each appList as app, index (app.path + app.name)}
+                  <button
+                    role="option"
+                    aria-selected={selectedIndex === index}
+                    class="flex w-full rounded p-2 text-left text-2xl transition-all duration-200 {selectedIndex !==
+                    index
+                      ? 'hover:bg-neutral-200 dark:hover:bg-neutral-700'
+                      : ''} {selectedIndex === index
+                      ? 'bg-neutral-300 dark:bg-neutral-600'
+                      : ''}"
+                    onclick={() => openApp(app)}
+                  >
+                    {#if app.icon}
+                      {#if app.icon_type === "Base64"}
+                        <img
+                          src={`data:image/png;base64,${app.icon}`}
+                          class="mr-2 inline-block h-8 w-8"
+                          alt=""
+                        />
+                      {:else}
+                        <!-- 所有其他情况使用 Phosphor 图标 -->
+                        <div
+                          class="mr-2 flex h-8 w-8 items-center justify-center rounded-md bg-gray-200 dark:bg-gray-700"
+                        >
+                          <PhosphorIcon icon={app.icon} class="h-6 w-6" />
+                        </div>
+                      {/if}
+                    {/if}
+                    <div class="flex flex-1 flex-col">
+                      <div class="flex items-center justify-between">
+                        <span>
+                          {app.name}
+                        </span>
+                        <span
+                          class="rounded-md bg-neutral-200 px-1.5 py-0.5 text-xs text-neutral-700 dark:bg-neutral-700 dark:text-neutral-300"
+                        >
+                          {app.source_display || app.source}
+                        </span>
                       </div>
-                    {/if}
-                  {/if}
-                  <div class="flex flex-1 flex-col">
-                    <div class="flex items-center justify-between">
-                      <span>
-                        {app.name}
-                      </span>
-                      <span
-                        class="rounded-md bg-neutral-200 px-1.5 py-0.5 text-xs text-neutral-700 dark:bg-neutral-700 dark:text-neutral-300"
-                      >
-                        {app.source_display || app.source}
-                      </span>
+                      {#if app.source !== "Command"}
+                        <span
+                          class="text-neutral-399 text-xs dark:text-neutral-500"
+                        >
+                          {app.path}
+                        </span>
+                      {/if}
                     </div>
-                    {#if app.source !== "Command"}
-                      <span
-                        class="text-neutral-399 text-xs dark:text-neutral-500"
-                      >
-                        {app.path}
-                      </span>
-                    {/if}
-                  </div>
-                </button>
-              {/each}
+                  </button>
+                {/each}
+              </div>
             </div>
           </ScrollArea.Viewport>
           <ScrollArea.Scrollbar
