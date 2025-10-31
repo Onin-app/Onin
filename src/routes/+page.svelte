@@ -13,6 +13,7 @@
     PuzzlePiece,
     CaretRight,
     Check,
+    CaretLeft,
   } from "phosphor-svelte";
 
   import { goto } from "$app/navigation";
@@ -23,6 +24,7 @@
   import { focusInputTrigger } from "$lib/stores/focusInput";
   import { detachWindowShortcut } from "$lib/stores/shortcuts";
   import PhosphorIcon from "$lib/components/PhosphorIcon.svelte";
+  import FileAttachment from "$lib/components/FileAttachment.svelte";
 
   import "../index.css";
 
@@ -32,6 +34,8 @@
   let selectedIndex = $state<number>(0);
   let currentTheme = $state<Theme>(Theme.DARK);
   let unlisten = $state<null | (() => void)>(null);
+  let attachedFiles = $state<File[]>([]);
+  let showAllFiles = $state<boolean>(false);
 
   // Plugin inline display state
   let showPluginInline = $state<boolean>(false);
@@ -68,6 +72,7 @@
       return;
     }
     inputValue = "";
+    clearAttachments();
     appList = originAppList;
     selectedIndex = 0;
     invoke("close_main_window");
@@ -211,6 +216,55 @@
     selectedIndex = 0;
   };
 
+  const handlePaste = async (e: ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    const files: File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.kind === "file") {
+        const file = item.getAsFile();
+        if (file) {
+          files.push(file);
+        }
+      }
+    }
+
+    if (files.length > 0) {
+      e.preventDefault();
+      attachedFiles = [...attachedFiles, ...files];
+      console.log("Attached files:", attachedFiles);
+    }
+  };
+
+  const handleDrop = (e: DragEvent) => {
+    e.preventDefault();
+    const files = Array.from(e.dataTransfer?.files || []);
+    if (files.length > 0) {
+      attachedFiles = [...attachedFiles, ...files];
+      console.log("Dropped files:", attachedFiles);
+    }
+  };
+
+  const handleDragOver = (e: DragEvent) => {
+    e.preventDefault();
+  };
+
+  // 清理附件和相关状态
+  const clearAttachments = () => {
+    attachedFiles = [];
+    showAllFiles = false;
+  };
+
+  const removeFile = (index: number) => {
+    attachedFiles = attachedFiles.filter((_, i) => i !== index);
+    // 如果删除后只剩1个或0个文件，自动收起
+    if (attachedFiles.length <= 1) {
+      showAllFiles = false;
+    }
+  };
+
   const openApp = async (app: LaunchableItem) => {
     try {
       if (app.action) {
@@ -226,6 +280,7 @@
         });
       }
       inputValue = "";
+      clearAttachments();
       appList = originAppList;
       selectedIndex = 0;
     } catch (error) {
@@ -393,8 +448,8 @@
     tabindex="0"
     onkeydown={handleKeyDown}
   >
-    <div class="flex items-center pb-2">
-      <button class="cursor-pointer" onclick={handleToSettings}>
+    <div class="flex items-center gap-2 pb-2">
+      <button class="flex-shrink-0 cursor-pointer" onclick={handleToSettings}>
         <img
           src="/ff_logo_{getTheme(currentTheme) === Theme.DARK
             ? Theme.LIGHT
@@ -403,15 +458,73 @@
           alt="Tauri logo"
         />
       </button>
-      <input
-        bind:this={inputElement}
-        class="ml-2 h-[60px] w-full p-2 text-2xl focus:ring-0 focus:outline-none active:ring-0 active:outline-none"
-        type="text"
-        placeholder="Hi Baize!"
-        bind:value={inputValue}
-        oninput={handleInput}
-      />
-      <div>
+      <div
+        class="flex w-full {showAllFiles
+          ? 'flex-col gap-2'
+          : 'flex-row items-center gap-2'} rounded-lg border border-neutral-300 bg-white px-2 py-2 dark:border-neutral-600 dark:bg-neutral-800"
+        ondrop={handleDrop}
+        ondragover={handleDragOver}
+        role="region"
+        aria-label="输入区域"
+      >
+        {#if attachedFiles.length > 0}
+          <div class="flex flex-wrap items-center gap-1.5">
+            {#if showAllFiles}
+              <!-- 展开模式：显示所有文件 -->
+              {#each attachedFiles as file, index}
+                <FileAttachment {file} onRemove={() => removeFile(index)} />
+              {/each}
+            {:else}
+              <!-- 折叠模式：只显示第一个文件 -->
+              <FileAttachment
+                file={attachedFiles[0]}
+                onRemove={() => removeFile(0)}
+              />
+            {/if}
+            {#if attachedFiles.length > 1}
+              <button
+                class="inline-flex h-[34px] items-center gap-1 rounded-md border px-2 text-sm font-medium transition-colors {showAllFiles
+                  ? 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-600 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50'
+                  : 'border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100 dark:border-orange-600 dark:bg-orange-900/30 dark:text-orange-300 dark:hover:bg-orange-900/50'}"
+                onclick={() => {
+                  showAllFiles = !showAllFiles;
+                }}
+                aria-label={showAllFiles ? "收起文件" : "展开所有文件"}
+              >
+                {#if showAllFiles}
+                  <CaretLeft class="size-4" weight="bold" />
+                  <span>收起</span>
+                {:else}
+                  <span>+{attachedFiles.length - 1}</span>
+                  <CaretRight class="size-4" weight="bold" />
+                {/if}
+              </button>
+            {/if}
+          </div>
+        {/if}
+        <input
+          bind:this={inputElement}
+          class="{showAllFiles
+            ? 'w-full'
+            : 'min-w-0 flex-1'} h-[34px] bg-transparent text-2xl focus:ring-0 focus:outline-none active:ring-0 active:outline-none"
+          type="text"
+          placeholder="Hi Baize!"
+          bind:value={inputValue}
+          oninput={handleInput}
+          onpaste={handlePaste}
+          onkeydown={(e) => {
+            if (
+              e.key === "Backspace" &&
+              inputValue === "" &&
+              attachedFiles.length > 0
+            ) {
+              e.preventDefault();
+              removeFile(attachedFiles.length - 1);
+            }
+          }}
+        />
+      </div>
+      <div class="flex-shrink-0">
         {#if showPluginInline}
           <DropdownMenu.Root>
             <DropdownMenu.Trigger class="ml-2 cursor-pointer">
@@ -458,7 +571,7 @@
                 </DropdownMenu.Item>
                 <DropdownMenu.CheckboxItem
                   bind:checked={currentPluginAutoDetach}
-                  class="rounded-button data-highlighted:bg-muted flex h-10 items-center py-3 pr-1.5 pl-3 text-sm font-medium ring-0! ring-transparent! select-none focus-visible:outline-none cursor-pointer"
+                  class="rounded-button data-highlighted:bg-muted flex h-10 cursor-pointer items-center py-3 pr-1.5 pl-3 text-sm font-medium ring-0! ring-transparent! select-none focus-visible:outline-none"
                   onCheckedChange={handleToggleAutoDetach}
                 >
                   {#snippet children({ checked })}
