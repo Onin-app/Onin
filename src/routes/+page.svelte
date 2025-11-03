@@ -126,6 +126,16 @@
     // 1. 立即获取一次数据
     await fetchApps();
 
+    // 监听窗口显示事件，自动粘贴剪贴板内容
+    const unlistenWindowShow = await listen<boolean>(
+      "window_visibility",
+      async (event) => {
+        if (event.payload) {
+          await autoPasteClipboard();
+        }
+      },
+    );
+
     // Fetch initial data. The visibility listener is now handled in the layout.
     // (async () => {
     //   const res = await invoke<AppInfo[]>("get_installed_apps");
@@ -193,6 +203,7 @@
       unlistenCommandsReady();
       unlistenPluginInline();
       unlistenDetachWindow();
+      unlistenWindowShow();
     };
   });
 
@@ -214,6 +225,60 @@
   const unsubscribe = theme.subscribe((value) => {
     currentTheme = value;
   });
+
+  // MIME 类型映射表
+  const MIME_TYPES: Record<string, string> = {
+    // 图片
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    gif: "image/gif",
+    webp: "image/webp",
+    svg: "image/svg+xml",
+    bmp: "image/bmp",
+    ico: "image/x-icon",
+    // 视频
+    mp4: "video/mp4",
+    webm: "video/webm",
+    avi: "video/x-msvideo",
+    mov: "video/quicktime",
+    // 音频
+    mp3: "audio/mpeg",
+    wav: "audio/wav",
+    ogg: "audio/ogg",
+    oga: "audio/ogg",
+    m4a: "audio/mp4",
+    // 文档
+    pdf: "application/pdf",
+    doc: "application/msword",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    xls: "application/vnd.ms-excel",
+    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ppt: "application/vnd.ms-powerpoint",
+    pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    // 压缩包
+    zip: "application/zip",
+    rar: "application/x-rar-compressed",
+    "7z": "application/x-7z-compressed",
+    tar: "application/x-tar",
+    gz: "application/gzip",
+    // 代码
+    js: "text/javascript",
+    ts: "text/typescript",
+    json: "application/json",
+    html: "text/html",
+    css: "text/css",
+    xml: "text/xml",
+    py: "text/x-python",
+    java: "text/x-java",
+    cpp: "text/x-c++src",
+    c: "text/x-csrc",
+    rs: "text/x-rust",
+    go: "text/x-go",
+    // 文本
+    txt: "text/plain",
+    md: "text/markdown",
+  };
 
   const handleInput = (
     e: Event & { currentTarget: EventTarget & HTMLInputElement },
@@ -244,6 +309,95 @@
       e.preventDefault();
       attachedFiles = [...attachedFiles, ...files];
       console.log("Attached files:", attachedFiles);
+    }
+  };
+
+  // 根据文件扩展名获取 MIME 类型
+  const getMimeType = (fileName: string): string => {
+    const ext = fileName.split(".").pop()?.toLowerCase() || "";
+    return MIME_TYPES[ext] || "application/octet-stream";
+  };
+
+  // 自动粘贴剪贴板内容
+  const autoPasteClipboard = async () => {
+    try {
+      // 如果已经有附件或输入内容，不自动粘贴
+      if (attachedFiles.length > 0 || inputValue.trim() !== "") {
+        return;
+      }
+
+      const clipboardContent = await invoke<{
+        text?: string;
+        files?: Array<{ path: string; name: string; is_directory: boolean }>;
+      }>("get_clipboard_content");
+
+      // 处理文件路径
+      if (clipboardContent.files && clipboardContent.files.length > 0) {
+        const files: File[] = [];
+
+        for (const fileInfo of clipboardContent.files) {
+          // 文件夹不需要读取内容
+          if (fileInfo.is_directory) {
+            const placeholderBlob = new Blob([]);
+            const file = new File([placeholderBlob], fileInfo.name, {
+              type: "application/x-directory",
+            });
+            Object.defineProperty(file, "path", {
+              value: fileInfo.path,
+              writable: false,
+            });
+            files.push(file);
+            continue;
+          }
+
+          try {
+            // 使用 Tauri 的文件系统 API 读取文件
+            const fileData = await invoke<number[]>("plugin_fs_read_file", {
+              path: fileInfo.path,
+            });
+
+            // 根据文件扩展名获取正确的 MIME 类型
+            const mimeType = getMimeType(fileInfo.name);
+
+            // 将数字数组转换为 Uint8Array
+            const uint8Array = new Uint8Array(fileData);
+            const blob = new Blob([uint8Array], { type: mimeType });
+            const file = new File([blob], fileInfo.name, {
+              type: mimeType,
+            });
+            // 添加路径属性
+            Object.defineProperty(file, "path", {
+              value: fileInfo.path,
+              writable: false,
+            });
+            files.push(file);
+          } catch (error) {
+            console.error("Failed to load file:", fileInfo.path, error);
+            // 如果读取失败，创建一个占位符文件对象（但仍然设置正确的 MIME 类型）
+            const mimeType = getMimeType(fileInfo.name);
+            const placeholderBlob = new Blob([], { type: mimeType });
+            const file = new File([placeholderBlob], fileInfo.name, {
+              type: mimeType,
+            });
+            // 添加自定义属性来标记这是一个路径引用
+            Object.defineProperty(file, "path", {
+              value: fileInfo.path,
+              writable: false,
+            });
+            files.push(file);
+          }
+        }
+
+        if (files.length > 0) {
+          attachedFiles = files;
+        }
+      }
+      // 处理文本内容
+      else if (clipboardContent.text) {
+        inputValue = clipboardContent.text.trim();
+      }
+    } catch (error) {
+      console.error("Failed to auto-paste clipboard:", error);
     }
   };
 

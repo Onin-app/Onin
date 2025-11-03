@@ -67,6 +67,7 @@ tokio-cron-scheduler = "0.13"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"
+clipboard-win = "5.4"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2"

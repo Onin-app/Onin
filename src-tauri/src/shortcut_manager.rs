@@ -337,6 +337,7 @@ fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::
                 Ok(false) => {
                     let _ = window.show();
                     let _ = window.set_focus();
+                    let _ = window.emit("window_visibility", &true);
                 }
                 Err(e) => {
                     eprintln!("Error checking window visibility: {}", e);

@@ -107,3 +107,73 @@ pub async fn plugin_clipboard_clear(
         }
     }
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ClipboardFile {
+    pub path: String,
+    pub name: String,
+    pub is_directory: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ClipboardContent {
+    pub text: Option<String>,
+    pub files: Option<Vec<ClipboardFile>>,
+}
+
+/// 读取剪贴板内容（文本或文件路径）
+#[tauri::command]
+pub async fn get_clipboard_content(
+    app: AppHandle,
+) -> Result<ClipboardContent, ClipboardError> {
+    // 先尝试读取文件路径
+    #[cfg(target_os = "windows")]
+    {
+        use clipboard_win::{formats, get_clipboard};
+        use std::path::{Path, PathBuf};
+        
+        // 尝试读取文件列表
+        if let Ok(files) = get_clipboard::<Vec<PathBuf>, _>(formats::FileList) {
+            let mut clipboard_files = Vec::new();
+            
+            for file_path in files.iter() {
+                let path_str = file_path.to_string_lossy().to_string();
+                let path = Path::new(&path_str);
+                
+                let name = path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("Unknown")
+                    .to_string();
+                
+                let is_directory = path.is_dir();
+                
+                clipboard_files.push(ClipboardFile {
+                    path: path_str,
+                    name,
+                    is_directory,
+                });
+            }
+            
+            if !clipboard_files.is_empty() {
+                return Ok(ClipboardContent {
+                    text: None,
+                    files: Some(clipboard_files),
+                });
+            }
+        }
+    }
+    
+    // 如果没有文件，尝试读取文本
+    match app.clipboard().read_text() {
+        Ok(text) => {
+            Ok(ClipboardContent {
+                text: Some(text),
+                files: None,
+            })
+        }
+        Err(e) => {
+            Err(ClipboardError::from(format!("Failed to read clipboard: {}", e)))
+        }
+    }
+}

@@ -40,7 +40,6 @@ pub const CLOSE_WINDOW_SHORTCUT_STR: &str = "escape";
 #[tauri::command]
 pub fn close_main_window(app: tauri::AppHandle, state: State<WindowState>) {
     if let Some(window) = app.get_webview_window("main") {
-        println!("🥳 这是ESC");
         // Informs the window event listener that this hide is intentional,
         // so it doesn't try to hide it again on focus loss.
         state
