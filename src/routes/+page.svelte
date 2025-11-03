@@ -26,6 +26,7 @@
   import { detachWindowShortcut } from "$lib/stores/shortcuts";
   import PhosphorIcon from "$lib/components/PhosphorIcon.svelte";
   import FileAttachment from "$lib/components/FileAttachment.svelte";
+  import TextAttachment from "$lib/components/TextAttachment.svelte";
 
   import "../index.css";
 
@@ -45,6 +46,7 @@
   let unlisten = $state<null | (() => void)>(null);
   let attachedFiles = $state<File[]>([]);
   let showAllFiles = $state<boolean>(false);
+  let attachedText = $state<string>(""); // 粘贴的文本内容
 
   // Plugin inline display state
   let showPluginInline = $state<boolean>(false);
@@ -81,6 +83,7 @@
       return;
     }
     inputValue = "";
+    attachedText = "";
     clearAttachments();
     appList = originAppList;
     selectedIndex = 0;
@@ -384,17 +387,20 @@
         }
 
         if (files.length > 0) {
-          // 粘贴文件时清空文本输入
+          // 粘贴文件时清空文本
           inputValue = "";
+          attachedText = "";
           attachedFiles = files;
         }
       }
       // 处理文本内容
       else if (clipboardContent.text) {
-        // 粘贴文本时清空附件
+        const text = clipboardContent.text.trim();
+        // 粘贴文本时清空附件和输入框
         attachedFiles = [];
         showAllFiles = false;
-        inputValue = clipboardContent.text.trim();
+        inputValue = "";
+        attachedText = text;
       }
 
       // 确保输入框获得焦点
@@ -421,6 +427,7 @@
   const clearAttachments = () => {
     attachedFiles = [];
     showAllFiles = false;
+    attachedText = "";
   };
 
   const removeFile = (index: number) => {
@@ -446,12 +453,23 @@
         });
       }
       inputValue = "";
+      attachedText = "";
       clearAttachments();
       appList = originAppList;
       selectedIndex = 0;
     } catch (error) {
       console.error("Failed to open app:", error);
     }
+  };
+
+  // 编辑文本附件
+  const editTextAttachment = () => {
+    inputValue = attachedText;
+    attachedText = "";
+    queueMicrotask(() => {
+      inputElement?.focus();
+      inputElement?.select();
+    });
   };
 
   const handleKeyDown = (e: KeyboardEvent) => {
@@ -633,7 +651,17 @@
         role="region"
         aria-label="输入区域"
       >
-        {#if attachedFiles.length > 0}
+        {#if attachedText}
+          <div use:animate class="flex flex-wrap items-center gap-1.5">
+            <TextAttachment
+              text={attachedText}
+              onEdit={editTextAttachment}
+              onRemove={() => {
+                attachedText = "";
+              }}
+            />
+          </div>
+        {:else if attachedFiles.length > 0}
           <div use:animate class="flex flex-wrap items-center gap-1.5">
             {#if showAllFiles}
               <!-- 展开模式：显示所有文件 -->
@@ -679,13 +707,20 @@
           oninput={handleInput}
           onpaste={handlePaste}
           onkeydown={(e) => {
-            if (
-              e.key === "Backspace" &&
-              inputValue === "" &&
-              attachedFiles.length > 0
-            ) {
+            if (e.key === "Backspace" && inputValue === "") {
               e.preventDefault();
-              removeFile(attachedFiles.length - 1);
+              if (attachedText) {
+                // 文本附件：进入编辑模式并全选
+                editTextAttachment();
+              } else if (attachedFiles.length > 0) {
+                // 文件附件：展开时删除最后一个，折叠时删除所有
+                if (showAllFiles) {
+                  removeFile(attachedFiles.length - 1);
+                } else {
+                  attachedFiles = [];
+                  showAllFiles = false;
+                }
+              }
             }
           }}
         />
