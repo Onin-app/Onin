@@ -321,11 +321,6 @@
   // 自动粘贴剪贴板内容
   const autoPasteClipboard = async () => {
     try {
-      // 如果已经有附件或输入内容，不自动粘贴
-      if (attachedFiles.length > 0 || inputValue.trim() !== "") {
-        return;
-      }
-
       const clipboardContent = await invoke<{
         text?: string;
         files?: Array<{ path: string; name: string; is_directory: boolean }>;
@@ -389,13 +384,21 @@
         }
 
         if (files.length > 0) {
+          // 粘贴文件时清空文本输入
+          inputValue = "";
           attachedFiles = files;
         }
       }
       // 处理文本内容
       else if (clipboardContent.text) {
+        // 粘贴文本时清空附件
+        attachedFiles = [];
+        showAllFiles = false;
         inputValue = clipboardContent.text.trim();
       }
+
+      // 确保输入框获得焦点
+      queueMicrotask(() => inputElement?.focus());
     } catch (error) {
       console.error("Failed to auto-paste clipboard:", error);
     }
