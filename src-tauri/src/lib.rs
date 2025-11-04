@@ -9,6 +9,7 @@ use tokio::sync::broadcast;
 use tracing_subscriber;
 use tracing_subscriber::fmt::format::FmtSpan; // 导入 FmtSpan
 
+mod app_config;
 mod command_manager;
 mod file_command_manager;
 pub mod icon_utils;
@@ -78,6 +79,9 @@ pub fn run() {
             Default::default(),
         ))
         .manage(plugin_api::command::PluginLoadedState(Default::default()))
+        .manage(app_config::AppConfigState(Mutex::new(
+            app_config::AppConfig::default(),
+        )))
         .register_uri_scheme_protocol("plugin", plugin_manager::handle_plugin_protocol)
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
@@ -228,6 +232,9 @@ pub fn run() {
             command_manager::refresh_commands,
             command_manager::get_plugin_commands_list,
             command_manager::get_plugin_id_mapping,
+            // App config commands
+            app_config::get_app_config,
+            app_config::update_app_config,
         ])
         .setup(move |app| {
             // Ensure the app data directory exists on startup.
@@ -236,6 +243,17 @@ pub fn run() {
                     eprintln!("Failed to create app data directory: {}", e);
                 }
             }
+
+            // Load app config
+            let config = app_config::load_config(app.handle()).unwrap_or_default();
+            let config_state = app.state::<app_config::AppConfigState>();
+            if let Ok(mut current_config) = config_state.0.lock() {
+                *current_config = config;
+            }
+
+            // Start clipboard monitor (Windows only)
+            #[cfg(target_os = "windows")]
+            plugin_api::clipboard::start_clipboard_monitor();
 
             // Initialize scheduler state
             let scheduler_state = tauri::async_runtime::block_on(async {

@@ -28,6 +28,7 @@
   let autostartEnabled = $state<boolean>(false);
   let trayIconEnabled = $state<boolean>(false);
   let shortcut = $state<string>("");
+  let autoPasteTimeLimit = $state<number>(5);
 
   const getTheme = () => currentTheme;
   const setTheme = (value: Theme) => {
@@ -66,6 +67,19 @@
     }
   };
 
+  const handleAutoPasteTimeLimitChange = async () => {
+    try {
+      await invoke("update_app_config", {
+        config: {
+          auto_paste_time_limit: autoPasteTimeLimit,
+        },
+      });
+      console.log("Auto paste time limit updated:", autoPasteTimeLimit);
+    } catch (error) {
+      console.error("Failed to update auto paste time limit:", error);
+    }
+  };
+
   const unsubscribe = theme.subscribe((value) => {
     currentTheme = value;
   });
@@ -81,6 +95,12 @@
       trayIconEnabled = await invoke("is_tray_visible");
     } catch (e) {
       console.error("Failed to get tray visibility state:", e);
+    }
+    try {
+      const config = await invoke<{ auto_paste_time_limit: number }>("get_app_config");
+      autoPasteTimeLimit = config.auto_paste_time_limit;
+    } catch (e) {
+      console.error("Failed to get app config:", e);
     }
   });
 
@@ -158,6 +178,25 @@
         onSave={() => detachWindowShortcut.setShortcut($detachWindowShortcut)}
         showPresets={false}
       />
+    {/snippet}
+  </SetItem>
+
+  <h2 class="mt-4 text-xl font-bold">剪贴板设置</h2>
+  <SetItem title="自动粘贴时间限制（秒）">
+    {#snippet content()}
+      <div class="flex items-center gap-2">
+        <input
+          type="number"
+          min="0"
+          max="60"
+          bind:value={autoPasteTimeLimit}
+          onchange={handleAutoPasteTimeLimitChange}
+          class="w-20 rounded border border-neutral-300 bg-white px-2 py-1 text-sm dark:border-neutral-600 dark:bg-neutral-700"
+        />
+        <span class="text-sm text-neutral-600 dark:text-neutral-400">
+          {autoPasteTimeLimit === 0 ? "不限制" : `${autoPasteTimeLimit}秒内复制的内容会自动粘贴`}
+        </span>
+      </div>
     {/snippet}
   </SetItem>
 

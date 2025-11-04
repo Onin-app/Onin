@@ -327,7 +327,37 @@
       const clipboardContent = await invoke<{
         text?: string;
         files?: Array<{ path: string; name: string; is_directory: boolean }>;
+        timestamp?: number;
       }>("get_clipboard_content");
+
+      // 获取配置的时间限制
+      const config = await invoke<{ auto_paste_time_limit: number }>("get_app_config");
+      const timeLimit = config.auto_paste_time_limit;
+
+      console.log("Auto paste config:", { timeLimit, timestamp: clipboardContent.timestamp });
+
+      // 如果设置了时间限制（不为0），检查剪贴板内容的时间
+      if (timeLimit > 0 && clipboardContent.timestamp) {
+        const clipboardTimestamp = clipboardContent.timestamp;
+        const currentTime = Math.floor(Date.now() / 1000); // 当前时间（秒）
+        const timeDiff = currentTime - clipboardTimestamp;
+        
+        console.log("Time check:", { 
+          clipboardTimestamp, 
+          currentTime, 
+          timeDiff, 
+          timeLimit,
+          shouldPaste: timeDiff <= timeLimit 
+        });
+        
+        // 如果时间差超过限制，不自动粘贴
+        if (timeDiff > timeLimit) {
+          console.log(`Clipboard content is too old (${timeDiff}s > ${timeLimit}s), skipping auto-paste`);
+          return;
+        }
+        
+        console.log(`Clipboard content is recent (${timeDiff}s <= ${timeLimit}s), auto-pasting`);
+      }
 
       // 处理文件路径
       if (clipboardContent.files && clipboardContent.files.length > 0) {
