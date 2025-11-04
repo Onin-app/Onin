@@ -201,12 +201,21 @@
       handleDetachPlugin();
     });
 
+    // Listen for clear app clipboard event
+    const unlistenClearClipboard = await listen("clear_app_clipboard", () => {
+      console.log("Clearing app clipboard content");
+      attachedText = "";
+      attachedFiles = [];
+      showAllFiles = false;
+    });
+
     unlisten = () => {
       unlistenAppsUpdated();
       unlistenCommandsReady();
       unlistenPluginInline();
       unlistenDetachWindow();
       unlistenWindowShow();
+      unlistenClearClipboard();
     };
   });
 
@@ -334,10 +343,20 @@
       const config = await invoke<{ auto_paste_time_limit: number }>("get_app_config");
       const timeLimit = config.auto_paste_time_limit;
 
-      console.log("Auto paste config:", { timeLimit, timestamp: clipboardContent.timestamp });
+      console.log("Auto paste config:", { 
+        timeLimit, 
+        timestamp: clipboardContent.timestamp,
+        fullConfig: config 
+      });
 
       // 如果设置了时间限制（不为0），检查剪贴板内容的时间
-      if (timeLimit > 0 && clipboardContent.timestamp) {
+      if (timeLimit > 0) {
+        // 如果没有时间戳，说明内容已被清空或无效，不自动粘贴
+        if (!clipboardContent.timestamp) {
+          console.log("No timestamp available, skipping auto-paste");
+          return;
+        }
+        
         const clipboardTimestamp = clipboardContent.timestamp;
         const currentTime = Math.floor(Date.now() / 1000); // 当前时间（秒）
         const timeDiff = currentTime - clipboardTimestamp;

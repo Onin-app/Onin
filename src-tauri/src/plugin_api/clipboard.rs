@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use tauri_plugin_clipboard_manager::ClipboardExt;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -126,6 +126,7 @@ pub struct ClipboardContent {
 use std::sync::Mutex;
 use once_cell::sync::Lazy;
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::Arc;
 
 // 全局存储剪贴板内容的时间戳
 static CLIPBOARD_TIMESTAMP: Lazy<Mutex<u64>> = 
@@ -133,6 +134,12 @@ static CLIPBOARD_TIMESTAMP: Lazy<Mutex<u64>> =
 
 // 剪贴板监控状态
 static CLIPBOARD_MONITOR_STARTED: Lazy<Mutex<bool>> = Lazy::new(|| Mutex::new(false));
+
+// 全局存储 AppHandle 用于定时清空剪贴板
+static APP_HANDLE: Lazy<Mutex<Option<Arc<AppHandle>>>> = Lazy::new(|| Mutex::new(None));
+
+// 全局存储窗口隐藏时的时间戳
+static WINDOW_HIDE_TIMESTAMP: Lazy<Mutex<Option<u64>>> = Lazy::new(|| Mutex::new(None));
 
 /// 更新剪贴板时间戳
 fn update_clipboard_timestamp() {
@@ -157,7 +164,7 @@ fn get_clipboard_timestamp() -> Option<u64> {
 }
 
 /// 启动剪贴板监控（使用 clipboard-rs）
-pub fn start_clipboard_monitor() {
+pub fn start_clipboard_monitor(app: AppHandle) {
     let mut started = CLIPBOARD_MONITOR_STARTED.lock().unwrap();
     if *started {
         println!("[Clipboard] Monitor already started");
@@ -166,11 +173,18 @@ pub fn start_clipboard_monitor() {
     *started = true;
     drop(started);
     
+    // 保存 AppHandle
+    {
+        let mut handle = APP_HANDLE.lock().unwrap();
+        *handle = Some(Arc::new(app.clone()));
+    }
+    
     println!("[Clipboard] Starting clipboard monitor with clipboard-rs...");
     
     // 初始化时间戳
     update_clipboard_timestamp();
     
+    // 启动剪贴板变化监控线程
     std::thread::spawn(move || {
         use clipboard_rs::{
             ClipboardContext, ClipboardHandler, 
@@ -202,6 +216,92 @@ pub fn start_clipboard_monitor() {
         
         println!("[Clipboard Monitor] Watcher started");
         watcher.start_watch();
+    });
+    
+    // 启动定时清空检查线程
+    std::thread::spawn(move || {
+        use crate::app_config::AppConfigState;
+        use tauri::Emitter;
+        
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            
+            // 获取 AppHandle
+            let app_handle = {
+                let handle = APP_HANDLE.lock().unwrap();
+                handle.as_ref().map(|h| Arc::clone(h))
+            };
+            
+            if let Some(app) = app_handle {
+                // 检查窗口是否隐藏
+                let window_hidden = if let Some(window) = app.get_webview_window("main") {
+                    !window.is_visible().unwrap_or(true)
+                } else {
+                    false
+                };
+                
+                // 只有在窗口隐藏时才执行自动清空逻辑
+                if !window_hidden {
+                    // 窗口可见，重置窗口隐藏时间戳
+                    let mut hide_ts = WINDOW_HIDE_TIMESTAMP.lock().unwrap();
+                    *hide_ts = None;
+                    continue;
+                }
+                
+                // 记录窗口隐藏的时间戳
+                let hide_timestamp = {
+                    let mut hide_ts = WINDOW_HIDE_TIMESTAMP.lock().unwrap();
+                    if hide_ts.is_none() {
+                        let now = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs();
+                        *hide_ts = Some(now);
+                        now
+                    } else {
+                        hide_ts.unwrap()
+                    }
+                };
+                
+                // 获取配置
+                let config_state = app.state::<AppConfigState>();
+                let config = config_state.0.lock().unwrap();
+                let auto_clear_time_limit = config.auto_clear_time_limit;
+                drop(config);
+                
+                // 如果设置了自动清空时间限制
+                if auto_clear_time_limit > 0 {
+                    if get_clipboard_timestamp().is_some() {
+                        let now = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs();
+                        
+                        // 计算从窗口隐藏开始的时间
+                        let elapsed_since_hide = now - hide_timestamp;
+                        
+                        // 只有当窗口隐藏时间超过设置的时间限制时才清空
+                        if elapsed_since_hide >= auto_clear_time_limit {
+                            println!("[Clipboard Monitor] Window hidden for {} seconds, clearing app clipboard content", elapsed_since_hide);
+                            
+                            // 发送事件到前端，让前端清空应用内部的剪贴板内容
+                            if let Err(e) = app.emit("clear_app_clipboard", ()) {
+                                println!("[Clipboard Monitor] Failed to emit clear event: {}", e);
+                            } else {
+                                println!("[Clipboard Monitor] Clear event sent to frontend");
+                            }
+                            
+                            // 重置时间戳，避免重复清空
+                            let mut ts = CLIPBOARD_TIMESTAMP.lock().unwrap();
+                            *ts = 0;
+                            // 重置窗口隐藏时间戳
+                            let mut hide_ts = WINDOW_HIDE_TIMESTAMP.lock().unwrap();
+                            *hide_ts = None;
+                        }
+                    }
+                }
+            }
+        }
     });
 }
 

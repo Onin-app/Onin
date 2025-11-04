@@ -8,16 +8,25 @@ pub struct AppConfig {
     /// 自动粘贴时间限制（秒），0 表示不限制
     #[serde(default = "default_auto_paste_time_limit")]
     pub auto_paste_time_limit: u64,
+    
+    /// 自动清空剪贴板时间限制（秒），0 表示不自动清空
+    #[serde(default = "default_auto_clear_time_limit")]
+    pub auto_clear_time_limit: u64,
 }
 
 fn default_auto_paste_time_limit() -> u64 {
     5 // 默认 5 秒
 }
 
+fn default_auto_clear_time_limit() -> u64 {
+    0 // 默认不自动清空
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
             auto_paste_time_limit: default_auto_paste_time_limit(),
+            auto_clear_time_limit: default_auto_clear_time_limit(),
         }
     }
 }
@@ -62,7 +71,7 @@ pub fn save_config(app: &AppHandle, config: &AppConfig) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn get_app_config(app: AppHandle, state: tauri::State<'_, AppConfigState>) -> Result<AppConfig, String> {
+pub fn get_app_config(_app: AppHandle, state: tauri::State<'_, AppConfigState>) -> Result<AppConfig, String> {
     let config = state.0.lock().map_err(|e| e.to_string())?;
     Ok(config.clone())
 }

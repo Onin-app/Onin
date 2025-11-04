@@ -29,6 +29,7 @@
   let trayIconEnabled = $state<boolean>(false);
   let shortcut = $state<string>("");
   let autoPasteTimeLimit = $state<number>(5);
+  let autoClearTimeLimit = $state<number>(0);
 
   const getTheme = () => currentTheme;
   const setTheme = (value: Theme) => {
@@ -67,16 +68,21 @@
     }
   };
 
-  const handleAutoPasteTimeLimitChange = async () => {
+  const updateConfig = async () => {
     try {
+      console.log("Updating config with:", {
+        autoPasteTimeLimit,
+        autoClearTimeLimit,
+      });
       await invoke("update_app_config", {
         config: {
           auto_paste_time_limit: autoPasteTimeLimit,
+          auto_clear_time_limit: autoClearTimeLimit,
         },
       });
-      console.log("Auto paste time limit updated:", autoPasteTimeLimit);
+      console.log("Config updated successfully");
     } catch (error) {
-      console.error("Failed to update auto paste time limit:", error);
+      console.error("Failed to update config:", error);
     }
   };
 
@@ -97,8 +103,13 @@
       console.error("Failed to get tray visibility state:", e);
     }
     try {
-      const config = await invoke<{ auto_paste_time_limit: number }>("get_app_config");
+      const config = await invoke<{
+        auto_paste_time_limit: number;
+        auto_clear_time_limit: number;
+      }>("get_app_config");
       autoPasteTimeLimit = config.auto_paste_time_limit;
+      autoClearTimeLimit = config.auto_clear_time_limit;
+      console.log("Loaded config:", { autoPasteTimeLimit, autoClearTimeLimit });
     } catch (e) {
       console.error("Failed to get app config:", e);
     }
@@ -190,11 +201,32 @@
           min="0"
           max="60"
           bind:value={autoPasteTimeLimit}
-          onchange={handleAutoPasteTimeLimitChange}
+          onchange={updateConfig}
           class="w-20 rounded border border-neutral-300 bg-white px-2 py-1 text-sm dark:border-neutral-600 dark:bg-neutral-700"
         />
         <span class="text-sm text-neutral-600 dark:text-neutral-400">
-          {autoPasteTimeLimit === 0 ? "不限制" : `${autoPasteTimeLimit}秒内复制的内容会自动粘贴`}
+          {autoPasteTimeLimit === 0
+            ? "不限制"
+            : `${autoPasteTimeLimit}秒内复制的内容会自动粘贴`}
+        </span>
+      </div>
+    {/snippet}
+  </SetItem>
+  <SetItem title="自动清空剪贴板时间限制（秒）">
+    {#snippet content()}
+      <div class="flex items-center gap-2">
+        <input
+          type="number"
+          min="0"
+          max="300"
+          bind:value={autoClearTimeLimit}
+          onchange={updateConfig}
+          class="w-20 rounded border border-neutral-300 bg-white px-2 py-1 text-sm dark:border-neutral-600 dark:bg-neutral-700"
+        />
+        <span class="text-sm text-neutral-600 dark:text-neutral-400">
+          {autoClearTimeLimit === 0
+            ? "不自动清空"
+            : `${autoClearTimeLimit}秒后自动清空剪贴板内容`}
         </span>
       </div>
     {/snippet}

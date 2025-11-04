@@ -253,7 +253,7 @@ pub fn run() {
 
             // Start clipboard monitor (Windows only)
             #[cfg(target_os = "windows")]
-            plugin_api::clipboard::start_clipboard_monitor();
+            plugin_api::clipboard::start_clipboard_monitor(app.handle().clone());
 
             // Initialize scheduler state
             let scheduler_state = tauri::async_runtime::block_on(async {
