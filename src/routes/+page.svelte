@@ -19,6 +19,7 @@
   } from "phosphor-svelte";
   import { goto } from "$app/navigation";
   import { fuzzyMatch } from "$lib/utils/fuzzyMatch";
+  import { getMatchedCommands } from "$lib/utils/matchCommand";
   import { Theme, type LaunchableItem } from "$lib/type";
   import { theme, getTheme } from "$lib/utils/theme";
   import { escapeHandler } from "$lib/stores/escapeHandler";
@@ -41,6 +42,7 @@
   let inputValue = $state<string>("");
   let originAppList = $state<LaunchableItem[]>([]);
   let appList = $state<LaunchableItem[]>([]);
+  let matchedCommands = $state<LaunchableItem[]>([]);
   let selectedIndex = $state<number>(0);
   let currentTheme = $state<Theme>(Theme.DARK);
   let unlisten = $state<null | (() => void)>(null);
@@ -300,6 +302,16 @@
     inputValue = value;
     appList = apps;
     selectedIndex = 0;
+    updateMatchedCommands();
+  };
+
+  // 更新匹配的命令
+  const updateMatchedCommands = () => {
+    matchedCommands = getMatchedCommands(
+      originAppList,
+      attachedText,
+      attachedFiles,
+    );
   };
 
   const handlePaste = async (e: ClipboardEvent) => {
@@ -320,7 +332,8 @@
     if (files.length > 0) {
       e.preventDefault();
       attachedFiles = [...attachedFiles, ...files];
-      console.log("Attached files:", attachedFiles);
+      // Debug: console.log("Attached files count:", files.length);
+      updateMatchedCommands();
     }
   };
 
@@ -340,13 +353,15 @@
       }>("get_clipboard_content");
 
       // 获取配置的时间限制
-      const config = await invoke<{ auto_paste_time_limit: number }>("get_app_config");
+      const config = await invoke<{ auto_paste_time_limit: number }>(
+        "get_app_config",
+      );
       const timeLimit = config.auto_paste_time_limit;
 
-      console.log("Auto paste config:", { 
-        timeLimit, 
+      console.log("Auto paste config:", {
+        timeLimit,
         timestamp: clipboardContent.timestamp,
-        fullConfig: config 
+        fullConfig: config,
       });
 
       // 如果设置了时间限制（不为0），检查剪贴板内容的时间
@@ -356,26 +371,30 @@
           console.log("No timestamp available, skipping auto-paste");
           return;
         }
-        
+
         const clipboardTimestamp = clipboardContent.timestamp;
         const currentTime = Math.floor(Date.now() / 1000); // 当前时间（秒）
         const timeDiff = currentTime - clipboardTimestamp;
-        
-        console.log("Time check:", { 
-          clipboardTimestamp, 
-          currentTime, 
-          timeDiff, 
+
+        console.log("Time check:", {
+          clipboardTimestamp,
+          currentTime,
+          timeDiff,
           timeLimit,
-          shouldPaste: timeDiff <= timeLimit 
+          shouldPaste: timeDiff <= timeLimit,
         });
-        
+
         // 如果时间差超过限制，不自动粘贴
         if (timeDiff > timeLimit) {
-          console.log(`Clipboard content is too old (${timeDiff}s > ${timeLimit}s), skipping auto-paste`);
+          console.log(
+            `Clipboard content is too old (${timeDiff}s > ${timeLimit}s), skipping auto-paste`,
+          );
           return;
         }
-        
-        console.log(`Clipboard content is recent (${timeDiff}s <= ${timeLimit}s), auto-pasting`);
+
+        console.log(
+          `Clipboard content is recent (${timeDiff}s <= ${timeLimit}s), auto-pasting`,
+        );
       }
 
       // 处理文件路径
@@ -397,42 +416,23 @@
             continue;
           }
 
-          try {
-            // 使用 Tauri 的文件系统 API 读取文件
-            const fileData = await invoke<number[]>("plugin_fs_read_file", {
-              path: fileInfo.path,
-            });
+          // 主应用不需要读取文件内容，只需要文件路径和元信息
+          // 根据文件扩展名获取正确的 MIME 类型
+          const mimeType = getMimeType(fileInfo.name);
 
-            // 根据文件扩展名获取正确的 MIME 类型
-            const mimeType = getMimeType(fileInfo.name);
+          // 创建一个占位符文件对象（只包含元信息，不包含实际内容）
+          const placeholderBlob = new Blob([], { type: mimeType });
+          const file = new File([placeholderBlob], fileInfo.name, {
+            type: mimeType,
+          });
 
-            // 将数字数组转换为 Uint8Array
-            const uint8Array = new Uint8Array(fileData);
-            const blob = new Blob([uint8Array], { type: mimeType });
-            const file = new File([blob], fileInfo.name, {
-              type: mimeType,
-            });
-            // 添加路径属性
-            Object.defineProperty(file, "path", {
-              value: fileInfo.path,
-              writable: false,
-            });
-            files.push(file);
-          } catch (error) {
-            console.error("Failed to load file:", fileInfo.path, error);
-            // 如果读取失败，创建一个占位符文件对象（但仍然设置正确的 MIME 类型）
-            const mimeType = getMimeType(fileInfo.name);
-            const placeholderBlob = new Blob([], { type: mimeType });
-            const file = new File([placeholderBlob], fileInfo.name, {
-              type: mimeType,
-            });
-            // 添加自定义属性来标记这是一个路径引用
-            Object.defineProperty(file, "path", {
-              value: fileInfo.path,
-              writable: false,
-            });
-            files.push(file);
-          }
+          // 添加路径属性，插件可以通过这个路径读取文件
+          Object.defineProperty(file, "path", {
+            value: fileInfo.path,
+            writable: false,
+          });
+
+          files.push(file);
         }
 
         if (files.length > 0) {
@@ -440,6 +440,7 @@
           inputValue = "";
           attachedText = "";
           attachedFiles = files;
+          updateMatchedCommands();
         }
       }
       // 处理文本内容
@@ -450,6 +451,7 @@
         showAllFiles = false;
         inputValue = "";
         attachedText = text;
+        updateMatchedCommands();
       }
 
       // 确保输入框获得焦点
@@ -465,6 +467,7 @@
     if (files.length > 0) {
       attachedFiles = [...attachedFiles, ...files];
       console.log("Dropped files:", attachedFiles);
+      updateMatchedCommands();
     }
   };
 
@@ -477,6 +480,7 @@
     attachedFiles = [];
     showAllFiles = false;
     attachedText = "";
+    matchedCommands = [];
   };
 
   const removeFile = (index: number) => {
@@ -485,14 +489,68 @@
     if (attachedFiles.length <= 1) {
       showAllFiles = false;
     }
+    updateMatchedCommands();
   };
 
   const openApp = async (app: LaunchableItem) => {
     try {
       if (app.action) {
+        // 准备附件数据
+        const args: any = {};
+
+        // 添加输入框内容
+        if (inputValue) {
+          args.input = inputValue;
+        }
+
+        // 添加粘贴的文本内容
+        if (attachedText) {
+          args.text = attachedText;
+        }
+
+        // 分类并添加文件
+        if (attachedFiles.length > 0) {
+          const images: any[] = [];
+          const textFiles: any[] = [];
+          const otherFiles: any[] = [];
+          const folders: any[] = [];
+
+          attachedFiles.forEach((file) => {
+            const filePath = (file as any).path;
+            const fileInfo = {
+              name: file.name,
+              path: filePath || "",
+              type: file.type,
+              size: file.size,
+            };
+
+            if (file.type === "application/x-directory") {
+              folders.push(fileInfo);
+            } else if (file.type.startsWith("image/")) {
+              images.push(fileInfo);
+            } else if (
+              file.type === "text/plain" ||
+              file.type === "text/markdown" ||
+              file.name.endsWith(".txt") ||
+              file.name.endsWith(".md")
+            ) {
+              textFiles.push(fileInfo);
+            } else {
+              otherFiles.push(fileInfo);
+            }
+          });
+
+          // 添加分类后的文件
+          if (images.length > 0) args.images = images;
+          if (textFiles.length > 0) args.textFiles = textFiles;
+          if (otherFiles.length > 0) args.files = otherFiles;
+          if (folders.length > 0) args.folders = folders;
+        }
+
         await invoke("execute_command", {
           name: app.action,
           window: await WebviewWindow.getCurrent(),
+          args: Object.keys(args).length > 0 ? args : null,
         });
       } else if (app.source === "FileCommand") {
         // Handle custom items that might not have an action
@@ -515,6 +573,7 @@
   const editTextAttachment = () => {
     inputValue = attachedText;
     attachedText = "";
+    matchedCommands = [];
     queueMicrotask(() => {
       inputElement?.focus();
       inputElement?.select();
@@ -522,17 +581,20 @@
   };
 
   const handleKeyDown = (e: KeyboardEvent) => {
+    // 优先显示匹配命令
+    const displayList = matchedCommands.length > 0 ? matchedCommands : appList;
+
     if (e.key === "ArrowDown" || (e.key === "Tab" && !e.shiftKey)) {
       e.preventDefault();
       selectedIndex =
-        selectedIndex === appList.length - 1 ? 0 : selectedIndex + 1;
+        selectedIndex === displayList.length - 1 ? 0 : selectedIndex + 1;
     } else if (e.key === "ArrowUp" || (e.key === "Tab" && e.shiftKey)) {
       e.preventDefault();
       selectedIndex =
-        selectedIndex === 0 ? appList.length - 1 : selectedIndex - 1;
-    } else if (e.key === "Enter" && appList.length > 0) {
+        selectedIndex === 0 ? displayList.length - 1 : selectedIndex - 1;
+    } else if (e.key === "Enter" && displayList.length > 0) {
       e.preventDefault();
-      openApp(appList[selectedIndex]);
+      openApp(displayList[selectedIndex]);
     }
 
     // 保持选中项在可见范围内
@@ -866,7 +928,7 @@
             <!-- App list display area -->
             <div class="app-list">
               <div use:animate>
-                {#each appList as app, index (app.path + app.name)}
+                {#each matchedCommands.length > 0 ? matchedCommands : appList as app, index (app.path + app.name)}
                   <button
                     role="option"
                     aria-selected={selectedIndex === index}

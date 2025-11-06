@@ -161,6 +161,7 @@ fn get_initial_system_commands() -> Vec<Command> {
             source: ItemSource::Command,
             action: CommandAction::System(cmd_info.name.to_string()),
             origin: None,
+            matches: None,
         })
         .collect()
 }
@@ -192,6 +193,7 @@ async fn get_initial_app_commands() -> Vec<Command> {
                         source: ItemSource::Application,
                         action: CommandAction::App(path),
                         origin: app_info.origin,
+                        matches: None,
                     }
                 })
             })
@@ -220,6 +222,7 @@ async fn get_initial_file_commands(app: &AppHandle) -> Vec<Command> {
             source: ItemSource::FileCommand,
             action: CommandAction::File(item.path),
             origin: None,
+            matches: None,
         })
         .collect()
 }
@@ -259,6 +262,7 @@ fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
                     source: ItemSource::Plugin,
                     action: CommandAction::Plugin(plugin.manifest.id.clone()),
                     origin: None,
+                    matches: None,
                 });
 
                 // 2. 为每个插件的功能指令创建Command
@@ -274,6 +278,26 @@ fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
                         })
                         .collect();
 
+                    // Convert plugin matches to shared_types::CommandMatch
+                    let matches = if !cmd.matches.is_empty() {
+                        Some(
+                            cmd.matches
+                                .iter()
+                                .map(|m| crate::shared_types::CommandMatch {
+                                    match_type: m.match_type.clone(),
+                                    name: m.name.clone(),
+                                    description: m.description.clone(),
+                                    regexp: m.regexp.clone(),
+                                    min: m.min,
+                                    max: m.max,
+                                    extensions: m.extensions.clone(),
+                                })
+                                .collect(),
+                        )
+                    } else {
+                        None
+                    };
+
                     commands.push(Command {
                         name: format!("plugin_cmd_{}_{}", safe_plugin_id, safe_cmd_code),
                         title: cmd.name.clone(),
@@ -286,6 +310,7 @@ fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
                             command_code: cmd.code.clone(),
                         },
                         origin: None,
+                        matches,
                     });
                 }
             }

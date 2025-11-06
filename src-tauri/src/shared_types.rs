@@ -64,6 +64,31 @@ pub struct LaunchableItem {
     /// Display name for the source (e.g., plugin name instead of "Plugin")
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_display: Option<String>,
+    /// Match conditions for paste content
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub matches: Option<Vec<CommandMatch>>,
+}
+
+/// 命令匹配配置
+/// 
+/// 三层优雅降级模型：
+/// 1. 开发者层：只需配置 extensions
+/// 2. 系统层：自动映射为内部 MIME 类型
+/// 3. 运行层：优先 MIME 判断，fallback 到 extensions
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct CommandMatch {
+    #[serde(rename = "type")]
+    pub match_type: String, // "text" | "image" | "file" | "folder"
+    pub name: String,
+    pub description: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub regexp: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max: Option<u32>,
+    #[serde(default)]
+    pub extensions: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -100,6 +125,8 @@ pub struct Command {
     pub action: CommandAction,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<AppOrigin>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub matches: Option<Vec<CommandMatch>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]

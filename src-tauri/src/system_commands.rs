@@ -75,7 +75,12 @@ pub async fn get_basic_commands(app: AppHandle) -> Vec<Command> {
 // --- 3. Unified Command Executor ---
 
 #[command]
-pub async fn execute_command(name: String, app: AppHandle, window: tauri::WebviewWindow) {
+pub async fn execute_command(
+    name: String,
+    app: AppHandle,
+    window: tauri::WebviewWindow,
+    args: Option<serde_json::Value>,
+) {
     let commands = command_manager::load_commands(&app).await;
     if let Some(command) = commands.iter().find(|cmd| cmd.name == name) {
         match &command.action {
@@ -114,7 +119,7 @@ pub async fn execute_command(name: String, app: AppHandle, window: tauri::Webvie
                     execution_store,
                     plugin_id.clone(),
                     command_code.clone(),
-                    None,
+                    args,
                 ).await {
                     Ok(result) => {
                         if !result.success {

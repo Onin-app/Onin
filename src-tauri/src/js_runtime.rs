@@ -959,7 +959,11 @@ impl PluginRuntimeManager {
             .get_mut(plugin_id)
             .ok_or_else(|| format!("Plugin runtime not found: {}", plugin_id))?;
 
+        // 将 args 序列化为 JSON 字符串
+        let args_json = serde_json::to_string(&args).map_err(|e| e.to_string())?;
+
         // 构造调用代码
+        // 注意：第二个参数直接传递 JSON 对象（不用引号包裹）
         let call_code = format!(
             r#"
             (async () => {{
@@ -977,7 +981,7 @@ impl PluginRuntimeManager {
                 }}
             }})();
             "#,
-            command, args
+            command, args_json
         );
 
         // 执行调用

@@ -132,6 +132,66 @@ export interface PluginPermissions {
 }
 
 /**
+ * Plugin command keyword configuration
+ * @interface PluginCommandKeyword
+ */
+export interface PluginCommandKeyword {
+  /** Keyword name */
+  name: string;
+  /** Keyword type: "prefix" | "fuzzy" | "exact" */
+  type: string;
+}
+
+/**
+ * Plugin command match configuration
+ * 
+ * Three-layer graceful degradation model:
+ * 1. Developer layer: Only configure extensions (e.g., [".png", ".jpg"])
+ * 2. System layer: Automatically map extensions to internal MIME types
+ * 3. Runtime layer: Prioritize MIME type matching, fallback to extensions
+ * 
+ * @interface PluginCommandMatch
+ */
+export interface PluginCommandMatch {
+  /** Match type: "text" | "image" | "file" | "folder" */
+  type: 'text' | 'image' | 'file' | 'folder';
+  /** Match name */
+  name: string;
+  /** Match description */
+  description: string;
+  /** Regular expression for text matching (only for type="text", as an additional condition) */
+  regexp?: string;
+  /** Minimum count (text: character count, file/image/folder: file count) */
+  min?: number;
+  /** Maximum count (text: character count, file/image/folder: file count) */
+  max?: number;
+  /** 
+   * File extensions filter (e.g., [".png", ".jpg"], [".pdf"], [".txt", ".md"])
+   * Supports wildcards like "*"
+   * Only for type="file" or "image"
+   * System will automatically map extensions to MIME types for matching
+   */
+  extensions?: string[];
+}
+
+/**
+ * Plugin command configuration
+ * @interface PluginCommand
+ */
+export interface PluginCommand {
+  /** Command code (unique identifier) */
+  code: string;
+  /** Command name */
+  name: string;
+  /** Command description */
+  description: string;
+  /** Command keywords */
+  keywords: PluginCommandKeyword[];
+  /** Command match conditions */
+  matches?: PluginCommandMatch[];
+}
+
+/**
  * Plugin manifest configuration
  * @interface PluginManifest
  */
@@ -146,12 +206,14 @@ export interface PluginManifest {
   description: string;
   /** Entry file path */
   entry: string;
+  /** Plugin type */
+  type?: string;
   /** Permission configuration */
   permissions?: PluginPermissions;
   /** Command definitions */
-  commands?: Array<{
-    id: string;
-    name: string;
-    description: string;
-  }>;
+  commands?: PluginCommand[];
+  /** Display mode: "inline" | "window" */
+  displayMode?: string;
+  /** Auto detach to separate window */
+  autoDetach?: boolean;
 }

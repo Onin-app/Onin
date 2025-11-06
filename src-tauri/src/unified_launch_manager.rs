@@ -81,6 +81,7 @@ pub async fn get_all_launchable_items(
                 action: Some(cmd.name),
                 origin: cmd.origin,
                 source_display,
+                matches: cmd.matches,
             })
         })
         .collect();

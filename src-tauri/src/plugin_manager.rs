@@ -23,6 +23,8 @@ pub struct PluginCommandManifest {
     pub name: String,
     pub description: String,
     pub keywords: Vec<PluginCommandKeyword>,
+    #[serde(default)]
+    pub matches: Vec<PluginCommandMatch>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -30,6 +32,28 @@ pub struct PluginCommandKeyword {
     pub name: String,
     #[serde(rename = "type")]
     pub keyword_type: String,
+}
+
+/// 插件命令匹配配置
+/// 
+/// 三层优雅降级模型：
+/// 1. 开发者层：只需配置 extensions（如 [".png", ".jpg"]）
+/// 2. 系统层：自动将 extensions 映射为内部 MIME 类型
+/// 3. 运行层：优先使用 MIME 类型判断，fallback 到 extensions
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PluginCommandMatch {
+    #[serde(rename = "type")]
+    pub match_type: String, // "text" | "image" | "file" | "folder"
+    pub name: String,
+    pub description: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub regexp: Option<String>, // 仅 type=text 时使用，作为额外的匹配条件
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min: Option<u32>, // text: 字符数, file/image/folder: 文件数量
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max: Option<u32>,
+    #[serde(default)]
+    pub extensions: Vec<String>, // 文件扩展名数组（如 [".png", ".jpg"]）
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
