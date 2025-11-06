@@ -21,8 +21,10 @@ pub fn get_apps() -> Result<Vec<(String, Option<String>)>, String> {
 }
 
 pub fn open_app(path: &str) -> Result<(), String> {
-    Command::new("xdg-open")
-        .arg(path)
+    // 在 Linux 上，使用 nohup 和后台运行确保进程独立
+    Command::new("sh")
+        .arg("-c")
+        .arg(format!("nohup xdg-open '{}' > /dev/null 2>&1 &", path))
         .spawn()
         .map_err(|e| e.to_string())?;
     Ok(())
