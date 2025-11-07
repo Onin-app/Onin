@@ -20,7 +20,8 @@
   import { goto } from "$app/navigation";
   import { fuzzyMatch } from "$lib/utils/fuzzyMatch";
   import { getMatchedCommands } from "$lib/utils/matchCommand";
-  import { Theme, type LaunchableItem } from "$lib/type";
+  import { sortByUsage } from "$lib/utils/sortByUsage";
+  import { Theme, type LaunchableItem, type CommandUsageStats, type AppConfig } from "$lib/type";
   import { theme, getTheme } from "$lib/utils/theme";
   import { escapeHandler } from "$lib/stores/escapeHandler";
   import { focusInputTrigger } from "$lib/stores/focusInput";
@@ -49,6 +50,13 @@
   let attachedFiles = $state<File[]>([]);
   let showAllFiles = $state<boolean>(false);
   let attachedText = $state<string>(""); // 粘贴的文本内容
+  let usageStats = $state<CommandUsageStats[]>([]);
+  let appConfig = $state<AppConfig>({
+    auto_paste_time_limit: 5,
+    auto_clear_time_limit: 0,
+    sort_mode: "smart",
+    enable_usage_tracking: true,
+  });
 
   // Plugin inline display state
   let showPluginInline = $state<boolean>(false);
@@ -127,6 +135,15 @@
     // Set up plugin message handler
     pluginMessageHandler = handlePluginMessage;
     window.addEventListener("message", handlePluginMessage);
+
+    // 加载配置和使用统计
+    try {
+      appConfig = await invoke<AppConfig>("get_app_config");
+      usageStats = await invoke<CommandUsageStats[]>("get_usage_stats");
+      console.log("Loaded config and usage stats:", { appConfig, usageStats });
+    } catch (error) {
+      console.error("Failed to load config or usage stats:", error);
+    }
 
     // 1. 立即获取一次数据
     await fetchApps();
@@ -228,6 +245,7 @@
       console.log("本机软件列表: ", res);
       if (res) {
         originAppList = res;
+        // 后端已经排序了，直接使用
         appList = res;
       }
       console.log(`Got ${appList.length} apps.`);
@@ -298,7 +316,9 @@
     e: Event & { currentTarget: EventTarget & HTMLInputElement },
   ) => {
     const value = e.currentTarget.value;
-    const apps = fuzzyMatch(value, originAppList);
+    let apps = fuzzyMatch(value, originAppList);
+    // 应用使用频率排序
+    apps = sortByUsage(apps, usageStats, appConfig.sort_mode, appConfig.enable_usage_tracking);
     inputValue = value;
     appList = apps;
     selectedIndex = 0;
@@ -552,6 +572,21 @@
           window: await WebviewWindow.getCurrent(),
           args: Object.keys(args).length > 0 ? args : null,
         });
+
+        // 刷新使用统计和列表（异步，不阻塞）
+        Promise.all([
+          invoke<CommandUsageStats[]>("get_usage_stats"),
+          invoke<LaunchableItem[]>("get_all_launchable_items")
+        ])
+          .then(([stats, items]) => {
+            usageStats = stats;
+            originAppList = items;
+            // 如果当前没有搜索，更新显示列表
+            if (!inputValue) {
+              appList = items;
+            }
+          })
+          .catch(err => console.error("Failed to refresh data:", err));
       } else if (app.source === "FileCommand") {
         // Handle custom items that might not have an action
         await invoke("open_app", {

@@ -3,6 +3,24 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum SortMode {
+    #[serde(rename = "smart")]
+    Smart,      // 智能排序：综合频率和最近使用
+    #[serde(rename = "frequency")]
+    Frequency,  // 纯频率排序
+    #[serde(rename = "recent")]
+    Recent,     // 最近使用排序
+    #[serde(rename = "default")]
+    Default,    // 默认排序（不使用频率）
+}
+
+impl Default for SortMode {
+    fn default() -> Self {
+        SortMode::Smart
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
     /// 自动粘贴时间限制（秒），0 表示不限制
@@ -12,6 +30,14 @@ pub struct AppConfig {
     /// 自动清空剪贴板时间限制（秒），0 表示不自动清空
     #[serde(default = "default_auto_clear_time_limit")]
     pub auto_clear_time_limit: u64,
+
+    /// 指令排序模式
+    #[serde(default)]
+    pub sort_mode: SortMode,
+
+    /// 是否启用使用频率追踪
+    #[serde(default = "default_enable_usage_tracking")]
+    pub enable_usage_tracking: bool,
 }
 
 fn default_auto_paste_time_limit() -> u64 {
@@ -22,11 +48,17 @@ fn default_auto_clear_time_limit() -> u64 {
     0 // 默认不自动清空
 }
 
+fn default_enable_usage_tracking() -> bool {
+    true // 默认启用
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
             auto_paste_time_limit: default_auto_paste_time_limit(),
             auto_clear_time_limit: default_auto_clear_time_limit(),
+            sort_mode: SortMode::default(),
+            enable_usage_tracking: default_enable_usage_tracking(),
         }
     }
 }

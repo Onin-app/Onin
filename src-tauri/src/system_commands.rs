@@ -81,6 +81,12 @@ pub async fn execute_command(
     window: tauri::WebviewWindow,
     args: Option<serde_json::Value>,
 ) {
+    // Record usage
+    let tracker_state = app.state::<crate::usage_tracker::UsageTrackerState>();
+    if let Err(e) = crate::usage_tracker::record_command_usage(app.clone(), tracker_state, name.clone()) {
+        eprintln!("Failed to record command usage: {}", e);
+    }
+    
     let commands = command_manager::load_commands(&app).await;
     if let Some(command) = commands.iter().find(|cmd| cmd.name == name) {
         match &command.action {

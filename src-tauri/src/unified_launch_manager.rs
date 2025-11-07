@@ -1,5 +1,8 @@
 use crate::command_manager;
 use crate::shared_types::{IconType, ItemSource, ItemType, LaunchableItem};
+use crate::app_config::{AppConfigState, SortMode};
+use crate::usage_tracker::{UsageTracker, UsageTrackerState};
+use tauri::Manager;
 
 /// A unified command to get all launchable items from various sources.
 #[tauri::command]
@@ -86,5 +89,55 @@ pub async fn get_all_launchable_items(
         })
         .collect();
 
-    Ok(all_items)
+    // 4. Apply sorting based on usage tracking
+    let sorted_items = apply_usage_sorting(&app, all_items)?;
+
+    Ok(sorted_items)
+}
+
+fn apply_usage_sorting(
+    app: &tauri::AppHandle,
+    mut items: Vec<LaunchableItem>,
+) -> Result<Vec<LaunchableItem>, String> {
+    // Get config
+    let config_state = app.state::<AppConfigState>();
+    let config = config_state.0.lock().map_err(|e| e.to_string())?;
+    
+    // If tracking is disabled or mode is Default, return items as-is
+    if !config.enable_usage_tracking || config.sort_mode == SortMode::Default {
+        return Ok(items);
+    }
+    
+    let sort_mode = config.sort_mode.clone();
+    drop(config); // Release lock
+    
+    // Get usage tracker
+    let tracker_state = app.state::<UsageTrackerState>();
+    let mut tracker_opt = tracker_state.0.lock().map_err(|e| e.to_string())?;
+    
+    if tracker_opt.is_none() {
+        *tracker_opt = Some(UsageTracker::new(app));
+    }
+    
+    let tracker = tracker_opt.as_ref().ok_or("Failed to get tracker")?;
+    
+    // Calculate scores for each item
+    items.sort_by(|a, b| {
+        let score_a = if let Some(action) = &a.action {
+            tracker.calculate_score(action, &sort_mode)
+        } else {
+            0.0
+        };
+        
+        let score_b = if let Some(action) = &b.action {
+            tracker.calculate_score(action, &sort_mode)
+        } else {
+            0.0
+        };
+        
+        // Sort in descending order (higher score first)
+        score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
+    });
+    
+    Ok(items)
 }

@@ -22,6 +22,7 @@ mod shortcut_manager;
 mod system_commands;
 mod tray_manager;
 mod unified_launch_manager;
+mod usage_tracker;
 mod window_manager;
 
 // 创建一个全局的、一次性的通道，用于广播 rdev 的输入事件。
@@ -82,6 +83,7 @@ pub fn run() {
         .manage(app_config::AppConfigState(Mutex::new(
             app_config::AppConfig::default(),
         )))
+        .manage(usage_tracker::UsageTrackerState(Mutex::new(None)))
         .register_uri_scheme_protocol("plugin", plugin_manager::handle_plugin_protocol)
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
@@ -235,6 +237,10 @@ pub fn run() {
             // App config commands
             app_config::get_app_config,
             app_config::update_app_config,
+            // Usage tracker commands
+            usage_tracker::record_command_usage,
+            usage_tracker::get_usage_stats,
+            usage_tracker::clear_usage_stats,
         ])
         .setup(move |app| {
             // Ensure the app data directory exists on startup.

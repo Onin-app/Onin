@@ -1,10 +1,10 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import { Label, RadioGroup, Switch, Button } from "bits-ui";
+  import { Label, RadioGroup, Switch, Button, Select } from "bits-ui";
 
   import { theme, toggleTheme } from "$lib/utils/theme";
-  import { Theme } from "$lib/type";
+  import { Theme, type SortMode, type AppConfig } from "$lib/type";
   import { detachWindowShortcut } from "$lib/stores/shortcuts";
 
   import SetItem from "./SetItem.svelte";
@@ -30,6 +30,15 @@
   let shortcut = $state<string>("");
   let autoPasteTimeLimit = $state<number>(5);
   let autoClearTimeLimit = $state<number>(0);
+  let sortMode = $state<SortMode>("smart");
+  let enableUsageTracking = $state<boolean>(true);
+
+  const sortModeOptions: { value: SortMode; label: string; description: string }[] = [
+    { value: "smart", label: "智能排序", description: "综合使用频率和最近使用时间" },
+    { value: "frequency", label: "频率优先", description: "按使用次数排序" },
+    { value: "recent", label: "最近使用", description: "按最后使用时间排序" },
+    { value: "default", label: "默认排序", description: "不使用频率数据" },
+  ];
 
   const getTheme = () => currentTheme;
   const setTheme = (value: Theme) => {
@@ -73,16 +82,33 @@
       console.log("Updating config with:", {
         autoPasteTimeLimit,
         autoClearTimeLimit,
+        sortMode,
+        enableUsageTracking,
       });
       await invoke("update_app_config", {
         config: {
           auto_paste_time_limit: autoPasteTimeLimit,
           auto_clear_time_limit: autoClearTimeLimit,
+          sort_mode: sortMode,
+          enable_usage_tracking: enableUsageTracking,
         },
       });
       console.log("Config updated successfully");
     } catch (error) {
       console.error("Failed to update config:", error);
+    }
+  };
+
+  const handleClearUsageStats = async () => {
+    if (!confirm("确定要清除所有使用记录吗？此操作不可恢复。")) {
+      return;
+    }
+    try {
+      await invoke("clear_usage_stats");
+      alert("使用记录已清除");
+    } catch (error) {
+      console.error("Failed to clear usage stats:", error);
+      alert("清除失败：" + error);
     }
   };
 
@@ -103,13 +129,12 @@
       console.error("Failed to get tray visibility state:", e);
     }
     try {
-      const config = await invoke<{
-        auto_paste_time_limit: number;
-        auto_clear_time_limit: number;
-      }>("get_app_config");
+      const config = await invoke<AppConfig>("get_app_config");
       autoPasteTimeLimit = config.auto_paste_time_limit;
       autoClearTimeLimit = config.auto_clear_time_limit;
-      console.log("Loaded config:", { autoPasteTimeLimit, autoClearTimeLimit });
+      sortMode = config.sort_mode;
+      enableUsageTracking = config.enable_usage_tracking;
+      console.log("Loaded config:", config);
     } catch (e) {
       console.error("Failed to get app config:", e);
     }
@@ -229,6 +254,51 @@
             : `${autoClearTimeLimit}秒后自动清空剪贴板内容`}
         </span>
       </div>
+    {/snippet}
+  </SetItem>
+
+  <h2 class="mt-4 text-xl font-bold">指令排序</h2>
+  <SetItem title="启用使用频率追踪">
+    {#snippet content()}
+      <Switch.Root
+        bind:checked={enableUsageTracking}
+        onCheckedChange={updateConfig}
+        name="enableUsageTracking"
+        class="focus-visible:ring-foreground focus-visible:ring-offset-background data-[state=checked]:bg-foreground data-[state=unchecked]:bg-dark-10 data-[state=unchecked]:shadow-mini-inset dark:data-[state=checked]:bg-foreground peer inline-flex h-[24px] min-h-[24px] w-[40px] shrink-0 cursor-pointer items-center rounded-full px-[3px] transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <Switch.Thumb
+          class="bg-background data-[state=unchecked]:shadow-mini dark:border-background/30 dark:bg-foreground dark:shadow-popover pointer-events-none block size-[20px] shrink-0 rounded-full transition-transform data-[state=checked]:translate-x-[14px] data-[state=unchecked]:translate-x-0 dark:border dark:data-[state=unchecked]:border"
+        />
+      </Switch.Root>
+    {/snippet}
+  </SetItem>
+  <SetItem title="排序模式">
+    {#snippet content()}
+      <div class="flex flex-col gap-2">
+        <select
+          bind:value={sortMode}
+          onchange={updateConfig}
+          disabled={!enableUsageTracking}
+          class="w-48 rounded border border-neutral-300 bg-white px-2 py-1 text-sm dark:border-neutral-600 dark:bg-neutral-700 disabled:opacity-50"
+        >
+          {#each sortModeOptions as option}
+            <option value={option.value}>{option.label}</option>
+          {/each}
+        </select>
+        <span class="text-xs text-neutral-600 dark:text-neutral-400">
+          {sortModeOptions.find(o => o.value === sortMode)?.description || ""}
+        </span>
+      </div>
+    {/snippet}
+  </SetItem>
+  <SetItem title="使用记录">
+    {#snippet content()}
+      <Button.Root
+        class="rounded-input bg-dark text-background shadow-mini hover:bg-dark/95 inline-flex h-8 items-center justify-center px-[14px] text-[12px] font-semibold active:scale-[0.98] active:transition-all"
+        onclick={handleClearUsageStats}
+      >
+        清除使用记录
+      </Button.Root>
     {/snippet}
   </SetItem>
 

@@ -77,3 +77,18 @@ export interface Shortcut {
   command_title?: string;
   readonly?: boolean;
 }
+
+export type SortMode = 'smart' | 'frequency' | 'recent' | 'default';
+
+export interface CommandUsageStats {
+  command_name: string;
+  usage_count: number;
+  last_used: number;
+}
+
+export interface AppConfig {
+  auto_paste_time_limit: number;
+  auto_clear_time_limit: number;
+  sort_mode: SortMode;
+  enable_usage_tracking: boolean;
+}
