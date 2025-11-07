@@ -76,6 +76,7 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(plugin_manager::PluginStore(Default::default()))
         .manage(plugin_manager::ActivePluginWindow(Mutex::new(None)))
+        .manage(plugin_manager::PluginWindowCreating(Mutex::new(std::collections::HashSet::new())))
         .manage(plugin_api::command::CommandExecutionStore(
             Default::default(),
         ))

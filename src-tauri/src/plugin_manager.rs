@@ -17,6 +17,9 @@ pub struct PluginStore(pub Mutex<HashMap<String, LoadedPlugin>>);
 // 用于跟踪当前活跃的插件窗口
 pub struct ActivePluginWindow(pub Mutex<Option<String>>);
 
+// 用于跟踪正在创建的插件窗口，防止重复创建
+pub struct PluginWindowCreating(pub Mutex<std::collections::HashSet<String>>);
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PluginCommandManifest {
     pub code: String,
@@ -855,6 +858,15 @@ async fn create_or_show_plugin_window(
 ) -> Result<(), String> {
     let window_label = format!("plugin_{}", plugin.manifest.id.replace('.', "_"));
 
+    // 检查窗口是否正在创建中
+    if let Some(creating_state) = app.try_state::<PluginWindowCreating>() {
+        let mut creating = creating_state.0.lock().unwrap();
+        if creating.contains(&window_label) {
+            println!("[plugin_manager] Window {} is already being created, skipping", window_label);
+            return Ok(());
+        }
+    }
+
     // 如果窗口已存在，切换显示状态
     if let Some(window) = app.get_webview_window(&window_label) {
         // 检查窗口是否被最小化
@@ -917,8 +929,20 @@ async fn create_or_show_plugin_window(
         builder = builder.menu(menu);
     }
 
+    // 标记窗口正在创建
+    if let Some(creating_state) = app.try_state::<PluginWindowCreating>() {
+        let mut creating = creating_state.0.lock().unwrap();
+        creating.insert(window_label.clone());
+    }
+
     match builder.build() {
         Ok(window) => {
+            // 窗口创建成功，移除创建标记
+            if let Some(creating_state) = app.try_state::<PluginWindowCreating>() {
+                let mut creating = creating_state.0.lock().unwrap();
+                creating.remove(&window_label);
+            }
+
             let plugin_id_for_menu = plugin.manifest.id.clone();
             let app_for_menu = app.clone();
 
@@ -1088,6 +1112,11 @@ async fn create_or_show_plugin_window(
             Ok(())
         }
         Err(e) => {
+            // 窗口创建失败，移除创建标记
+            if let Some(creating_state) = app.try_state::<PluginWindowCreating>() {
+                let mut creating = creating_state.0.lock().unwrap();
+                creating.remove(&window_label);
+            }
             eprintln!("Failed to build plugin window: {}", e);
             Err(format!("Failed to build plugin window: {}", e))
         }
