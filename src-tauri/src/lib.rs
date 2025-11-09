@@ -189,6 +189,7 @@ pub fn run() {
             plugin_manager::plugin_is_maximized,
             plugin_manager::plugin_show_window,
             plugin_manager::plugin_set_focus,
+            plugin_manager::plugin_start_dragging,
             // 注册 notification 命令
             plugin_api::notification::show_notification,
             plugin_api::command::execute_plugin_command,

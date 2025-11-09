@@ -820,6 +820,11 @@ pub fn plugin_set_focus(app: tauri::AppHandle, label: String) -> Result<(), Stri
 }
 
 #[tauri::command]
+pub fn plugin_start_dragging(window: tauri::WebviewWindow) -> Result<(), String> {
+    window.start_dragging().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn open_plugin_in_window(
     app: tauri::AppHandle,
     store: State<'_, PluginStore>,
@@ -914,7 +919,8 @@ async fn create_or_show_plugin_window(
         Menu::with_items(&app, &[&back_to_inline])
     })();
 
-    let mut builder = WebviewWindowBuilder::new(
+    // 创建窗口构建器
+    let builder = WebviewWindowBuilder::new(
         &app,
         window_label.clone(),
         tauri::WebviewUrl::External(plugin_url.parse().unwrap()),
@@ -922,12 +928,15 @@ async fn create_or_show_plugin_window(
     .title(plugin.manifest.name.clone())
     .inner_size(800.0, 600.0)
     .resizable(true)
-    .decorations(false); // 隐藏系统标题栏
+    .decorations(false) // 所有平台都隐藏系统装饰
+    .transparent(false); // 确保窗口不透明
 
     // 如果菜单创建成功，添加到窗口
-    if let Ok(menu) = menu_result {
-        builder = builder.menu(menu);
-    }
+    let builder = if let Ok(menu) = menu_result {
+        builder.menu(menu)
+    } else {
+        builder
+    };
 
     // 标记窗口正在创建
     if let Some(creating_state) = app.try_state::<PluginWindowCreating>() {

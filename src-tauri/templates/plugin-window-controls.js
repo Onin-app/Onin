@@ -82,6 +82,41 @@
       const { getCurrent } = window.__TAURI__.webviewWindow;
       const currentWindow = getCurrent();
       updateDebug('窗口对象已获取: ' + currentWindow.label);
+      
+      // 初始化拖动功能
+      const topbar = document.getElementById('plugin-window-topbar');
+      const topbarTitle = document.getElementById('plugin-window-topbar-title');
+      
+      if (topbar) {
+        // 为整个顶栏添加拖动功能
+        const initDrag = (element) => {
+          element.addEventListener('mousedown', async (e) => {
+            // 只在左键点击且不是在按钮上时触发拖动
+            if (e.button === 0 && !e.target.closest('button')) {
+              e.preventDefault();
+              try {
+                // 使用 Tauri 命令来启动拖动
+                await window.__TAURI__.core.invoke('plugin_start_dragging');
+                console.log('[Plugin Window] Dragging started');
+              } catch (error) {
+                console.error('[Plugin Window] Failed to start dragging:', error);
+                updateDebug('拖动失败: ' + error.message);
+              }
+            }
+          });
+        };
+        
+        initDrag(topbar);
+        if (topbarTitle) {
+          initDrag(topbarTitle);
+        }
+        
+        console.log('[Plugin Window] Drag event listeners attached');
+        updateDebug('拖动监听器已添加 ✓');
+      } else {
+        console.warn('[Plugin Window] Topbar element not found');
+        updateDebug('未找到顶栏元素');
+      }
     
       // 切换到主窗口模式
       const backBtn = document.getElementById('plugin-back-to-inline-btn');

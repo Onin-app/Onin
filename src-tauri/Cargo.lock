@@ -381,7 +381,6 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "clipboard-rs",
- "clipboard-win",
  "deno_core",
  "futures",
  "icns",
