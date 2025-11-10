@@ -316,38 +316,39 @@ pub async fn get_clipboard_content(
     // 先尝试读取文件路径
     #[cfg(target_os = "windows")]
     {
-        use clipboard_win::{formats, get_clipboard};
-        use std::path::{Path, PathBuf};
+        use clipboard_rs::{Clipboard, ClipboardContext};
+        use std::path::Path;
         
         // 尝试读取文件列表
-        if let Ok(files) = get_clipboard::<Vec<PathBuf>, _>(formats::FileList) {
-            let mut clipboard_files = Vec::new();
-            
-            for file_path in files.iter() {
-                let path_str = file_path.to_string_lossy().to_string();
-                let path = Path::new(&path_str);
+        if let Ok(ctx) = ClipboardContext::new() {
+            if let Ok(files) = ctx.get_files() {
+                let mut clipboard_files = Vec::new();
                 
-                let name = path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("Unknown")
-                    .to_string();
+                for file_path in files.iter() {
+                    let path = Path::new(file_path);
+                    
+                    let name = path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("Unknown")
+                        .to_string();
+                    
+                    let is_directory = path.is_dir();
+                    
+                    clipboard_files.push(ClipboardFile {
+                        path: file_path.clone(),
+                        name,
+                        is_directory,
+                    });
+                }
                 
-                let is_directory = path.is_dir();
-                
-                clipboard_files.push(ClipboardFile {
-                    path: path_str,
-                    name,
-                    is_directory,
-                });
-            }
-            
-            if !clipboard_files.is_empty() {
-                return Ok(ClipboardContent {
-                    text: None,
-                    files: Some(clipboard_files),
-                    timestamp,
-                });
+                if !clipboard_files.is_empty() {
+                    return Ok(ClipboardContent {
+                        text: None,
+                        files: Some(clipboard_files),
+                        timestamp,
+                    });
+                }
             }
         }
     }
