@@ -185,7 +185,7 @@ fn get_system_localized_name(app_path: &Path) -> Option<String> {
     None
 }
 
-fn get_localized_name(app_path: &Path, base_name: &str) -> Option<String> {
+fn get_localized_name(app_path: &Path, _base_name: &str) -> Option<String> {
     let resources_path = app_path.join("Contents/Resources");
 
     // 扩展语言目录列表，包括可能的中文本地化
@@ -260,6 +260,7 @@ pub async fn get_apps() -> Result<Vec<AppInfo>, String> {
         let mut app_map = HashMap::new();
         let mut search_paths = vec![
             PathBuf::from("/System/Applications"),
+            PathBuf::from("/System/Applications/Utilities"),
             PathBuf::from("/Applications"),
         ];
 
