@@ -60,7 +60,7 @@
 
   // Plugin inline display state
   let showPluginInline = $state<boolean>(false);
-  let currentPluginHtml = $state<string>("");
+  let currentPluginUrl = $state<string>("");
   let currentPluginId = $state<string>("");
   let currentPluginAutoDetach = $state<boolean>(false);
 
@@ -88,7 +88,7 @@
     // If plugin is showing inline, close it first
     if (showPluginInline) {
       showPluginInline = false;
-      currentPluginHtml = "";
+      currentPluginUrl = "";
       currentPluginId = "";
       return;
     }
@@ -186,14 +186,14 @@
     const unlistenPluginInline = await listen<{
       plugin_id: string;
       plugin_name: string;
-      html_content: string;
+      plugin_url: string;
     }>("show_plugin_inline", async (event) => {
       console.log(
         "Received show_plugin_inline event for:",
         event.payload.plugin_id,
       );
       showPluginInline = true;
-      currentPluginHtml = event.payload.html_content;
+      currentPluginUrl = event.payload.plugin_url;
       currentPluginId = event.payload.plugin_id;
 
       // Fetch plugin auto_detach state
@@ -682,7 +682,7 @@
 
   const handleClosePlugin = () => {
     showPluginInline = false;
-    currentPluginHtml = "";
+    currentPluginUrl = "";
     currentPluginId = "";
     currentPluginAutoDetach = false;
   };
@@ -949,10 +949,9 @@
     <div class="relative flex-1 overflow-hidden">
       {#if showPluginInline}
         <!-- Plugin inline display area -->
-        <!-- 使用 srcdoc 加载HTML内容，base标签指向 plugin:// 协议以加载资源 -->
-        <!-- 不使用 sandbox 属性，允许完整的脚本执行和 Tauri API 访问 -->
+        <!-- 使用本地 HTTP 服务器加载插件，支持所有资源和动态导入 -->
         <iframe
-          srcdoc={currentPluginHtml}
+          src={currentPluginUrl}
           class="h-full w-full border-0"
           title="Plugin"
           allow="clipboard-read; clipboard-write"

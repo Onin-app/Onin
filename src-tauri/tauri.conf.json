@@ -29,8 +29,12 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' plugin: 'unsafe-inline' 'unsafe-eval'; script-src 'self' plugin: 'unsafe-inline' 'unsafe-eval'; style-src 'self' plugin: 'unsafe-inline'; img-src 'self' plugin: data:; font-src 'self' plugin:; connect-src 'self' plugin:; frame-src 'self' plugin:;",
-      "dangerousDisableAssetCspModification": true
+      "csp": "default-src 'self' plugin: asset: https://asset.localhost 'unsafe-inline' 'unsafe-eval'; script-src 'self' plugin: asset: https://asset.localhost 'unsafe-inline' 'unsafe-eval'; style-src 'self' plugin: asset: https://asset.localhost 'unsafe-inline'; img-src 'self' plugin: asset: https://asset.localhost data:; font-src 'self' plugin: asset: https://asset.localhost; connect-src 'self' plugin: asset: https://asset.localhost; frame-src 'self' plugin: asset: https://asset.localhost;",
+      "dangerousDisableAssetCspModification": true,
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["**"]
+      }
     }
   },
   "bundle": {

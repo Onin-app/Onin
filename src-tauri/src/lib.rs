@@ -17,6 +17,7 @@ mod installed_apps;
 mod js_runtime;
 mod plugin_api;
 mod plugin_manager;
+mod plugin_server;
 pub mod shared_types;
 mod shortcut_manager;
 mod system_commands;
@@ -77,6 +78,7 @@ pub fn run() {
         .manage(plugin_manager::PluginStore(Default::default()))
         .manage(plugin_manager::ActivePluginWindow(Mutex::new(None)))
         .manage(plugin_manager::PluginWindowCreating(Mutex::new(std::collections::HashSet::new())))
+        .manage(plugin_manager::PluginServerPort(Mutex::new(None)))
         .manage(plugin_api::command::CommandExecutionStore(
             Default::default(),
         ))
@@ -280,6 +282,27 @@ pub fn run() {
             // Initialize plugins and command manager asynchronously
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
+                // 0. 启动插件 HTTP 服务器
+                let plugins_dir = match app_handle.path().app_data_dir() {
+                    Ok(dir) => dir.join("plugins"),
+                    Err(e) => {
+                        eprintln!("[ERROR] Failed to get plugins directory: {}", e);
+                        return;
+                    }
+                };
+                
+                match plugin_server::start_plugin_server(plugins_dir).await {
+                    Ok(port) => {
+                        println!("[INFO] Plugin server started on port {}", port);
+                        // 保存端口到状态
+                        let server_port = app_handle.state::<plugin_manager::PluginServerPort>();
+                        *server_port.0.lock().unwrap() = Some(port);
+                    }
+                    Err(e) => {
+                        eprintln!("[ERROR] Failed to start plugin server: {}", e);
+                    }
+                }
+                
                 // 1. 先加载插件
                 let plugin_store = app_handle.state::<plugin_manager::PluginStore>();
                 if let Err(e) = plugin_manager::load_plugins(app_handle.clone(), plugin_store) {

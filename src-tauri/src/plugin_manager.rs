@@ -20,6 +20,9 @@ pub struct ActivePluginWindow(pub Mutex<Option<String>>);
 // 用于跟踪正在创建的插件窗口，防止重复创建
 pub struct PluginWindowCreating(pub Mutex<std::collections::HashSet<String>>);
 
+// 用于存储插件服务器端口
+pub struct PluginServerPort(pub Mutex<Option<u16>>);
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PluginCommandManifest {
     pub code: String,
@@ -38,7 +41,7 @@ pub struct PluginCommandKeyword {
 }
 
 /// 插件命令匹配配置
-/// 
+///
 /// 三层优雅降级模型：
 /// 1. 开发者层：只需配置 extensions（如 [".png", ".jpg"]）
 /// 2. 系统层：自动将 extensions 映射为内部 MIME 类型
@@ -867,7 +870,10 @@ async fn create_or_show_plugin_window(
     if let Some(creating_state) = app.try_state::<PluginWindowCreating>() {
         let mut creating = creating_state.0.lock().unwrap();
         if creating.contains(&window_label) {
-            println!("[plugin_manager] Window {} is already being created, skipping", window_label);
+            println!(
+                "[plugin_manager] Window {} is already being created, skipping",
+                window_label
+            );
             return Ok(());
         }
     }
@@ -878,7 +884,7 @@ async fn create_or_show_plugin_window(
         let is_minimized = window.is_minimized().unwrap_or(false);
         // 检查窗口是否可见
         let is_visible = window.is_visible().unwrap_or(false);
-        
+
         if is_minimized || !is_visible {
             // 窗口被最小化或隐藏，显示并聚焦
             if is_minimized {
@@ -1225,26 +1231,20 @@ pub fn execute_plugin_entry(
                     });
                     Ok(())
                 } else {
-                    // Display inline - read and inline all resources (CSS, JS) into HTML
-                    let html_content = std::fs::read_to_string(&entry_path)
-                        .map_err(|e| format!("Failed to read plugin HTML: {}", e))?;
-
-                    let html_dir = entry_path.parent().unwrap_or(&plugin_dir);
-
-                    // Inline all CSS and JS resources
-                    let mut modified_html = inline_resources(&html_content, html_dir);
-
-                    // Inject Tauri API bridge and plugin ID
-                    modified_html = inject_tauri_bridge(&modified_html, &plugin.manifest.id);
-
-                    // Send to frontend
+                    // Display inline - use HTTP server
                     let main_window = app
                         .get_webview_window("main")
                         .ok_or_else(|| "Main window not found".to_string())?;
 
+                    // 获取插件服务器端口
+                    let server_port_state = app.state::<PluginServerPort>();
+                    let port = server_port_state
+                        .0
+                        .lock()
+                        .unwrap()
+                        .ok_or_else(|| "Plugin server not started".to_string())?;
+
                     // 特殊处理：当通过快捷键触发内联插件时，需要显示主窗口
-                    // 这是因为内联插件默认在主窗口中显示，如果主窗口隐藏，用户将看不到任何反馈
-                    // 即使用户为主窗口显示/隐藏绑定了其他快捷键，这里也需要确保窗口可见
                     if let Ok(false) = main_window.is_visible() {
                         if let Err(e) = main_window.show() {
                             eprintln!("[plugin_manager] Warning: Failed to show main window for inline plugin: {}", e);
@@ -1258,13 +1258,18 @@ pub fn execute_plugin_entry(
                     struct PluginInlinePayload {
                         plugin_id: String,
                         plugin_name: String,
-                        html_content: String,
+                        plugin_url: String,
                     }
+
+                    let plugin_url = format!(
+                        "http://127.0.0.1:{}/plugin/{}/{}",
+                        port, plugin.dir_name, plugin.manifest.entry
+                    );
 
                     let payload = PluginInlinePayload {
                         plugin_id: plugin.manifest.id.clone(),
                         plugin_name: plugin.manifest.name.clone(),
-                        html_content: modified_html,
+                        plugin_url,
                     };
 
                     main_window
@@ -1686,7 +1691,10 @@ pub fn uninstall_plugin(
     if plugin_was_in_store {
         println!("[plugin_manager] Plugin removed from store: {}", plugin_id);
     } else {
-        println!("[plugin_manager] Plugin not found in store, will try to clean up files: {}", plugin_id);
+        println!(
+            "[plugin_manager] Plugin not found in store, will try to clean up files: {}",
+            plugin_id
+        );
     }
 
     // 2. 删除符号链接（即使插件不在 store 中也尝试删除）
@@ -1703,18 +1711,24 @@ pub fn uninstall_plugin(
             // 在 Windows 上，使用 symlink_metadata 检查是否为符号链接
             let metadata = std::fs::symlink_metadata(&plugin_link_path)
                 .map_err(|e| format!("Failed to get symlink metadata: {}", e))?;
-            
+
             let file_type = metadata.file_type();
             let is_symlink = file_type.is_symlink();
-            
-            println!("[plugin_manager] Symlink metadata - is_dir: {}, is_file: {}, is_symlink: {}", 
-                metadata.is_dir(), file_type.is_file(), is_symlink);
-            
+
+            println!(
+                "[plugin_manager] Symlink metadata - is_dir: {}, is_file: {}, is_symlink: {}",
+                metadata.is_dir(),
+                file_type.is_file(),
+                is_symlink
+            );
+
             // 对于符号链接，Windows 需要根据链接类型使用不同的删除方法
             if is_symlink {
                 // 在 Windows 上，目录符号链接的 is_dir() 可能返回 false（如果目标不存在）
                 // 我们先尝试作为目录删除，如果失败再尝试作为文件删除
-                println!("[plugin_manager] Attempting to remove symlink (trying directory first)...");
+                println!(
+                    "[plugin_manager] Attempting to remove symlink (trying directory first)..."
+                );
                 match std::fs::remove_dir(&plugin_link_path) {
                     Ok(_) => {
                         println!("[plugin_manager] Successfully removed directory symlink");
@@ -1747,7 +1761,10 @@ pub fn uninstall_plugin(
                 .map_err(|e| format!("Failed to remove plugin link: {}", e))?;
         }
     } else {
-        println!("[plugin_manager] Plugin link does not exist: {:?}", plugin_link_path);
+        println!(
+            "[plugin_manager] Plugin link does not exist: {:?}",
+            plugin_link_path
+        );
     }
 
     // 3. 清理插件状态
@@ -1763,8 +1780,14 @@ pub fn uninstall_plugin(
     if let Ok(settings_path) = get_plugin_settings_path(&app, &plugin_id) {
         if settings_path.exists() {
             match std::fs::remove_file(&settings_path) {
-                Ok(_) => println!("[plugin_manager] Plugin settings removed: {:?}", settings_path),
-                Err(e) => eprintln!("[plugin_manager] Warning: Failed to remove settings file: {}", e),
+                Ok(_) => println!(
+                    "[plugin_manager] Plugin settings removed: {:?}",
+                    settings_path
+                ),
+                Err(e) => eprintln!(
+                    "[plugin_manager] Warning: Failed to remove settings file: {}",
+                    e
+                ),
             }
         } else {
             println!("[plugin_manager] No settings file to remove");
@@ -1777,10 +1800,13 @@ pub fn uninstall_plugin(
         .enable_all()
         .build()
         .map_err(|e| format!("Failed to create runtime: {}", e))?;
-    
+
     rt.block_on(async {
         if let Err(e) = crate::js_runtime::clear_plugin_runtime(&plugin_id).await {
-            eprintln!("[plugin_manager] Warning: Failed to clear JS runtime for {}: {}", plugin_id, e);
+            eprintln!(
+                "[plugin_manager] Warning: Failed to clear JS runtime for {}: {}",
+                plugin_id, e
+            );
         } else {
             println!("[plugin_manager] JavaScript runtime cleaned");
         }
@@ -1898,10 +1924,10 @@ pub fn handle_plugin_protocol<R: tauri::Runtime>(
         }
     };
 
-    // 如果是 HTML 文件，需要修改其中的资源路径并注入顶栏
+    // 如果是 HTML 文件，需要修改其中的资源路径并注入内容
     if plugin_file_path.extension().and_then(|s| s.to_str()) == Some("html") {
         if let Ok(html_content) = String::from_utf8(content.clone()) {
-            // 将绝对路径转换为相对路径，这样浏览器会通过同一个协议请求资源
+            // 将绝对路径转换为相对路径
             let mut modified_html = html_content
                 .replace("src=\"/assets/", "src=\"./assets/")
                 .replace("href=\"/assets/", "href=\"./assets/")
@@ -1909,28 +1935,36 @@ pub fn handle_plugin_protocol<R: tauri::Runtime>(
                 .replace("href='/assets/", "href='./assets/")
                 .replace("href=\"/vite.svg\"", "href=\"./vite.svg\"");
 
-            // 注入自定义顶栏（从外部模板加载）
-            let topbar_html = format!(
-                "{}\n<script>\n{}\n</script>",
-                PLUGIN_WINDOW_TOPBAR_TEMPLATE,
-                PLUGIN_WINDOW_CONTROLS_SCRIPT
-            );
+            // 获取插件信息以注入 plugin ID
+            let store = context.app_handle().state::<PluginStore>();
+            let store_lock = store.0.lock().unwrap();
+            let plugin_opt = store_lock.values().find(|p| p.dir_name == plugin_dir_name);
 
-            // 在 </head> 之前或 <body> 之后注入顶栏
-            if let Some(head_pos) = modified_html.find("</head>") {
-                modified_html.insert_str(head_pos, &topbar_html);
-            } else if let Some(body_pos) = modified_html.find("<body") {
-                if let Some(body_end) = modified_html[body_pos..].find('>') {
-                    let insert_pos = body_pos + body_end + 1;
-                    modified_html.insert_str(insert_pos, &topbar_html);
+            if let Some(plugin) = plugin_opt {
+                // 注入 plugin ID
+                let plugin_id_script = format!(
+                    r#"<script>window.__PLUGIN_ID__ = '{}';</script>"#,
+                    plugin.manifest.id
+                );
+
+                // 注入自定义顶栏
+                let topbar_html = format!(
+                    "{}{}\n<script>\n{}\n</script>",
+                    plugin_id_script, PLUGIN_WINDOW_TOPBAR_TEMPLATE, PLUGIN_WINDOW_CONTROLS_SCRIPT
+                );
+
+                // 在 </head> 之前或 <body> 之后注入
+                if let Some(head_pos) = modified_html.find("</head>") {
+                    modified_html.insert_str(head_pos, &topbar_html);
+                } else if let Some(body_pos) = modified_html.find("<body") {
+                    if let Some(body_end) = modified_html[body_pos..].find('>') {
+                        let insert_pos = body_pos + body_end + 1;
+                        modified_html.insert_str(insert_pos, &topbar_html);
+                    }
                 }
             }
 
             content = modified_html.into_bytes();
-            println!(
-                "[plugin_protocol] Modified HTML content and injected topbar for plugin: {}",
-                plugin_dir_name
-            );
         }
     }
 
