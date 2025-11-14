@@ -1,5 +1,5 @@
 use deno_core::op2;
-use deno_core::{JsRuntime, OpState, PollEventLoopOptions, RuntimeOptions};
+use deno_core::{JsRuntime, ModuleSpecifier, OpState, PollEventLoopOptions, RuntimeOptions};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
@@ -1105,18 +1105,56 @@ pub async fn execute_js(
     let plugin_id_str = plugin_id.unwrap_or("");
     let mut runtime = create_runtime_with_plugin_id(app_handle, plugin_id_str)?;
 
-    // 将代码包装为异步 IIFE，支持顶层 await
-    // 如果提供了 plugin_id，在包装代码内部注入
-    let wrapped_code = if let Some(id) = plugin_id {
+    // 检测代码是否已经是 IIFE 格式
+    let is_iife =
+        js_code.trim_start().starts_with("(function") || js_code.trim_start().starts_with("(()");
+
+    // 检测代码是否包含 import 语句
+    let has_import =
+        js_code.contains("import ") && (js_code.contains("from \"") || js_code.contains("from '"));
+
+    let wrapped_code = if has_import {
+        // ES 模块：转换为动态 import
+        // 将 ES 模块代码转换为 data URL
+        let code_with_id = if let Some(id) = plugin_id {
+            format!("globalThis.__PLUGIN_ID__ = '{}';\n{}", id, js_code)
+        } else {
+            js_code.to_string()
+        };
+
+        // 使用 data URL 和动态 import
+        let data_url = format!(
+            "data:text/javascript;base64,{}",
+            base64::Engine::encode(
+                &base64::engine::general_purpose::STANDARD,
+                code_with_id.as_bytes()
+            )
+        );
+
         format!(
-            "(async () => {{\n  globalThis.__PLUGIN_ID__ = '{}';\n{}\n}})().catch(err => console.error('Plugin error:', err));",
-            id, js_code
+            "(async () => {{\n  await import('{}');\n}})().catch(err => console.error('Plugin module error:', err));",
+            data_url
         )
+    } else if is_iife {
+        // 如果已经是 IIFE，直接使用，但注入 plugin_id
+        if let Some(id) = plugin_id {
+            format!("globalThis.__PLUGIN_ID__ = '{}';\n{}", id, js_code)
+        } else {
+            js_code.to_string()
+        }
     } else {
-        format!(
-            "(async () => {{\n{}\n}})().catch(err => console.error('Plugin error:', err));",
-            js_code
-        )
+        // 否则包装为异步 IIFE，支持顶层 await
+        if let Some(id) = plugin_id {
+            format!(
+                "(async () => {{\n  globalThis.__PLUGIN_ID__ = '{}';\n{}\n}})().catch(err => console.error('Plugin error:', err));",
+                id, js_code
+            )
+        } else {
+            format!(
+                "(async () => {{\n{}\n}})().catch(err => console.error('Plugin error:', err));",
+                js_code
+            )
+        }
     };
 
     // 执行插件代码

@@ -18,7 +18,7 @@ describe('Lifecycle API', () => {
       lifecycle.onLoad(mockCallback);
 
       // Wait for microtask to execute
-      await new Promise(resolve => queueMicrotask(resolve));
+      await new Promise<void>(resolve => queueMicrotask(resolve));
 
       expect(mockCallback).toHaveBeenCalledTimes(1);
     });
@@ -95,27 +95,43 @@ describe('Lifecycle API', () => {
     });
   });
 
-  describe('onActivate', () => {
-    it('should register activate callback', async () => {
+  describe('onUnload', () => {
+    it('should register unload callback', async () => {
       const { lifecycle } = await import('../lifecycle');
       
       const mockCallback = vi.fn();
       
       expect(() => {
-        lifecycle.onActivate(mockCallback);
+        lifecycle.onUnload(mockCallback);
       }).not.toThrow();
     });
-  });
 
-  describe('onDeactivate', () => {
-    it('should register deactivate callback', async () => {
+    it('should execute unload callbacks', async () => {
       const { lifecycle } = await import('../lifecycle');
       
       const mockCallback = vi.fn();
+      lifecycle.onUnload(mockCallback);
+
+      // Execute unload callbacks
+      await lifecycle._executeUnloadCallbacks();
+
+      expect(mockCallback).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle errors in unload callbacks gracefully', async () => {
+      const { lifecycle } = await import('../lifecycle');
       
-      expect(() => {
-        lifecycle.onDeactivate(mockCallback);
-      }).not.toThrow();
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      
+      lifecycle.onUnload(async () => {
+        throw new Error('Unload error');
+      });
+
+      // Should not throw
+      await expect(lifecycle._executeUnloadCallbacks()).resolves.not.toThrow();
+      
+      expect(consoleErrorSpy).toHaveBeenCalled();
+      consoleErrorSpy.mockRestore();
     });
   });
 

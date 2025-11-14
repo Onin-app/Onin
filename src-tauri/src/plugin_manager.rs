@@ -149,6 +149,12 @@ pub struct PluginManifest {
     /// If true, HTML plugins will always open in a separate window
     #[serde(default)]
     pub auto_detach: bool,
+    /// Lifecycle file for view plugins (optional)
+    /// For view plugins (HTML entry), this file will be executed on load
+    /// to register lifecycle hooks, settings, and commands
+    /// Default: "lifecycle.js" if not specified
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lifecycle: Option<String>,
 }
 
 fn default_display_mode() -> String {
@@ -431,20 +437,43 @@ fn load_plugins_internal(
                     manifest.name, loaded_plugin.dir_name, enabled
                 );
 
-                // 自动执行 entry 文件进行初始化（如果是 .js 文件）
+                // 自动执行生命周期文件进行初始化
+                // Headless 插件：执行 index.js (entry)
+                // View 插件：执行 lifecycle.js（如果存在）
                 let entry_path = path.join(&manifest.entry);
+                
                 if entry_path.is_file() {
                     if let Some(extension) = Path::new(&manifest.entry)
                         .extension()
                         .and_then(|s| s.to_str())
                     {
-                        if extension == "js" {
-                            // JS 文件自动执行以注册设置和命令
-                            plugins_to_init.push((
-                                manifest.id.clone(),
-                                entry_path,
-                                dir_name.clone(),
-                            ));
+                        match extension {
+                            "js" => {
+                                // Headless 插件：直接执行 index.js
+                                plugins_to_init.push((
+                                    manifest.id.clone(),
+                                    entry_path,
+                                    dir_name.clone(),
+                                ));
+                            }
+                            "html" => {
+                                // View 插件：查找并执行 lifecycle.js
+                                let lifecycle_file = manifest
+                                    .lifecycle
+                                    .as_ref()
+                                    .map(|s| s.as_str())
+                                    .unwrap_or("lifecycle.js");
+                                let lifecycle_path = path.join(lifecycle_file);
+                                
+                                if lifecycle_path.is_file() {
+                                    plugins_to_init.push((
+                                        manifest.id.clone(),
+                                        lifecycle_path,
+                                        dir_name.clone(),
+                                    ));
+                                }
+                            }
+                            _ => {}
                         }
                     }
                 }
@@ -1602,15 +1631,48 @@ pub fn import_plugin(
 
     println!("[plugin_manager] Plugin added to store: {}", manifest.id);
 
-    // 8. 初始化插件（如果是 JS 文件）
+    // 8. 初始化插件生命周期
+    // Headless 插件：执行 index.js (entry)
+    // View 插件：执行 lifecycle.js（如果存在）
     let entry_path = source.join(&manifest.entry);
     if entry_path.is_file() {
         if let Some(extension) = std::path::Path::new(&manifest.entry)
             .extension()
             .and_then(|s| s.to_str())
         {
-            if extension == "js" {
-                println!("[plugin_manager] Initializing JS plugin: {}", manifest.id);
+            let lifecycle_path = match extension {
+                "js" => {
+                    // Headless 插件：直接使用 index.js
+                    println!("[plugin_manager] Initializing headless plugin: {}", manifest.id);
+                    Some(entry_path.clone())
+                }
+                "html" => {
+                    // View 插件：查找 lifecycle.js
+                    let lifecycle_file = manifest
+                        .lifecycle
+                        .as_ref()
+                        .map(|s| s.as_str())
+                        .unwrap_or("lifecycle.js");
+                    let lc_path = source.join(lifecycle_file);
+                    
+                    if lc_path.is_file() {
+                        println!(
+                            "[plugin_manager] Initializing view plugin lifecycle: {} ({})",
+                            manifest.id, lifecycle_file
+                        );
+                        Some(lc_path)
+                    } else {
+                        println!(
+                            "[plugin_manager] No lifecycle file found for view plugin {} (looked for: {})",
+                            manifest.id, lifecycle_file
+                        );
+                        None
+                    }
+                }
+                _ => None,
+            };
+
+            if let Some(lc_path) = lifecycle_path {
                 let app_clone = app.clone();
                 let plugin_id = manifest.id.clone();
                 let plugin_name = manifest.name.clone();
@@ -1621,7 +1683,7 @@ pub fn import_plugin(
                         .unwrap();
 
                     rt.block_on(async {
-                        match std::fs::read_to_string(&entry_path) {
+                        match std::fs::read_to_string(&lc_path) {
                             Ok(js_code) => {
                                 match js_runtime::execute_js(&app_clone, &js_code, Some(&plugin_id)).await {
                                     Ok(_) => {
@@ -1647,7 +1709,7 @@ pub fn import_plugin(
                                 }
                             }
                             Err(e) => {
-                                eprintln!("[plugin_manager] Failed to read entry file for {}: {}", plugin_id, e);
+                                eprintln!("[plugin_manager] Failed to read lifecycle file for {}: {}", plugin_id, e);
                                 #[derive(serde::Serialize, Clone)]
                                 struct PluginInitError {
                                     plugin_id: String,
@@ -1657,7 +1719,7 @@ pub fn import_plugin(
                                 let _ = app_clone.emit("plugin-init-error", PluginInitError {
                                     plugin_id,
                                     plugin_name,
-                                    error: format!("Failed to read entry file: {}", e),
+                                    error: format!("Failed to read lifecycle file: {}", e),
                                 });
                             }
                         }

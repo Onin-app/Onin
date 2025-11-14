@@ -1,25 +1,46 @@
 /**
- * Plugin Lifecycle API
+ * 插件生命周期 API
  * 
- * Provides lifecycle hooks for plugin initialization and cleanup.
- * Similar to Vue's lifecycle hooks or React's useEffect.
+ * 提供两个简单的生命周期钩子用于插件初始化和清理：
+ * - onLoad: 插件加载时调用
+ * - onUnload: 插件卸载时调用
  * 
- * Callbacks are executed automatically at the end of the current event loop tick.
+ * headless 插件在 index.js 中实现生命周期
+ * view 插件在 lifecycle.js 中实现生命周期（不依赖 DOM）
+ * 
+ * 回调函数会在当前事件循环结束时自动执行。
  * 
  * @module api/lifecycle
  * @example
  * ```typescript
+ * // Headless 插件 (index.js)
  * import { lifecycle, settings, command } from 'baize-plugin-sdk';
  * 
- * // Register lifecycle hooks - they execute automatically!
  * lifecycle.onLoad(async () => {
- *   // Register settings
  *   await settings.useSettingsSchema([...]);
- *   
- *   // Register commands
  *   command.register(async (cmd, args) => {...});
- *   
- *   console.log('Plugin loaded!');
+ *   console.log('Headless 插件已加载！');
+ * });
+ * 
+ * lifecycle.onUnload(async () => {
+ *   console.log('正在清理...');
+ * });
+ * ```
+ * 
+ * @example
+ * ```typescript
+ * // View 插件 (lifecycle.js)
+ * import { lifecycle, settings, command } from 'baize-plugin-sdk';
+ * 
+ * lifecycle.onLoad(async () => {
+ *   await settings.useSettingsSchema([...]);
+ *   command.register(async (cmd, args) => {...});
+ *   console.log('View 插件生命周期已加载！');
+ *   // 注意：这里不要操作 DOM，UI 代码在单独的 HTML/JS 文件中
+ * });
+ * 
+ * lifecycle.onUnload(async () => {
+ *   console.log('View 插件正在卸载...');
  * });
  * ```
  */
@@ -29,56 +50,54 @@ import { createError } from '../types/errors';
 type LifecycleCallback = () => void | Promise<void>;
 
 let loadCallbacks: LifecycleCallback[] = [];
-let activateCallbacks: LifecycleCallback[] = [];
-let deactivateCallbacks: LifecycleCallback[] = [];
+let unloadCallbacks: LifecycleCallback[] = [];
 let loadExecutionScheduled = false;
 
 /**
- * Register a callback to run when the plugin is loaded
+ * 注册插件加载时的回调函数
  * 
- * This hook runs automatically when the plugin is loaded by the system,
- * before any user interaction. The callback is executed at the end of the
- * current event loop tick, so you can register multiple callbacks and they
- * will all be executed together.
+ * 此钩子在插件被系统加载时自动运行，在任何用户交互之前。
+ * 回调函数在当前事件循环结束时执行，因此你可以注册多个回调，
+ * 它们会一起执行。
  * 
- * Use it to:
- * - Register settings schema
- * - Register command handlers
- * - Initialize default data
- * - Set up plugin state
+ * 用途：
+ * - 注册设置模式
+ * - 注册命令处理器
+ * - 初始化默认数据
+ * - 设置插件状态
  * 
- * @param callback - Function to execute on plugin load
+ * @param callback - 插件加载时执行的函数
  * 
  * @example
  * ```typescript
  * import { lifecycle, settings, command, storage } from 'baize-plugin-sdk';
  * 
  * lifecycle.onLoad(async () => {
- *   // 1. Register settings
+ *   // 1. 注册设置
  *   await settings.useSettingsSchema([
  *     {
  *       key: 'apiKey',
- *       label: 'API Key',
+ *       label: 'API 密钥',
  *       type: 'password',
  *       required: true
  *     }
  *   ]);
  *   
- *   // 2. Register command handler
+ *   // 2. 注册命令处理器
  *   command.register(async (cmd, args) => {
  *     if (cmd === 'get-status') {
  *       return { status: 'ready' };
  *     }
  *   });
  *   
- *   // 3. Initialize first-run data
+ *   // 3. 初始化首次运行数据
  *   const firstRun = await storage.getItem('first-run');
  *   if (firstRun === null) {
  *     await storage.setItem('first-run', false);
  *     await storage.setItem('install-time', new Date().toISOString());
  *   }
  *   
- *   console.log('Plugin initialized successfully');
+ *   console.log('插件初始化成功');
  * });
  * ```
  */
@@ -98,42 +117,16 @@ function onLoad(callback: LifecycleCallback): void {
 }
 
 /**
- * Register a callback to run when the plugin is activated by the user
+ * 注册插件卸载时的回调函数
  * 
- * This hook runs when the user explicitly executes the plugin.
- * Use it for:
- * - Showing UI
- * - Performing main plugin functionality
- * - User interactions
+ * 此钩子在插件被禁用、卸载或应用程序关闭时运行。
+ * 用途：
+ * - 清理资源
+ * - 保存状态
+ * - 取消待处理的操作
+ * - 关闭连接
  * 
- * @param callback - Function to execute on plugin activation
- * 
- * @example
- * ```typescript
- * import { lifecycle, notification } from 'baize-plugin-sdk';
- * 
- * lifecycle.onActivate(async () => {
- *   await notification.show({
- *     title: 'Plugin Activated',
- *     body: 'The plugin is now running'
- *   });
- * });
- * ```
- */
-function onActivate(callback: LifecycleCallback): void {
-  activateCallbacks.push(callback);
-}
-
-/**
- * Register a callback to run when the plugin is deactivated
- * 
- * This hook runs when the plugin is disabled or unloaded.
- * Use it for:
- * - Cleanup resources
- * - Save state
- * - Cancel pending operations
- * 
- * @param callback - Function to execute on plugin deactivation
+ * @param callback - 插件卸载时执行的函数
  * 
  * @example
  * ```typescript
@@ -143,24 +136,24 @@ function onActivate(callback: LifecycleCallback): void {
  * 
  * lifecycle.onLoad(() => {
  *   intervalId = setInterval(() => {
- *     console.log('Background task running...');
+ *     console.log('后台任务运行中...');
  *   }, 5000);
  * });
  * 
- * lifecycle.onDeactivate(async () => {
+ * lifecycle.onUnload(async () => {
  *   clearInterval(intervalId);
- *   await storage.setItem('last-deactivate', new Date().toISOString());
- *   console.log('Plugin cleaned up');
+ *   await storage.setItem('last-unload', new Date().toISOString());
+ *   console.log('插件已清理');
  * });
  * ```
  */
-function onDeactivate(callback: LifecycleCallback): void {
-  deactivateCallbacks.push(callback);
+function onUnload(callback: LifecycleCallback): void {
+  unloadCallbacks.push(callback);
 }
 
 /**
- * Internal function to execute all registered load callbacks
- * Called automatically by the plugin system
+ * 内部函数：执行所有已注册的加载回调
+ * 由插件系统自动调用
  * @internal
  */
 async function executeLoadCallbacks(): Promise<void> {
@@ -176,53 +169,43 @@ async function executeLoadCallbacks(): Promise<void> {
 }
 
 /**
- * Internal function to execute all registered activate callbacks
- * Called automatically by the plugin system
+ * 内部函数：执行所有已注册的卸载回调
+ * 由插件系统自动调用
  * @internal
  */
-async function executeActivateCallbacks(): Promise<void> {
-  for (const callback of activateCallbacks) {
+async function executeUnloadCallbacks(): Promise<void> {
+  for (const callback of unloadCallbacks) {
     try {
       await callback();
     } catch (error) {
-      console.error('[Lifecycle] Error in onActivate callback:', error);
-      throw createError.common.unknown(`onActivate callback failed: ${error}`);
+      console.error('[Lifecycle] Error in onUnload callback:', error);
+      // Don't throw on unload errors, just log them
     }
   }
 }
 
 /**
- * Internal function to execute all registered deactivate callbacks
- * Called automatically by the plugin system
- * @internal
- */
-async function executeDeactivateCallbacks(): Promise<void> {
-  for (const callback of deactivateCallbacks) {
-    try {
-      await callback();
-    } catch (error) {
-      console.error('[Lifecycle] Error in onDeactivate callback:', error);
-      // Don't throw on deactivate errors, just log them
-    }
-  }
-}
-
-/**
- * Internal function to reset all lifecycle callbacks
- * Used for testing and plugin reloading
+ * 内部函数：重置所有生命周期回调
+ * 用于测试和插件重新加载
  * @internal
  */
 function resetCallbacks(): void {
   loadCallbacks = [];
-  activateCallbacks = [];
-  deactivateCallbacks = [];
+  unloadCallbacks = [];
+  loadExecutionScheduled = false;
 }
 
 /**
- * Lifecycle API namespace
+ * 生命周期 API 命名空间
+ * 
+ * 提供两个简单的生命周期钩子：
+ * - onLoad: 插件加载时调用（自动执行）
+ * - onUnload: 插件卸载时调用
  */
 export const lifecycle = {
   onLoad,
-  onActivate,
-  onDeactivate,
+  onUnload,
+  // Internal functions exposed for plugin system
+  _executeUnloadCallbacks: executeUnloadCallbacks,
+  _resetCallbacks: resetCallbacks,
 };
