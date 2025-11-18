@@ -249,6 +249,121 @@ export function paste(): Promise<string | null> {
 }
 
 /**
+ * Clipboard content type enumeration
+ * @since 0.1.0
+ * @group Types
+ */
+export type ClipboardContentType = 'text' | 'image' | 'files' | 'empty';
+
+/**
+ * File information in clipboard
+ * @interface ClipboardFile
+ * @since 0.1.0
+ * @group Types
+ */
+export interface ClipboardFile {
+  /** Full file path */
+  path: string;
+  /** File name */
+  name: string;
+  /** Whether this is a directory */
+  is_directory: boolean;
+}
+
+/**
+ * Enhanced metadata about clipboard content including type, timestamp, and age information
+ * @interface ClipboardMetadata
+ * @since 0.1.0
+ * @group Types
+ */
+export interface ClipboardMetadata {
+  /** The text content in the clipboard, or null if no text */
+  text: string | null;
+  /** List of file paths if clipboard contains files, or null if no files */
+  files: ClipboardFile[] | null;
+  /** The type of content in the clipboard */
+  contentType: ClipboardContentType;
+  /** 
+   * Unix timestamp (in seconds) when the clipboard content was last updated.
+   * 
+   * Note: This timestamp is independent from the app's auto_clear_time_limit setting.
+   * Even if the app clears its internal state, this timestamp will still reflect
+   * when the system clipboard was actually modified.
+   * 
+   * May be null only if:
+   * - Clipboard monitoring hasn't started yet
+   * - The clipboard has never been modified since app start
+   */
+  timestamp: number | null;
+  /** 
+   * Age of the clipboard content in seconds (time since it was copied).
+   * Calculated as: current_time - timestamp.
+   * Will be null if timestamp is null.
+   */
+  age: number | null;
+}
+
+/**
+ * Gets comprehensive clipboard metadata including content type, timestamp, and age.
+ * This enhanced API provides detailed information about clipboard content:
+ * - Content type detection (text, image, files, or empty)
+ * - Text content (if available)
+ * - Image detection
+ * - File paths (if files were copied)
+ * - Timestamp when content was copied
+ * - Age in seconds (automatically calculated)
+ * 
+ * @returns Promise that resolves to comprehensive clipboard metadata
+ * @throws {PluginError} Same error conditions as {@link readText}
+ * @example
+ * ```typescript
+ * // Basic usage - check content type and age
+ * const metadata = await clipboard.getMetadata();
+ * console.log('Content type:', metadata.contentType);
+ * console.log('Age:', metadata.age, 'seconds');
+ * 
+ * // Handle different content types
+ * switch (metadata.contentType) {
+ *   case 'text':
+ *     console.log('Text:', metadata.text);
+ *     break;
+ *   case 'image':
+ *     console.log('Clipboard contains an image');
+ *     break;
+ *   case 'files':
+ *     console.log('Files:', metadata.files?.map(f => f.name));
+ *     break;
+ *   case 'empty':
+ *     console.log('Clipboard is empty');
+ *     break;
+ * }
+ * 
+ * // Time-based filtering using age
+ * if (metadata.age !== null && metadata.age < 10) {
+ *   console.log('Content is fresh (less than 10 seconds old)');
+ *   await processContent(metadata);
+ * }
+ * 
+ * // Check for image
+ * if (metadata.contentType === 'image') {
+ *   console.log('Image detected in clipboard');
+ * }
+ * 
+ * if (metadata.files && metadata.files.length > 0) {
+ *   console.log('Files copied:', metadata.files.length);
+ *   metadata.files.forEach(file => {
+ *     console.log(`- ${file.name} (${file.is_directory ? 'dir' : 'file'})`);
+ *   });
+ * }
+ * ```
+ * @since 0.1.0
+ * @group API
+ */
+export function getMetadata(): Promise<ClipboardMetadata> {
+  return callClipboardApi<ClipboardMetadata>("plugin_clipboard_get_metadata");
+}
+
+/**
  * Clipboard API namespace - provides functions for interacting with the system clipboard
  * 
  * Supports reading and writing text and image data to/from the system clipboard.
@@ -273,6 +388,10 @@ export function paste(): Promise<string | null> {
  * if (await clipboard.hasText()) {
  *   console.log('Clipboard has text content');
  * }
+ * 
+ * // Get metadata with timestamp
+ * const metadata = await clipboard.getMetadata();
+ * console.log('Content age:', Date.now() / 1000 - metadata.timestamp);
  * ```
  */
 export const clipboard = {
@@ -282,15 +401,18 @@ export const clipboard = {
   readImage,
   writeImage,
   clear,
-  
+
   /** Check methods */
   hasText,
   hasImage,
-  
+
+  /** Metadata methods */
+  getMetadata,
+
   /** Convenience methods */
   copy,
   paste,
-  
+
   /** Error handling tools */
   parseClipboardError,
 };

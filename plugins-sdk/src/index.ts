@@ -181,3 +181,6 @@ export type { FileInfo } from './api/fs';
 
 // Dialog types
 export type { DialogFilter, OpenDialogOptions, SaveDialogOptions } from './api/dialog';
+
+// Clipboard types
+export type { ClipboardMetadata, ClipboardContentType, ClipboardFile } from './api/clipboard';

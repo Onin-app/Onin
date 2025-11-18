@@ -667,6 +667,17 @@ async fn op_invoke(
             }
         }
 
+        "plugin_clipboard_get_metadata" => {
+            match plugin_api::clipboard::plugin_clipboard_get_metadata(app_handle).await {
+                Ok(metadata) => InvokeResult::Ok {
+                    value: serde_json::to_value(metadata).unwrap_or(serde_json::Value::Null),
+                },
+                Err(e) => InvokeResult::Err {
+                    error: format!("Clipboard error: {:?}", e),
+                },
+            }
+        }
+
         "register_plugin_settings_schema" => {
             println!("[js_runtime] Handling register_plugin_settings_schema");
 

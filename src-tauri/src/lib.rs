@@ -227,6 +227,7 @@ pub fn run() {
             plugin_api::clipboard::plugin_clipboard_read_image,
             plugin_api::clipboard::plugin_clipboard_write_image,
             plugin_api::clipboard::plugin_clipboard_clear,
+            plugin_api::clipboard::plugin_clipboard_get_metadata,
             plugin_api::clipboard::get_clipboard_content,
             // 注册定时任务命令
             plugin_api::scheduler::schedule_task,
