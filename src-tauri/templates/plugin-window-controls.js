@@ -160,6 +160,11 @@
             console.log('[Plugin Window] Minimizing...');
             await currentWindow.minimize();
             updateDebug('已最小化');
+            
+            // 触发窗口隐藏事件
+            if (window.__TAURI__?.event?._trigger) {
+              window.__TAURI__.event._trigger('window_visibility', false);
+            }
           } catch (error) {
             console.error('[Plugin Window] Failed to minimize:', error);
             updateDebug('最小化失败: ' + error.message);

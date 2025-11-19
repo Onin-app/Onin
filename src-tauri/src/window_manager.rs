@@ -190,9 +190,14 @@ pub fn setup_window_events(app: &App) -> Result<(), Box<dyn std::error::Error>> 
                     // Final check before hiding
                     let lock_state: State<WindowCloseLockState> = app_handle_for_task.state();
                     if !window_to_hide.is_focused().unwrap_or(false) && lock_state.0.load(Ordering::Relaxed) == 0 {
-                        println!("Hiding window now.");
-                        window_to_hide.hide().ok();
-                        window_to_hide.emit("window_visibility", &false).unwrap_or_default();
+                        // 只有在窗口可见时才隐藏并发送事件
+                        if window_to_hide.is_visible().unwrap_or(false) {
+                            println!("Hiding window now.");
+                            window_to_hide.hide().ok();
+                            window_to_hide.emit("window_visibility", &false).unwrap_or_default();
+                        } else {
+                            println!("Window already hidden, skipping hide event.");
+                        }
                     } else {
                         println!("Hide cancelled at the last moment (window re-focused or locked).");
                     }

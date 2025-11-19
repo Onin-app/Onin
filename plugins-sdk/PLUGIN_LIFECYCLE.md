@@ -9,7 +9,7 @@
 
 ## 生命周期钩子
 
-所有插件都可以使用两个生命周期钩子：
+所有插件都可以使用以下生命周期钩子：
 
 ### `onLoad()`
 插件被系统加载时调用。用于：
@@ -24,6 +24,26 @@
 - 保存状态
 - 取消待处理的操作
 - 关闭连接
+
+### `onWindowShow()`
+插件窗口显示或从最小化恢复时调用。用于：
+- 刷新窗口数据
+- 恢复定时任务
+- 更新 UI 状态
+
+**支持的运行模式：**
+- `display_mode="window"`: 独立窗口获得焦点时触发
+- `display_mode="inline"`: 主窗口显示时触发（因为 iframe 在主窗口内）
+
+### `onWindowHide()`
+插件窗口隐藏或最小化时调用。用于：
+- 暂停后台任务
+- 保存临时状态
+- 释放资源
+
+**支持的运行模式：**
+- `display_mode="window"`: 独立窗口失去焦点时触发
+- `display_mode="inline"`: 主窗口隐藏时触发（因为 iframe 在主窗口内）
 
 ## 代码格式支持
 
@@ -156,6 +176,17 @@ lifecycle.onLoad(async () => {
 lifecycle.onUnload(async () => {
   // 清理
   await storage.setItem('last-unload', new Date().toISOString());
+});
+
+// 窗口显示/隐藏钩子（支持 window 和 inline 模式）
+lifecycle.onWindowShow(() => {
+  console.log('窗口已显示');
+  // 刷新数据或恢复任务
+});
+
+lifecycle.onWindowHide(() => {
+  console.log('窗口已隐藏');
+  // 暂停定时器或保存状态
 });
 ```
 

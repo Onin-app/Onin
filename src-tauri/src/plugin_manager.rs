@@ -441,7 +441,7 @@ fn load_plugins_internal(
                 // Headless 插件：执行 index.js (entry)
                 // View 插件：执行 lifecycle.js（如果存在）
                 let entry_path = path.join(&manifest.entry);
-                
+
                 if entry_path.is_file() {
                     if let Some(extension) = Path::new(&manifest.entry)
                         .extension()
@@ -464,7 +464,7 @@ fn load_plugins_internal(
                                     .map(|s| s.as_str())
                                     .unwrap_or("lifecycle.js");
                                 let lifecycle_path = path.join(lifecycle_file);
-                                
+
                                 if lifecycle_path.is_file() {
                                     plugins_to_init.push((
                                         manifest.id.clone(),
@@ -888,6 +888,21 @@ pub fn open_plugin_in_window(
     Ok(())
 }
 
+/// 辅助函数：触发窗口可见性事件
+fn trigger_window_visibility_event(window: &tauri::WebviewWindow, is_visible: bool) {
+    let eval_script = format!(
+        r#"
+        if (window.__TAURI__?.event?._trigger) {{
+            window.__TAURI__.event._trigger('window_visibility', {});
+        }}
+        "#,
+        is_visible
+    );
+    if let Err(e) = window.eval(&eval_script) {
+        eprintln!("Failed to trigger window_visibility ({}): {}", is_visible, e);
+    }
+}
+
 /// 创建或显示插件窗口的共享函数
 async fn create_or_show_plugin_window(
     app: tauri::AppHandle,
@@ -927,11 +942,17 @@ async fn create_or_show_plugin_window(
             if let Err(e) = window.set_focus() {
                 eprintln!("Failed to focus plugin window: {}", e);
             }
+
+            // 发送窗口可见性事件到前端
+            trigger_window_visibility_event(&window, true);
         } else {
             // 窗口已显示，最小化它
             if let Err(e) = window.minimize() {
                 eprintln!("Failed to minimize plugin window: {}", e);
             }
+
+            // 发送窗口可见性事件到前端
+            trigger_window_visibility_event(&window, false);
         }
         return Ok(());
     }
@@ -954,6 +975,60 @@ async fn create_or_show_plugin_window(
         Menu::with_items(&app, &[&back_to_inline])
     })();
 
+    // 创建初始化脚本，注入简化的 Tauri event API
+    // 只注入 listen 功能，用于监听 window_visibility 事件
+    let init_script = r#"
+        (function initTauriEventListener() {
+            if (typeof window.__TAURI__ === 'undefined') {
+                setTimeout(initTauriEventListener, 50);
+                return;
+            }
+            
+            // 如果 event API 已存在，直接使用
+            if (window.__TAURI__.event && window.__TAURI__.event.listen) {
+                return;
+            }
+            
+            // 创建简化的 event API（只支持 listen）
+            const eventListeners = new Map();
+            let listenerIdCounter = 0;
+            
+            window.__TAURI__.event = {
+                listen: function(eventName, handler) {
+                    const listenerId = listenerIdCounter++;
+                    
+                    if (!eventListeners.has(eventName)) {
+                        eventListeners.set(eventName, new Map());
+                    }
+                    
+                    eventListeners.get(eventName).set(listenerId, handler);
+                    
+                    // 返回 unlisten 函数
+                    return Promise.resolve(function unlisten() {
+                        const listeners = eventListeners.get(eventName);
+                        if (listeners) {
+                            listeners.delete(listenerId);
+                        }
+                    });
+                },
+                
+                // 内部函数：触发事件（由后端通过 eval 调用）
+                _trigger: function(eventName, payload) {
+                    const listeners = eventListeners.get(eventName);
+                    if (listeners) {
+                        listeners.forEach((handler) => {
+                            try {
+                                handler({ event: eventName, payload: payload });
+                            } catch (error) {
+                                console.error('[Plugin Window] Error in event handler:', error);
+                            }
+                        });
+                    }
+                }
+            };
+        })();
+    "#;
+
     // 创建窗口构建器
     let builder = WebviewWindowBuilder::new(
         &app,
@@ -964,7 +1039,8 @@ async fn create_or_show_plugin_window(
     .inner_size(800.0, 600.0)
     .resizable(true)
     .decorations(false) // 所有平台都隐藏系统装饰
-    .transparent(false); // 确保窗口不透明
+    .transparent(false) // 确保窗口不透明
+    .initialization_script(init_script); // 注入事件监听器
 
     // 如果菜单创建成功，添加到窗口
     let builder = if let Ok(menu) = menu_result {
@@ -1033,7 +1109,14 @@ async fn create_or_show_plugin_window(
             });
 
             let label_for_event = window_label_for_tracking.clone();
+            let window_for_event = window.clone();
+
             window.on_window_event(move |event| {
+                println!(
+                    "[plugin_manager] Window event for {}: {:?}",
+                    label_for_event, event
+                );
+
                 match event {
                     tauri::WindowEvent::Focused(true) => {
                         println!(
@@ -1053,6 +1136,9 @@ async fn create_or_show_plugin_window(
                                 );
                             }
                         }
+
+                        // 窗口显示事件由前端通过浏览器原生 API 自动处理
+                        // 不需要后端触发，前端会监听 visibilitychange 和 focus 事件
 
                         // 重新注册 ESC 快捷键
                         let _ = app_for_window_event
@@ -1084,6 +1170,9 @@ async fn create_or_show_plugin_window(
                                 }
                             }
                         }
+
+                        // 窗口隐藏事件由前端通过浏览器原生 API 自动处理
+                        // 不需要后端触发，前端会监听 visibilitychange 和 blur 事件
 
                         // 注销 ESC 快捷键
                         if let Err(e) = app_for_window_event
@@ -1643,7 +1732,10 @@ pub fn import_plugin(
             let lifecycle_path = match extension {
                 "js" => {
                     // Headless 插件：直接使用 index.js
-                    println!("[plugin_manager] Initializing headless plugin: {}", manifest.id);
+                    println!(
+                        "[plugin_manager] Initializing headless plugin: {}",
+                        manifest.id
+                    );
                     Some(entry_path.clone())
                 }
                 "html" => {
@@ -1654,7 +1746,7 @@ pub fn import_plugin(
                         .map(|s| s.as_str())
                         .unwrap_or("lifecycle.js");
                     let lc_path = source.join(lifecycle_file);
-                    
+
                     if lc_path.is_file() {
                         println!(
                             "[plugin_manager] Initializing view plugin lifecycle: {} ({})",

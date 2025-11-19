@@ -13,7 +13,7 @@ describe('Lifecycle API', () => {
   describe('onLoad', () => {
     it('should execute callback automatically', async () => {
       const { lifecycle } = await import('../lifecycle');
-      
+
       const mockCallback = vi.fn();
       lifecycle.onLoad(mockCallback);
 
@@ -25,17 +25,17 @@ describe('Lifecycle API', () => {
 
     it('should execute multiple callbacks in order', async () => {
       const { lifecycle } = await import('../lifecycle');
-      
+
       const executionOrder: number[] = [];
-      
+
       lifecycle.onLoad(async () => {
         executionOrder.push(1);
       });
-      
+
       lifecycle.onLoad(async () => {
         executionOrder.push(2);
       });
-      
+
       lifecycle.onLoad(async () => {
         executionOrder.push(3);
       });
@@ -48,9 +48,9 @@ describe('Lifecycle API', () => {
 
     it('should handle async callbacks', async () => {
       const { lifecycle } = await import('../lifecycle');
-      
+
       let value = 0;
-      
+
       lifecycle.onLoad(async () => {
         await new Promise(resolve => setTimeout(resolve, 10));
         value = 42;
@@ -64,9 +64,9 @@ describe('Lifecycle API', () => {
 
     it('should handle errors in callbacks', async () => {
       const { lifecycle } = await import('../lifecycle');
-      
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
+
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+
       lifecycle.onLoad(async () => {
         throw new Error('Test error');
       });
@@ -75,15 +75,15 @@ describe('Lifecycle API', () => {
       await new Promise(resolve => setTimeout(resolve, 10));
 
       expect(consoleErrorSpy).toHaveBeenCalled();
-      
+
       consoleErrorSpy.mockRestore();
     });
 
     it('should not execute callbacks multiple times', async () => {
       const { lifecycle } = await import('../lifecycle');
-      
+
       const mockCallback = vi.fn();
-      
+
       lifecycle.onLoad(mockCallback);
       lifecycle.onLoad(mockCallback);
 
@@ -98,9 +98,9 @@ describe('Lifecycle API', () => {
   describe('onUnload', () => {
     it('should register unload callback', async () => {
       const { lifecycle } = await import('../lifecycle');
-      
+
       const mockCallback = vi.fn();
-      
+
       expect(() => {
         lifecycle.onUnload(mockCallback);
       }).not.toThrow();
@@ -108,7 +108,7 @@ describe('Lifecycle API', () => {
 
     it('should execute unload callbacks', async () => {
       const { lifecycle } = await import('../lifecycle');
-      
+
       const mockCallback = vi.fn();
       lifecycle.onUnload(mockCallback);
 
@@ -120,27 +120,82 @@ describe('Lifecycle API', () => {
 
     it('should handle errors in unload callbacks gracefully', async () => {
       const { lifecycle } = await import('../lifecycle');
-      
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
+
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+
       lifecycle.onUnload(async () => {
         throw new Error('Unload error');
       });
 
       // Should not throw
       await expect(lifecycle._executeUnloadCallbacks()).resolves.not.toThrow();
-      
+
       expect(consoleErrorSpy).toHaveBeenCalled();
       consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe('Window lifecycle hooks', () => {
+    it('should register onWindowShow callback', async () => {
+      const { lifecycle } = await import('../lifecycle');
+
+      const mockCallback = vi.fn();
+
+      expect(() => {
+        lifecycle.onWindowShow(mockCallback);
+      }).not.toThrow();
+    });
+
+    it('should register onWindowHide callback', async () => {
+      const { lifecycle } = await import('../lifecycle');
+
+      const mockCallback = vi.fn();
+
+      expect(() => {
+        lifecycle.onWindowHide(mockCallback);
+      }).not.toThrow();
+    });
+
+    it('should register multiple window callbacks', async () => {
+      const { lifecycle } = await import('../lifecycle');
+
+      const showCallback1 = vi.fn();
+      const showCallback2 = vi.fn();
+      const hideCallback1 = vi.fn();
+      const hideCallback2 = vi.fn();
+
+      lifecycle.onWindowShow(showCallback1);
+      lifecycle.onWindowShow(showCallback2);
+      lifecycle.onWindowHide(hideCallback1);
+      lifecycle.onWindowHide(hideCallback2);
+
+      // Callbacks should be registered but not called yet
+      expect(showCallback1).not.toHaveBeenCalled();
+      expect(showCallback2).not.toHaveBeenCalled();
+      expect(hideCallback1).not.toHaveBeenCalled();
+      expect(hideCallback2).not.toHaveBeenCalled();
+    });
+
+    it('should handle async window callbacks', async () => {
+      const { lifecycle } = await import('../lifecycle');
+
+      const mockCallback = vi.fn(async () => {
+        await new Promise(resolve => setTimeout(resolve, 10));
+      });
+
+      lifecycle.onWindowShow(mockCallback);
+
+      // Callback should be registered but not called yet
+      expect(mockCallback).not.toHaveBeenCalled();
     });
   });
 
   describe('Integration', () => {
     it('should work with settings registration', async () => {
       const { lifecycle } = await import('../lifecycle');
-      
+
       let settingsRegistered = false;
-      
+
       lifecycle.onLoad(async () => {
         // Simulate settings registration
         await new Promise(resolve => setTimeout(resolve, 5));
@@ -155,9 +210,9 @@ describe('Lifecycle API', () => {
 
     it('should work with command registration', async () => {
       const { lifecycle } = await import('../lifecycle');
-      
+
       const commands: string[] = [];
-      
+
       lifecycle.onLoad(async () => {
         // Simulate command registration
         commands.push('command1');

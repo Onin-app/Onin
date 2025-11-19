@@ -51,7 +51,10 @@ type LifecycleCallback = () => void | Promise<void>;
 
 let loadCallbacks: LifecycleCallback[] = [];
 let unloadCallbacks: LifecycleCallback[] = [];
+let windowShowCallbacks: LifecycleCallback[] = [];
+let windowHideCallbacks: LifecycleCallback[] = [];
 let loadExecutionScheduled = false;
+let windowEventsInitialized = false;
 
 /**
  * 注册插件加载时的回调函数
@@ -103,7 +106,7 @@ let loadExecutionScheduled = false;
  */
 function onLoad(callback: LifecycleCallback): void {
   loadCallbacks.push(callback);
-  
+
   // Schedule execution if not already scheduled
   if (!loadExecutionScheduled) {
     loadExecutionScheduled = true;
@@ -185,6 +188,225 @@ async function executeUnloadCallbacks(): Promise<void> {
 }
 
 /**
+ * 注册插件窗口显示时的回调函数
+ * 
+ * 支持两种运行模式：
+ * - display_mode="window": 独立窗口获得焦点时触发
+ * - display_mode="inline": iframe 可见时触发
+ * 
+ * 用途：
+ * - 刷新窗口数据
+ * - 恢复定时任务
+ * - 更新 UI 状态
+ * 
+ * @param callback - 窗口显示时执行的函数
+ * 
+ * @example
+ * ```typescript
+ * import { lifecycle } from 'baize-plugin-sdk';
+ * 
+ * lifecycle.onWindowShow(() => {
+ *   console.log('窗口已显示');
+ *   // 刷新数据
+ *   refreshData();
+ * });
+ * ```
+ */
+function onWindowShow(callback: LifecycleCallback): void {
+  // 检查是否已经注册过相同的回调
+  if (windowShowCallbacks.includes(callback)) {
+    return;
+  }
+
+  windowShowCallbacks.push(callback);
+  initializeWindowEvents();
+}
+
+/**
+ * 注册插件窗口隐藏时的回调函数
+ * 
+ * 支持两种运行模式：
+ * - display_mode="window": 独立窗口失去焦点时触发
+ * - display_mode="inline": iframe 隐藏时触发
+ * 
+ * 用途：
+ * - 暂停后台任务
+ * - 保存临时状态
+ * - 释放资源
+ * 
+ * @param callback - 窗口隐藏时执行的函数
+ * 
+ * @example
+ * ```typescript
+ * import { lifecycle } from 'baize-plugin-sdk';
+ * 
+ * lifecycle.onWindowHide(() => {
+ *   console.log('窗口已隐藏');
+ *   // 暂停定时器
+ *   pauseTimers();
+ * });
+ * ```
+ */
+function onWindowHide(callback: LifecycleCallback): void {
+  // 检查是否已经注册过相同的回调
+  if (windowHideCallbacks.includes(callback)) {
+    return;
+  }
+
+  windowHideCallbacks.push(callback);
+  initializeWindowEvents();
+}
+
+// 防抖：防止短时间内多次触发
+// 100ms 的防抖时间足以过滤掉窗口激活过程中的短暂焦点切换
+const DEBOUNCE_MS = 100;
+let lastShowTime = 0;
+let lastHideTime = 0;
+
+/**
+ * 执行窗口显示回调（带防抖）
+ * @internal
+ */
+async function executeWindowShowCallbacks(): Promise<void> {
+  const now = Date.now();
+  if (now - lastShowTime < DEBOUNCE_MS) {
+    return;
+  }
+  lastShowTime = now;
+
+  for (const callback of windowShowCallbacks) {
+    try {
+      await callback();
+    } catch (error) {
+      console.error('[Lifecycle] Error in onWindowShow callback:', error);
+    }
+  }
+}
+
+/**
+ * 执行窗口隐藏回调（带防抖）
+ * @internal
+ */
+async function executeWindowHideCallbacks(): Promise<void> {
+  const now = Date.now();
+  if (now - lastHideTime < DEBOUNCE_MS) {
+    return;
+  }
+  lastHideTime = now;
+
+  for (const callback of windowHideCallbacks) {
+    try {
+      await callback();
+    } catch (error) {
+      console.error('[Lifecycle] Error in onWindowHide callback:', error);
+    }
+  }
+}
+
+/**
+ * 初始化窗口事件监听
+ * 支持三种模式（按优先级）：
+ * 1. 浏览器原生 API (visibilitychange) - 最简单可靠
+ * 2. Tauri 事件系统 - 作为备选方案
+ * 3. iframe postMessage - 用于 inline 模式
+ * @internal
+ */
+function initializeWindowEvents(): void {
+  if (windowEventsInitialized) {
+    return;
+  }
+
+  windowEventsInitialized = true;
+
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  // 检测运行环境
+  const isInIframe = window.self !== window.top;
+
+  if (isInIframe) {
+    // iframe 模式：监听来自父窗口的消息
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'plugin-lifecycle-event') {
+        const { event: eventName } = event.data;
+
+        if (eventName === 'show') {
+          executeWindowShowCallbacks().catch((error) => {
+            console.error('[Lifecycle] Failed to execute window show callbacks:', error);
+          });
+        } else if (eventName === 'hide') {
+          executeWindowHideCallbacks().catch((error) => {
+            console.error('[Lifecycle] Failed to execute window hide callbacks:', error);
+          });
+        }
+      }
+    });
+  } else {
+    // 独立窗口模式：监听后端发送的 window_visibility 事件
+    let isUsingTauriEvents = false;
+
+    const tryListenWindowVisibility = (attempt = 1, maxAttempts = 10) => {
+      const tauri = (window as any).__TAURI__;
+
+      if (!tauri?.event?.listen) {
+        if (attempt < maxAttempts) {
+          setTimeout(() => tryListenWindowVisibility(attempt + 1), attempt * 100);
+        } else {
+          // 降级方案：使用 visibilitychange
+          setupFallbackVisibilityChange();
+        }
+        return;
+      }
+
+      // 监听后端发送的 window_visibility 事件
+      tauri.event.listen('window_visibility', (event: any) => {
+        const isVisible = event.payload;
+
+        if (isVisible) {
+          executeWindowShowCallbacks().catch((error) => {
+            console.error('[Lifecycle] Failed to execute window show callbacks:', error);
+          });
+        } else {
+          executeWindowHideCallbacks().catch((error) => {
+            console.error('[Lifecycle] Failed to execute window hide callbacks:', error);
+          });
+        }
+      }).then(() => {
+        // 成功注册 Tauri 事件监听器，标记为已使用
+        isUsingTauriEvents = true;
+      }).catch((error: Error) => {
+        console.error('[Lifecycle] Failed to listen to window_visibility:', error);
+        // 如果注册失败，使用降级方案
+        setupFallbackVisibilityChange();
+      });
+    };
+
+    // 降级方案：使用 visibilitychange
+    const setupFallbackVisibilityChange = () => {
+      // 只有在没有使用 Tauri 事件时才设置降级方案
+      if (isUsingTauriEvents) {
+        return;
+      }
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          executeWindowHideCallbacks().catch((error) => {
+            console.error('[Lifecycle] Failed to execute window hide callbacks:', error);
+          });
+        } else {
+          executeWindowShowCallbacks().catch((error) => {
+            console.error('[Lifecycle] Failed to execute window show callbacks:', error);
+          });
+        }
+      });
+    };
+
+    tryListenWindowVisibility();
+  }
+}
+
+/**
  * 内部函数：重置所有生命周期回调
  * 用于测试和插件重新加载
  * @internal
@@ -192,19 +414,26 @@ async function executeUnloadCallbacks(): Promise<void> {
 function resetCallbacks(): void {
   loadCallbacks = [];
   unloadCallbacks = [];
+  windowShowCallbacks = [];
+  windowHideCallbacks = [];
   loadExecutionScheduled = false;
+  windowEventsInitialized = false;
 }
 
 /**
  * 生命周期 API 命名空间
  * 
- * 提供两个简单的生命周期钩子：
+ * 提供生命周期钩子：
  * - onLoad: 插件加载时调用（自动执行）
  * - onUnload: 插件卸载时调用
+ * - onWindowShow: 插件窗口显示时调用（仅 window 模式）
+ * - onWindowHide: 插件窗口隐藏时调用（仅 window 模式）
  */
 export const lifecycle = {
   onLoad,
   onUnload,
+  onWindowShow,
+  onWindowHide,
   // Internal functions exposed for plugin system
   _executeUnloadCallbacks: executeUnloadCallbacks,
   _resetCallbacks: resetCallbacks,

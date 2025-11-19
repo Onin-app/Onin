@@ -63,6 +63,7 @@
   let currentPluginUrl = $state<string>("");
   let currentPluginId = $state<string>("");
   let currentPluginAutoDetach = $state<boolean>(false);
+  let pluginIframeElement = $state<HTMLIFrameElement | null>(null);
 
   // Refresh state
   let isRefreshing = $state<boolean>(false);
@@ -83,10 +84,23 @@
     }
   });
 
+  // Forward main window visibility events to plugin iframe
+  let mainWindowVisible = $state<boolean>(true);
+
   const handleEsc = () => {
-    console.log("Main page ESC handler executing");
     // If plugin is showing inline, close it first
     if (showPluginInline) {
+      // Send hide event to plugin iframe before closing
+      if (pluginIframeElement && pluginIframeElement.contentWindow) {
+        pluginIframeElement.contentWindow.postMessage(
+          {
+            type: 'plugin-lifecycle-event',
+            event: 'hide',
+          },
+          '*'
+        );
+      }
+      
       showPluginInline = false;
       currentPluginUrl = "";
       currentPluginId = "";
@@ -152,8 +166,22 @@
     const unlistenWindowShow = await listen<boolean>(
       "window_visibility",
       async (event) => {
+        mainWindowVisible = event.payload;
+        
         if (event.payload) {
           await autoPasteClipboard();
+        }
+        
+        // Forward visibility event to plugin iframe
+        if (pluginIframeElement && pluginIframeElement.contentWindow) {
+          const eventType = event.payload ? 'show' : 'hide';
+          pluginIframeElement.contentWindow.postMessage(
+            {
+              type: 'plugin-lifecycle-event',
+              event: eventType,
+            },
+            '*'
+          );
         }
       },
     );
@@ -951,10 +979,23 @@
         <!-- Plugin inline display area -->
         <!-- 使用本地 HTTP 服务器加载插件，支持所有资源和动态导入 -->
         <iframe
+          bind:this={pluginIframeElement}
           src={currentPluginUrl}
           class="h-full w-full border-0"
           title="Plugin"
           allow="clipboard-read; clipboard-write"
+          onload={() => {
+            // Send show event to plugin iframe after it loads
+            if (pluginIframeElement && pluginIframeElement.contentWindow) {
+              pluginIframeElement.contentWindow.postMessage(
+                {
+                  type: 'plugin-lifecycle-event',
+                  event: 'show',
+                },
+                '*'
+              );
+            }
+          }}
         ></iframe>
       {:else}
         <ScrollArea.Root class="h-full w-full rounded-[10px] border px-2 py-2">

@@ -333,6 +333,7 @@ fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::
             match window.is_visible() {
                 Ok(true) => {
                     let _ = window.hide();
+                    let _ = window.emit("window_visibility", &false);
                 }
                 Ok(false) => {
                     let _ = window.show();
