@@ -787,6 +787,17 @@ pub fn get_plugin_with_schema(
         .ok_or_else(|| format!("Plugin not found: {}", plugin_id))
 }
 
+#[tauri::command]
+pub fn get_plugin_server_port(app: tauri::AppHandle) -> Result<u16, String> {
+    let server_port_state = app.state::<PluginServerPort>();
+    let port = server_port_state
+        .0
+        .lock()
+        .unwrap()
+        .ok_or_else(|| "Plugin server not started".to_string())?;
+    Ok(port)
+}
+
 // 插件窗口控制命令
 #[tauri::command]
 pub fn plugin_close_window(app: tauri::AppHandle, label: String) -> Result<(), String> {
@@ -957,13 +968,13 @@ async fn create_or_show_plugin_window(
         return Ok(());
     }
 
-    // 使用自定义协议来加载插件文件
+    // 使用 Svelte 页面加载插件窗口，页面内部会用 iframe 加载插件
     let plugin_url = format!(
-        "plugin://localhost/{}/{}",
-        plugin.dir_name, plugin.manifest.entry
+        "http://localhost:1420/plugin-window?plugin_id={}",
+        plugin.manifest.id
     );
     println!(
-        "[plugin_manager] Loading plugin in window from: {}",
+        "[plugin_manager] Loading plugin window from: {}",
         plugin_url
     );
 
@@ -975,60 +986,6 @@ async fn create_or_show_plugin_window(
         Menu::with_items(&app, &[&back_to_inline])
     })();
 
-    // 创建初始化脚本，注入简化的 Tauri event API
-    // 只注入 listen 功能，用于监听 window_visibility 事件
-    let init_script = r#"
-        (function initTauriEventListener() {
-            if (typeof window.__TAURI__ === 'undefined') {
-                setTimeout(initTauriEventListener, 50);
-                return;
-            }
-            
-            // 如果 event API 已存在，直接使用
-            if (window.__TAURI__.event && window.__TAURI__.event.listen) {
-                return;
-            }
-            
-            // 创建简化的 event API（只支持 listen）
-            const eventListeners = new Map();
-            let listenerIdCounter = 0;
-            
-            window.__TAURI__.event = {
-                listen: function(eventName, handler) {
-                    const listenerId = listenerIdCounter++;
-                    
-                    if (!eventListeners.has(eventName)) {
-                        eventListeners.set(eventName, new Map());
-                    }
-                    
-                    eventListeners.get(eventName).set(listenerId, handler);
-                    
-                    // 返回 unlisten 函数
-                    return Promise.resolve(function unlisten() {
-                        const listeners = eventListeners.get(eventName);
-                        if (listeners) {
-                            listeners.delete(listenerId);
-                        }
-                    });
-                },
-                
-                // 内部函数：触发事件（由后端通过 eval 调用）
-                _trigger: function(eventName, payload) {
-                    const listeners = eventListeners.get(eventName);
-                    if (listeners) {
-                        listeners.forEach((handler) => {
-                            try {
-                                handler({ event: eventName, payload: payload });
-                            } catch (error) {
-                                console.error('[Plugin Window] Error in event handler:', error);
-                            }
-                        });
-                    }
-                }
-            };
-        })();
-    "#;
-
     // 创建窗口构建器
     let builder = WebviewWindowBuilder::new(
         &app,
@@ -1039,8 +996,7 @@ async fn create_or_show_plugin_window(
     .inner_size(800.0, 600.0)
     .resizable(true)
     .decorations(false) // 所有平台都隐藏系统装饰
-    .transparent(false) // 确保窗口不透明
-    .initialization_script(init_script); // 注入事件监听器
+    .transparent(false); // 确保窗口不透明
 
     // 如果菜单创建成功，添加到窗口
     let builder = if let Ok(menu) = menu_result {

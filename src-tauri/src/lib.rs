@@ -181,6 +181,7 @@ pub fn run() {
             plugin_manager::get_plugin_settings,
             plugin_manager::save_plugin_settings,
             plugin_manager::get_plugin_with_schema,
+            plugin_manager::get_plugin_server_port,
             plugin_manager::import_plugin,
             plugin_manager::uninstall_plugin,
             // 插件窗口控制命令
