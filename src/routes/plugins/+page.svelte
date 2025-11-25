@@ -285,15 +285,22 @@
     try {
       await invoke("uninstall_plugin", { pluginId });
 
-      // 更新本地状态
-      plugins = plugins.filter((p) => p.id !== pluginId);
-
-      console.log(`Plugin ${pluginId} uninstalled`);
+      // 刷新插件列表（从后端重新加载）
+      try {
+        const refreshedPlugins = await invoke<any[]>("refresh_plugins");
+        plugins = refreshedPlugins.map((plugin) => ({
+          ...plugin,
+          downloads: plugin.downloads ?? Math.floor(Math.random() * 10000),
+        }));
+      } catch (refreshError) {
+        console.error("Failed to refresh plugins:", refreshError);
+        // 如果刷新失败，至少更新本地状态
+        plugins = plugins.filter((p) => p.id !== pluginId);
+      }
 
       // 刷新命令列表
       try {
         await invoke("refresh_commands");
-        console.log("Commands refreshed after plugin uninstall");
       } catch (refreshError) {
         console.error("Failed to refresh commands:", refreshError);
       }

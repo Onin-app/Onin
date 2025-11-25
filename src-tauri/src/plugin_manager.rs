@@ -155,6 +155,14 @@ pub struct PluginManifest {
     /// Default: "lifecycle.js" if not specified
     #[serde(skip_serializing_if = "Option::is_none")]
     pub lifecycle: Option<String>,
+    /// Development mode flag
+    /// If true, plugin will be loaded from devServer instead of local files
+    #[serde(default, rename = "devMode")]
+    pub dev_mode: bool,
+    /// Development server URL
+    /// Used when devMode is true (e.g., "http://localhost:5172")
+    #[serde(skip_serializing_if = "Option::is_none", rename = "devServer")]
+    pub dev_server: Option<String>,
 }
 
 fn default_display_mode() -> String {
@@ -297,7 +305,6 @@ fn save_plugin_states(
     };
     let content = serde_json::to_string_pretty(&plugin_states).map_err(|e| e.to_string())?;
     std::fs::write(path, content).map_err(|e| e.to_string())?;
-    println!("[plugin_manager] Saved plugin states: {:?}", states);
     Ok(())
 }
 
@@ -377,27 +384,18 @@ fn load_plugins_internal(
     store: &State<PluginStore>,
     clear_existing: bool,
 ) -> Result<Vec<LoadedPlugin>, String> {
-    println!("[plugin_manager] Loading plugins...");
-    let data_dir = app.path().app_data_dir().map_err(|e| {
-        println!("[plugin_manager] Error getting data dir: {}", e);
-        e.to_string()
-    })?;
-
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let plugins_dir = data_dir.join("plugins");
-    println!("[plugin_manager] Plugins dir: {:?}", plugins_dir);
 
     if !plugins_dir.is_dir() {
-        println!("[plugin_manager] Plugins dir not found.");
         return Ok(Vec::new());
     }
 
-    // 加载插件状态
     let plugin_states = load_plugin_states(app);
 
     let mut store_lock = store.0.lock().unwrap();
     if clear_existing {
-        store_lock.clear(); // Clear old plugins
-        println!("[plugin_manager] Cleared existing plugins from store.");
+        store_lock.clear();
     }
 
     let mut plugins_to_init = Vec::new();
@@ -429,13 +427,8 @@ fn load_plugins_internal(
                     manifest: manifest_with_state,
                     dir_name: dir_name.clone(),
                     enabled,
-                    settings: None, // Settings will be registered dynamically via JavaScript
+                    settings: None,
                 };
-
-                println!(
-                    "[plugin_manager] Loaded plugin: {} from {} (enabled: {})",
-                    manifest.name, loaded_plugin.dir_name, enabled
-                );
 
                 // 自动执行生命周期文件进行初始化
                 // Headless 插件：执行 index.js (entry)
@@ -484,17 +477,10 @@ fn load_plugins_internal(
     }
 
     let plugins = store_lock.values().cloned().collect();
-    println!("[plugin_manager] Loaded {} plugins.", store_lock.len());
-
-    // 释放锁后执行初始化脚本
     drop(store_lock);
 
     // 执行所有插件的初始化脚本
     if !plugins_to_init.is_empty() {
-        println!(
-            "[plugin_manager] Initializing {} plugins",
-            plugins_to_init.len()
-        );
         let app_clone = app.clone();
         std::thread::spawn(move || {
             let rt = tokio::runtime::Builder::new_current_thread()
@@ -504,29 +490,8 @@ fn load_plugins_internal(
 
             rt.block_on(async {
                 for (plugin_id, entry_path, _dir_name) in plugins_to_init {
-                    println!("[plugin_manager] Initializing plugin: {}", plugin_id);
-                    match std::fs::read_to_string(&entry_path) {
-                        Ok(js_code) => {
-                            if let Err(e) =
-                                js_runtime::execute_js(&app_clone, &js_code, Some(&plugin_id)).await
-                            {
-                                eprintln!(
-                                    "[plugin_manager] Failed to initialize plugin {}: {}",
-                                    plugin_id, e
-                                );
-                            } else {
-                                println!(
-                                    "[plugin_manager] Successfully initialized plugin {}",
-                                    plugin_id
-                                );
-                            }
-                        }
-                        Err(e) => {
-                            eprintln!(
-                                "[plugin_manager] Failed to read entry file for {}: {}",
-                                plugin_id, e
-                            );
-                        }
+                    if let Ok(js_code) = std::fs::read_to_string(&entry_path) {
+                        let _ = js_runtime::execute_js(&app_clone, &js_code, Some(&plugin_id)).await;
                     }
                 }
             });
@@ -556,44 +521,15 @@ pub async fn refresh_plugins(
     app: tauri::AppHandle,
     store: State<'_, PluginStore>,
 ) -> Result<Vec<LoadedPlugin>, String> {
-    println!("[plugin_manager] Refreshing plugins...");
-
     // 清除 JavaScript 运行时缓存
-    if let Err(e) = crate::js_runtime::clear_all_plugin_runtimes().await {
-        println!(
-            "[plugin_manager] Warning: Failed to clear JS runtimes: {}",
-            e
-        );
-        // 不要因为这个错误而失败，继续刷新插件
-    } else {
-        println!("[plugin_manager] Successfully cleared all plugin runtimes");
-    }
+    let _ = crate::js_runtime::clear_all_plugin_runtimes().await;
 
     // 清除插件加载状态缓存
     let loaded_state = app.state::<crate::plugin_api::command::PluginLoadedState>();
-    {
-        let mut state = loaded_state.0.lock().unwrap();
-        let count = state.len();
-        state.clear();
-        println!("[plugin_manager] Cleared {} plugin loaded states", count);
-    }
+    loaded_state.0.lock().unwrap().clear();
 
     // 重新加载所有插件
-    let result = load_plugins_internal(&app, &store, true);
-
-    match &result {
-        Ok(plugins) => {
-            println!(
-                "[plugin_manager] Successfully refreshed {} plugins.",
-                plugins.len()
-            );
-        }
-        Err(e) => {
-            println!("[plugin_manager] Failed to refresh plugins: {}", e);
-        }
-    }
-
-    result
+    load_plugins_internal(&app, &store, true)
 }
 
 #[tauri::command]
@@ -711,21 +647,17 @@ pub fn register_plugin_settings_schema(
         );
 
         // Emit event to notify frontend that schema has been registered
-        println!("[plugin_manager] Emitting plugin-settings-schema-registered event");
         if let Err(e) = app.emit("plugin-settings-schema-registered", &plugin_id) {
             eprintln!(
-                "[plugin_manager] ❌ Failed to emit schema registered event: {}",
+                "[plugin_manager] Failed to emit schema registered event: {}",
                 e
             );
             return Err(format!("Failed to emit event: {}", e));
         }
-        println!("[plugin_manager] ✅ Event emitted successfully");
 
         Ok(())
     } else {
-        let error_msg = format!("Plugin not found: {}", plugin_id);
-        eprintln!("[plugin_manager] ❌ {}", error_msg);
-        Err(error_msg)
+        Err(format!("Plugin not found: {}", plugin_id))
     }
 }
 
@@ -910,7 +842,10 @@ fn trigger_window_visibility_event(window: &tauri::WebviewWindow, is_visible: bo
         is_visible
     );
     if let Err(e) = window.eval(&eval_script) {
-        eprintln!("Failed to trigger window_visibility ({}): {}", is_visible, e);
+        eprintln!(
+            "Failed to trigger window_visibility ({}): {}",
+            is_visible, e
+        );
     }
 }
 
@@ -977,6 +912,21 @@ async fn create_or_show_plugin_window(
         "[plugin_manager] Loading plugin window from: {}",
         plugin_url
     );
+
+    // 如果是开发模式，打印开发服务器信息
+    if plugin.manifest.dev_mode {
+        if let Some(dev_server) = &plugin.manifest.dev_server {
+            println!(
+                "[plugin_manager] Plugin {} is in dev mode, will load from: {}",
+                plugin.manifest.id, dev_server
+            );
+        } else {
+            eprintln!(
+                "[plugin_manager] Warning: Plugin {} has devMode=true but no devServer specified",
+                plugin.manifest.id
+            );
+        }
+    }
 
     // 创建窗口菜单
     use tauri::menu::{Menu, MenuItemBuilder};
@@ -1055,12 +1005,9 @@ async fn create_or_show_plugin_window(
                 }
 
                 // 注册 ESC 快捷键
-                println!("[plugin_manager] Registering ESC shortcut for plugin window");
                 let _ = app_for_immediate.global_shortcut().unregister(esc_shortcut);
                 if let Err(e) = app_for_immediate.global_shortcut().register(esc_shortcut) {
                     eprintln!("[plugin_manager] Failed to register ESC shortcut: {}", e);
-                } else {
-                    println!("[plugin_manager] ESC shortcut registered successfully");
                 }
             });
 
@@ -1105,8 +1052,6 @@ async fn create_or_show_plugin_window(
                             .register(esc_shortcut)
                         {
                             eprintln!("[plugin_manager] Failed to register ESC shortcut: {}", e);
-                        } else {
-                            println!("[plugin_manager] ESC shortcut registered successfully");
                         }
                     }
                     tauri::WindowEvent::Focused(false) => {
@@ -1122,7 +1067,6 @@ async fn create_or_show_plugin_window(
                             if let Ok(mut active) = active_window_state.0.lock() {
                                 if active.as_ref() == Some(&label_for_event) {
                                     *active = None;
-                                    println!("[plugin_manager] Cleared active plugin window");
                                 }
                             }
                         }
@@ -1235,11 +1179,86 @@ pub fn execute_plugin_entry(
         plugin.manifest.name, plugin.enabled
     );
 
+    // 调试：打印开发模式信息
+    println!(
+        "[plugin_manager] Plugin dev_mode: {}, dev_server: {:?}",
+        plugin.manifest.dev_mode, plugin.manifest.dev_server
+    );
+
     // 检查插件是否启用
     if !plugin.enabled {
         return Err("Plugin is disabled".to_string());
     }
 
+    // 开发模式下，直接使用开发服务器，不需要检查本地文件
+    if plugin.manifest.dev_mode {
+        if let Some(dev_server) = &plugin.manifest.dev_server {
+            println!(
+                "[plugin_manager] Plugin {} is in dev mode, loading from: {}",
+                plugin.manifest.id, dev_server
+            );
+
+            // 开发模式下，假设是 HTML 插件（webview）
+            // 检查是否应该在窗口中打开
+            let should_open_in_window =
+                plugin.manifest.auto_detach || plugin.manifest.display_mode.as_str() == "window";
+
+            if should_open_in_window {
+                // 在独立窗口中打开
+                let app_clone = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(e) = create_or_show_plugin_window(app_clone, &plugin).await {
+                        eprintln!("Failed to create or show plugin window: {}", e);
+                    }
+                });
+                return Ok(());
+            } else {
+                // 内联模式
+                let main_window = app
+                    .get_webview_window("main")
+                    .ok_or_else(|| "Main window not found".to_string())?;
+
+                // 显示主窗口
+                if let Ok(false) = main_window.is_visible() {
+                    if let Err(e) = main_window.show() {
+                        eprintln!(
+                            "[plugin_manager] Warning: Failed to show main window: {}",
+                            e
+                        );
+                    }
+                    if let Err(e) = main_window.set_focus() {
+                        eprintln!(
+                            "[plugin_manager] Warning: Failed to focus main window: {}",
+                            e
+                        );
+                    }
+                }
+
+                #[derive(Serialize, Clone)]
+                struct PluginInlinePayload {
+                    plugin_id: String,
+                    plugin_name: String,
+                    plugin_url: String,
+                }
+
+                let payload = PluginInlinePayload {
+                    plugin_id: plugin.manifest.id.clone(),
+                    plugin_name: plugin.manifest.name.clone(),
+                    plugin_url: dev_server.clone(),
+                };
+
+                main_window
+                    .emit("show_plugin_inline", payload)
+                    .map_err(|e| format!("Failed to emit show_plugin_inline event: {}", e))?;
+
+                return Ok(());
+            }
+        } else {
+            return Err("Plugin has devMode=true but no devServer specified".to_string());
+        }
+    }
+
+    // 生产模式：检查本地文件
     let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let plugin_dir = data_dir.join("plugins").join(&plugin.dir_name);
     let entry_path = plugin_dir.join(&plugin.manifest.entry);
@@ -1248,13 +1267,10 @@ pub fn execute_plugin_entry(
         return Err(format!("Plugin entry file not found: {:?}", entry_path));
     }
 
-    println!("[plugin_manager] Plugin entry: {}", plugin.manifest.entry);
-
     if let Some(extension) = Path::new(&plugin.manifest.entry)
         .extension()
         .and_then(|s| s.to_str())
     {
-        println!("[plugin_manager] Plugin extension: {}", extension);
         match extension {
             "js" => {
                 println!(
@@ -1305,18 +1321,10 @@ pub fn execute_plugin_entry(
                     });
                     Ok(())
                 } else {
-                    // Display inline - use HTTP server
+                    // Display inline - use HTTP server (生产模式)
                     let main_window = app
                         .get_webview_window("main")
                         .ok_or_else(|| "Main window not found".to_string())?;
-
-                    // 获取插件服务器端口
-                    let server_port_state = app.state::<PluginServerPort>();
-                    let port = server_port_state
-                        .0
-                        .lock()
-                        .unwrap()
-                        .ok_or_else(|| "Plugin server not started".to_string())?;
 
                     // 特殊处理：当通过快捷键触发内联插件时，需要显示主窗口
                     if let Ok(false) = main_window.is_visible() {
@@ -1334,6 +1342,14 @@ pub fn execute_plugin_entry(
                         plugin_name: String,
                         plugin_url: String,
                     }
+
+                    // 获取插件服务器端口
+                    let server_port_state = app.state::<PluginServerPort>();
+                    let port = server_port_state
+                        .0
+                        .lock()
+                        .unwrap()
+                        .ok_or_else(|| "Plugin server not started".to_string())?;
 
                     let plugin_url = format!(
                         "http://127.0.0.1:{}/plugin/{}/{}",
@@ -1674,7 +1690,7 @@ pub fn import_plugin(
         store_lock.insert(manifest.id.clone(), loaded_plugin.clone());
     }
 
-    println!("[plugin_manager] Plugin added to store: {}", manifest.id);
+
 
     // 8. 初始化插件生命周期
     // Headless 插件：执行 index.js (entry)
@@ -1735,12 +1751,11 @@ pub fn import_plugin(
                             Ok(js_code) => {
                                 match js_runtime::execute_js(&app_clone, &js_code, Some(&plugin_id)).await {
                                     Ok(_) => {
-                                        println!("[plugin_manager] Successfully initialized imported plugin {}", plugin_id);
                                         // 通知前端初始化成功
                                         let _ = app_clone.emit("plugin-init-success", &plugin_id);
                                     }
                                     Err(e) => {
-                                        eprintln!("[plugin_manager] Failed to initialize imported plugin {}: {}", plugin_id, e);
+                                        eprintln!("[plugin_manager] Failed to initialize plugin {}: {}", plugin_id, e);
                                         // 通知前端初始化失败
                                         #[derive(serde::Serialize, Clone)]
                                         struct PluginInitError {
@@ -1757,7 +1772,7 @@ pub fn import_plugin(
                                 }
                             }
                             Err(e) => {
-                                eprintln!("[plugin_manager] Failed to read lifecycle file for {}: {}", plugin_id, e);
+                                eprintln!("[plugin_manager] Failed to read lifecycle file: {}", e);
                                 #[derive(serde::Serialize, Clone)]
                                 struct PluginInitError {
                                     plugin_id: String,
@@ -1790,32 +1805,39 @@ pub fn uninstall_plugin(
     store: State<'_, PluginStore>,
     plugin_id: String,
 ) -> Result<(), String> {
-    println!("[plugin_manager] Uninstalling plugin: {}", plugin_id);
+    // 1. 从 store 中获取插件信息（需要 dir_name）
+    let dir_name = {
+        let store_lock = store.0.lock().unwrap();
+        store_lock.get(&plugin_id).map(|p| p.dir_name.clone())
+    };
 
-    // 1. 从 store 中移除（如果存在）
+    // 2. 从 store 中移除
     let plugin_was_in_store = {
         let mut store_lock = store.0.lock().unwrap();
         store_lock.remove(&plugin_id).is_some()
     };
 
-    if plugin_was_in_store {
-        println!("[plugin_manager] Plugin removed from store: {}", plugin_id);
-    } else {
-        println!(
-            "[plugin_manager] Plugin not found in store, will try to clean up files: {}",
-            plugin_id
-        );
-    }
 
-    // 2. 删除符号链接（即使插件不在 store 中也尝试删除）
+
+    // 3. 删除插件目录（使用 dir_name 而不是 plugin_id）
     let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let plugin_link_path = data_dir.join("plugins").join(&plugin_id);
+    let plugins_dir = data_dir.join("plugins");
+
+    // 如果有 dir_name，使用它；否则尝试使用 plugin_id
+    let dir_to_remove = if let Some(ref dn) = dir_name {
+        dn.clone()
+    } else {
+        plugin_id.clone()
+    };
+
+    let plugin_link_path = plugins_dir.join(&dir_to_remove);
+
+    println!(
+        "[plugin_manager] Attempting to remove plugin directory: {:?} (dir_name: {:?})",
+        plugin_link_path, dir_name
+    );
 
     if plugin_link_path.exists() {
-        println!(
-            "[plugin_manager] Removing plugin link: {:?}",
-            plugin_link_path
-        );
         #[cfg(windows)]
         {
             // 在 Windows 上，使用 symlink_metadata 检查是否为符号链接
@@ -1840,28 +1862,20 @@ pub fn uninstall_plugin(
                     "[plugin_manager] Attempting to remove symlink (trying directory first)..."
                 );
                 match std::fs::remove_dir(&plugin_link_path) {
-                    Ok(_) => {
-                        println!("[plugin_manager] Successfully removed directory symlink");
-                    }
-                    Err(e) => {
-                        println!("[plugin_manager] Failed to remove as directory ({}), trying as file...", e);
+                    Ok(_) => {}
+                    Err(_) => {
                         std::fs::remove_file(&plugin_link_path)
-                            .map_err(|e2| format!("Failed to remove plugin link as both directory and file. Dir error: {}, File error: {}", e, e2))?;
-                        println!("[plugin_manager] Successfully removed file symlink");
+                            .map_err(|e| format!("Failed to remove plugin link: {}", e))?;
                     }
                 }
             } else {
                 // 不是符号链接，可能是实际的目录或文件
                 if metadata.is_dir() {
-                    println!("[plugin_manager] Removing actual directory (not a symlink)...");
                     std::fs::remove_dir_all(&plugin_link_path)
                         .map_err(|e| format!("Failed to remove plugin directory: {}", e))?;
-                    println!("[plugin_manager] Successfully removed directory");
                 } else {
-                    println!("[plugin_manager] Removing actual file (not a symlink)...");
                     std::fs::remove_file(&plugin_link_path)
                         .map_err(|e| format!("Failed to remove plugin file: {}", e))?;
-                    println!("[plugin_manager] Successfully removed file");
                 }
             }
         }
@@ -1872,40 +1886,78 @@ pub fn uninstall_plugin(
         }
     } else {
         println!(
-            "[plugin_manager] Plugin link does not exist: {:?}",
+            "[plugin_manager] Plugin directory does not exist: {:?}",
             plugin_link_path
         );
+
+        // 如果使用 plugin_id 找不到，尝试扫描 plugins 目录查找匹配的插件
+        if dir_name.is_none() {
+            println!(
+                "[plugin_manager] Scanning plugins directory to find plugin with ID: {}",
+                plugin_id
+            );
+            if let Ok(entries) = std::fs::read_dir(&plugins_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_dir() {
+                        let manifest_path = path.join("manifest.json");
+                        if manifest_path.is_file() {
+                            if let Ok(content) = std::fs::read_to_string(&manifest_path) {
+                                if let Ok(manifest) =
+                                    serde_json::from_str::<PluginManifest>(&content)
+                                {
+                                    if manifest.id == plugin_id {
+                                        println!(
+                                            "[plugin_manager] Found plugin directory: {:?}",
+                                            path
+                                        );
+                                        // 尝试删除找到的目录
+                                        #[cfg(windows)]
+                                        {
+                                            let metadata = std::fs::symlink_metadata(&path)
+                                                .map_err(|e| {
+                                                    format!("Failed to get metadata: {}", e)
+                                                })?;
+                                            if metadata.is_dir() {
+                                                std::fs::remove_dir_all(&path).map_err(|e| {
+                                                    format!("Failed to remove directory: {}", e)
+                                                })?;
+                                                println!("[plugin_manager] Successfully removed directory");
+                                            }
+                                        }
+                                        #[cfg(not(windows))]
+                                        {
+                                            std::fs::remove_dir_all(&path).map_err(|e| {
+                                                format!("Failed to remove directory: {}", e)
+                                            })?;
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
-    // 3. 清理插件状态
-    println!("[plugin_manager] Cleaning plugin states...");
+    // 4. 清理插件状态
     let plugin_states = load_plugin_states(&app);
     let mut new_states = plugin_states.clone();
     new_states.remove(&plugin_id);
     save_plugin_states(&app, &new_states)?;
-    println!("[plugin_manager] Plugin states cleaned");
 
-    // 4. 清理插件设置
-    println!("[plugin_manager] Cleaning plugin settings...");
+    // 5. 清理插件设置
     if let Ok(settings_path) = get_plugin_settings_path(&app, &plugin_id) {
         if settings_path.exists() {
-            match std::fs::remove_file(&settings_path) {
-                Ok(_) => println!(
-                    "[plugin_manager] Plugin settings removed: {:?}",
-                    settings_path
-                ),
-                Err(e) => eprintln!(
-                    "[plugin_manager] Warning: Failed to remove settings file: {}",
-                    e
-                ),
+            if let Err(e) = std::fs::remove_file(&settings_path) {
+                eprintln!("[plugin_manager] Failed to remove settings file: {}", e);
             }
-        } else {
-            println!("[plugin_manager] No settings file to remove");
         }
     }
 
-    // 5. 清理 JavaScript 运行时
-    println!("[plugin_manager] Cleaning JavaScript runtime...");
+    // 6. 清理 JavaScript 运行时
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -1913,12 +1965,7 @@ pub fn uninstall_plugin(
 
     rt.block_on(async {
         if let Err(e) = crate::js_runtime::clear_plugin_runtime(&plugin_id).await {
-            eprintln!(
-                "[plugin_manager] Warning: Failed to clear JS runtime for {}: {}",
-                plugin_id, e
-            );
-        } else {
-            println!("[plugin_manager] JavaScript runtime cleaned");
+            eprintln!("[plugin_manager] Failed to clear JS runtime: {}", e);
         }
     });
 
@@ -1926,10 +1973,6 @@ pub fn uninstall_plugin(
         return Err(format!("Plugin not found: {}", plugin_id));
     }
 
-    println!(
-        "[plugin_manager] Successfully uninstalled plugin: {}",
-        plugin_id
-    );
     Ok(())
 }
 

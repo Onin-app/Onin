@@ -34,17 +34,31 @@
           pluginId,
         });
         console.log("[PluginWindow] Plugin data:", plugin);
+        console.log(
+          "[PluginWindow] devMode:",
+          plugin.devMode,
+          "devServer:",
+          plugin.devServer,
+        );
 
         // LoadedPlugin 使用了 flatten，所以字段在顶层
         pluginName = plugin.name || "Unknown Plugin";
 
-        // 获取插件服务器端口
-        const port = await invoke<number>("get_plugin_server_port");
-
-        // 构建插件 URL（和 inline 模式一样，但添加 mode=window 参数）
-        pluginUrl = `http://127.0.0.1:${port}/plugin/${plugin.dir_name}/${plugin.entry}?mode=window`;
-
-        console.log("[PluginWindow] Loading plugin:", pluginName, pluginUrl);
+        // 根据开发模式决定使用哪个 URL
+        if (plugin.devMode && plugin.devServer) {
+          // 开发模式：使用开发服务器
+          pluginUrl = plugin.devServer;
+          console.log(
+            "[PluginWindow] Loading plugin from dev server:",
+            pluginName,
+            pluginUrl,
+          );
+        } else {
+          // 生产模式：使用插件服务器
+          const port = await invoke<number>("get_plugin_server_port");
+          pluginUrl = `http://127.0.0.1:${port}/plugin/${plugin.dir_name}/${plugin.entry}?mode=window`;
+          console.log("[PluginWindow] Loading plugin:", pluginName, pluginUrl);
+        }
       } catch (error) {
         console.error("[PluginWindow] Failed to load plugin info:", error);
       }
@@ -118,7 +132,10 @@
 
   const handleStartDragging = async (event: MouseEvent) => {
     // 只在左键点击且不是在按钮上时触发拖动
-    if (event.button === 0 && !(event.target as HTMLElement).closest('button')) {
+    if (
+      event.button === 0 &&
+      !(event.target as HTMLElement).closest("button")
+    ) {
       event.preventDefault();
       try {
         await invoke("plugin_start_dragging");
