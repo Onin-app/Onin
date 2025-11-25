@@ -116,8 +116,16 @@
     }
   };
 
-  const handleStartDragging = () => {
-    currentWindow.startDragging();
+  const handleStartDragging = async (event: MouseEvent) => {
+    // 只在左键点击且不是在按钮上时触发拖动
+    if (event.button === 0 && !(event.target as HTMLElement).closest('button')) {
+      event.preventDefault();
+      try {
+        await invoke("plugin_start_dragging");
+      } catch (error) {
+        console.error("[PluginWindow] Failed to start dragging:", error);
+      }
+    }
   };
 </script>
 
