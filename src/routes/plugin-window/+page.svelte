@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-  import { Minus, Square, CornersIn, X } from "phosphor-svelte";
+  import { Minus, Square, CornersIn, X, ArrowsIn } from "phosphor-svelte";
 
   import "../../index.css";
 
@@ -144,6 +144,44 @@
       }
     }
   };
+
+  const handleBackToInline = async () => {
+    try {
+      console.log("[PluginWindow] Switching back to inline mode");
+
+      // 1. 先切换插件的 auto_detach 为 false
+      await invoke("toggle_plugin_auto_detach", {
+        pluginId,
+        autoDetach: false,
+      });
+      console.log("[PluginWindow] Plugin auto_detach set to false");
+
+      // 2. 获取主窗口并显示
+      const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+      const mainWindow = await WebviewWindow.getByLabel("main");
+
+      if (mainWindow) {
+        console.log("[PluginWindow] Showing main window");
+        await mainWindow.show();
+        await mainWindow.setFocus();
+      } else {
+        console.error("[PluginWindow] Main window not found");
+      }
+
+      // 3. 在主窗口中以 inline 模式执行插件
+      console.log("[PluginWindow] Executing plugin in inline mode");
+      await invoke("execute_plugin_entry", { pluginId });
+
+      // 4. 等待一下确保插件已经在主窗口中显示
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      // 5. 最后关闭当前独立窗口
+      console.log("[PluginWindow] Closing plugin window");
+      await invoke("plugin_close_window", { label: windowLabel });
+    } catch (error) {
+      console.error("[PluginWindow] Failed to switch to inline mode:", error);
+    }
+  };
 </script>
 
 <svelte:head>
@@ -180,6 +218,18 @@
 
     <!-- 窗口控制按钮 -->
     <div class="titlebar-controls">
+      <button
+        onclick={handleBackToInline}
+        class="titlebar-button titlebar-button-inline"
+        type="button"
+        title="切换到主窗口模式"
+        aria-label="切换到主窗口模式"
+      >
+        <ArrowsIn size={16} weight="bold" />
+      </button>
+
+      <div class="titlebar-separator"></div>
+
       <button
         onclick={handleMinimize}
         class="titlebar-button"
@@ -304,6 +354,22 @@
 
   .titlebar-button-close:active {
     background: hsl(0 84% 50%) !important;
+  }
+
+  .titlebar-button-inline:hover {
+    background: hsl(var(--primary) / 0.2);
+    color: hsl(var(--primary));
+  }
+
+  .titlebar-button-inline:active {
+    background: hsl(var(--primary) / 0.3);
+  }
+
+  .titlebar-separator {
+    width: 1px;
+    height: 16px;
+    background: hsl(var(--border) / 0.3);
+    margin: 0 4px;
   }
 
   .plugin-content {

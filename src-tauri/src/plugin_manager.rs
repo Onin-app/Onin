@@ -928,14 +928,6 @@ async fn create_or_show_plugin_window(
         }
     }
 
-    // 创建窗口菜单
-    use tauri::menu::{Menu, MenuItemBuilder};
-    let menu_result = (|| -> Result<Menu<tauri::Wry>, tauri::Error> {
-        let back_to_inline =
-            MenuItemBuilder::with_id("back_to_inline", "切换到主窗口模式").build(&app)?;
-        Menu::with_items(&app, &[&back_to_inline])
-    })();
-
     // 创建窗口构建器
     let builder = WebviewWindowBuilder::new(
         &app,
@@ -947,13 +939,6 @@ async fn create_or_show_plugin_window(
     .resizable(true)
     .decorations(false) // 所有平台都隐藏系统装饰
     .transparent(false); // 确保窗口不透明
-
-    // 如果菜单创建成功，添加到窗口
-    let builder = if let Ok(menu) = menu_result {
-        builder.menu(menu)
-    } else {
-        builder
-    };
 
     // 标记窗口正在创建
     if let Some(creating_state) = app.try_state::<PluginWindowCreating>() {
@@ -968,9 +953,6 @@ async fn create_or_show_plugin_window(
                 let mut creating = creating_state.0.lock().unwrap();
                 creating.remove(&window_label);
             }
-
-            let plugin_id_for_menu = plugin.manifest.id.clone();
-            let app_for_menu = app.clone();
 
             // 监听窗口事件，用于注册/注销 ESC 快捷键
             use std::str::FromStr;
@@ -1104,41 +1086,6 @@ async fn create_or_show_plugin_window(
                             .unregister(esc_shortcut);
                     }
                     _ => {}
-                }
-            });
-
-            // 监听菜单事件
-            window.on_menu_event(move |window, event| {
-                if event.id().as_ref() == "back_to_inline" {
-                    println!(
-                        "[plugin_manager] Switching plugin {} back to inline mode",
-                        plugin_id_for_menu
-                    );
-
-                    // 关闭当前窗口
-                    if let Err(e) = window.close() {
-                        eprintln!("Failed to close plugin window: {}", e);
-                    }
-
-                    // 切换插件的 auto_detach 为 false
-                    if let Err(e) = toggle_plugin_auto_detach(
-                        app_for_menu.clone(),
-                        app_for_menu.state::<PluginStore>(),
-                        plugin_id_for_menu.clone(),
-                        false, // 设置为 false，切换回主窗口模式
-                    ) {
-                        eprintln!("Failed to toggle plugin auto_detach: {}", e);
-                    }
-
-                    // 显示主窗口
-                    if let Some(main_window) = app_for_menu.get_webview_window("main") {
-                        if let Err(e) = main_window.show() {
-                            eprintln!("Failed to show main window: {}", e);
-                        }
-                        if let Err(e) = main_window.set_focus() {
-                            eprintln!("Failed to focus main window: {}", e);
-                        }
-                    }
                 }
             });
 
