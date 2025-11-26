@@ -1,3 +1,24 @@
+// Auto-initialize plugin ID from URL or parent window
+if (typeof window !== 'undefined') {
+  // Try to get plugin ID from URL parameters
+  const urlParams = new URLSearchParams(window.location.search);
+  const pluginIdFromUrl = urlParams.get('plugin_id');
+  
+  if (pluginIdFromUrl) {
+    (window as any).__PLUGIN_ID__ = pluginIdFromUrl;
+    (globalThis as any).__PLUGIN_ID__ = pluginIdFromUrl;
+  }
+  
+  // Listen for plugin ID from parent window (for iframe mode)
+  window.addEventListener('message', (event) => {
+    if (event.data?.type === 'set-plugin-id') {
+      const pluginId = event.data.pluginId;
+      (window as any).__PLUGIN_ID__ = pluginId;
+      (globalThis as any).__PLUGIN_ID__ = pluginId;
+    }
+  });
+}
+
 /**
  * Baize Plugin SDK - Main entry point providing unified API access
  * 

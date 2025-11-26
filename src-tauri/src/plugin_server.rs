@@ -79,7 +79,7 @@ use std::collections::HashMap;
 async fn serve_plugin_file(
     State(state): State<Arc<PluginServerState>>,
     Path((plugin_id, file_path)): Path<(String, String)>,
-    Query(params): Query<HashMap<String, String>>,
+    Query(_params): Query<HashMap<String, String>>,
 ) -> Response {
     // Construct the file path
     let file_path = if file_path.is_empty() {
@@ -143,17 +143,11 @@ async fn serve_plugin_file(
         _ => "application/octet-stream",
     };
 
-    // For HTML files, inject Tauri bridge only in inline mode
-    let is_window_mode = params.get("mode").map(|s| s.as_str()) == Some("window");
+    // For HTML files, always inject Tauri bridge and plugin ID
+    // Both inline and window modes need the bridge for communication
     let final_content = if full_path.extension().and_then(|s| s.to_str()) == Some("html") {
         if let Ok(html) = String::from_utf8(content.clone()) {
-            if !is_window_mode {
-                // 内联模式：注入 Tauri bridge
-                inject_tauri_bridge(&html, &plugin_id).into_bytes()
-            } else {
-                // 独立窗口模式：不注入 bridge
-                html.into_bytes()
-            }
+            inject_tauri_bridge(&html, &plugin_id).into_bytes()
         } else {
             content
         }
@@ -170,9 +164,13 @@ fn inject_tauri_bridge(html: &str, plugin_id: &str) -> String {
         r#"
 <script>
 (function() {{
-  console.log('[Plugin Server] Initializing Tauri API bridge');
+  // Get plugin ID from URL parameters or injected value
+  const urlParams = new URLSearchParams(window.location.search);
+  const pluginIdFromUrl = urlParams.get('plugin_id');
+  const pluginIdFromInjection = '{}';
   
-  window.__PLUGIN_ID__ = '{}';
+  window.__PLUGIN_ID__ = pluginIdFromUrl || pluginIdFromInjection;
+  globalThis.__PLUGIN_ID__ = window.__PLUGIN_ID__;
   
   const createProxy = (command) => {{
     return (...args) => {{
@@ -219,8 +217,6 @@ fn inject_tauri_bridge(html: &str, plugin_id: &str) -> String {
   }};
   
   window.__TAURI_INVOKE__ = invokeProxy;
-  
-  console.log('[Plugin Server] Tauri API bridge ready');
 }})();
 </script>
 "#,

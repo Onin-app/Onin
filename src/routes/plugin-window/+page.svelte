@@ -46,8 +46,10 @@
 
         // 根据开发模式决定使用哪个 URL
         if (plugin.devMode && plugin.devServer) {
-          // 开发模式：使用开发服务器
-          pluginUrl = plugin.devServer;
+          // 开发模式：使用开发服务器，添加 plugin_id 参数
+          const url = new URL(plugin.devServer);
+          url.searchParams.set("plugin_id", pluginId);
+          pluginUrl = url.toString();
           console.log(
             "[PluginWindow] Loading plugin from dev server:",
             pluginName,
@@ -56,7 +58,7 @@
         } else {
           // 生产模式：使用插件服务器
           const port = await invoke<number>("get_plugin_server_port");
-          pluginUrl = `http://127.0.0.1:${port}/plugin/${plugin.dir_name}/${plugin.entry}?mode=window`;
+          pluginUrl = `http://127.0.0.1:${port}/plugin/${plugin.dir_name}/${plugin.entry}?mode=window&plugin_id=${pluginId}`;
           console.log("[PluginWindow] Loading plugin:", pluginName, pluginUrl);
         }
       } catch (error) {
@@ -80,6 +82,24 @@
       };
     })();
   });
+
+  // 监听 iframe 加载完成，注入 plugin ID
+  const handleIframeLoad = () => {
+    const iframe = pluginIframeElement;
+    if (!iframe?.contentWindow) return;
+
+    // Send plugin ID to iframe via postMessage
+    // Use specific origin for better security
+    try {
+      const targetOrigin = new URL(pluginUrl).origin;
+      iframe.contentWindow.postMessage(
+        { type: "set-plugin-id", pluginId },
+        targetOrigin,
+      );
+    } catch (error) {
+      console.error("[PluginWindow] Failed to send plugin ID:", error);
+    }
+  };
 
   // 处理来自插件 iframe 的 Tauri API 调用
   const handlePluginMessage = async (event: MessageEvent) => {
@@ -274,6 +294,7 @@
         src={pluginUrl}
         title={pluginName}
         allow="clipboard-read; clipboard-write"
+        onload={handleIframeLoad}
       ></iframe>
     {:else}
       <div class="loading-container">
