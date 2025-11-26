@@ -23,6 +23,9 @@ pub struct PluginWindowCreating(pub Mutex<std::collections::HashSet<String>>);
 // 用于存储插件服务器端口
 pub struct PluginServerPort(pub Mutex<Option<u16>>);
 
+// 用于防止窗口切换的防抖机制
+pub struct PluginWindowToggleDebounce(pub Mutex<HashMap<String, std::time::Instant>>);
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PluginCommandManifest {
     pub code: String,
@@ -856,6 +859,27 @@ async fn create_or_show_plugin_window(
 ) -> Result<(), String> {
     let window_label = format!("plugin_{}", plugin.manifest.id.replace('.', "_"));
 
+    // 防抖检查：防止短时间内重复触发
+    const DEBOUNCE_MS: u64 = 100; // 100ms 防抖时间
+    if let Some(debounce_state) = app.try_state::<PluginWindowToggleDebounce>() {
+        let mut debounce_map = debounce_state.0.lock().unwrap();
+        let now = std::time::Instant::now();
+        
+        if let Some(last_toggle) = debounce_map.get(&window_label) {
+            let elapsed = now.duration_since(*last_toggle).as_millis() as u64;
+            if elapsed < DEBOUNCE_MS {
+                println!(
+                    "[plugin_manager] Window {} toggle debounced ({}ms since last toggle)",
+                    window_label, elapsed
+                );
+                return Ok(());
+            }
+        }
+        
+        // 更新最后切换时间
+        debounce_map.insert(window_label.clone(), now);
+    }
+
     // 检查窗口是否正在创建中
     if let Some(creating_state) = app.try_state::<PluginWindowCreating>() {
         let mut creating = creating_state.0.lock().unwrap();
@@ -875,8 +899,14 @@ async fn create_or_show_plugin_window(
         // 检查窗口是否可见
         let is_visible = window.is_visible().unwrap_or(false);
 
+        println!(
+            "[plugin_manager] Window {} state - minimized: {}, visible: {}",
+            window_label, is_minimized, is_visible
+        );
+
         if is_minimized || !is_visible {
             // 窗口被最小化或隐藏，显示并聚焦
+            println!("[plugin_manager] Showing window {}", window_label);
             if is_minimized {
                 if let Err(e) = window.unminimize() {
                     eprintln!("Failed to unminimize plugin window: {}", e);
@@ -893,6 +923,7 @@ async fn create_or_show_plugin_window(
             trigger_window_visibility_event(&window, true);
         } else {
             // 窗口已显示，最小化它
+            println!("[plugin_manager] Minimizing window {}", window_label);
             if let Err(e) = window.minimize() {
                 eprintln!("Failed to minimize plugin window: {}", e);
             }
