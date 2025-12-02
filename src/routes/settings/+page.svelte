@@ -104,7 +104,7 @@
       插件管理
     </Button.Root>
   </div>
-  <div class="main h-full flex-1 overflow-auto">
+  <div class="main h-full flex-1">
     <ActiveComponent />
   </div>
 </main>

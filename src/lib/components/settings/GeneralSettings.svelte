@@ -33,8 +33,16 @@
   let sortMode = $state<SortMode>("smart");
   let enableUsageTracking = $state<boolean>(true);
 
-  const sortModeOptions: { value: SortMode; label: string; description: string }[] = [
-    { value: "smart", label: "智能排序", description: "综合使用频率和最近使用时间" },
+  const sortModeOptions: {
+    value: SortMode;
+    label: string;
+    description: string;
+  }[] = [
+    {
+      value: "smart",
+      label: "智能排序",
+      description: "综合使用频率和最近使用时间",
+    },
     { value: "frequency", label: "频率优先", description: "按使用次数排序" },
     { value: "recent", label: "最近使用", description: "按最后使用时间排序" },
     { value: "default", label: "默认排序", description: "不使用频率数据" },
@@ -143,7 +151,7 @@
   onDestroy(unsubscribe);
 </script>
 
-<main class="h-full w-full p-4">
+<main class="h-full w-full overflow-auto p-4">
   <h2 class="text-xl font-bold">主题设置</h2>
   <SetItem title="主题">
     {#snippet content()}
@@ -279,14 +287,14 @@
           bind:value={sortMode}
           onchange={updateConfig}
           disabled={!enableUsageTracking}
-          class="w-48 rounded border border-neutral-300 bg-white px-2 py-1 text-sm dark:border-neutral-600 dark:bg-neutral-700 disabled:opacity-50"
+          class="w-48 rounded border border-neutral-300 bg-white px-2 py-1 text-sm disabled:opacity-50 dark:border-neutral-600 dark:bg-neutral-700"
         >
           {#each sortModeOptions as option}
             <option value={option.value}>{option.label}</option>
           {/each}
         </select>
         <span class="text-xs text-neutral-600 dark:text-neutral-400">
-          {sortModeOptions.find(o => o.value === sortMode)?.description || ""}
+          {sortModeOptions.find((o) => o.value === sortMode)?.description || ""}
         </span>
       </div>
     {/snippet}
