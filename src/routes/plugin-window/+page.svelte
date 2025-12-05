@@ -76,8 +76,33 @@
       // 监听来自 iframe 的消息（Tauri API 调用）
       window.addEventListener("message", handlePluginMessage);
 
+      // 监听来自后端的窗口可见性事件，转发给 iframe 中的插件
+      const { listen } = await import("@tauri-apps/api/event");
+      const unlistenVisibility = await listen<boolean>(
+        "window_visibility",
+        (event) => {
+          const iframe = document.querySelector("iframe");
+          if (!iframe?.contentWindow || !pluginUrl) return;
+
+          const eventType = event.payload ? "show" : "hide";
+          try {
+            const targetOrigin = new URL(pluginUrl).origin;
+            iframe.contentWindow.postMessage(
+              { type: "plugin-lifecycle-event", event: eventType },
+              targetOrigin,
+            );
+          } catch (error) {
+            console.error(
+              "[PluginWindow] Failed to send lifecycle event:",
+              error,
+            );
+          }
+        },
+      );
+
       return () => {
         unlisten();
+        unlistenVisibility();
         window.removeEventListener("message", handlePluginMessage);
       };
     })();

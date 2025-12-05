@@ -494,7 +494,8 @@ fn load_plugins_internal(
             rt.block_on(async {
                 for (plugin_id, entry_path, _dir_name) in plugins_to_init {
                     if let Ok(js_code) = std::fs::read_to_string(&entry_path) {
-                        let _ = js_runtime::execute_js(&app_clone, &js_code, Some(&plugin_id)).await;
+                        let _ =
+                            js_runtime::execute_js(&app_clone, &js_code, Some(&plugin_id)).await;
                     }
                 }
             });
@@ -864,7 +865,7 @@ async fn create_or_show_plugin_window(
     if let Some(debounce_state) = app.try_state::<PluginWindowToggleDebounce>() {
         let mut debounce_map = debounce_state.0.lock().unwrap();
         let now = std::time::Instant::now();
-        
+
         if let Some(last_toggle) = debounce_map.get(&window_label) {
             let elapsed = now.duration_since(*last_toggle).as_millis() as u64;
             if elapsed < DEBOUNCE_MS {
@@ -875,7 +876,7 @@ async fn create_or_show_plugin_window(
                 return Ok(());
             }
         }
-        
+
         // 更新最后切换时间
         debounce_map.insert(window_label.clone(), now);
     }
@@ -1028,33 +1029,24 @@ async fn create_or_show_plugin_window(
             let window_for_event = window.clone();
 
             window.on_window_event(move |event| {
-                println!(
-                    "[plugin_manager] Window event for {}: {:?}",
-                    label_for_event, event
-                );
-
                 match event {
                     tauri::WindowEvent::Focused(true) => {
-                        println!(
-                            "[plugin_manager] Plugin window focused: {}",
-                            label_for_event
-                        );
-
                         // 记录活跃窗口
                         if let Some(active_window_state) =
                             app_for_window_event.try_state::<ActivePluginWindow>()
                         {
                             if let Ok(mut active) = active_window_state.0.lock() {
                                 *active = Some(label_for_event.clone());
-                                println!(
-                                    "[plugin_manager] Updated active plugin window: {}",
-                                    label_for_event
-                                );
                             }
                         }
 
-                        // 窗口显示事件由前端通过浏览器原生 API 自动处理
-                        // 不需要后端触发，前端会监听 visibilitychange 和 focus 事件
+                        // 发送窗口可见性事件到前端
+                        if let Err(e) = window_for_event.emit("window_visibility", true) {
+                            eprintln!(
+                                "[plugin_manager] Failed to emit window_visibility event: {}",
+                                e
+                            );
+                        }
 
                         // 重新注册 ESC 快捷键
                         let _ = app_for_window_event
@@ -1068,11 +1060,6 @@ async fn create_or_show_plugin_window(
                         }
                     }
                     tauri::WindowEvent::Focused(false) => {
-                        println!(
-                            "[plugin_manager] Plugin window unfocused: {}",
-                            label_for_event
-                        );
-
                         // 清除活跃窗口记录
                         if let Some(active_window_state) =
                             app_for_window_event.try_state::<ActivePluginWindow>()
@@ -1084,8 +1071,13 @@ async fn create_or_show_plugin_window(
                             }
                         }
 
-                        // 窗口隐藏事件由前端通过浏览器原生 API 自动处理
-                        // 不需要后端触发，前端会监听 visibilitychange 和 blur 事件
+                        // 发送窗口可见性事件到前端
+                        if let Err(e) = window_for_event.emit("window_visibility", false) {
+                            eprintln!(
+                                "[plugin_manager] Failed to emit window_visibility event: {}",
+                                e
+                            );
+                        }
 
                         // 注销 ESC 快捷键
                         if let Err(e) = app_for_window_event
@@ -1096,11 +1088,6 @@ async fn create_or_show_plugin_window(
                         }
                     }
                     tauri::WindowEvent::CloseRequested { .. } => {
-                        println!(
-                            "[plugin_manager] Plugin window closing: {}",
-                            label_for_event
-                        );
-
                         // 清除活跃窗口记录
                         if let Some(active_window_state) =
                             app_for_window_event.try_state::<ActivePluginWindow>()
@@ -1668,8 +1655,6 @@ pub fn import_plugin(
         store_lock.insert(manifest.id.clone(), loaded_plugin.clone());
     }
 
-
-
     // 8. 初始化插件生命周期
     // Headless 插件：执行 index.js (entry)
     // View 插件：执行 lifecycle.js（如果存在）
@@ -1727,13 +1712,18 @@ pub fn import_plugin(
                     rt.block_on(async {
                         match std::fs::read_to_string(&lc_path) {
                             Ok(js_code) => {
-                                match js_runtime::execute_js(&app_clone, &js_code, Some(&plugin_id)).await {
+                                match js_runtime::execute_js(&app_clone, &js_code, Some(&plugin_id))
+                                    .await
+                                {
                                     Ok(_) => {
                                         // 通知前端初始化成功
                                         let _ = app_clone.emit("plugin-init-success", &plugin_id);
                                     }
                                     Err(e) => {
-                                        eprintln!("[plugin_manager] Failed to initialize plugin {}: {}", plugin_id, e);
+                                        eprintln!(
+                                            "[plugin_manager] Failed to initialize plugin {}: {}",
+                                            plugin_id, e
+                                        );
                                         // 通知前端初始化失败
                                         #[derive(serde::Serialize, Clone)]
                                         struct PluginInitError {
@@ -1741,11 +1731,14 @@ pub fn import_plugin(
                                             plugin_name: String,
                                             error: String,
                                         }
-                                        let _ = app_clone.emit("plugin-init-error", PluginInitError {
-                                            plugin_id: plugin_id.clone(),
-                                            plugin_name: plugin_name.clone(),
-                                            error: e.to_string(),
-                                        });
+                                        let _ = app_clone.emit(
+                                            "plugin-init-error",
+                                            PluginInitError {
+                                                plugin_id: plugin_id.clone(),
+                                                plugin_name: plugin_name.clone(),
+                                                error: e.to_string(),
+                                            },
+                                        );
                                     }
                                 }
                             }
@@ -1757,11 +1750,14 @@ pub fn import_plugin(
                                     plugin_name: String,
                                     error: String,
                                 }
-                                let _ = app_clone.emit("plugin-init-error", PluginInitError {
-                                    plugin_id,
-                                    plugin_name,
-                                    error: format!("Failed to read lifecycle file: {}", e),
-                                });
+                                let _ = app_clone.emit(
+                                    "plugin-init-error",
+                                    PluginInitError {
+                                        plugin_id,
+                                        plugin_name,
+                                        error: format!("Failed to read lifecycle file: {}", e),
+                                    },
+                                );
                             }
                         }
                     });
@@ -1794,8 +1790,6 @@ pub fn uninstall_plugin(
         let mut store_lock = store.0.lock().unwrap();
         store_lock.remove(&plugin_id).is_some()
     };
-
-
 
     // 3. 删除插件目录（使用 dir_name 而不是 plugin_id）
     let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;

@@ -19,5 +19,10 @@
     "core:window:allow-is-maximized",
     "core:window:allow-set-focus",
     "core:window:allow-set-title"
-  ]
+  ],
+  "remote": {
+    "urls": [
+      "http://localhost:*"
+    ]
+  }
 }
