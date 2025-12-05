@@ -244,10 +244,39 @@ struct PluginStates {
     states: HashMap<String, PluginState>, // plugin_id -> state
 }
 
+// 窗口位置和大小持久化结构
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct WindowBounds {
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
+    #[serde(default)]
+    pub is_maximized: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct PluginWindowStates {
+    windows: HashMap<String, WindowBounds>, // plugin_id -> window bounds
+}
+
 // 获取插件状态文件路径
 fn get_plugin_states_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
     let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     Ok(data_dir.join("plugin_states.json"))
+}
+
+// 获取插件窗口状态文件路径
+fn get_plugin_window_states_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let plugin_data_dir = data_dir.join("plugin_data");
+    
+    // 确保目录存在
+    if !plugin_data_dir.exists() {
+        std::fs::create_dir_all(&plugin_data_dir).map_err(|e| e.to_string())?;
+    }
+    
+    Ok(plugin_data_dir.join("window_states.json"))
 }
 
 // 获取插件设置文件路径
@@ -309,6 +338,63 @@ fn save_plugin_states(
     let content = serde_json::to_string_pretty(&plugin_states).map_err(|e| e.to_string())?;
     std::fs::write(path, content).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+// 加载插件窗口状态
+fn load_plugin_window_states(app: &tauri::AppHandle) -> HashMap<String, WindowBounds> {
+    match get_plugin_window_states_path(app) {
+        Ok(path) => {
+            if path.exists() {
+                match std::fs::read_to_string(&path) {
+                    Ok(content) => match serde_json::from_str::<PluginWindowStates>(&content) {
+                        Ok(window_states) => {
+                            println!(
+                                "[plugin_manager] Loaded plugin window states: {:?}",
+                                window_states.windows
+                            );
+                            return window_states.windows;
+                        }
+                        Err(e) => {
+                            eprintln!("[plugin_manager] Failed to parse plugin window states: {}", e);
+                        }
+                    },
+                    Err(e) => {
+                        eprintln!("[plugin_manager] Failed to read plugin window states file: {}", e);
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("[plugin_manager] Failed to get plugin window states path: {}", e);
+        }
+    }
+    HashMap::new()
+}
+
+// 保存插件窗口状态
+fn save_plugin_window_states(
+    app: &tauri::AppHandle,
+    states: &HashMap<String, WindowBounds>,
+) -> Result<(), String> {
+    let path = get_plugin_window_states_path(app)?;
+    let window_states = PluginWindowStates {
+        windows: states.clone(),
+    };
+    let content = serde_json::to_string_pretty(&window_states).map_err(|e| e.to_string())?;
+    std::fs::write(path, content).map_err(|e| e.to_string())?;
+    println!("[plugin_manager] Saved plugin window states: {:?}", states);
+    Ok(())
+}
+
+// 保存单个插件窗口状态
+fn save_plugin_window_state(
+    app: &tauri::AppHandle,
+    plugin_id: &str,
+    bounds: WindowBounds,
+) -> Result<(), String> {
+    let mut states = load_plugin_window_states(app);
+    states.insert(plugin_id.to_string(), bounds);
+    save_plugin_window_states(app, &states)
 }
 
 // 获取系统保护路径（使用系统 API 动态获取）
@@ -883,7 +969,7 @@ async fn create_or_show_plugin_window(
 
     // 检查窗口是否正在创建中
     if let Some(creating_state) = app.try_state::<PluginWindowCreating>() {
-        let mut creating = creating_state.0.lock().unwrap();
+        let creating = creating_state.0.lock().unwrap();
         if creating.contains(&window_label) {
             println!(
                 "[plugin_manager] Window {} is already being created, skipping",
@@ -960,17 +1046,37 @@ async fn create_or_show_plugin_window(
         }
     }
 
+    // 加载保存的窗口状态
+    let window_states = load_plugin_window_states(&app);
+    let saved_bounds = window_states.get(&plugin.manifest.id);
+    
     // 创建窗口构建器
-    let builder = WebviewWindowBuilder::new(
+    let mut builder = WebviewWindowBuilder::new(
         &app,
         window_label.clone(),
         tauri::WebviewUrl::External(plugin_url.parse().unwrap()),
     )
     .title(plugin.manifest.name.clone())
-    .inner_size(800.0, 600.0)
     .resizable(true)
     .decorations(false) // 所有平台都隐藏系统装饰
     .transparent(false); // 确保窗口不透明
+    
+    // 应用保存的窗口位置和大小
+    if let Some(bounds) = saved_bounds {
+        println!(
+            "[plugin_manager] Restoring window bounds for {}: x={}, y={}, width={}, height={}, maximized={}",
+            plugin.manifest.id, bounds.x, bounds.y, bounds.width, bounds.height, bounds.is_maximized
+        );
+        builder = builder
+            .position(bounds.x as f64, bounds.y as f64)
+            .inner_size(bounds.width as f64, bounds.height as f64);
+        
+        // 如果窗口之前是最大化的，创建后需要最大化
+        // 注意：不能在构建器中直接设置最大化状态，需要在窗口创建后设置
+    } else {
+        // 使用默认大小
+        builder = builder.inner_size(800.0, 600.0);
+    }
 
     // 标记窗口正在创建
     if let Some(creating_state) = app.try_state::<PluginWindowCreating>() {
@@ -984,6 +1090,16 @@ async fn create_or_show_plugin_window(
             if let Some(creating_state) = app.try_state::<PluginWindowCreating>() {
                 let mut creating = creating_state.0.lock().unwrap();
                 creating.remove(&window_label);
+            }
+            
+            // 如果之前窗口是最大化的，恢复最大化状态
+            if let Some(bounds) = saved_bounds {
+                if bounds.is_maximized {
+                    println!("[plugin_manager] Restoring maximized state for {}", plugin.manifest.id);
+                    if let Err(e) = window.maximize() {
+                        eprintln!("Failed to maximize window: {}", e);
+                    }
+                }
             }
 
             // 监听窗口事件，用于注册/注销 ESC 快捷键
@@ -1027,6 +1143,8 @@ async fn create_or_show_plugin_window(
 
             let label_for_event = window_label_for_tracking.clone();
             let window_for_event = window.clone();
+            let plugin_id_for_event = plugin.manifest.id.clone();
+            let app_for_save = app.clone();
 
             window.on_window_event(move |event| {
                 match event {
@@ -1087,7 +1205,59 @@ async fn create_or_show_plugin_window(
                             eprintln!("Failed to unregister ESC shortcut: {}", e);
                         }
                     }
+                    tauri::WindowEvent::Moved(position) => {
+                        // 保存窗口位置
+                        if let Ok(size) = window_for_event.inner_size() {
+                            if let Ok(is_maximized) = window_for_event.is_maximized() {
+                                let bounds = WindowBounds {
+                                    x: position.x,
+                                    y: position.y,
+                                    width: size.width,
+                                    height: size.height,
+                                    is_maximized,
+                                };
+                                if let Err(e) = save_plugin_window_state(&app_for_save, &plugin_id_for_event, bounds) {
+                                    eprintln!("[plugin_manager] Failed to save window position: {}", e);
+                                }
+                            }
+                        }
+                    }
+                    tauri::WindowEvent::Resized(size) => {
+                        // 保存窗口大小
+                        if let Ok(position) = window_for_event.outer_position() {
+                            if let Ok(is_maximized) = window_for_event.is_maximized() {
+                                let bounds = WindowBounds {
+                                    x: position.x,
+                                    y: position.y,
+                                    width: size.width,
+                                    height: size.height,
+                                    is_maximized,
+                                };
+                                if let Err(e) = save_plugin_window_state(&app_for_save, &plugin_id_for_event, bounds) {
+                                    eprintln!("[plugin_manager] Failed to save window size: {}", e);
+                                }
+                            }
+                        }
+                    }
                     tauri::WindowEvent::CloseRequested { .. } => {
+                        // 在关闭前保存最终的窗口状态
+                        if let Ok(position) = window_for_event.outer_position() {
+                            if let Ok(size) = window_for_event.inner_size() {
+                                if let Ok(is_maximized) = window_for_event.is_maximized() {
+                                    let bounds = WindowBounds {
+                                        x: position.x,
+                                        y: position.y,
+                                        width: size.width,
+                                        height: size.height,
+                                        is_maximized,
+                                    };
+                                    if let Err(e) = save_plugin_window_state(&app_for_save, &plugin_id_for_event, bounds) {
+                                        eprintln!("[plugin_manager] Failed to save window state on close: {}", e);
+                                    }
+                                }
+                            }
+                        }
+                        
                         // 清除活跃窗口记录
                         if let Some(active_window_state) =
                             app_for_window_event.try_state::<ActivePluginWindow>()
