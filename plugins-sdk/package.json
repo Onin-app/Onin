@@ -1,7 +1,7 @@
 {
   "name": "baize-sdk",
   "private": false,
-  "version": "0.0.1",
+  "version": "0.0.2",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -32,5 +32,8 @@
     "vite": "^5.0.0",
     "vite-plugin-dts": "^4.0.0",
     "vitest": "^2.0.0"
+  },
+  "peerDependencies": {
+    "@tauri-apps/api": "^2.0.0"
   }
 }
