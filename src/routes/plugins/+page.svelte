@@ -576,13 +576,19 @@
         </Tabs.Content>
 
         <Tabs.Content value="market" class="flex-1 overflow-auto">
-          <div
-            class="flex h-full flex-col items-center justify-center text-neutral-500"
-          >
-            <Storefront class="mb-4 h-12 w-12 opacity-50" />
-            <p class="text-lg">插件市场即将推出</p>
-            <p class="mt-2 text-sm">敬请期待更多精彩插件</p>
-          </div>
+          {#await import('$lib/components/marketplace/MarketplaceView.svelte')}
+            <div class="flex h-full items-center justify-center">
+              <div class="text-neutral-500">加载中...</div>
+            </div>
+          {:then { default: MarketplaceView }}
+            <MarketplaceView />
+          {:catch error}
+            <div class="flex h-full flex-col items-center justify-center text-neutral-500">
+              <Storefront class="mb-4 h-12 w-12 opacity-50" />
+              <p class="text-lg">插件市场加载失败</p>
+              <p class="mt-2 text-sm">{error.message}</p>
+            </div>
+          {/await}
         </Tabs.Content>
       </Tabs.Root>
     </div>
