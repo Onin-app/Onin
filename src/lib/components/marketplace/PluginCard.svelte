@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { GithubLogo } from "phosphor-svelte";
+  import { GithubLogo, Download, Star } from "phosphor-svelte";
   import type { MarketplacePlugin } from "$lib/types/marketplace";
 
   interface Props {
@@ -12,6 +12,13 @@
 
   function handleImageError() {
     imageError = true;
+  }
+
+  function formatNumber(num: number): string {
+    if (num >= 1000) {
+      return (num / 1000).toFixed(1) + "k";
+    }
+    return num.toString();
   }
 </script>
 
@@ -37,9 +44,10 @@
       {/if}
     </div>
 
-    <!-- 信息 -->
-    <div class="flex min-w-0 flex-1 flex-col">
-      <div class="mb-1 flex items-start justify-between gap-2">
+    <!-- 右侧信息 -->
+    <div class="flex min-w-0 flex-1 flex-col gap-1">
+      <!-- 标题和 GitHub 链接 -->
+      <div class="flex items-start justify-between gap-2">
         <h3 class="truncate text-base leading-tight font-semibold">
           {plugin.name}
         </h3>
@@ -54,17 +62,35 @@
           <GithubLogo class="h-4 w-4" />
         </a>
       </div>
+
+      <!-- 描述 -->
       <p class="line-clamp-2 text-sm text-neutral-500 dark:text-neutral-400">
         {plugin.description}
       </p>
+
+      <!-- 作者和 ID -->
+      <div class="flex items-center justify-between text-xs text-neutral-400">
+        <span class="truncate">{plugin.author}</span>
+        <span class="ml-2 shrink-0">ID: {plugin.id}</span>
+      </div>
     </div>
   </div>
 
-  <!-- 作者和分类 -->
+  <!-- 底部：统计和分类 -->
   <div
     class="flex items-center justify-between border-t border-neutral-200 pt-2 dark:border-neutral-700"
   >
-    <span class="truncate text-xs text-neutral-400">{plugin.author}</span>
+    <!-- 统计 -->
+    <div class="flex items-center gap-3 text-xs text-neutral-500">
+      <div class="flex items-center gap-1">
+        <Star class="h-3.5 w-3.5" />
+        <span>{formatNumber(plugin.stars)}</span>
+      </div>
+      <div class="flex items-center gap-1">
+        <Download class="h-3.5 w-3.5" />
+        <span>{formatNumber(plugin.downloads)}</span>
+      </div>
+    </div>
 
     <!-- 分类标签 -->
     <span

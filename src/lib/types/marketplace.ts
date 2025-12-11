@@ -11,8 +11,10 @@ export interface MarketplacePlugin {
   category: string;
   keywords: string[];
   addedAt: number;
+  license?: string;
   version?: string;
-  downloads?: number;
+  downloads: number;
+  stars: number;
 }
 
 export interface FetchPluginsParams {

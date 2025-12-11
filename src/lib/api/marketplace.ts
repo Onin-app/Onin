@@ -47,7 +47,8 @@ export async function fetchPlugins(params: FetchPluginsParams = {}): Promise<Plu
   return request<PluginListResponse>(endpoint);
 }
 
-// 获取插件详情（暂未实现）
+// 获取插件详情
 export async function fetchPluginDetail(pluginId: string): Promise<MarketplacePlugin> {
-  return request<MarketplacePlugin>(`/api/v1/plugins/${pluginId}`);
+  const response = await request<{ data: MarketplacePlugin }>(`/api/v1/plugins/${pluginId}`);
+  return response.data;
 }
