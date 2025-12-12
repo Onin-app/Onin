@@ -29,10 +29,13 @@
     description: string;
     entry: string;
     author?: string;
+    icon?: string; // 插件图标
     downloads?: number;
     stars?: number;
     enabled?: boolean;
     settings?: PluginSettingsSchema;
+    dir_name?: string; // 目录名（包含后缀）
+    install_source?: "local" | "marketplace"; // 安装来源
   }
 
   import { goto } from "$app/navigation";
@@ -70,6 +73,12 @@
     escapeHandler.set(handleEsc);
     // 只获取已加载的插件，不重新初始化
     await loadPlugins(false);
+
+    // Listen for plugin installation events
+    listen<string>("plugin-installed", async () => {
+      console.log("[Plugins Page] Plugin installed, refreshing list");
+      await loadPlugins(true);
+    });
 
     // Listen for settings schema registration events
     listen<string>("plugin-settings-schema-registered", async (event) => {
@@ -237,16 +246,46 @@
     }
   };
 
+  // 生成插件 icon 的 URL
+  function getPluginIconUrl(plugin: PluginManifest): string | undefined {
+    if (!plugin.icon) return undefined;
+
+    // 如果是完整 URL（marketplace 插件），直接返回
+    if (
+      plugin.icon.startsWith("http://") ||
+      plugin.icon.startsWith("https://")
+    ) {
+      return plugin.icon;
+    }
+
+    // 如果是相对路径（本地插件），构建本地 URL
+    const dirName = plugin.dir_name || plugin.id;
+    return `plugin://${dirName}/${plugin.icon}`;
+  }
+
+  let imageErrors = $state<Set<string>>(new Set());
+
+  function handleImageError(pluginId: string) {
+    imageErrors.add(pluginId);
+    imageErrors = imageErrors; // 触发响应式更新
+  }
+
   const togglePlugin = async (pluginId: string, enabled: boolean) => {
-    // 找到插件名称
-    const plugin = plugins.find((p) => p.id === pluginId);
+    // pluginId 现在是 dir_name（包含后缀）
+    // 找到插件
+    const plugin = plugins.find(
+      (p) => p.dir_name === pluginId || p.id === pluginId,
+    );
     const pluginName = plugin?.name || pluginId;
 
     try {
       await invoke("toggle_plugin", { pluginId, enabled });
 
       // 更新本地状态
-      plugins = plugins.map((p) => (p.id === pluginId ? { ...p, enabled } : p));
+      plugins = plugins.map((p) => {
+        const pId = p.dir_name || p.id;
+        return pId === pluginId ? { ...p, enabled } : p;
+      });
 
       console.log(
         `Plugin ${pluginId} is now ${enabled ? "enabled" : "disabled"}`,
@@ -424,7 +463,7 @@
         <Tabs.Content value="installed" class="flex-1 overflow-auto">
           {#if filteredPlugins.length > 0}
             <div class="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
-              {#each filteredPlugins as plugin (plugin.id)}
+              {#each filteredPlugins as plugin (plugin.dir_name || plugin.id)}
                 <div
                   class="group flex flex-col rounded-lg border border-neutral-200 bg-white p-3 transition-all hover:border-neutral-300 hover:shadow-sm dark:border-neutral-700 dark:bg-neutral-900 dark:hover:border-neutral-600"
                 >
@@ -432,10 +471,36 @@
                   <div class="mb-2 flex items-start gap-3">
                     <!-- 左侧图标 -->
                     <button
-                      class="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-neutral-100 to-neutral-200 transition-transform hover:scale-105 dark:from-neutral-800 dark:to-neutral-700"
+                      class="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-neutral-100 to-neutral-200 transition-transform hover:scale-105 dark:from-neutral-800 dark:to-neutral-700"
                       onclick={() => executePlugin(plugin.id)}
                     >
-                      <PuzzlePiece class="h-8 w-8" />
+                      {#if getPluginIconUrl(plugin) && !imageErrors.has(plugin.id)}
+                        <img
+                          src={getPluginIconUrl(plugin)}
+                          alt={plugin.name}
+                          class="h-12 w-12 rounded object-contain"
+                          onerror={() => {
+                            console.error(
+                              "Failed to load icon:",
+                              plugin.icon,
+                              "URL:",
+                              getPluginIconUrl(plugin),
+                            );
+                            handleImageError(plugin.id);
+                          }}
+                        />
+                      {:else}
+                        <PuzzlePiece class="h-8 w-8" />
+                      {/if}
+
+                      <!-- 来源标识 -->
+                      {#if plugin.install_source === "local"}
+                        <span
+                          class="absolute -top-1 -right-1 rounded bg-orange-500 px-1.5 py-0.5 text-[10px] font-medium text-white shadow-sm"
+                        >
+                          本地
+                        </span>
+                      {/if}
                     </button>
 
                     <!-- 右侧信息 -->
@@ -501,7 +566,7 @@
                       <Switch.Root
                         checked={plugin.enabled !== false}
                         onCheckedChange={(checked) => {
-                          togglePlugin(plugin.id, checked);
+                          togglePlugin(plugin.dir_name || plugin.id, checked);
                         }}
                         class="focus-visible:ring-foreground focus-visible:ring-offset-background data-[state=checked]:bg-foreground data-[state=unchecked]:bg-dark-10 data-[state=unchecked]:shadow-mini-inset dark:data-[state=checked]:bg-foreground peer inline-flex h-[20px] min-h-[20px] w-[36px] shrink-0 cursor-pointer items-center rounded-full px-[2px] transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50"
                       >
@@ -583,7 +648,9 @@
           {:then { default: MarketplaceView }}
             <MarketplaceView />
           {:catch error}
-            <div class="flex h-full flex-col items-center justify-center text-neutral-500">
+            <div
+              class="flex h-full flex-col items-center justify-center text-neutral-500"
+            >
               <Storefront class="mb-4 h-12 w-12 opacity-50" />
               <p class="text-lg">插件市场加载失败</p>
               <p class="mt-2 text-sm">{error.message}</p>

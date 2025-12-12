@@ -12,9 +12,15 @@ export interface MarketplacePlugin {
   keywords: string[];
   addedAt: number;
   license?: string;
-  version?: string;
   downloads: number;
   stars: number;
+  // 下载相关字段（仅在详情接口返回）
+  downloadUrl?: string;
+  version?: string;
+  size?: number;
+  checksum?: string;
+  releaseDate?: string;
+  releaseNotes?: string;
 }
 
 export interface FetchPluginsParams {

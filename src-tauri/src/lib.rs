@@ -185,6 +185,7 @@ pub fn run() {
             plugin_manager::get_plugin_server_port,
             plugin_manager::import_plugin,
             plugin_manager::uninstall_plugin,
+            plugin_manager::download_and_install_plugin,
             // 插件窗口控制命令
             plugin_manager::plugin_close_window,
             plugin_manager::plugin_minimize_window,

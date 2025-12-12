@@ -138,6 +138,8 @@ pub struct PluginManifest {
     pub version: String,
     pub description: String,
     pub entry: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
     #[serde(rename = "type")]
     pub plugin_type: Option<String>,
     #[serde(default)]
@@ -215,6 +217,15 @@ pub struct PluginSettingsSchema {
     pub fields: Vec<SettingField>,
 }
 
+/// 插件安装来源
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum InstallSource {
+    #[serde(rename = "local")]
+    Local,
+    #[serde(rename = "marketplace")]
+    Marketplace,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LoadedPlugin {
     #[serde(flatten)]
@@ -225,10 +236,88 @@ pub struct LoadedPlugin {
     /// Dynamically registered settings schema (not from manifest)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub settings: Option<PluginSettingsSchema>,
+    /// Installation source
+    #[serde(default = "default_install_source")]
+    pub install_source: InstallSource,
 }
 
 fn default_enabled() -> bool {
     true
+}
+
+fn default_install_source() -> InstallSource {
+    InstallSource::Local
+}
+
+/// 从目录名解析插件 ID 和安装来源
+/// 例如：
+/// - "translate@local" -> ("translate", InstallSource::Local)
+/// - "translate@market" -> ("translate", InstallSource::Marketplace)
+/// - "translate" -> ("translate", InstallSource::Local) // 兼容旧版本
+fn parse_plugin_dir_name(dir_name: &str) -> (String, InstallSource) {
+    if let Some(at_pos) = dir_name.rfind('@') {
+        let plugin_id = dir_name[..at_pos].to_string();
+        let suffix = &dir_name[at_pos + 1..];
+        
+        let source = match suffix {
+            "market" | "marketplace" => InstallSource::Marketplace,
+            "local" => InstallSource::Local,
+            _ => InstallSource::Local, // 未知后缀默认为 Local
+        };
+        
+        (plugin_id, source)
+    } else {
+        // 没有后缀，默认为 Local（兼容旧版本）
+        (dir_name.to_string(), InstallSource::Local)
+    }
+}
+
+/// 生成带后缀的目录名
+fn make_plugin_dir_name(plugin_id: &str, source: InstallSource) -> String {
+    match source {
+        InstallSource::Local => format!("{}@local", plugin_id),
+        InstallSource::Marketplace => format!("{}@market", plugin_id),
+    }
+}
+
+/// 通过 plugin_id 查找插件（返回第一个匹配的）
+fn find_plugin_by_id<'a>(
+    store: &'a HashMap<String, LoadedPlugin>,
+    plugin_id: &str,
+) -> Option<&'a LoadedPlugin> {
+    // 先尝试直接匹配 dir_name（兼容旧版本）
+    if let Some(plugin) = store.get(plugin_id) {
+        return Some(plugin);
+    }
+    
+    // 查找 manifest.id 匹配的插件
+    store.values().find(|p| p.manifest.id == plugin_id)
+}
+
+/// 通过 plugin_id 查找插件（可变引用）
+fn find_plugin_by_id_mut<'a>(
+    store: &'a mut HashMap<String, LoadedPlugin>,
+    plugin_id: &str,
+) -> Option<&'a mut LoadedPlugin> {
+    // 先尝试直接匹配 dir_name
+    if store.contains_key(plugin_id) {
+        return store.get_mut(plugin_id);
+    }
+    
+    // 查找 manifest.id 匹配的插件
+    store.values_mut().find(|p| p.manifest.id == plugin_id)
+}
+
+/// 获取同一 plugin_id 的所有版本
+fn find_all_versions(
+    store: &HashMap<String, LoadedPlugin>,
+    plugin_id: &str,
+) -> Vec<String> {
+    store
+        .iter()
+        .filter(|(_, p)| p.manifest.id == plugin_id)
+        .map(|(dir_name, _)| dir_name.clone())
+        .collect()
 }
 
 // 插件状态持久化结构
@@ -501,6 +590,9 @@ fn load_plugins_internal(
                     serde_json::from_str(&manifest_content).map_err(|e| e.to_string())?;
 
                 let dir_name = path.file_name().unwrap().to_str().unwrap().to_string();
+                
+                // 解析目录名，提取插件 ID 和安装来源
+                let (_parsed_id, install_source) = parse_plugin_dir_name(&dir_name);
 
                 // 从持久化状态中获取启用状态和 auto_detach，如果没有则使用默认值
                 let (enabled, auto_detach) = if let Some(state) = plugin_states.get(&manifest.id) {
@@ -511,13 +603,6 @@ fn load_plugins_internal(
 
                 let mut manifest_with_state = manifest.clone();
                 manifest_with_state.auto_detach = auto_detach;
-
-                let loaded_plugin = LoadedPlugin {
-                    manifest: manifest_with_state,
-                    dir_name: dir_name.clone(),
-                    enabled,
-                    settings: None,
-                };
 
                 // 自动执行生命周期文件进行初始化
                 // Headless 插件：执行 index.js (entry)
@@ -560,7 +645,16 @@ fn load_plugins_internal(
                     }
                 }
 
-                store_lock.insert(manifest.id.clone(), loaded_plugin);
+                let loaded_plugin = LoadedPlugin {
+                    manifest: manifest_with_state,
+                    dir_name: dir_name.clone(),
+                    enabled,
+                    settings: None,
+                    install_source: install_source.clone(),
+                };
+
+                // 使用 dir_name 作为 key，这样同一插件的不同版本可以共存
+                store_lock.insert(dir_name.clone(), loaded_plugin);
             }
         }
     }
@@ -626,44 +720,77 @@ pub async fn refresh_plugins(
 pub fn toggle_plugin(
     app: tauri::AppHandle,
     store: State<'_, PluginStore>,
-    plugin_id: String,
+    plugin_id: String,  // 这里是 dir_name（包含后缀）
     enabled: bool,
 ) -> Result<(), String> {
     let mut store_lock = store.0.lock().unwrap();
 
-    if let Some(plugin) = store_lock.get_mut(&plugin_id) {
-        plugin.enabled = enabled;
-        println!(
-            "[plugin_manager] Plugin {} is now {}",
-            plugin_id,
-            if enabled { "enabled" } else { "disabled" }
-        );
+    // 查找插件
+    let plugin = store_lock.get_mut(&plugin_id)
+        .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+    
+    let manifest_id = plugin.manifest.id.clone();
+    
+    // 如果要启用这个插件，需要禁用同一 manifest.id 的其他版本
+    if enabled {
+        let other_versions: Vec<String> = store_lock
+            .iter()
+            .filter(|(dir_name, p)| {
+                p.manifest.id == manifest_id && *dir_name != &plugin_id && p.enabled
+            })
+            .map(|(dir_name, _)| dir_name.clone())
+            .collect();
+        
+        for other_dir_name in other_versions {
+            if let Some(other_plugin) = store_lock.get_mut(&other_dir_name) {
+                other_plugin.enabled = false;
+                println!(
+                    "[plugin_manager] Auto-disabled {} version of plugin {}",
+                    match other_plugin.install_source {
+                        InstallSource::Local => "local",
+                        InstallSource::Marketplace => "market",
+                    },
+                    manifest_id
+                );
+            }
+        }
+    }
+    
+    // 启用/禁用当前插件
+    let plugin = store_lock.get_mut(&plugin_id).unwrap();
+    plugin.enabled = enabled;
+    println!(
+        "[plugin_manager] Plugin {} ({}) is now {}",
+        manifest_id,
+        plugin_id,
+        if enabled { "enabled" } else { "disabled" }
+    );
 
-        // 收集所有插件的状态
-        let mut states = HashMap::new();
-        for (id, plugin) in store_lock.iter() {
+    // 收集所有插件的状态（使用 manifest.id 作为 key）
+    let mut states = HashMap::new();
+    for (_, plugin) in store_lock.iter() {
+        // 对于同一 manifest.id 的多个版本，只保存启用的那个
+        if plugin.enabled || !states.contains_key(&plugin.manifest.id) {
             states.insert(
-                id.clone(),
+                plugin.manifest.id.clone(),
                 PluginState {
                     enabled: plugin.enabled,
                     auto_detach: plugin.manifest.auto_detach,
                 },
             );
         }
-
-        // 释放锁后再保存状态
-        drop(store_lock);
-
-        // 持久化保存状态
-        if let Err(e) = save_plugin_states(&app, &states) {
-            eprintln!("[plugin_manager] Failed to save plugin states: {}", e);
-            return Err(format!("Failed to save plugin state: {}", e));
-        }
-
-        Ok(())
-    } else {
-        Err(format!("Plugin not found: {}", plugin_id))
     }
+
+    // 释放锁后再保存状态
+    drop(store_lock);
+
+    // 持久化保存状态
+    if let Err(e) = save_plugin_states(&app, &states) {
+        eprintln!("[plugin_manager] Failed to save plugin states: {}", e);
+        return Err(format!("Failed to save plugin state: {}", e));
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -1739,8 +1866,9 @@ pub fn import_plugin(
             .map_err(|e| format!("Failed to create plugins directory: {}", e))?;
     }
 
-    // 5. 创建符号链接
-    let plugin_link_path = plugins_dir.join(&manifest.id);
+    // 5. 创建符号链接（使用 @local 后缀）
+    let dir_name = make_plugin_dir_name(&manifest.id, InstallSource::Local);
+    let plugin_link_path = plugins_dir.join(&dir_name);
 
     // 如果已存在，先删除
     if plugin_link_path.exists() {
@@ -1814,15 +1942,16 @@ pub fn import_plugin(
 
     let loaded_plugin = LoadedPlugin {
         manifest: manifest_with_state,
-        dir_name: manifest.id.clone(),
+        dir_name: dir_name.clone(),
         enabled,
         settings: None,
+        install_source: InstallSource::Local,
     };
 
-    // 7. 添加到 store
+    // 7. 添加到 store（使用 dir_name 作为 key）
     {
         let mut store_lock = store.0.lock().unwrap();
-        store_lock.insert(manifest.id.clone(), loaded_plugin.clone());
+        store_lock.insert(dir_name.clone(), loaded_plugin.clone());
     }
 
     // 8. 初始化插件生命周期
@@ -2293,4 +2422,282 @@ pub fn handle_plugin_protocol<R: tauri::Runtime>(
         .header("Cache-Control", "no-cache")
         .body(content.into())
         .unwrap()
+}
+
+/// 下载并安装插件（使用 @market 后缀）
+#[tauri::command]
+pub async fn download_and_install_plugin(
+    app: tauri::AppHandle,
+    store: State<'_, PluginStore>,
+    download_url: String,
+    _plugin_id: String,  // 市场 ID，仅用于前端传递，不用于验证
+    icon_url: Option<String>,  // 市场提供的图标 URL
+) -> Result<LoadedPlugin, String> {
+    println!("[plugin_manager] Downloading plugin from: {}", download_url);
+
+    // 1. 下载 ZIP 文件到临时目录
+    let temp_dir = tempfile::tempdir()
+        .map_err(|e| format!("Failed to create temp directory: {}", e))?;
+    let zip_path = temp_dir.path().join("plugin.zip");
+
+    let response = reqwest::get(&download_url)
+        .await
+        .map_err(|e| format!("Failed to download plugin: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Download failed with status: {}", response.status()));
+    }
+
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| format!("Failed to read response: {}", e))?;
+
+    std::fs::write(&zip_path, &bytes)
+        .map_err(|e| format!("Failed to write zip file: {}", e))?;
+
+    println!("[plugin_manager] Downloaded {} bytes", bytes.len());
+
+    // 2. 解压到临时目录
+    let extract_dir = temp_dir.path().join("extracted");
+    std::fs::create_dir_all(&extract_dir)
+        .map_err(|e| format!("Failed to create extract directory: {}", e))?;
+
+    let file = std::fs::File::open(&zip_path)
+        .map_err(|e| format!("Failed to open zip file: {}", e))?;
+    let mut archive = zip::ZipArchive::new(file)
+        .map_err(|e| format!("Failed to read zip archive: {}", e))?;
+
+    for i in 0..archive.len() {
+        let mut file = archive
+            .by_index(i)
+            .map_err(|e| format!("Failed to read zip entry: {}", e))?;
+        let outpath = match file.enclosed_name() {
+            Some(path) => extract_dir.join(path),
+            None => continue,
+        };
+
+        if file.name().ends_with('/') {
+            std::fs::create_dir_all(&outpath)
+                .map_err(|e| format!("Failed to create directory: {}", e))?;
+        } else {
+            if let Some(p) = outpath.parent() {
+                if !p.exists() {
+                    std::fs::create_dir_all(p)
+                        .map_err(|e| format!("Failed to create parent directory: {}", e))?;
+                }
+            }
+            let mut outfile = std::fs::File::create(&outpath)
+                .map_err(|e| format!("Failed to create file: {}", e))?;
+            std::io::copy(&mut file, &mut outfile)
+                .map_err(|e| format!("Failed to extract file: {}", e))?;
+        }
+    }
+
+    // 3. 查找插件根目录
+    let plugin_root = find_plugin_root(&extract_dir)?;
+
+    // 4. 读取 manifest.json（使用真实的插件 ID）
+    let manifest_path = plugin_root.join("manifest.json");
+    if !manifest_path.exists() {
+        return Err("manifest.json not found in extracted files".to_string());
+    }
+
+    let manifest_content = std::fs::read_to_string(&manifest_path)
+        .map_err(|e| format!("Failed to read manifest: {}", e))?;
+    let mut manifest: PluginManifest = serde_json::from_str(&manifest_content)
+        .map_err(|e| format!("Invalid manifest format: {}", e))?;
+
+    // 如果市场提供了 icon URL，使用它覆盖 manifest 中的 icon
+    if let Some(icon) = icon_url {
+        manifest.icon = Some(icon);
+    }
+
+    println!(
+        "[plugin_manager] Plugin manifest loaded: {} ({})",
+        manifest.name, manifest.id
+    );
+
+    // 5. 生成带 @market 后缀的目录名
+    let dir_name = make_plugin_dir_name(&manifest.id, InstallSource::Marketplace);
+    
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let plugins_dir = data_dir.join("plugins");
+    let target_dir = plugins_dir.join(&dir_name);
+
+    // 检查市场版本是否已存在
+    if target_dir.exists() {
+        return Err(format!(
+            "插件市场版本 '{}' 已存在。\n请先卸载现有版本，然后再安装。",
+            manifest.name
+        ));
+    }
+
+    // 6. 确保 plugins 目录存在并复制文件
+    if !plugins_dir.exists() {
+        std::fs::create_dir_all(&plugins_dir)
+            .map_err(|e| format!("Failed to create plugins directory: {}", e))?;
+    }
+
+    copy_dir_all(&plugin_root, &target_dir)?;
+
+    // 将更新后的 manifest（包含 icon URL）写回到目标目录
+    let target_manifest_path = target_dir.join("manifest.json");
+    let updated_manifest_content = serde_json::to_string_pretty(&manifest)
+        .map_err(|e| format!("Failed to serialize manifest: {}", e))?;
+    std::fs::write(&target_manifest_path, updated_manifest_content)
+        .map_err(|e| format!("Failed to write updated manifest: {}", e))?;
+
+    println!(
+        "[plugin_manager] Plugin files copied to: {:?}",
+        target_dir
+    );
+
+    // 7. 加载插件到 store
+    let plugin_states = load_plugin_states(&app);
+    let auto_detach = if let Some(state) = plugin_states.get(&manifest.id) {
+        state.auto_detach
+    } else {
+        manifest.auto_detach
+    };
+
+    let mut manifest_with_state = manifest.clone();
+    manifest_with_state.auto_detach = auto_detach;
+
+    let loaded_plugin = LoadedPlugin {
+        manifest: manifest_with_state,
+        dir_name: dir_name.clone(),
+        enabled: true,  // 新安装的插件默认启用
+        settings: None,
+        install_source: InstallSource::Marketplace,
+    };
+
+    // 添加到 store（使用 dir_name 作为 key）
+    // 并禁用同一 manifest.id 的其他版本
+    {
+        let mut store_lock = store.0.lock().unwrap();
+        
+        // 禁用同一 manifest.id 的其他版本
+        let other_versions: Vec<String> = store_lock
+            .iter()
+            .filter(|(_, p)| p.manifest.id == manifest.id && p.enabled)
+            .map(|(dir_name, _)| dir_name.clone())
+            .collect();
+        
+        for other_dir_name in other_versions {
+            if let Some(other_plugin) = store_lock.get_mut(&other_dir_name) {
+                other_plugin.enabled = false;
+                println!(
+                    "[plugin_manager] Auto-disabled {} version when installing market version",
+                    match other_plugin.install_source {
+                        InstallSource::Local => "local",
+                        InstallSource::Marketplace => "market",
+                    }
+                );
+            }
+        }
+        
+        store_lock.insert(dir_name.clone(), loaded_plugin.clone());
+    }
+
+    // 8. 初始化插件生命周期
+    let entry_path = target_dir.join(&manifest.entry);
+    if entry_path.is_file() {
+        if let Some(extension) = std::path::Path::new(&manifest.entry)
+            .extension()
+            .and_then(|s| s.to_str())
+        {
+            let lifecycle_path = match extension {
+                "js" => Some(entry_path.clone()),
+                "html" => {
+                    let lifecycle_file = manifest
+                        .lifecycle
+                        .as_ref()
+                        .map(|s| s.as_str())
+                        .unwrap_or("lifecycle.js");
+                    let lc_path = target_dir.join(lifecycle_file);
+                    if lc_path.is_file() {
+                        Some(lc_path)
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            };
+
+            if let Some(lc_path) = lifecycle_path {
+                let app_clone = app.clone();
+                let plugin_id = manifest.id.clone();
+                std::thread::spawn(move || {
+                    let rt = tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                        .unwrap();
+
+                    rt.block_on(async {
+                        if let Ok(js_code) = std::fs::read_to_string(&lc_path) {
+                            let _ = js_runtime::execute_js(&app_clone, &js_code, Some(&plugin_id)).await;
+                        }
+                    });
+                });
+            }
+        }
+    }
+
+    println!(
+        "[plugin_manager] Successfully installed plugin: {}",
+        manifest.name
+    );
+    
+    // 发送插件安装成功事件，通知前端刷新列表
+    let _ = app.emit("plugin-installed", &manifest.id);
+    
+    Ok(loaded_plugin)
+}
+
+/// 查找包含 manifest.json 的插件根目录
+fn find_plugin_root(extract_dir: &Path) -> Result<std::path::PathBuf, String> {
+    if extract_dir.join("manifest.json").exists() {
+        return Ok(extract_dir.to_path_buf());
+    }
+
+    let entries = std::fs::read_dir(extract_dir)
+        .map_err(|e| format!("Failed to read extract directory: {}", e))?;
+
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("Failed to read directory entry: {}", e))?;
+        let path = entry.path();
+
+        if path.is_dir() && path.join("manifest.json").exists() {
+            return Ok(path);
+        }
+    }
+
+    Err("manifest.json not found in extracted files".to_string())
+}
+
+/// 递归复制目录
+fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), String> {
+    std::fs::create_dir_all(dst)
+        .map_err(|e| format!("Failed to create directory {:?}: {}", dst, e))?;
+
+    for entry in std::fs::read_dir(src)
+        .map_err(|e| format!("Failed to read directory {:?}: {}", src, e))?
+    {
+        let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
+        let ty = entry
+            .file_type()
+            .map_err(|e| format!("Failed to get file type: {}", e))?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+
+        if ty.is_dir() {
+            copy_dir_all(&src_path, &dst_path)?;
+        } else {
+            std::fs::copy(&src_path, &dst_path)
+                .map_err(|e| format!("Failed to copy file {:?}: {}", src_path, e))?;
+        }
+    }
+
+    Ok(())
 }
