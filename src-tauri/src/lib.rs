@@ -80,6 +80,7 @@ pub fn run() {
         .manage(plugin_manager::PluginWindowCreating(Mutex::new(std::collections::HashSet::new())))
         .manage(plugin_manager::PluginServerPort(Mutex::new(None)))
         .manage(plugin_manager::PluginWindowToggleDebounce(Mutex::new(std::collections::HashMap::new())))
+        .manage(plugin_manager::PluginWindowStateSaveDebounce(Mutex::new(std::collections::HashMap::new())))
         .manage(plugin_api::command::CommandExecutionStore(
             Default::default(),
         ))

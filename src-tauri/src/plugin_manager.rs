@@ -335,13 +335,74 @@ struct PluginStates {
 
 // 窗口位置和大小持久化结构
 #[derive(Serialize, Deserialize, Debug, Clone)]
-struct WindowBounds {
+pub struct WindowBounds {
     pub x: i32,
     pub y: i32,
     pub width: u32,
     pub height: u32,
     #[serde(default)]
     pub is_maximized: bool,
+}
+
+// 默认窗口尺寸常量
+const DEFAULT_WINDOW_WIDTH: u32 = 1000;
+const DEFAULT_WINDOW_HEIGHT: u32 = 700;
+const MIN_WINDOW_WIDTH: u32 = 400;
+const MIN_WINDOW_HEIGHT: u32 = 300;
+const MAX_WINDOW_WIDTH: u32 = 4096;  // 支持 4K 显示器
+const MAX_WINDOW_HEIGHT: u32 = 2160;
+
+impl WindowBounds {
+    /// 验证并修正窗口尺寸，确保在合理范围内
+    fn validate_and_fix(&mut self) {
+        // 验证宽度
+        if self.width < MIN_WINDOW_WIDTH || self.width > MAX_WINDOW_WIDTH {
+            eprintln!(
+                "[plugin_manager] Invalid window width: {}, using default: {}",
+                self.width, DEFAULT_WINDOW_WIDTH
+            );
+            self.width = DEFAULT_WINDOW_WIDTH;
+        }
+        
+        // 验证高度
+        if self.height < MIN_WINDOW_HEIGHT || self.height > MAX_WINDOW_HEIGHT {
+            eprintln!(
+                "[plugin_manager] Invalid window height: {}, using default: {}",
+                self.height, DEFAULT_WINDOW_HEIGHT
+            );
+            self.height = DEFAULT_WINDOW_HEIGHT;
+        }
+        
+        // 验证位置（确保窗口至少部分可见）
+        // 允许负值，但不能太离谱
+        const MAX_OFFSET: i32 = 10000;
+        if self.x < -MAX_OFFSET || self.x > MAX_OFFSET {
+            eprintln!(
+                "[plugin_manager] Invalid window x position: {}, resetting to 100",
+                self.x
+            );
+            self.x = 100;
+        }
+        
+        if self.y < -MAX_OFFSET || self.y > MAX_OFFSET {
+            eprintln!(
+                "[plugin_manager] Invalid window y position: {}, resetting to 100",
+                self.y
+            );
+            self.y = 100;
+        }
+    }
+    
+    /// 创建默认窗口边界
+    fn default() -> Self {
+        WindowBounds {
+            x: 100,
+            y: 100,
+            width: DEFAULT_WINDOW_WIDTH,
+            height: DEFAULT_WINDOW_HEIGHT,
+            is_maximized: false,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -429,18 +490,18 @@ fn save_plugin_states(
     Ok(())
 }
 
-// 加载插件窗口状态
+// 加载插件窗口状态（静默模式，减少日志输出）
 fn load_plugin_window_states(app: &tauri::AppHandle) -> HashMap<String, WindowBounds> {
     match get_plugin_window_states_path(app) {
         Ok(path) => {
             if path.exists() {
                 match std::fs::read_to_string(&path) {
                     Ok(content) => match serde_json::from_str::<PluginWindowStates>(&content) {
-                        Ok(window_states) => {
-                            println!(
-                                "[plugin_manager] Loaded plugin window states: {:?}",
-                                window_states.windows
-                            );
+                        Ok(mut window_states) => {
+                            // 验证并修正所有窗口的尺寸
+                            for bounds in window_states.windows.values_mut() {
+                                bounds.validate_and_fix();
+                            }
                             return window_states.windows;
                         }
                         Err(e) => {
@@ -460,30 +521,92 @@ fn load_plugin_window_states(app: &tauri::AppHandle) -> HashMap<String, WindowBo
     HashMap::new()
 }
 
-// 保存插件窗口状态
+// 保存插件窗口状态（静默模式，减少日志输出）
 fn save_plugin_window_states(
     app: &tauri::AppHandle,
     states: &HashMap<String, WindowBounds>,
 ) -> Result<(), String> {
     let path = get_plugin_window_states_path(app)?;
+    
+    // 验证所有窗口尺寸
+    let mut validated_states = states.clone();
+    for bounds in validated_states.values_mut() {
+        bounds.validate_and_fix();
+    }
+    
     let window_states = PluginWindowStates {
-        windows: states.clone(),
+        windows: validated_states,
     };
     let content = serde_json::to_string_pretty(&window_states).map_err(|e| e.to_string())?;
     std::fs::write(path, content).map_err(|e| e.to_string())?;
-    println!("[plugin_manager] Saved plugin window states: {:?}", states);
     Ok(())
 }
 
-// 保存单个插件窗口状态
+// 用于防抖窗口状态保存
+pub struct PluginWindowStateSaveDebounce(pub Mutex<HashMap<String, (std::time::Instant, WindowBounds)>>);
+
+// 保存单个插件窗口状态（带防抖和验证）
 fn save_plugin_window_state(
     app: &tauri::AppHandle,
     plugin_id: &str,
-    bounds: WindowBounds,
+    mut bounds: WindowBounds,
 ) -> Result<(), String> {
-    let mut states = load_plugin_window_states(app);
-    states.insert(plugin_id.to_string(), bounds);
-    save_plugin_window_states(app, &states)
+    // 验证并修正窗口尺寸
+    bounds.validate_and_fix();
+    
+    // macOS 窗口事件触发频率更高，使用更长的防抖时间
+    #[cfg(target_os = "macos")]
+    const DEBOUNCE_MS: u64 = 1000; // macOS: 1000ms 防抖时间
+    
+    #[cfg(not(target_os = "macos"))]
+    const DEBOUNCE_MS: u64 = 500; // 其他平台: 500ms 防抖时间
+    
+    // 使用防抖机制，避免频繁保存
+    if let Some(debounce_state) = app.try_state::<PluginWindowStateSaveDebounce>() {
+        let mut debounce_map = debounce_state.0.lock().unwrap();
+        let now = std::time::Instant::now();
+        
+        // 更新防抖映射
+        debounce_map.insert(plugin_id.to_string(), (now, bounds.clone()));
+        drop(debounce_map);
+        
+        // 启动延迟保存任务
+        let app_clone = app.clone();
+        let plugin_id_clone = plugin_id.to_string();
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(tokio::time::Duration::from_millis(DEBOUNCE_MS)).await;
+            
+            // 检查是否仍然是最新的状态
+            if let Some(debounce_state) = app_clone.try_state::<PluginWindowStateSaveDebounce>() {
+                let mut debounce_map = debounce_state.0.lock().unwrap();
+                
+                if let Some((timestamp, bounds)) = debounce_map.get(&plugin_id_clone) {
+                    let elapsed = std::time::Instant::now().duration_since(*timestamp).as_millis() as u64;
+                    
+                    // 如果已经过了防抖时间，执行保存
+                    if elapsed >= DEBOUNCE_MS {
+                        let bounds_to_save = bounds.clone();
+                        debounce_map.remove(&plugin_id_clone);
+                        drop(debounce_map);
+                        
+                        // 执行实际的保存操作
+                        let mut states = load_plugin_window_states(&app_clone);
+                        states.insert(plugin_id_clone.clone(), bounds_to_save);
+                        if let Err(e) = save_plugin_window_states(&app_clone, &states) {
+                            eprintln!("[plugin_manager] Failed to save window state: {}", e);
+                        }
+                    }
+                }
+            }
+        });
+        
+        Ok(())
+    } else {
+        // 如果没有防抖状态，直接保存（向后兼容）
+        let mut states = load_plugin_window_states(app);
+        states.insert(plugin_id.to_string(), bounds);
+        save_plugin_window_states(app, &states)
+    }
 }
 
 // 获取系统保护路径（使用系统 API 动态获取）
@@ -1221,7 +1344,15 @@ async fn create_or_show_plugin_window(
 
     // 加载保存的窗口状态
     let window_states = load_plugin_window_states(&app);
-    let saved_bounds = window_states.get(&plugin.manifest.id);
+    let saved_bounds = window_states.get(&plugin.manifest.id).cloned();
+    
+    // 获取窗口边界（使用保存的值或默认值）
+    let bounds = saved_bounds.unwrap_or_else(WindowBounds::default);
+    
+    println!(
+        "[plugin_manager] Creating window for {}: x={}, y={}, width={}, height={}, maximized={}",
+        plugin.manifest.id, bounds.x, bounds.y, bounds.width, bounds.height, bounds.is_maximized
+    );
     
     // 创建窗口构建器
     let mut builder = WebviewWindowBuilder::new(
@@ -1232,24 +1363,9 @@ async fn create_or_show_plugin_window(
     .title(plugin.manifest.name.clone())
     .resizable(true)
     .decorations(false) // 所有平台都隐藏系统装饰
-    .transparent(false); // 确保窗口不透明
-    
-    // 应用保存的窗口位置和大小
-    if let Some(bounds) = saved_bounds {
-        println!(
-            "[plugin_manager] Restoring window bounds for {}: x={}, y={}, width={}, height={}, maximized={}",
-            plugin.manifest.id, bounds.x, bounds.y, bounds.width, bounds.height, bounds.is_maximized
-        );
-        builder = builder
-            .position(bounds.x as f64, bounds.y as f64)
-            .inner_size(bounds.width as f64, bounds.height as f64);
-        
-        // 如果窗口之前是最大化的，创建后需要最大化
-        // 注意：不能在构建器中直接设置最大化状态，需要在窗口创建后设置
-    } else {
-        // 使用默认大小
-        builder = builder.inner_size(800.0, 600.0);
-    }
+    .transparent(false) // 确保窗口不透明
+    .position(bounds.x as f64, bounds.y as f64)
+    .inner_size(bounds.width as f64, bounds.height as f64);
 
     // 标记窗口正在创建
     if let Some(creating_state) = app.try_state::<PluginWindowCreating>() {
@@ -1266,12 +1382,10 @@ async fn create_or_show_plugin_window(
             }
             
             // 如果之前窗口是最大化的，恢复最大化状态
-            if let Some(bounds) = saved_bounds {
-                if bounds.is_maximized {
-                    println!("[plugin_manager] Restoring maximized state for {}", plugin.manifest.id);
-                    if let Err(e) = window.maximize() {
-                        eprintln!("Failed to maximize window: {}", e);
-                    }
+            if bounds.is_maximized {
+                println!("[plugin_manager] Restoring maximized state for {}", plugin.manifest.id);
+                if let Err(e) = window.maximize() {
+                    eprintln!("Failed to maximize window: {}", e);
                 }
             }
 
@@ -1378,36 +1492,21 @@ async fn create_or_show_plugin_window(
                             eprintln!("Failed to unregister ESC shortcut: {}", e);
                         }
                     }
-                    tauri::WindowEvent::Moved(position) => {
-                        // 保存窗口位置
-                        if let Ok(size) = window_for_event.inner_size() {
-                            if let Ok(is_maximized) = window_for_event.is_maximized() {
-                                let bounds = WindowBounds {
-                                    x: position.x,
-                                    y: position.y,
-                                    width: size.width,
-                                    height: size.height,
-                                    is_maximized,
-                                };
-                                if let Err(e) = save_plugin_window_state(&app_for_save, &plugin_id_for_event, bounds) {
-                                    eprintln!("[plugin_manager] Failed to save window position: {}", e);
-                                }
-                            }
-                        }
-                    }
-                    tauri::WindowEvent::Resized(size) => {
-                        // 保存窗口大小
+                    tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => {
+                        // 统一处理窗口移动和调整大小事件
+                        // 使用一致的方式获取位置和尺寸
                         if let Ok(position) = window_for_event.outer_position() {
-                            if let Ok(is_maximized) = window_for_event.is_maximized() {
-                                let bounds = WindowBounds {
-                                    x: position.x,
-                                    y: position.y,
-                                    width: size.width,
-                                    height: size.height,
-                                    is_maximized,
-                                };
-                                if let Err(e) = save_plugin_window_state(&app_for_save, &plugin_id_for_event, bounds) {
-                                    eprintln!("[plugin_manager] Failed to save window size: {}", e);
+                            if let Ok(size) = window_for_event.inner_size() {
+                                if let Ok(is_maximized) = window_for_event.is_maximized() {
+                                    let bounds = WindowBounds {
+                                        x: position.x,
+                                        y: position.y,
+                                        width: size.width,
+                                        height: size.height,
+                                        is_maximized,
+                                    };
+                                    // 使用防抖保存，避免频繁 I/O
+                                    let _ = save_plugin_window_state(&app_for_save, &plugin_id_for_event, bounds);
                                 }
                             }
                         }
