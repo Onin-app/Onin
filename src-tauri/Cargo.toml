@@ -68,6 +68,8 @@ tokio-cron-scheduler = "0.13"
 axum = "0.7"
 tower = "0.4"
 tower-http = { version = "0.5", features = ["fs", "cors"] }
+zip = "2.2"
+tempfile = "3.13"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"

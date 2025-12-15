@@ -13,7 +13,7 @@ const API_KEY = import.meta.env.VITE_MARKETPLACE_API_KEY || '';
 // 通用请求函数
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
-  
+
   const headers = new Headers(options.headers);
   if (API_KEY) {
     headers.set('X-API-Key', API_KEY);
@@ -35,7 +35,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 // 获取插件列表
 export async function fetchPlugins(params: FetchPluginsParams = {}): Promise<PluginListResponse> {
   const queryParams = new URLSearchParams();
-  
+
   if (params.page) queryParams.set('page', params.page.toString());
   if (params.limit) queryParams.set('limit', params.limit.toString());
   if (params.category) queryParams.set('category', params.category);
@@ -51,4 +51,19 @@ export async function fetchPlugins(params: FetchPluginsParams = {}): Promise<Plu
 export async function fetchPluginDetail(pluginId: string): Promise<MarketplacePlugin> {
   const response = await request<{ data: MarketplacePlugin }>(`/api/v1/plugins/${pluginId}`);
   return response.data;
+}
+
+// 下载并安装插件
+export async function downloadAndInstallPlugin(
+  downloadUrl: string,
+  pluginId: string,
+  iconUrl?: string
+): Promise<void> {
+  const { invoke } = await import('@tauri-apps/api/core');
+
+  await invoke('download_and_install_plugin', {
+    downloadUrl,
+    pluginId,
+    iconUrl,
+  });
 }

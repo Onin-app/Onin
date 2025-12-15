@@ -1,14 +1,31 @@
 <script lang="ts">
-  import { GithubLogo, Download, Star } from "phosphor-svelte";
+  import {
+    GithubLogo,
+    Download,
+    Star,
+    DownloadSimple,
+    Check,
+  } from "phosphor-svelte";
   import type { MarketplacePlugin } from "$lib/types/marketplace";
+  import { downloadAndInstallPlugin } from "$lib/api/marketplace";
 
   interface Props {
     plugin: MarketplacePlugin;
+    isInstalled?: boolean;
     onclick?: () => void;
+    oninstall?: () => void;
   }
 
-  let { plugin, onclick }: Props = $props();
+  let { plugin, isInstalled = false, onclick, oninstall }: Props = $props();
   let imageError = $state(false);
+  let installing = $state(false);
+  
+  // 调试日志
+  $effect(() => {
+    if (isInstalled) {
+      console.log(`[PluginCard] ${plugin.name} is installed`);
+    }
+  });
 
   function handleImageError() {
     imageError = true;
@@ -20,11 +37,38 @@
     }
     return num.toString();
   }
+
+  async function handleInstall(e: MouseEvent) {
+    e.stopPropagation();
+
+    if (!plugin.downloadUrl || installing || isInstalled) {
+      return;
+    }
+
+    try {
+      installing = true;
+      await downloadAndInstallPlugin(plugin.downloadUrl, plugin.id, plugin.icon);
+      oninstall?.();
+    } catch (error) {
+      console.error("Failed to install plugin:", error);
+      alert(`安装失败: ${error}`);
+    } finally {
+      installing = false;
+    }
+  }
 </script>
 
-<button
-  class="group flex flex-col rounded-lg border border-neutral-200 bg-white p-3 text-left transition-all hover:border-neutral-300 hover:shadow-sm dark:border-neutral-700 dark:bg-neutral-900 dark:hover:border-neutral-600"
+<div
+  class="group flex cursor-pointer flex-col rounded-lg border border-neutral-200 bg-white p-3 text-left transition-all hover:border-neutral-300 hover:shadow-sm dark:border-neutral-700 dark:bg-neutral-900 dark:hover:border-neutral-600"
   {onclick}
+  role="button"
+  tabindex="0"
+  onkeydown={(e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onclick?.();
+    }
+  }}
 >
   <!-- 顶部：图标和信息 -->
   <div class="mb-2 flex items-start gap-3">
@@ -76,7 +120,7 @@
     </div>
   </div>
 
-  <!-- 底部：统计和分类 -->
+  <!-- 底部：统计、分类和安装按钮 -->
   <div
     class="flex items-center justify-between border-t border-neutral-200 pt-2 dark:border-neutral-700"
   >
@@ -92,11 +136,35 @@
       </div>
     </div>
 
-    <!-- 分类标签 -->
-    <span
-      class="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400"
-    >
-      {plugin.category}
-    </span>
+    <!-- 右侧：分类和安装按钮 -->
+    <div class="flex items-center gap-2">
+      <!-- 分类标签 -->
+      <span
+        class="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400"
+      >
+        {plugin.category}
+      </span>
+
+      <!-- 安装按钮 -->
+      {#if plugin.downloadUrl}
+        <button
+          class="flex items-center gap-1 rounded bg-blue-500 px-3 py-1 text-xs text-white transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+          onclick={handleInstall}
+          disabled={installing || isInstalled}
+          class:opacity-50={isInstalled}
+          class:cursor-not-allowed={isInstalled}
+        >
+          {#if isInstalled}
+            <Check class="h-3.5 w-3.5" />
+            <span>已安装</span>
+          {:else if installing}
+            <span>安装中...</span>
+          {:else}
+            <DownloadSimple class="h-3.5 w-3.5" />
+            <span>安装</span>
+          {/if}
+        </button>
+      {/if}
+    </div>
   </div>
-</button>
+</div>
