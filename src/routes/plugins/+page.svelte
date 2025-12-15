@@ -247,8 +247,36 @@
   };
 
   // 生成插件 icon 的 URL
-  function getPluginIconUrl(plugin: PluginManifest): string | undefined {
-    if (!plugin.icon) return undefined;
+  async function getPluginIconUrl(plugin: PluginManifest): Promise<string | undefined> {
+    if (!plugin.icon) {
+      // 如果 manifest 中没有 icon，尝试查找默认图标文件
+      const dirName = plugin.dir_name || plugin.id;
+      
+      // 尝试常见的图标文件名
+      const iconNames = ['icon.svg', 'icon.png', 'icon.jpg', 'icon.jpeg'];
+      
+      // 获取插件服务器端口
+      try {
+        const port = await invoke<number>("get_plugin_server_port");
+        
+        // 尝试每个可能的图标文件
+        for (const iconName of iconNames) {
+          const testUrl = `http://127.0.0.1:${port}/plugin/${dirName}/${iconName}`;
+          try {
+            const response = await fetch(testUrl, { method: 'HEAD' });
+            if (response.ok) {
+              return testUrl;
+            }
+          } catch (e) {
+            // 继续尝试下一个
+          }
+        }
+      } catch (e) {
+        console.error("Failed to get plugin server port:", e);
+      }
+      
+      return undefined;
+    }
 
     // 如果是完整 URL（marketplace 插件），直接返回
     if (
@@ -258,9 +286,15 @@
       return plugin.icon;
     }
 
-    // 如果是相对路径（本地插件），构建本地 URL
-    const dirName = plugin.dir_name || plugin.id;
-    return `plugin://${dirName}/${plugin.icon}`;
+    // 如果是相对路径（本地插件），通过插件服务器访问
+    try {
+      const port = await invoke<number>("get_plugin_server_port");
+      const dirName = plugin.dir_name || plugin.id;
+      return `http://127.0.0.1:${port}/plugin/${dirName}/${plugin.icon}`;
+    } catch (e) {
+      console.error("Failed to get plugin server port:", e);
+      return undefined;
+    }
   }
 
   let imageErrors = $state<Set<string>>(new Set());
@@ -474,24 +508,30 @@
                       class="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-neutral-100 to-neutral-200 transition-transform hover:scale-105 dark:from-neutral-800 dark:to-neutral-700"
                       onclick={() => executePlugin(plugin.id)}
                     >
-                      {#if getPluginIconUrl(plugin) && !imageErrors.has(plugin.id)}
-                        <img
-                          src={getPluginIconUrl(plugin)}
-                          alt={plugin.name}
-                          class="h-12 w-12 rounded object-contain"
-                          onerror={() => {
-                            console.error(
-                              "Failed to load icon:",
-                              plugin.icon,
-                              "URL:",
-                              getPluginIconUrl(plugin),
-                            );
-                            handleImageError(plugin.id);
-                          }}
-                        />
-                      {:else}
+                      {#await getPluginIconUrl(plugin)}
+                        <PuzzlePiece class="h-8 w-8 animate-pulse" />
+                      {:then iconUrl}
+                        {#if iconUrl && !imageErrors.has(plugin.id)}
+                          <img
+                            src={iconUrl}
+                            alt={plugin.name}
+                            class="h-12 w-12 rounded object-contain"
+                            onerror={() => {
+                              console.error(
+                                "Failed to load icon:",
+                                plugin.icon,
+                                "URL:",
+                                iconUrl,
+                              );
+                              handleImageError(plugin.id);
+                            }}
+                          />
+                        {:else}
+                          <PuzzlePiece class="h-8 w-8" />
+                        {/if}
+                      {:catch error}
                         <PuzzlePiece class="h-8 w-8" />
-                      {/if}
+                      {/await}
 
                       <!-- 来源标识 -->
                       {#if plugin.install_source === "local"}

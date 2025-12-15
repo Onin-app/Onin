@@ -82,6 +82,7 @@
           alt={plugin.name}
           class="h-12 w-12 rounded object-contain"
           onerror={handleImageError}
+          crossorigin="anonymous"
         />
       {:else}
         <div class="text-2xl">🧩</div>
