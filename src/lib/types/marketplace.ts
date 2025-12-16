@@ -21,6 +21,7 @@ export interface MarketplacePlugin {
   checksum?: string;
   releaseDate?: string;
   releaseNotes?: string;
+  readme?: string;
 }
 
 export interface FetchPluginsParams {

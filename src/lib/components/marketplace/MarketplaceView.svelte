@@ -394,6 +394,21 @@
           {/if}
         </div>
 
+        <!-- README -->
+        {#if selectedPlugin.readme}
+          <div class="mb-6">
+            <h3 class="mb-3 text-lg font-semibold">插件说明</h3>
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div
+              class="prose prose-sm dark:prose-invert max-w-none rounded-lg bg-neutral-50 p-4 dark:bg-neutral-800"
+              onclick={handleMarkdownClick}
+            >
+              {@html renderMarkdown(selectedPlugin.readme)}
+            </div>
+          </div>
+        {/if}
+
         <!-- 更新说明 -->
         {#if selectedPlugin.releaseNotes}
           <div class="mb-6">
@@ -401,16 +416,11 @@
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
-              class="prose max-w-none rounded-lg bg-neutral-50 p-4 text-sm dark:bg-neutral-800"
+              class="prose prose-sm dark:prose-invert max-w-none rounded-lg bg-neutral-50 p-4 dark:bg-neutral-800"
               onclick={handleMarkdownClick}
             >
               {@html renderMarkdown(selectedPlugin.releaseNotes)}
             </div>
-          </div>
-        {:else}
-          <!-- 调试信息：如果没有 releaseNotes -->
-          <div class="mb-6 text-sm text-neutral-400">
-            <p>暂无更新说明</p>
           </div>
         {/if}
 
