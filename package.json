@@ -26,6 +26,7 @@
     "@tauri-apps/plugin-os": "~2",
     "@tauri-apps/plugin-store": "~2",
     "bits-ui": "^2.8.8",
+    "marked": "^17.0.1",
     "pinyin": "^2.11.2",
     "tailwindcss": "^4.1.10"
   },
@@ -38,6 +39,7 @@
     "@sveltejs/adapter-static": "^3.0.8",
     "@sveltejs/kit": "^2.22.0",
     "@sveltejs/vite-plugin-svelte": "^5.1.0",
+    "@tailwindcss/typography": "^0.5.19",
     "@tauri-apps/cli": "^2.6.0",
     "@types/pinyin": "^2.10.2",
     "phosphor-svelte": "^3.0.1",

@@ -50,6 +50,12 @@ export async function fetchPlugins(params: FetchPluginsParams = {}): Promise<Plu
 // 获取插件详情
 export async function fetchPluginDetail(pluginId: string): Promise<MarketplacePlugin> {
   const response = await request<{ data: MarketplacePlugin }>(`/api/v1/plugins/${pluginId}`);
+  console.log("[API] Plugin detail response:", {
+    pluginId,
+    hasReleaseNotes: !!response.data.releaseNotes,
+    releaseNotesLength: response.data.releaseNotes?.length,
+    data: response.data
+  });
   return response.data;
 }
 
