@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { Star, Download, Package, GithubLogo } from "phosphor-svelte";
+  import { Dialog } from "bits-ui";
   import { marked } from "marked";
 
   interface PluginDetail {
@@ -21,11 +22,12 @@
   }
 
   interface Props {
+    open: boolean;
     pluginId: string;
-    onclose: () => void;
+    onOpenChange: (open: boolean) => void;
   }
 
-  let { pluginId, onclose }: Props = $props();
+  let { open = $bindable(), pluginId, onOpenChange }: Props = $props();
   let detail = $state<PluginDetail | null>(null);
   let loading = $state(true);
   let error = $state<string | null>(null);
@@ -126,167 +128,164 @@
     }
   }
 
-  // 组件挂载时加载详情
+  // 当 open 或 pluginId 变化时加载详情
   $effect(() => {
-    loadDetail();
+    if (open && pluginId) {
+      loadDetail();
+    }
   });
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
-  class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-  onclick={onclose}
->
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="relative max-h-[80vh] w-full max-w-2xl overflow-auto rounded-lg bg-white p-6 shadow-xl dark:bg-neutral-900"
-    onclick={(e) => e.stopPropagation()}
-  >
-    <!-- 关闭按钮 -->
-    <button
-      class="absolute top-4 right-4 rounded p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-      onclick={onclose}
-      aria-label="关闭"
+<Dialog.Root {open} onOpenChange={onOpenChange}>
+  <Dialog.Portal>
+    <Dialog.Overlay
+      class="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+    />
+    <Dialog.Content
+      class="fixed top-[50%] left-[50%] z-50 max-h-[80vh] w-full max-w-2xl translate-x-[-50%] translate-y-[-50%] overflow-auto rounded-lg bg-white p-6 shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] dark:bg-neutral-900"
     >
-      <svg
-        class="h-5 w-5"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
+      <Dialog.Close
+        class="absolute top-4 right-4 rounded p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+        aria-label="关闭"
       >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M6 18L18 6M6 6l12 12"
-        />
-      </svg>
-    </button>
-
-    {#if loading}
-      <div class="flex h-64 items-center justify-center">
-        <div class="text-neutral-500">加载中...</div>
-      </div>
-    {:else if error}
-      <div class="flex h-64 flex-col items-center justify-center">
-        <p class="text-lg text-red-500">加载失败</p>
-        <p class="mt-2 text-sm text-neutral-500">{error}</p>
-      </div>
-    {:else if detail}
-      <!-- 插件头部 -->
-      <div class="mb-6 flex items-start gap-4">
-        <div
-          class="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-neutral-100 to-neutral-200 dark:from-neutral-800 dark:to-neutral-700"
+        <svg
+          class="h-5 w-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
         >
-          {#await getPluginIconUrl(detail)}
-            <div class="text-4xl">🧩</div>
-          {:then iconUrl}
-            {#if iconUrl}
-              <img
-                src={iconUrl}
-                alt={detail.name}
-                class="h-16 w-16 rounded object-contain"
-              />
-            {:else}
-              <div class="text-4xl">🧩</div>
-            {/if}
-          {:catch}
-            <div class="text-4xl">🧩</div>
-          {/await}
-        </div>
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M6 18L18 6M6 6l12 12"
+          />
+        </svg>
+      </Dialog.Close>
 
-        <div class="flex-1">
-          <div class="mb-2 flex items-center gap-2">
-            <h2 class="text-2xl font-bold">{detail.name}</h2>
-            {#if detail.install_source === "local"}
-              <span
-                class="rounded bg-orange-500 px-2 py-0.5 text-xs font-medium text-white"
-              >
-                本地
-              </span>
-            {:else}
-              <span
-                class="rounded bg-blue-500 px-2 py-0.5 text-xs font-medium text-white"
-              >
-                市场
-              </span>
-            {/if}
-          </div>
-          <p class="mb-2 text-neutral-600 dark:text-neutral-400">
-            {detail.description}
-          </p>
-          <div class="flex items-center gap-4 text-sm text-neutral-500">
-            {#if detail.author}
-              <span>作者: {detail.author}</span>
-            {/if}
-            <span>版本: {detail.version}</span>
-            <span>ID: {detail.id}</span>
-          </div>
+      {#if loading}
+        <div class="flex h-64 items-center justify-center">
+          <div class="text-neutral-500">加载中...</div>
         </div>
-      </div>
-
-      <!-- 统计信息（仅市场插件） -->
-      {#if detail.install_source === "marketplace" && (detail.stars || detail.downloads)}
-        <div
-          class="mb-6 flex justify-around rounded-lg bg-neutral-50 p-4 dark:bg-neutral-800"
-        >
-          {#if detail.stars}
-            <div class="flex items-center gap-3">
-              <Star class="h-8 w-8 text-yellow-500" weight="fill" />
-              <div>
-                <div class="text-xl font-semibold">{detail.stars}</div>
-                <div class="text-xs text-neutral-500">Stars</div>
-              </div>
-            </div>
-          {/if}
-          {#if detail.downloads}
-            <div class="flex items-center gap-3">
-              <Download class="h-8 w-8 text-blue-500" weight="fill" />
-              <div>
-                <div class="text-xl font-semibold">{detail.downloads}</div>
-                <div class="text-xs text-neutral-500">Downloads</div>
-              </div>
-            </div>
-          {/if}
+      {:else if error}
+        <div class="flex h-64 flex-col items-center justify-center">
+          <p class="text-lg text-red-500">加载失败</p>
+          <p class="mt-2 text-sm text-neutral-500">{error}</p>
         </div>
-      {/if}
-
-      <!-- README -->
-      {#if detail.readme}
-        <div class="mb-6">
-          <h3 class="mb-3 text-lg font-semibold">插件说明</h3>
-          <!-- svelte-ignore a11y_click_events_have_key_events -->
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
+      {:else if detail}
+        <!-- 插件头部 -->
+        <div class="mb-6 flex items-start gap-4">
           <div
-            class="prose prose-sm dark:prose-invert max-w-none rounded-lg bg-neutral-50 p-4 dark:bg-neutral-800"
-            onclick={handleMarkdownClick}
+            class="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-neutral-100 to-neutral-200 dark:from-neutral-800 dark:to-neutral-700"
           >
-            {@html renderMarkdown(detail.readme)}
+            {#await getPluginIconUrl(detail)}
+              <div class="text-4xl">🧩</div>
+            {:then iconUrl}
+              {#if iconUrl}
+                <img
+                  src={iconUrl}
+                  alt={detail.name}
+                  class="h-16 w-16 rounded object-contain"
+                />
+              {:else}
+                <div class="text-4xl">🧩</div>
+              {/if}
+            {:catch}
+              <div class="text-4xl">🧩</div>
+            {/await}
+          </div>
+
+          <div class="flex-1">
+            <div class="mb-2 flex items-center gap-2">
+              <h2 class="text-2xl font-bold">{detail.name}</h2>
+              {#if detail.install_source === "local"}
+                <span
+                  class="rounded bg-orange-500 px-2 py-0.5 text-xs font-medium text-white"
+                >
+                  本地
+                </span>
+              {:else}
+                <span
+                  class="rounded bg-blue-500 px-2 py-0.5 text-xs font-medium text-white"
+                >
+                  市场
+                </span>
+              {/if}
+            </div>
+            <p class="mb-2 text-neutral-600 dark:text-neutral-400">
+              {detail.description}
+            </p>
+            <div class="flex items-center gap-4 text-sm text-neutral-500">
+              {#if detail.author}
+                <span>作者: {detail.author}</span>
+              {/if}
+              <span>版本: {detail.version}</span>
+              <span>ID: {detail.id}</span>
+            </div>
           </div>
         </div>
-      {:else}
-        <div class="mb-6 text-center text-neutral-500">
-          <Package class="mx-auto mb-2 h-12 w-12 opacity-50" />
-          <p>该插件没有提供说明文档</p>
-        </div>
-      {/if}
 
-      <!-- GitHub 链接（如果有） -->
-      {#if detail.repository}
-        <div class="border-t border-neutral-200 pt-4 dark:border-neutral-700">
-          <a
-            href={detail.repository}
-            target="_blank"
-            rel="noopener noreferrer"
-            class="flex items-center gap-2 text-sm text-blue-600 hover:underline dark:text-blue-400"
+        <!-- 统计信息（仅市场插件） -->
+        {#if detail.install_source === "marketplace" && (detail.stars || detail.downloads)}
+          <div
+            class="mb-6 flex justify-around rounded-lg bg-neutral-50 p-4 dark:bg-neutral-800"
           >
-            <GithubLogo class="h-4 w-4" />
-            查看源码
-          </a>
-        </div>
+            {#if detail.stars}
+              <div class="flex items-center gap-3">
+                <Star class="h-8 w-8 text-yellow-500" weight="fill" />
+                <div>
+                  <div class="text-xl font-semibold">{detail.stars}</div>
+                  <div class="text-xs text-neutral-500">Stars</div>
+                </div>
+              </div>
+            {/if}
+            {#if detail.downloads}
+              <div class="flex items-center gap-3">
+                <Download class="h-8 w-8 text-blue-500" weight="fill" />
+                <div>
+                  <div class="text-xl font-semibold">{detail.downloads}</div>
+                  <div class="text-xs text-neutral-500">Downloads</div>
+                </div>
+              </div>
+            {/if}
+          </div>
+        {/if}
+
+        <!-- README -->
+        {#if detail.readme}
+          <div class="mb-6">
+            <h3 class="mb-3 text-lg font-semibold">插件说明</h3>
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div
+              class="prose prose-sm dark:prose-invert max-w-none rounded-lg bg-neutral-50 p-4 dark:bg-neutral-800"
+              onclick={handleMarkdownClick}
+            >
+              {@html renderMarkdown(detail.readme)}
+            </div>
+          </div>
+        {:else}
+          <div class="mb-6 text-center text-neutral-500">
+            <Package class="mx-auto mb-2 h-12 w-12 opacity-50" />
+            <p>该插件没有提供说明文档</p>
+          </div>
+        {/if}
+
+        <!-- GitHub 链接（如果有） -->
+        {#if detail.repository}
+          <div class="border-t border-neutral-200 pt-4 dark:border-neutral-700">
+            <a
+              href={detail.repository}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="flex items-center gap-2 text-sm text-blue-600 hover:underline dark:text-blue-400"
+            >
+              <GithubLogo class="h-4 w-4" />
+              查看源码
+            </a>
+          </div>
+        {/if}
       {/if}
-    {/if}
-  </div>
-</div>
+    </Dialog.Content>
+  </Dialog.Portal>
+</Dialog.Root>

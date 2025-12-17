@@ -45,6 +45,7 @@
   let activeTab = $state("installed");
   let plugins: PluginManifest[] = $state([]);
   let currentSettingsPlugin: PluginManifest | null = $state(null);
+  let detailDialogOpen = $state(false);
   let selectedPluginForDetail: string | null = $state(null);
 
   const handleEsc = () => {
@@ -406,10 +407,14 @@
 
   const openPluginDetail = (pluginId: string) => {
     selectedPluginForDetail = pluginId;
+    detailDialogOpen = true;
   };
 
-  const closePluginDetail = () => {
-    selectedPluginForDetail = null;
+  const handleDetailDialogOpenChange = (open: boolean) => {
+    detailDialogOpen = open;
+    if (!open) {
+      selectedPluginForDetail = null;
+    }
   };
 
   const filteredPlugins = $derived(
@@ -421,8 +426,9 @@
 
 {#if selectedPluginForDetail}
   <InstalledPluginDetail
+    bind:open={detailDialogOpen}
     pluginId={selectedPluginForDetail}
-    onclose={closePluginDetail}
+    onOpenChange={handleDetailDialogOpenChange}
   />
 {/if}
 

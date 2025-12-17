@@ -8,7 +8,7 @@
     Download,
     GithubLogo,
   } from "phosphor-svelte";
-  import { Button } from "bits-ui";
+  import { Button, Dialog } from "bits-ui";
   import PluginCard from "./PluginCard.svelte";
   import { fetchPlugins } from "$lib/api/marketplace";
   import type { MarketplacePlugin } from "$lib/types/marketplace";
@@ -114,11 +114,13 @@
 
   let selectedPlugin = $state<MarketplacePlugin | null>(null);
   let loadingDetail = $state(false);
+  let detailDialogOpen = $state(false);
 
   async function handlePluginClick(plugin: MarketplacePlugin) {
     // 总是获取插件详情以获取完整信息（包括 releaseNotes）
     loadingDetail = true;
     selectedPlugin = plugin; // 先显示基本信息
+    detailDialogOpen = true;
 
     try {
       const { fetchPluginDetail } = await import("$lib/api/marketplace");
@@ -144,8 +146,11 @@
     }
   }
 
-  function closeDetail() {
-    selectedPlugin = null;
+  function handleDetailDialogOpenChange(open: boolean) {
+    detailDialogOpen = open;
+    if (!open) {
+      selectedPlugin = null;
+    }
   }
 
   async function handleInstall() {
@@ -162,7 +167,7 @@
     } catch (e) {
       console.error("Failed to refresh plugins:", e);
     }
-    closeDetail();
+    detailDialogOpen = false;
   }
 
   onMount(() => {
@@ -293,38 +298,32 @@
 
 <!-- 插件详情弹窗 -->
 {#if selectedPlugin}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-    onclick={closeDetail}
-  >
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div
-      class="relative max-h-[80vh] w-full max-w-2xl overflow-auto rounded-lg bg-white p-6 shadow-xl dark:bg-neutral-900"
-      onclick={(e) => e.stopPropagation()}
-    >
-      <!-- 关闭按钮 -->
-      <button
-        class="absolute top-4 right-4 rounded p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-        onclick={closeDetail}
-        aria-label="关闭"
+  <Dialog.Root open={detailDialogOpen} onOpenChange={handleDetailDialogOpenChange}>
+    <Dialog.Portal>
+      <Dialog.Overlay
+        class="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+      />
+      <Dialog.Content
+        class="fixed top-[50%] left-[50%] z-50 max-h-[80vh] w-full max-w-2xl translate-x-[-50%] translate-y-[-50%] overflow-auto rounded-lg bg-white p-6 shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] dark:bg-neutral-900"
       >
-        <svg
-          class="h-5 w-5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
+        <Dialog.Close
+          class="absolute top-4 right-4 rounded p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+          aria-label="关闭"
         >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M6 18L18 6M6 6l12 12"
-          />
-        </svg>
-      </button>
+          <svg
+            class="h-5 w-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+        </Dialog.Close>
 
       {#if loadingDetail}
         <div class="flex h-64 items-center justify-center">
@@ -454,6 +453,7 @@
           </a>
         </div>
       {/if}
-    </div>
-  </div>
+      </Dialog.Content>
+    </Dialog.Portal>
+  </Dialog.Root>
 {/if}
