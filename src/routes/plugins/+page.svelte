@@ -545,12 +545,18 @@
 
                     <!-- 右侧信息 -->
                     <div class="flex min-w-0 flex-1 flex-col">
+                      <!-- 标题、版本和 GitHub 链接 -->
                       <div class="mb-1 flex items-start justify-between gap-2">
-                        <h3
-                          class="truncate text-base leading-tight font-semibold"
-                        >
-                          {plugin.name}
-                        </h3>
+                        <div class="flex items-baseline gap-2 min-w-0">
+                          <h3
+                            class="truncate text-base leading-tight font-semibold"
+                          >
+                            {plugin.name}
+                          </h3>
+                          {#if plugin.version}
+                            <span class="shrink-0 text-xs text-neutral-400">v{plugin.version}</span>
+                          {/if}
+                        </div>
                         <Button.Root
                           class="shrink-0 rounded p-1 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-neutral-100 dark:hover:bg-neutral-800"
                           onclick={(e: MouseEvent) => {
@@ -572,33 +578,20 @@
 
                   <!-- 作者和 ID -->
                   <div
-                    class="mb-2 flex items-center gap-2 text-xs text-neutral-400"
+                    class="mb-2 flex items-center justify-between gap-2 text-xs text-neutral-400"
                   >
                     {#if plugin.author}
                       <span class="truncate">{plugin.author}</span>
                     {/if}
-                    <span class="text-neutral-300 dark:text-neutral-600">
-                      ID: {plugin.id}
-                    </span>
+                    <span class="shrink-0 text-neutral-300 dark:text-neutral-600">ID: {plugin.id}</span>
                   </div>
 
-                  <!-- 底部：统计和操作 -->
+                  <!-- 底部：操作按钮 -->
                   <div
                     class="flex items-center justify-between border-t border-neutral-200 pt-2 dark:border-neutral-700"
                   >
-                    <!-- 左侧：收藏和下载数 -->
-                    <div
-                      class="flex items-center gap-3 text-xs text-neutral-500"
-                    >
-                      <div class="flex items-center gap-1">
-                        <Star class="h-3.5 w-3.5" />
-                        <span>{plugin.stars ?? 0}</span>
-                      </div>
-                      <div class="flex items-center gap-1">
-                        <Download class="h-3.5 w-3.5" />
-                        <span>{plugin.downloads ?? 0}</span>
-                      </div>
-                    </div>
+                    <!-- 左侧：占位 -->
+                    <div></div>
 
                     <!-- 右侧：操作按钮 -->
                     <div class="flex items-center gap-1">

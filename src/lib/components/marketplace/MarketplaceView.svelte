@@ -250,6 +250,7 @@
           <PluginCard
             {plugin}
             {isInstalled}
+            showStats={true}
             onclick={() => handlePluginClick(plugin)}
             oninstall={handleInstall}
           />

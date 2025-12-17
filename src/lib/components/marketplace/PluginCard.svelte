@@ -14,9 +14,10 @@
     isInstalled?: boolean;
     onclick?: () => void;
     oninstall?: () => void;
+    showStats?: boolean; // 是否显示统计信息（star 和 downloads）
   }
 
-  let { plugin, isInstalled = false, onclick, oninstall }: Props = $props();
+  let { plugin, isInstalled = false, onclick, oninstall, showStats = true }: Props = $props();
   let imageError = $state(false);
   let installing = $state(false);
   
@@ -91,11 +92,16 @@
 
     <!-- 右侧信息 -->
     <div class="flex min-w-0 flex-1 flex-col gap-1">
-      <!-- 标题和 GitHub 链接 -->
+      <!-- 标题、版本和 GitHub 链接 -->
       <div class="flex items-start justify-between gap-2">
-        <h3 class="truncate text-base leading-tight font-semibold">
-          {plugin.name}
-        </h3>
+        <div class="flex items-baseline gap-2 min-w-0">
+          <h3 class="truncate text-base leading-tight font-semibold">
+            {plugin.name}
+          </h3>
+          {#if plugin.version}
+            <span class="shrink-0 text-xs text-neutral-400">v{plugin.version}</span>
+          {/if}
+        </div>
         <a
           href={plugin.repository}
           target="_blank"
@@ -114,9 +120,9 @@
       </p>
 
       <!-- 作者和 ID -->
-      <div class="flex items-center justify-between text-xs text-neutral-400">
+      <div class="flex items-center justify-between gap-2 text-xs text-neutral-400">
         <span class="truncate">{plugin.author}</span>
-        <span class="ml-2 shrink-0">ID: {plugin.id}</span>
+        <span class="shrink-0 text-neutral-300 dark:text-neutral-600">ID: {plugin.id}</span>
       </div>
     </div>
   </div>
@@ -125,26 +131,38 @@
   <div
     class="flex items-center justify-between border-t border-neutral-200 pt-2 dark:border-neutral-700"
   >
-    <!-- 统计 -->
-    <div class="flex items-center gap-3 text-xs text-neutral-500">
-      <div class="flex items-center gap-1">
-        <Star class="h-3.5 w-3.5" />
-        <span>{formatNumber(plugin.stars)}</span>
+    <!-- 左侧：统计或分类 -->
+    {#if showStats}
+      <!-- 统计信息（市场列表） -->
+      <div class="flex items-center gap-3 text-xs text-neutral-500">
+        <div class="flex items-center gap-1">
+          <Star class="h-3.5 w-3.5" />
+          <span>{formatNumber(plugin.stars)}</span>
+        </div>
+        <div class="flex items-center gap-1">
+          <Download class="h-3.5 w-3.5" />
+          <span>{formatNumber(plugin.downloads)}</span>
+        </div>
       </div>
-      <div class="flex items-center gap-1">
-        <Download class="h-3.5 w-3.5" />
-        <span>{formatNumber(plugin.downloads)}</span>
-      </div>
-    </div>
-
-    <!-- 右侧：分类和安装按钮 -->
-    <div class="flex items-center gap-2">
-      <!-- 分类标签 -->
+    {:else}
+      <!-- 分类标签（已安装列表） -->
       <span
         class="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400"
       >
         {plugin.category}
       </span>
+    {/if}
+
+    <!-- 右侧：分类和安装按钮 -->
+    <div class="flex items-center gap-2">
+      <!-- 分类标签（仅在市场列表显示） -->
+      {#if showStats}
+        <span
+          class="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400"
+        >
+          {plugin.category}
+        </span>
+      {/if}
 
       <!-- 安装按钮 -->
       {#if plugin.downloadUrl}
