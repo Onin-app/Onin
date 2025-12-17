@@ -14,13 +14,12 @@
     Gear,
     Trash,
     Package,
-    Star,
-    Download,
     GithubLogo,
     WarningCircle,
   } from "phosphor-svelte";
   import PluginSettings from "$lib/components/plugin/PluginSettings.svelte";
   import type { PluginSettingsSchema } from "$lib/types/plugin-settings";
+  import InstalledPluginDetail from "$lib/components/marketplace/InstalledPluginDetail.svelte";
 
   interface PluginManifest {
     id: string;
@@ -46,6 +45,7 @@
   let activeTab = $state("installed");
   let plugins: PluginManifest[] = $state([]);
   let currentSettingsPlugin: PluginManifest | null = $state(null);
+  let selectedPluginForDetail: string | null = $state(null);
 
   const handleEsc = () => {
     goto("/");
@@ -404,12 +404,27 @@
     currentSettingsPlugin = null;
   };
 
+  const openPluginDetail = (pluginId: string) => {
+    selectedPluginForDetail = pluginId;
+  };
+
+  const closePluginDetail = () => {
+    selectedPluginForDetail = null;
+  };
+
   const filteredPlugins = $derived(
     plugins.filter((plugin) =>
       plugin.name.toLowerCase().includes(searchQuery.toLowerCase()),
     ),
   );
 </script>
+
+{#if selectedPluginForDetail}
+  <InstalledPluginDetail
+    pluginId={selectedPluginForDetail}
+    onclose={closePluginDetail}
+  />
+{/if}
 
 {#if currentSettingsPlugin && currentSettingsPlugin.settings}
   <PluginSettings
@@ -499,14 +514,26 @@
             <div class="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
               {#each filteredPlugins as plugin (plugin.dir_name || plugin.id)}
                 <div
-                  class="group flex flex-col rounded-lg border border-neutral-200 bg-white p-3 transition-all hover:border-neutral-300 hover:shadow-sm dark:border-neutral-700 dark:bg-neutral-900 dark:hover:border-neutral-600"
+                  class="group flex cursor-pointer flex-col rounded-lg border border-neutral-200 bg-white p-3 transition-all hover:border-neutral-300 hover:shadow-sm dark:border-neutral-700 dark:bg-neutral-900 dark:hover:border-neutral-600"
+                  onclick={() => openPluginDetail(plugin.id)}
+                  role="button"
+                  tabindex="0"
+                  onkeydown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      openPluginDetail(plugin.id);
+                    }
+                  }}
                 >
                   <!-- 顶部：图标和信息（左右结构） -->
                   <div class="mb-2 flex items-start gap-3">
                     <!-- 左侧图标 -->
                     <button
                       class="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-neutral-100 to-neutral-200 transition-transform hover:scale-105 dark:from-neutral-800 dark:to-neutral-700"
-                      onclick={() => executePlugin(plugin.id)}
+                      onclick={(e: MouseEvent) => {
+                        e.stopPropagation();
+                        executePlugin(plugin.id);
+                      }}
                     >
                       {#await getPluginIconUrl(plugin)}
                         <PuzzlePiece class="h-8 w-8 animate-pulse" />
@@ -594,7 +621,9 @@
                     <div></div>
 
                     <!-- 右侧：操作按钮 -->
-                    <div class="flex items-center gap-1">
+                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                    <div class="flex items-center gap-1" onclick={(e: MouseEvent) => e.stopPropagation()}>
                       <!-- 启用/禁用开关 -->
                       <Switch.Root
                         checked={plugin.enabled !== false}

@@ -938,6 +938,50 @@ pub fn get_plugin_with_schema(
         .ok_or_else(|| format!("Plugin not found: {}", plugin_id))
 }
 
+/// 插件详情响应（包含 README）
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PluginDetail {
+    #[serde(flatten)]
+    pub plugin: LoadedPlugin,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub readme: Option<String>,
+}
+
+#[tauri::command]
+pub fn get_plugin_detail(
+    app: tauri::AppHandle,
+    store: State<'_, PluginStore>,
+    plugin_id: String,
+) -> Result<PluginDetail, String> {
+    let store_lock = store.0.lock().unwrap();
+
+    let plugin = find_plugin_by_id(&store_lock, &plugin_id)
+        .cloned()
+        .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+
+    // 读取 README.md
+    let plugins_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?
+        .join("plugins");
+    
+    let plugin_dir = plugins_dir.join(&plugin.dir_name);
+    let readme_path = plugin_dir.join("README.md");
+    
+    let readme = if readme_path.exists() {
+        std::fs::read_to_string(&readme_path)
+            .ok()
+    } else {
+        None
+    };
+
+    Ok(PluginDetail {
+        plugin,
+        readme,
+    })
+}
+
 #[tauri::command]
 pub fn get_plugin_server_port(app: tauri::AppHandle) -> Result<u16, String> {
     let server_port_state = app.state::<PluginServerPort>();
