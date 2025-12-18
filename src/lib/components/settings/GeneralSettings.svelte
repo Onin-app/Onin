@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import { Label, RadioGroup, Switch, Button, Select } from "bits-ui";
+  import { Label, RadioGroup, Switch, Button } from "bits-ui";
+  import { toast } from "svelte-sonner";
 
   import { theme, toggleTheme } from "$lib/utils/theme";
   import { Theme, type SortMode, type AppConfig } from "$lib/type";
@@ -66,10 +67,12 @@
       }
       // 从后端重新获取状态以确保UI同步
       autostartEnabled = await invoke("plugin:autostart|is_enabled");
+      toast.success(autostartEnabled ? "已启用开机自启" : "已禁用开机自启");
     } catch (error) {
       console.error("Failed to toggle autostart:", error);
       // 如果设置失败，将UI状态回滚
       autostartEnabled = !autostartEnabled;
+      toast.error("设置开机自启失败");
     }
   };
 
@@ -79,10 +82,12 @@
       await invoke("set_tray_visibility", { visible: trayIconEnabled });
       // 从后端重新获取状态以确保UI同步
       trayIconEnabled = await invoke("is_tray_visible");
+      toast.success(trayIconEnabled ? "已显示托盘图标" : "已隐藏托盘图标");
     } catch (error) {
       console.error("Failed to toggle tray icon visibility:", error);
       // 如果设置失败，将UI状态回滚
       trayIconEnabled = !trayIconEnabled;
+      toast.error("设置托盘图标失败");
     }
   };
 
@@ -105,8 +110,10 @@
         },
       });
       console.log("Config updated successfully");
+      toast.success("配置已保存");
     } catch (error) {
       console.error("Failed to update config:", error);
+      toast.error("保存配置失败，请重试");
     }
   };
 
@@ -116,10 +123,10 @@
     }
     try {
       await invoke("clear_usage_stats");
-      alert("使用记录已清除");
+      toast.success("使用记录已清除");
     } catch (error) {
       console.error("Failed to clear usage stats:", error);
-      alert("清除失败：" + error);
+      toast.error("清除失败：" + String(error));
     }
   };
 
@@ -128,17 +135,27 @@
   });
 
   onMount(async () => {
-    autostartEnabled = await invoke("plugin:autostart|is_enabled");
+    try {
+      autostartEnabled = await invoke("plugin:autostart|is_enabled");
+    } catch (e) {
+      console.error("Failed to get autostart state:", e);
+      toast.error("获取开机自启状态失败");
+    }
+
     try {
       shortcut = await invoke("get_toggle_shortcut");
     } catch (e) {
       console.error("Failed to get shortcut:", e);
+      toast.error("获取快捷键配置失败");
     }
+
     try {
       trayIconEnabled = await invoke("is_tray_visible");
     } catch (e) {
       console.error("Failed to get tray visibility state:", e);
+      toast.error("获取托盘图标状态失败");
     }
+
     try {
       const config = await invoke<AppConfig>("get_app_config");
       autoPasteTimeLimit = config.auto_paste_time_limit;
@@ -149,6 +166,7 @@
       console.log("Loaded config:", config);
     } catch (e) {
       console.error("Failed to get app config:", e);
+      toast.error("加载应用配置失败，请重启应用");
     }
   });
 
