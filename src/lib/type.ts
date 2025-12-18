@@ -91,4 +91,5 @@ export interface AppConfig {
   auto_clear_time_limit: number;
   sort_mode: SortMode;
   enable_usage_tracking: boolean;
+  marketplace_api_url?: string;
 }

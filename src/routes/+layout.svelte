@@ -8,6 +8,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { page } from "$app/state";
   import { setupPluginConsoleListener } from "$lib/plugin-console";
+  import { Toaster } from "svelte-sonner";
 
   // Setup plugin console listener to forward plugin console output to webview devtools
   setupPluginConsoleListener();
@@ -68,3 +69,5 @@
 </script>
 
 <slot />
+
+<Toaster richColors position="top-center" />

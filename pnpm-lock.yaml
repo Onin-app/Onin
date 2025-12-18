@@ -47,6 +47,9 @@ importers:
       pinyin:
         specifier: ^2.11.2
         version: 2.11.2
+      svelte-sonner:
+        specifier: ^1.0.7
+        version: 1.0.7(svelte@5.34.7)
       tailwindcss:
         specifier: ^4.1.10
         version: 4.1.10
@@ -2226,6 +2229,11 @@ packages:
       svelte: ^4.0.0 || ^5.0.0-next.0
       typescript: '>=5.0.0'
 
+  svelte-sonner@1.0.7:
+    resolution: {integrity: sha512-1EUFYmd7q/xfs2qCHwJzGPh9n5VJ3X6QjBN10fof2vxgy8fYE7kVfZ7uGnd7i6fQaWIr5KvXcwYXE/cmTEjk5A==}
+    peerDependencies:
+      svelte: ^5.0.0
+
   svelte-toolbelt@0.9.2:
     resolution: {integrity: sha512-REb1cENGnFbhNSmIdCb1SDIpjEa3n1kXhNVHqGNEesjmPX3bG87gUZiCG8cqOt9AAarqzTzOtI2jEEWr/ZbHwA==}
     engines: {node: '>=18', pnpm: '>=8.7.0'}
@@ -4381,6 +4389,11 @@ snapshots:
       typescript: 5.8.3
     transitivePeerDependencies:
       - picomatch
+
+  svelte-sonner@1.0.7(svelte@5.34.7):
+    dependencies:
+      runed: 0.28.0(svelte@5.34.7)
+      svelte: 5.34.7
 
   svelte-toolbelt@0.9.2(svelte@5.34.7):
     dependencies:

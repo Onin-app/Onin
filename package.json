@@ -28,6 +28,7 @@
     "bits-ui": "^2.8.8",
     "marked": "^17.0.1",
     "pinyin": "^2.11.2",
+    "svelte-sonner": "^1.0.7",
     "tailwindcss": "^4.1.10"
   },
   "devDependencies": {

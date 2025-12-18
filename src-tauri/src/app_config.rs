@@ -38,6 +38,10 @@ pub struct AppConfig {
     /// 是否启用使用频率追踪
     #[serde(default = "default_enable_usage_tracking")]
     pub enable_usage_tracking: bool,
+
+    /// 插件市场 API 地址（可选）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub marketplace_api_url: Option<String>,
 }
 
 fn default_auto_paste_time_limit() -> u64 {
@@ -59,6 +63,7 @@ impl Default for AppConfig {
             auto_clear_time_limit: default_auto_clear_time_limit(),
             sort_mode: SortMode::default(),
             enable_usage_tracking: default_enable_usage_tracking(),
+            marketplace_api_url: None,
         }
     }
 }

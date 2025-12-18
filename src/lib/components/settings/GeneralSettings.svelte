@@ -32,6 +32,7 @@
   let autoClearTimeLimit = $state<number>(0);
   let sortMode = $state<SortMode>("smart");
   let enableUsageTracking = $state<boolean>(true);
+  let marketplaceApiUrl = $state<string>("");
 
   const sortModeOptions: {
     value: SortMode;
@@ -92,6 +93,7 @@
         autoClearTimeLimit,
         sortMode,
         enableUsageTracking,
+        marketplaceApiUrl,
       });
       await invoke("update_app_config", {
         config: {
@@ -99,6 +101,7 @@
           auto_clear_time_limit: autoClearTimeLimit,
           sort_mode: sortMode,
           enable_usage_tracking: enableUsageTracking,
+          marketplace_api_url: marketplaceApiUrl || undefined,
         },
       });
       console.log("Config updated successfully");
@@ -142,6 +145,7 @@
       autoClearTimeLimit = config.auto_clear_time_limit;
       sortMode = config.sort_mode;
       enableUsageTracking = config.enable_usage_tracking;
+      marketplaceApiUrl = config.marketplace_api_url || "";
       console.log("Loaded config:", config);
     } catch (e) {
       console.error("Failed to get app config:", e);
@@ -307,6 +311,24 @@
       >
         清除使用记录
       </Button.Root>
+    {/snippet}
+  </SetItem>
+
+  <h2 class="mt-4 text-xl font-bold">插件市场</h2>
+  <SetItem title="API 地址">
+    {#snippet content()}
+      <div class="flex items-center gap-2">
+        <input
+          type="text"
+          bind:value={marketplaceApiUrl}
+          onchange={updateConfig}
+          placeholder="https://..."
+          class="flex-1 rounded border border-neutral-300 bg-white px-2 py-1 text-sm dark:border-neutral-600 dark:bg-neutral-700"
+        />
+        <span class="text-xs text-neutral-600 dark:text-neutral-400">
+          插件市场 API 服务器地址
+        </span>
+      </div>
     {/snippet}
   </SetItem>
 

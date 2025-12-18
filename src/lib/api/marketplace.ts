@@ -5,13 +5,39 @@ import type {
   PluginListResponse,
   MarketplacePlugin,
 } from '$lib/types/marketplace';
+import type { AppConfig } from '$lib/type';
+import { toast } from 'svelte-sonner';
 
 // API 配置
-const API_BASE_URL = import.meta.env.VITE_MARKETPLACE_API_URL || 'https://api.baize.app';
 const API_KEY = import.meta.env.VITE_MARKETPLACE_API_KEY || '';
+
+// 获取 API Base URL
+async function getApiBaseUrl(): Promise<string | null> {
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    const config = await invoke<AppConfig>('get_app_config');
+
+    if (!config.marketplace_api_url) {
+      toast.warning('请先在设置中配置插件市场 API 地址');
+      return null;
+    }
+
+    return config.marketplace_api_url;
+  } catch (error) {
+    console.error('Failed to get marketplace API URL from config:', error);
+    toast.error('获取配置失败，请检查设置');
+    return null;
+  }
+}
 
 // 通用请求函数
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const API_BASE_URL = await getApiBaseUrl();
+
+  if (!API_BASE_URL) {
+    throw new Error('Marketplace API URL not configured');
+  }
+
   const url = `${API_BASE_URL}${endpoint}`;
 
   const headers = new Headers(options.headers);
