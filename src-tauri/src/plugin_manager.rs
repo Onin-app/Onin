@@ -1223,6 +1223,14 @@ async fn create_or_show_plugin_window(
     let window_states = load_plugin_window_states(&app);
     let saved_bounds = window_states.get(&plugin.manifest.id);
     
+    // 创建窗口菜单
+    use tauri::menu::{Menu, MenuItemBuilder};
+    let menu_result = (|| -> Result<Menu<tauri::Wry>, tauri::Error> {
+        let back_to_inline =
+            MenuItemBuilder::with_id("back_to_inline", "切换到主窗口模式").build(&app)?;
+        Menu::with_items(&app, &[&back_to_inline])
+    })();
+
     // 创建窗口构建器
     let mut builder = WebviewWindowBuilder::new(
         &app,
@@ -1250,6 +1258,13 @@ async fn create_or_show_plugin_window(
         // 使用默认大小
         builder = builder.inner_size(800.0, 600.0);
     }
+
+    // 如果菜单创建成功，添加到窗口
+    let builder = if let Ok(menu) = menu_result {
+        builder.menu(menu)
+    } else {
+        builder
+    };
 
     // 标记窗口正在创建
     if let Some(creating_state) = app.try_state::<PluginWindowCreating>() {

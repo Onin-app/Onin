@@ -68,10 +68,9 @@
       // 检查初始最大化状态
       isMaximized = await currentWindow.isMaximized();
 
-      // 监听窗口最大化状态变化
-      const unlisten = await currentWindow.onResized(async () => {
-        isMaximized = await currentWindow.isMaximized();
-      });
+      // BUG FIX: 移除 onResized 监听器，避免无限循环
+      // 不再监听 resize 事件来更新 isMaximized 状态
+      // 改为在按钮点击时手动更新状态
 
       // 监听来自 iframe 的消息（Tauri API 调用）
       window.addEventListener("message", handlePluginMessage);
@@ -101,7 +100,6 @@
       );
 
       return () => {
-        unlisten();
         unlistenVisibility();
         window.removeEventListener("message", handlePluginMessage);
       };
@@ -167,28 +165,31 @@
     await invoke("plugin_minimize_window", { label: windowLabel });
   };
 
+  // BUG FIX: 手动管理 isMaximized 状态，避免 onResized 无限循环
   const handleMaximize = async () => {
     if (isMaximized) {
       await invoke("plugin_unmaximize_window", { label: windowLabel });
+      isMaximized = false;  // 手动更新状态
     } else {
       await invoke("plugin_maximize_window", { label: windowLabel });
+      isMaximized = true;   // 手动更新状态
     }
   };
 
-  const handleStartDragging = async (event: MouseEvent) => {
-    // 只在左键点击且不是在按钮上时触发拖动
-    if (
-      event.button === 0 &&
-      !(event.target as HTMLElement).closest("button")
-    ) {
-      event.preventDefault();
-      try {
-        await invoke("plugin_start_dragging");
-      } catch (error) {
-        console.error("[PluginWindow] Failed to start dragging:", error);
-      }
+  // BUG FIX: 使用 currentWindow.startDragging() 而不是 invoke
+  function handleTitlebarMouseDown(event: MouseEvent) {
+    // 只在左键点击时拖动
+    if (event.button !== 0) return;
+    
+    // 如果点击的是按钮或其他交互元素，不拖动
+    const target = event.target as HTMLElement;
+    if (target.closest('button') || target.closest('input') || target.closest('select')) {
+      return;
     }
-  };
+    
+    // 使用 Tauri API 开始拖动（需要 core:window:allow-start-dragging 权限）
+    currentWindow.startDragging();
+  }
 
   const handleBackToInline = async () => {
     try {
@@ -244,18 +245,7 @@
 
 <div class="plugin-window-container">
   <!-- 自定义顶栏 -->
-  <!-- 
-    svelte-ignore a11y_no_noninteractive_element_interactions 
-    (Tauri system drag region: event is only for internal tracking; 
-    actual drag is handled by Tauri backend, not exposed to AT)
-  -->
-  <div
-    class="titlebar"
-    role="application"
-    aria-label="Application window title bar — drag to move"
-    data-tauri-drag-region
-    onmousedown={handleStartDragging}
-  >
+  <div class="titlebar" onmousedown={handleTitlebarMouseDown}>
     <!-- 插件标题 -->
     <div class="titlebar-title">
       {pluginName || "Plugin"}
