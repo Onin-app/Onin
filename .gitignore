@@ -10,3 +10,9 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 dist
 target
+
+# Monorepo
+packages/*/node_modules
+packages/*/dist
+packages/*/build
+packages/*/.svelte-kit
