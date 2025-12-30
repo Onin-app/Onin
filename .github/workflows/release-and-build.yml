@@ -45,16 +45,16 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # 记录发布前的版本
-          OLD_VERSION=$(node -p "require('./package.json').version")
+          OLD_VERSION=$(node -p "require('./packages/app/package.json').version")
           echo "Version before release: $OLD_VERSION"
-          
+
           # 运行 semantic-release
           pnpm release
-          
+
           # 记录发布后的版本
-          NEW_VERSION=$(node -p "require('./package.json').version")
+          NEW_VERSION=$(node -p "require('./packages/app/package.json').version")
           echo "Version after release: $NEW_VERSION"
-          
+
           # 检查版本是否发生变化或者是否有新的 tag
           if [ "$OLD_VERSION" != "$NEW_VERSION" ] || git describe --tags --exact-match HEAD 2>/dev/null; then
             echo "released=true" >> $GITHUB_OUTPUT
@@ -80,7 +80,7 @@ jobs:
           echo "Released: ${{ needs.release.outputs.released }}"
           echo "Version: ${{ needs.release.outputs.version }}"
           echo "Tag: ${{ needs.release.outputs.tag }}"
-          
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -94,26 +94,24 @@ jobs:
         with:
           node-version: 20
           cache: 'pnpm'
-      
+
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workdir: './src-tauri'
+          workspaces: './packages/app/src-tauri -> target'
 
       - name: Install frontend dependencies
         run: pnpm install
-
-      - name: Build frontend
-        run: pnpm build
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          projectPath: packages/app
           tagName: ${{ needs.release.outputs.tag }}
           releaseName: 'Baize v${{ needs.release.outputs.version }}'
           releaseBody: 'See the assets to download and install this version.'

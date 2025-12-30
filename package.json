@@ -5,16 +5,19 @@
   "description": "Baize monorepo - App, SDK and Demo",
   "type": "module",
   "scripts": {
-    "dev": "pnpm --filter app dev",
+    "dev": "pnpm --filter app tauri:dev",
     "dev:demo": "pnpm --filter demo dev",
     "build": "pnpm -r build",
-    "build:app": "pnpm --filter app build",
+    "build:app": "pnpm --filter app tauri:build",
     "build:sdk": "pnpm --filter sdk build",
     "build:demo": "pnpm --filter demo build",
     "test": "pnpm -r test",
     "test:sdk": "pnpm --filter sdk test",
+    "check": "pnpm --filter app check",
     "format": "prettier --write \"packages/**/*.{ts,svelte,json}\"",
     "tauri": "cd packages/app && pnpm tauri",
+    "tauri:dev": "pnpm --filter app tauri:dev",
+    "tauri:build": "pnpm --filter app tauri:build",
     "release": "pnpm --filter app release"
   },
   "devDependencies": {
