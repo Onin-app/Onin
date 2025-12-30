@@ -1,0 +1,64 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "baize",
+  "version": "0.1.0",
+  "identifier": "com.baize.data",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../build"
+  },
+  "app": {
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "width": 800,
+        "height": 400,
+        "dragDropEnabled": true,
+        "alwaysOnTop": true,
+        "center": true,
+        "closable": false,
+        "decorations": false,
+        "focus": true,
+        "hiddenTitle": true,
+        "maximizable": false,
+        "skipTaskbar": true,
+        "transparent": true,
+        "shadow": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' plugin: asset: https://asset.localhost 'unsafe-inline' 'unsafe-eval'; script-src 'self' plugin: asset: https://asset.localhost 'unsafe-inline' 'unsafe-eval'; style-src 'self' plugin: asset: https://asset.localhost 'unsafe-inline'; img-src 'self' plugin: asset: https://asset.localhost data:; font-src 'self' plugin: asset: https://asset.localhost; connect-src 'self' plugin: asset: https://asset.localhost; frame-src 'self' plugin: asset: https://asset.localhost;",
+      "dangerousDisableAssetCspModification": true,
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["**"]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "macOS": {
+      "entitlements": "entitlements.macos.plist",
+      "exceptionDomain": "localhost",
+      "frameworks": [],
+      "providerShortName": null,
+      "signingIdentity": null
+    }
+  },
+  "plugins": {
+    "globalShortcut": {
+      "enable": true
+    },
+    "notification": null
+  }
+}

@@ -1,45 +1,82 @@
-# Tauri + SvelteKit + TypeScript
+# Baize Monorepo
 
-This template should help get you started developing with Tauri, SvelteKit and TypeScript in Vite.
+Baize 插件化桌面应用 - Tauri + SvelteKit
 
-## Recommended IDE Setup
+## 快速开始
 
-[VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer).
+```bash
+# 安装
+pnpm install
 
----
+# 开发
+pnpm dev              # Web 开发 (http://localhost:1420)
+pnpm tauri dev        # Tauri 桌面应用（首次需要 3-10 分钟编译 Rust）
+pnpm dev:demo         # SDK demo (http://localhost:5174)
 
-# Baize
+# 构建
+pnpm build            # 构建所有包
+pnpm build:sdk        # 只构建 SDK
 
-## 项目目标
+# 测试
+pnpm test:sdk         # 测试 SDK
+```
 
-创建一个快速启动应用程序，类似于 raycast、utools、alfred、wox。
+## 项目结构
 
-## 技术栈
+```
+packages/
+├── app/              # 主应用 (Tauri + SvelteKit)
+│   └── docs/         # 主应用设计文档
+├── sdk/              # 插件 SDK (发布为 baize-sdk)
+│   ├── docs/         # SDK 设计文档
+│   └── examples/     # SDK 使用示例
+└── demo/             # SDK 测试项目
+```
 
-- **Tauri**: 用于构建跨平台桌面应用程序。
-  - 优点：性能好，安全性高，可以使用 Web 技术进行开发。
-  - 缺点：学习曲线较陡峭，生态系统不如 Electron 完善。
-- **Svelte**: 用于构建用户界面。
-  - 优点：性能好，代码量少，易于学习。
-  - 缺点：生态系统不如 React 和 Vue 完善。
-- **Rust**: 用于编写 Tauri 后端代码。
-  - 优点：性能好，安全性高，适合编写系统级代码。
-  - 缺点：学习曲线较陡峭，编译速度较慢。
+## SDK 开发流程
 
-## 项目进度
+1. 修改 SDK: `packages/sdk/src/`
+2. 构建: `pnpm build:sdk`
+3. 测试: `pnpm dev:demo`
 
-- [x] 创建项目基本结构
-- [x] 实现快速启动功能
-- [ ] 添加插件支持
-- [ ] 优化用户界面
+## 常见问题
 
-## 难点
+### Tauri 启动失败
 
-- 如何实现快速启动：需要研究 utools、alfred、raycast 等软件的实现方式。
-- 如何添加插件支持：需要设计插件 API 和插件加载机制。
-- 如何优化用户界面：需要考虑用户体验和性能。
+```bash
+# 清理构建缓存
+rm -rf packages/app/src-tauri/target
+pnpm tauri dev
+```
 
-## 疑问点
+### SDK 改动后 Demo 没更新
 
-- 是否需要使用其他技术栈：例如，是否需要使用 TypeScript 来编写 Svelte 代码。
-- 如何更好地组织项目结构：需要考虑项目的可维护性和可扩展性。
+```bash
+# 重新构建 SDK
+pnpm build:sdk
+```
+
+### 依赖问题
+
+```bash
+# 重新安装
+rm -rf node_modules packages/*/node_modules pnpm-lock.yaml
+pnpm install
+```
+
+## 文档
+
+### 主应用
+- [API 文档](packages/app/docs/API.md)
+- [插件系统](packages/app/docs/PLUGIN_COMMAND_USAGE.md)
+- [窗口管理](packages/app/docs/WINDOW_LIFECYCLE_FINAL.md)
+- [更多...](packages/app/docs/)
+
+### SDK
+- [SDK README](packages/sdk/README.md)
+- [API 设计](packages/sdk/docs/)
+- [使用示例](packages/sdk/examples/)
+
+## License
+
+MIT
