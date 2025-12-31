@@ -9,12 +9,13 @@
 ### 前端（plugins-sdk）
 
 使用浏览器标准 API：
+
 - `document.visibilitychange` - 检测文档可见性变化
 - `window.focus` / `window.blur` - 检测窗口焦点变化
 
 ```typescript
 // 独立窗口模式
-document.addEventListener('visibilitychange', () => {
+document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
     // 窗口隐藏
     executeWindowHideCallbacks();
@@ -24,13 +25,13 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-window.addEventListener('focus', () => {
+window.addEventListener("focus", () => {
   if (!document.hidden) {
     executeWindowShowCallbacks();
   }
 });
 
-window.addEventListener('blur', () => {
+window.addEventListener("blur", () => {
   executeWindowHideCallbacks();
 });
 ```
@@ -38,6 +39,7 @@ window.addEventListener('blur', () => {
 ### 后端（src-tauri）
 
 **不需要任何特殊处理**！
+
 - 不需要注入自定义事件系统
 - 不需要 `eval` 触发事件
 - 不需要 `initialization_script`
@@ -63,15 +65,15 @@ let builder = WebviewWindowBuilder::new(
 
 ```typescript
 // lifecycle.ts
-import { lifecycle } from 'baize-plugin-sdk';
+import { lifecycle } from "onin-plugin-sdk";
 
 lifecycle.onWindowShow(() => {
-  console.log('窗口显示了');
+  console.log("窗口显示了");
   // 刷新数据、恢复定时器等
 });
 
 lifecycle.onWindowHide(() => {
-  console.log('窗口隐藏了');
+  console.log("窗口隐藏了");
   // 暂停任务、保存状态等
 });
 ```
@@ -82,12 +84,12 @@ lifecycle.onWindowHide(() => {
 <!-- index.html -->
 <!DOCTYPE html>
 <html>
-<body>
-  <!-- 你的内容 -->
-  
-  <script type="module" src="./lifecycle.ts"></script>
-  <script type="module" src="./ui.ts"></script>
-</body>
+  <body>
+    <!-- 你的内容 -->
+
+    <script type="module" src="./lifecycle.ts"></script>
+    <script type="module" src="./ui.ts"></script>
+  </body>
 </html>
 ```
 
@@ -114,7 +116,7 @@ async function executeWindowShowCallbacks(): Promise<void> {
     return; // 忽略重复触发
   }
   lastShowTime = now;
-  
+
   // 执行回调...
 }
 ```
@@ -131,17 +133,20 @@ async function executeWindowShowCallbacks(): Promise<void> {
 
 ```typescript
 // 父窗口发送消息
-iframe.contentWindow.postMessage({
-  type: 'plugin-lifecycle-event',
-  event: 'show' // 或 'hide'
-}, '*');
+iframe.contentWindow.postMessage(
+  {
+    type: "plugin-lifecycle-event",
+    event: "show", // 或 'hide'
+  },
+  "*",
+);
 
 // iframe 内监听消息
-window.addEventListener('message', (event) => {
-  if (event.data.type === 'plugin-lifecycle-event') {
-    if (event.data.event === 'show') {
+window.addEventListener("message", (event) => {
+  if (event.data.type === "plugin-lifecycle-event") {
+    if (event.data.event === "show") {
       executeWindowShowCallbacks();
-    } else if (event.data.event === 'hide') {
+    } else if (event.data.event === "hide") {
       executeWindowHideCallbacks();
     }
   }
@@ -178,18 +183,19 @@ window.addEventListener('message', (event) => {
 
 ## 与之前方案的对比
 
-| 特性 | 之前的方案 | 新方案 |
-|------|-----------|--------|
-| 后端代码 | 需要注入 100+ 行 JS | 不需要任何特殊代码 |
-| 前端代码 | 复杂的重试逻辑 | 简单的事件监听 |
-| 依赖 | 依赖 Tauri 事件系统 | 只依赖浏览器标准 API |
-| 可靠性 | 需要等待 Tauri API 加载 | 立即可用 |
-| 性能 | 需要 Rust ↔ JS 通信 | 纯前端，零开销 |
-| 维护成本 | 高 | 低 |
+| 特性     | 之前的方案              | 新方案               |
+| -------- | ----------------------- | -------------------- |
+| 后端代码 | 需要注入 100+ 行 JS     | 不需要任何特殊代码   |
+| 前端代码 | 复杂的重试逻辑          | 简单的事件监听       |
+| 依赖     | 依赖 Tauri 事件系统     | 只依赖浏览器标准 API |
+| 可靠性   | 需要等待 Tauri API 加载 | 立即可用             |
+| 性能     | 需要 Rust ↔ JS 通信    | 纯前端，零开销       |
+| 维护成本 | 高                      | 低                   |
 
 ## 总结
 
 通过使用浏览器原生 API，我们实现了一个：
+
 - ✅ 更简单
 - ✅ 更可靠
 - ✅ 更高效

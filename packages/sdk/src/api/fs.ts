@@ -50,7 +50,7 @@ async function callFsApi<T = any>(method: string, args?: any): Promise<T> {
     throw parseFsError(error, {
       path: args?.path || args?.sourcePath,
       method,
-      args
+      args,
     });
   }
 }
@@ -77,7 +77,7 @@ async function callFsApi<T = any>(method: string, args?: any): Promise<T> {
  *     console.error('Failed to read config:', error.message);
  *   }
  * }
- * 
+ *
  * // Read log file
  * const logContent = await fs.readFile('logs/app.log');
  * console.log('Recent logs:', logContent.split('\n').slice(-10));
@@ -86,7 +86,7 @@ async function callFsApi<T = any>(method: string, args?: any): Promise<T> {
  * @group API
  */
 export function readFile(path: string): Promise<string> {
-  return callFsApi<string>("plugin_fs_read_file", { path });
+  return callFsApi<string>('plugin_fs_read_file', { path });
 }
 
 /**
@@ -98,7 +98,7 @@ export function readFile(path: string): Promise<string> {
  * await fs.writeFile('log.txt', 'This is a log entry.');
  */
 export function writeFile(path: string, content: string): Promise<void> {
-  return callFsApi("plugin_fs_write_file", { path, content });
+  return callFsApi('plugin_fs_write_file', { path, content });
 }
 
 /**
@@ -111,7 +111,7 @@ export function writeFile(path: string, content: string): Promise<void> {
  * }
  */
 export function exists(path: string): Promise<boolean> {
-  return callFsApi<boolean>("plugin_fs_exists", { path });
+  return callFsApi<boolean>('plugin_fs_exists', { path });
 }
 
 /**
@@ -122,8 +122,11 @@ export function exists(path: string): Promise<boolean> {
  * @example
  * await fs.createDir('data/logs', true);
  */
-export function createDir(path: string, recursive: boolean = true): Promise<void> {
-  return callFsApi("plugin_fs_create_dir", { path, recursive });
+export function createDir(
+  path: string,
+  recursive: boolean = true,
+): Promise<void> {
+  return callFsApi('plugin_fs_create_dir', { path, recursive });
 }
 
 /**
@@ -137,7 +140,7 @@ export function createDir(path: string, recursive: boolean = true): Promise<void
  * }
  */
 export function listDir(path: string): Promise<FileInfo[]> {
-  return callFsApi<FileInfo[]>("plugin_fs_list_dir", { path });
+  return callFsApi<FileInfo[]>('plugin_fs_list_dir', { path });
 }
 
 /**
@@ -148,7 +151,7 @@ export function listDir(path: string): Promise<FileInfo[]> {
  * await fs.deleteFile('temp.txt');
  */
 export function deleteFile(path: string): Promise<void> {
-  return callFsApi("plugin_fs_delete_file", { path });
+  return callFsApi('plugin_fs_delete_file', { path });
 }
 
 /**
@@ -159,8 +162,11 @@ export function deleteFile(path: string): Promise<void> {
  * @example
  * await fs.deleteDir('old_data', true);
  */
-export function deleteDir(path: string, recursive: boolean = false): Promise<void> {
-  return callFsApi("plugin_fs_delete_dir", { path, recursive });
+export function deleteDir(
+  path: string,
+  recursive: boolean = false,
+): Promise<void> {
+  return callFsApi('plugin_fs_delete_dir', { path, recursive });
 }
 
 /**
@@ -172,7 +178,7 @@ export function deleteDir(path: string, recursive: boolean = false): Promise<voi
  * console.log(`Size: ${info.size} bytes`);
  */
 export function getFileInfo(path: string): Promise<FileInfo> {
-  return callFsApi<FileInfo>("plugin_fs_get_file_info", { path });
+  return callFsApi<FileInfo>('plugin_fs_get_file_info', { path });
 }
 
 /**
@@ -184,7 +190,7 @@ export function getFileInfo(path: string): Promise<FileInfo> {
  * await fs.copyFile('source.txt', 'destination.txt');
  */
 export function copyFile(sourcePath: string, destPath: string): Promise<void> {
-  return callFsApi("plugin_fs_copy_file", { sourcePath, destPath });
+  return callFsApi('plugin_fs_copy_file', { sourcePath, destPath });
 }
 
 /**
@@ -196,27 +202,27 @@ export function copyFile(sourcePath: string, destPath: string): Promise<void> {
  * await fs.moveFile('old-name.txt', 'new-name.txt');
  */
 export function moveFile(sourcePath: string, destPath: string): Promise<void> {
-  return callFsApi("plugin_fs_move_file", { sourcePath, destPath });
+  return callFsApi('plugin_fs_move_file', { sourcePath, destPath });
 }
 
 /**
  * File system API namespace - provides sandboxed file operations for plugins
- * 
+ *
  * All file operations are restricted to the plugin's data directory for security.
  * Paths are relative to the plugin's isolated storage space, ensuring data
  * separation between plugins and preventing access to system files.
- * 
+ *
  * **Security**: All file operations are sandboxed within the plugin's data directory.
  * Attempts to access files outside this directory will result in errors.
- * 
+ *
  * **Path Handling**: All paths are relative to the plugin data directory.
  * Use forward slashes (/) for cross-platform compatibility.
- * 
+ *
  * **Encoding**: Text files are read/written using UTF-8 encoding by default.
- * 
+ *
  * **Performance**: For better performance with multiple operations, consider
  * using batch operations when available.
- * 
+ *
  * @namespace fs
  * @version 0.1.0
  * @since 0.1.0
@@ -224,22 +230,22 @@ export function moveFile(sourcePath: string, destPath: string): Promise<void> {
  * @see {@link parseFsError} - For file system error handling utilities
  * @example
  * ```typescript
- * import { fs } from 'baize-plugin-sdk';
- * 
+ * import { fs } from 'onin-plugin-sdk';
+ *
  * // Basic file operations
  * await fs.writeFile('data.txt', 'Hello World');
  * const content = await fs.readFile('data.txt');
  * console.log(content); // 'Hello World'
- * 
+ *
  * // Directory operations
  * await fs.createDir('backups', true);
  * const files = await fs.listDir('.');
  * console.log('Files in plugin directory:', files);
- * 
+ *
  * // File management
  * await fs.copyFile('data.txt', 'backups/data-backup.txt');
  * await fs.moveFile('old-name.txt', 'new-name.txt');
- * 
+ *
  * // Check file existence
  * if (await fs.exists('config.json')) {
  *   const config = JSON.parse(await fs.readFile('config.json'));

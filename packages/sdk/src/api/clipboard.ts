@@ -12,7 +12,10 @@ import { parseClipboardError } from '../utils/error-parser';
  * @internal
  * @group Core
  */
-async function callClipboardApi<T = any>(method: string, args?: any): Promise<T> {
+async function callClipboardApi<T = any>(
+  method: string,
+  args?: any,
+): Promise<T> {
   try {
     return await dispatch({
       webview: () => invoke<T>(method, args),
@@ -26,7 +29,7 @@ async function callClipboardApi<T = any>(method: string, args?: any): Promise<T>
     // Use unified error parser
     throw parseClipboardError(error, {
       method,
-      args
+      args,
     });
   }
 }
@@ -58,7 +61,7 @@ async function callClipboardApi<T = any>(method: string, args?: any): Promise<T>
  * @group API
  */
 export function readText(): Promise<string | null> {
-  return callClipboardApi<string | null>("plugin_clipboard_read_text");
+  return callClipboardApi<string | null>('plugin_clipboard_read_text');
 }
 
 /**
@@ -83,7 +86,7 @@ export function readText(): Promise<string | null> {
  * @group API
  */
 export function writeText(text: string): Promise<void> {
-  return callClipboardApi("plugin_clipboard_write_text", { text });
+  return callClipboardApi('plugin_clipboard_write_text', { text });
 }
 
 /**
@@ -115,7 +118,7 @@ export function writeText(text: string): Promise<void> {
  * @group API
  */
 export function readImage(): Promise<string | null> {
-  return callClipboardApi<string | null>("plugin_clipboard_read_image");
+  return callClipboardApi<string | null>('plugin_clipboard_read_image');
 }
 
 /**
@@ -140,8 +143,9 @@ export function readImage(): Promise<string | null> {
  * @group API
  */
 export function writeImage(imageData: string | Uint8Array): Promise<void> {
-  const data = typeof imageData === 'string' ? imageData : Array.from(imageData);
-  return callClipboardApi("plugin_clipboard_write_image", { imageData: data });
+  const data =
+    typeof imageData === 'string' ? imageData : Array.from(imageData);
+  return callClipboardApi('plugin_clipboard_write_image', { imageData: data });
 }
 
 /**
@@ -164,7 +168,7 @@ export function writeImage(imageData: string | Uint8Array): Promise<void> {
  * @group API
  */
 export function clear(): Promise<void> {
-  return callClipboardApi("plugin_clipboard_clear");
+  return callClipboardApi('plugin_clipboard_clear');
 }
 
 /**
@@ -283,19 +287,19 @@ export interface ClipboardMetadata {
   files: ClipboardFile[] | null;
   /** The type of content in the clipboard */
   contentType: ClipboardContentType;
-  /** 
+  /**
    * Unix timestamp (in seconds) when the clipboard content was last updated.
-   * 
+   *
    * Note: This timestamp is independent from the app's auto_clear_time_limit setting.
    * Even if the app clears its internal state, this timestamp will still reflect
    * when the system clipboard was actually modified.
-   * 
+   *
    * May be null only if:
    * - Clipboard monitoring hasn't started yet
    * - The clipboard has never been modified since app start
    */
   timestamp: number | null;
-  /** 
+  /**
    * Age of the clipboard content in seconds (time since it was copied).
    * Calculated as: current_time - timestamp.
    * Will be null if timestamp is null.
@@ -312,7 +316,7 @@ export interface ClipboardMetadata {
  * - File paths (if files were copied)
  * - Timestamp when content was copied
  * - Age in seconds (automatically calculated)
- * 
+ *
  * @returns Promise that resolves to comprehensive clipboard metadata
  * @throws {PluginError} Same error conditions as {@link readText}
  * @example
@@ -321,7 +325,7 @@ export interface ClipboardMetadata {
  * const metadata = await clipboard.getMetadata();
  * console.log('Content type:', metadata.contentType);
  * console.log('Age:', metadata.age, 'seconds');
- * 
+ *
  * // Handle different content types
  * switch (metadata.contentType) {
  *   case 'text':
@@ -337,18 +341,18 @@ export interface ClipboardMetadata {
  *     console.log('Clipboard is empty');
  *     break;
  * }
- * 
+ *
  * // Time-based filtering using age
  * if (metadata.age !== null && metadata.age < 10) {
  *   console.log('Content is fresh (less than 10 seconds old)');
  *   await processContent(metadata);
  * }
- * 
+ *
  * // Check for image
  * if (metadata.contentType === 'image') {
  *   console.log('Image detected in clipboard');
  * }
- * 
+ *
  * if (metadata.files && metadata.files.length > 0) {
  *   console.log('Files copied:', metadata.files.length);
  *   metadata.files.forEach(file => {
@@ -360,15 +364,15 @@ export interface ClipboardMetadata {
  * @group API
  */
 export function getMetadata(): Promise<ClipboardMetadata> {
-  return callClipboardApi<ClipboardMetadata>("plugin_clipboard_get_metadata");
+  return callClipboardApi<ClipboardMetadata>('plugin_clipboard_get_metadata');
 }
 
 /**
  * Clipboard API namespace - provides functions for interacting with the system clipboard
- * 
+ *
  * Supports reading and writing text and image data to/from the system clipboard.
  * All operations require appropriate permissions and handle various clipboard states gracefully.
- * 
+ *
  * @namespace clipboard
  * @version 0.1.0
  * @since 0.1.0
@@ -376,19 +380,19 @@ export function getMetadata(): Promise<ClipboardMetadata> {
  * @see {@link parseClipboardError} - For error handling utilities
  * @example
  * ```typescript
- * import { clipboard } from 'baize-plugin-sdk';
- * 
+ * import { clipboard } from 'onin-plugin-sdk';
+ *
  * // Read text from clipboard
  * const text = await clipboard.readText();
- * 
+ *
  * // Write text to clipboard
  * await clipboard.writeText('Hello World');
- * 
+ *
  * // Check if clipboard has content
  * if (await clipboard.hasText()) {
  *   console.log('Clipboard has text content');
  * }
- * 
+ *
  * // Get metadata with timestamp
  * const metadata = await clipboard.getMetadata();
  * console.log('Content age:', Date.now() / 1000 - metadata.timestamp);

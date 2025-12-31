@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "baize",
+  "productName": "onin",
   "version": "0.1.0",
-  "identifier": "com.baize.data",
+  "identifier": "com.onin.data",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",

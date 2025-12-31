@@ -36,11 +36,13 @@ export function isRetryableError(error: unknown): boolean {
       case errorCode.http.HTTP_ERROR:
         // Based on standard HTTP status codes to determine if retryable
         const status = error.context?.status;
-        return status === 429 || // Too Many Requests
+        return (
+          status === 429 || // Too Many Requests
           status === 500 || // Internal Server Error
           status === 502 || // Bad Gateway
           status === 503 || // Service Unavailable
-          status === 504;   // Gateway Timeout
+          status === 504
+        ); // Gateway Timeout
 
       case errorCode.clipboard.UNAVAILABLE:
         return true;
@@ -96,7 +98,7 @@ export function getRetryDelay(error: unknown, attempt: number = 1): number {
 export function calculateExponentialBackoff(
   baseDelay: number,
   attempt: number,
-  maxDelay: number = 30000
+  maxDelay: number = 30000,
 ): number {
   const delay = baseDelay * Math.pow(2, attempt - 1);
   return Math.min(delay, maxDelay);
@@ -114,7 +116,7 @@ export function calculateExponentialBackoff(
  */
 export async function withRetry<T>(
   operation: () => Promise<T>,
-  options: RetryOptions = {}
+  options: RetryOptions = {},
 ): Promise<T> {
   const {
     maxRetries = 3,
@@ -122,15 +124,18 @@ export async function withRetry<T>(
     exponentialBackoff = false,
     maxDelay = 30000,
     shouldRetry = isRetryableError,
-    getDelay = (error, attempt) => exponentialBackoff
-      ? calculateExponentialBackoff(baseDelay, attempt, maxDelay)
-      : getRetryDelay(error, attempt),
+    getDelay = (error, attempt) =>
+      exponentialBackoff
+        ? calculateExponentialBackoff(baseDelay, attempt, maxDelay)
+        : getRetryDelay(error, attempt),
     onRetry = (error, attempt, delay) => {
-      console.log(`Operation failed, retrying in ${delay}ms (${attempt}/${maxRetries})`);
+      console.log(
+        `Operation failed, retrying in ${delay}ms (${attempt}/${maxRetries})`,
+      );
       if (errorUtils.isPluginError(error)) {
         console.log(`Error type: ${error.code}, message: ${error.message}`);
       }
-    }
+    },
   } = options;
 
   let lastError: unknown;
@@ -153,7 +158,7 @@ export async function withRetry<T>(
       onRetry(error, attempt, delay);
 
       // Wait for delay time
-      await new Promise(resolve => setTimeout(resolve, delay));
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
 
@@ -171,7 +176,7 @@ export async function withRetry<T>(
  */
 export function createRetryWrapper<T extends (...args: any[]) => Promise<any>>(
   fn: T,
-  options: RetryOptions = {}
+  options: RetryOptions = {},
 ): T {
   return ((...args: Parameters<T>) => {
     return withRetry(() => fn(...args), options);
@@ -180,31 +185,31 @@ export function createRetryWrapper<T extends (...args: any[]) => Promise<any>>(
 
 /**
  * Retry utilities collection - provides retry mechanisms for error-prone operations
- * 
+ *
  * Offers configurable retry logic with exponential backoff, custom error filtering,
  * and callback hooks for monitoring retry attempts. Particularly useful for network
  * operations and other potentially unreliable operations.
- * 
+ *
  * **Features:**
  * - Configurable retry count and delay strategies
  * - Exponential backoff with jitter support
  * - Custom error filtering to determine retry eligibility
  * - Progress callbacks for monitoring retry attempts
  * - Function wrapper utilities for easy integration
- * 
+ *
  * @namespace retry
  * @version 0.1.0
  * @since 0.1.0
  * @group Utilities
  * @example
  * ```typescript
- * import { retry, http } from 'baize-plugin-sdk';
- * 
+ * import { retry, http } from 'onin-plugin-sdk';
+ *
  * // Basic retry with default options
  * const data = await retry.withRetry(async () => {
  *   return await http.get('https://api.example.com/data');
  * });
- * 
+ *
  * // Advanced retry with custom options
  * const result = await retry.withRetry(
  *   async () => await someUnreliableOperation(),
@@ -222,13 +227,13 @@ export function createRetryWrapper<T extends (...args: any[]) => Promise<any>>(
  *     }
  *   }
  * );
- * 
+ *
  * // Create reusable retry wrapper
  * const reliableHttpGet = retry.createRetryWrapper(
  *   (url: string) => http.get(url),
  *   { maxRetries: 3, exponentialBackoff: true }
  * );
- * 
+ *
  * const response = await reliableHttpGet('https://api.example.com/data');
  * ```
  */

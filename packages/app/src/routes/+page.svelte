@@ -21,7 +21,12 @@
   import { fuzzyMatch } from "$lib/utils/fuzzyMatch";
   import { getMatchedCommands } from "$lib/utils/matchCommand";
   import { sortByUsage } from "$lib/utils/sortByUsage";
-  import { Theme, type LaunchableItem, type CommandUsageStats, type AppConfig } from "$lib/type";
+  import {
+    Theme,
+    type LaunchableItem,
+    type CommandUsageStats,
+    type AppConfig,
+  } from "$lib/type";
   import { theme, getTheme } from "$lib/utils/theme";
   import { escapeHandler } from "$lib/stores/escapeHandler";
   import { focusInputTrigger } from "$lib/stores/focusInput";
@@ -94,13 +99,13 @@
       if (pluginIframeElement && pluginIframeElement.contentWindow) {
         pluginIframeElement.contentWindow.postMessage(
           {
-            type: 'plugin-lifecycle-event',
-            event: 'hide',
+            type: "plugin-lifecycle-event",
+            event: "hide",
           },
-          '*'
+          "*",
         );
       }
-      
+
       showPluginInline = false;
       currentPluginUrl = "";
       currentPluginId = "";
@@ -167,20 +172,20 @@
       "window_visibility",
       async (event) => {
         mainWindowVisible = event.payload;
-        
+
         if (event.payload) {
           await autoPasteClipboard();
         }
-        
+
         // Forward visibility event to plugin iframe
         if (pluginIframeElement && pluginIframeElement.contentWindow) {
-          const eventType = event.payload ? 'show' : 'hide';
+          const eventType = event.payload ? "show" : "hide";
           pluginIframeElement.contentWindow.postMessage(
             {
-              type: 'plugin-lifecycle-event',
+              type: "plugin-lifecycle-event",
               event: eventType,
             },
-            '*'
+            "*",
           );
         }
       },
@@ -346,7 +351,12 @@
     const value = e.currentTarget.value;
     let apps = fuzzyMatch(value, originAppList);
     // 应用使用频率排序
-    apps = sortByUsage(apps, usageStats, appConfig.sort_mode, appConfig.enable_usage_tracking);
+    apps = sortByUsage(
+      apps,
+      usageStats,
+      appConfig.sort_mode,
+      appConfig.enable_usage_tracking,
+    );
     inputValue = value;
     appList = apps;
     selectedIndex = 0;
@@ -604,7 +614,7 @@
         // 刷新使用统计和列表（异步，不阻塞）
         Promise.all([
           invoke<CommandUsageStats[]>("get_usage_stats"),
-          invoke<LaunchableItem[]>("get_all_launchable_items")
+          invoke<LaunchableItem[]>("get_all_launchable_items"),
         ])
           .then(([stats, items]) => {
             usageStats = stats;
@@ -614,7 +624,7 @@
               appList = items;
             }
           })
-          .catch(err => console.error("Failed to refresh data:", err));
+          .catch((err) => console.error("Failed to refresh data:", err));
       } else if (app.source === "FileCommand") {
         // Handle custom items that might not have an action
         await invoke("open_app", {
@@ -874,9 +884,9 @@
           bind:this={inputElement}
           class="{showAllFiles
             ? 'w-full'
-            : 'min-w-0 flex-1'} h-[34px] bg-transparent text-2xl focus:ring-0 focus:outline-none active:ring-0 active:outline-none"
+            : 'min-w-0 flex-1'} h-[34px] bg-transparent text-2xl focus:outline-none focus:ring-0 active:outline-none active:ring-0"
           type="text"
-          placeholder="Hi Baize!"
+          placeholder="Hi Onin!"
           bind:value={inputValue}
           oninput={handleInput}
           onpaste={handlePaste}
@@ -907,11 +917,11 @@
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
               <DropdownMenu.Content
-                class="border-muted bg-background shadow-popover rounded-xl border px-1 py-1.5 outline-hidden focus-visible:outline-hidden"
+                class="border-muted bg-background shadow-popover outline-hidden focus-visible:outline-hidden rounded-xl border px-1 py-1.5"
                 sideOffset={8}
               >
                 <DropdownMenu.Item
-                  class="rounded-button data-highlighted:bg-muted flex h-10 items-center py-3 pr-1.5 pl-3 text-sm font-medium ring-0! ring-transparent! select-none focus-visible:outline-none"
+                  class="rounded-button data-highlighted:bg-muted ring-0! ring-transparent! flex h-10 select-none items-center py-3 pl-3 pr-1.5 text-sm font-medium focus-visible:outline-none"
                 >
                   <button
                     class="flex w-full cursor-pointer items-center"
@@ -929,7 +939,7 @@
                   </button>
                 </DropdownMenu.Item>
                 <DropdownMenu.Item
-                  class="rounded-button data-highlighted:bg-muted flex h-10 items-center py-3 pr-1.5 pl-3 text-sm font-medium ring-0! ring-transparent! select-none focus-visible:outline-none"
+                  class="rounded-button data-highlighted:bg-muted ring-0! ring-transparent! flex h-10 select-none items-center py-3 pl-3 pr-1.5 text-sm font-medium focus-visible:outline-none"
                 >
                   <button
                     class="flex w-full cursor-pointer items-center"
@@ -946,7 +956,7 @@
                 </DropdownMenu.Item>
                 <DropdownMenu.CheckboxItem
                   bind:checked={currentPluginAutoDetach}
-                  class="rounded-button data-highlighted:bg-muted flex h-10 cursor-pointer items-center py-3 pr-1.5 pl-3 text-sm font-medium ring-0! ring-transparent! select-none focus-visible:outline-none"
+                  class="rounded-button data-highlighted:bg-muted ring-0! ring-transparent! flex h-10 cursor-pointer select-none items-center py-3 pl-3 pr-1.5 text-sm font-medium focus-visible:outline-none"
                   onCheckedChange={handleToggleAutoDetach}
                 >
                   {#snippet children({ checked })}
@@ -989,10 +999,10 @@
             if (pluginIframeElement && pluginIframeElement.contentWindow) {
               pluginIframeElement.contentWindow.postMessage(
                 {
-                  type: 'plugin-lifecycle-event',
-                  event: 'show',
+                  type: "plugin-lifecycle-event",
+                  event: "show",
                 },
-                '*'
+                "*",
               );
             }
           }}
@@ -1057,13 +1067,13 @@
           </ScrollArea.Viewport>
           <ScrollArea.Scrollbar
             orientation="vertical"
-            class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-2.5 touch-none rounded-full border-l border-l-transparent p-px transition-all duration-200 select-none hover:w-3"
+            class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-2.5 touch-none select-none rounded-full border-l border-l-transparent p-px transition-all duration-200 hover:w-3"
           >
             <ScrollArea.Thumb class="bg-muted-foreground flex-1 rounded-full" />
           </ScrollArea.Scrollbar>
           <ScrollArea.Scrollbar
             orientation="horizontal"
-            class="bg-muted hover:bg-dark-10 flex h-2.5 touch-none rounded-full border-t border-t-transparent p-px transition-all duration-200 select-none hover:h-3 "
+            class="bg-muted hover:bg-dark-10 flex h-2.5 touch-none select-none rounded-full border-t border-t-transparent p-px transition-all duration-200 hover:h-3 "
           >
             <ScrollArea.Thumb class="bg-muted-foreground rounded-full" />
           </ScrollArea.Scrollbar>

@@ -50,7 +50,7 @@ jobs:
         with:
           projectPath: packages/app
           tagName: ${{ github.event.inputs.tag }}
-          releaseName: 'Baize ${{ github.event.inputs.tag }}'
+          releaseName: 'Onin ${{ github.event.inputs.tag }}'
           releaseBody: 'Manual build for ${{ github.event.inputs.tag }}'
           releaseDraft: false
           prerelease: false

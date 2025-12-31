@@ -1,10 +1,10 @@
 /**
  * Plugin Settings API
- * 
+ *
  * Provides methods to define and read plugin settings configured by users.
  * Settings are defined programmatically using useSettingsSchema() and can be
  * configured through the plugin settings UI.
- * 
+ *
  * @module api/settings
  */
 
@@ -181,16 +181,16 @@ let settingsSchema: SettingField[] = [];
 
 /**
  * Register settings schema for the plugin
- * 
+ *
  * This should be called once during plugin initialization to define
  * the settings that users can configure.
- * 
+ *
  * @param schema - Array of setting field descriptors
- * 
+ *
  * @example
  * ```typescript
- * import { settings } from 'baize-plugin-sdk';
- * 
+ * import { settings } from 'onin-plugin-sdk';
+ *
  * const settingsSchema: SettingField[] = [
  *   {
  *     key: 'apiKey',
@@ -228,7 +228,7 @@ let settingsSchema: SettingField[] = [];
  *     description: 'Show desktop notifications'
  *   }
  * ];
- * 
+ *
  * settings.useSettingsSchema(settingsSchema);
  * ```
  */
@@ -244,15 +244,23 @@ async function useSettingsSchema(schema: SettingField[]): Promise<void> {
     // Convert to internal format and register with host
     await invoke('register_plugin_settings_schema', {
       pluginId,
-      schema: convertSchemaToInternal(schema)
+      schema: convertSchemaToInternal(schema),
     });
   } catch (error) {
     // Re-throw if already a plugin error
-    if (error && typeof error === 'object' && error !== null && 'name' in error && error.name === 'PluginError') {
+    if (
+      error &&
+      typeof error === 'object' &&
+      error !== null &&
+      'name' in error &&
+      error.name === 'PluginError'
+    ) {
       throw error;
     }
     const errorMessage = error instanceof Error ? error.message : String(error);
-    throw createError.common.unknown(`Failed to register settings schema: ${errorMessage}`);
+    throw createError.common.unknown(
+      `Failed to register settings schema: ${errorMessage}`,
+    );
   }
 }
 
@@ -261,20 +269,20 @@ async function useSettingsSchema(schema: SettingField[]): Promise<void> {
  */
 function convertSchemaToInternal(schema: SettingField[]) {
   return {
-    fields: schema
+    fields: schema,
   };
 }
 
 /**
  * Get all settings for the current plugin
- * 
+ *
  * @returns Promise resolving to settings object
  * @throws {PluginError} If settings cannot be retrieved
- * 
+ *
  * @example
  * ```typescript
- * import { settings } from 'baize-plugin-sdk';
- * 
+ * import { settings } from 'onin-plugin-sdk';
+ *
  * const config = await settings.getAll();
  * console.log('API Key:', config.apiKey);
  * console.log('Refresh Interval:', config.refreshInterval);
@@ -287,12 +295,18 @@ async function getAll<T extends SettingsValues = SettingsValues>(): Promise<T> {
       throw createError.common.unknown('Plugin ID not found in global context');
     }
 
-    const result = await invoke<SettingsValues>('get_plugin_settings', { pluginId });
+    const result = await invoke<SettingsValues>('get_plugin_settings', {
+      pluginId,
+    });
 
     // Merge with default values from schema
     const merged: SettingsValues = { ...result };
     for (const field of settingsSchema) {
-      if (merged[field.key] === undefined && 'defaultValue' in field && field.defaultValue !== undefined) {
+      if (
+        merged[field.key] === undefined &&
+        'defaultValue' in field &&
+        field.defaultValue !== undefined
+      ) {
         merged[field.key] = field.defaultValue;
       }
     }
@@ -300,7 +314,13 @@ async function getAll<T extends SettingsValues = SettingsValues>(): Promise<T> {
     return merged as T;
   } catch (error) {
     // Re-throw if already a plugin error
-    if (error && typeof error === 'object' && error !== null && 'name' in error && error.name === 'PluginError') {
+    if (
+      error &&
+      typeof error === 'object' &&
+      error !== null &&
+      'name' in error &&
+      error.name === 'PluginError'
+    ) {
       throw error;
     }
     throw createError.common.unknown(`Failed to get plugin settings: ${error}`);
@@ -309,20 +329,23 @@ async function getAll<T extends SettingsValues = SettingsValues>(): Promise<T> {
 
 /**
  * Get a specific setting value
- * 
+ *
  * @param key - Setting key
  * @param defaultValue - Default value if setting is not found
  * @returns Promise resolving to setting value
- * 
+ *
  * @example
  * ```typescript
- * import { settings } from 'baize-plugin-sdk';
- * 
+ * import { settings } from 'onin-plugin-sdk';
+ *
  * const apiKey = await settings.get<string>('apiKey');
  * const timeout = await settings.get<number>('timeout', 30);
  * ```
  */
-async function get<T extends JsonValue = JsonValue>(key: string, defaultValue?: T): Promise<T | undefined> {
+async function get<T extends JsonValue = JsonValue>(
+  key: string,
+  defaultValue?: T,
+): Promise<T | undefined> {
   try {
     const allSettings = await getAll();
     const value = allSettings[key];
@@ -344,7 +367,7 @@ async function get<T extends JsonValue = JsonValue>(key: string, defaultValue?: 
 
 /**
  * Get the registered settings schema
- * 
+ *
  * @returns The current settings schema
  */
 function getSchema(): SettingField[] {

@@ -109,7 +109,7 @@ async function callDialogApi<T = any>(method: string, args?: any): Promise<T> {
     // Use unified error parser
     throw parseDialogError(error, {
       method,
-      args
+      args,
     });
   }
 }
@@ -128,7 +128,7 @@ async function callDialogApi<T = any>(method: string, args?: any): Promise<T> {
  *   title: 'Info',
  *   message: 'This is an informational message.'
  * });
- * 
+ *
  * // Warning message with custom styling
  * await dialog.showMessage({
  *   title: 'Warning',
@@ -136,7 +136,7 @@ async function callDialogApi<T = any>(method: string, args?: any): Promise<T> {
  *   kind: 'warning',
  *   okLabel: 'I Understand'
  * });
- * 
+ *
  * // Error message
  * await dialog.showMessage({
  *   title: 'Error',
@@ -148,7 +148,7 @@ async function callDialogApi<T = any>(method: string, args?: any): Promise<T> {
  * @group API
  */
 export function showMessage(options: MessageDialogOptions): Promise<void> {
-  return callDialogApi("plugin_dialog_message", options);
+  return callDialogApi('plugin_dialog_message', options);
 }
 
 /**
@@ -165,7 +165,7 @@ export function showMessage(options: MessageDialogOptions): Promise<void> {
  * }
  */
 export function showConfirm(options: ConfirmDialogOptions): Promise<boolean> {
-  return callDialogApi<boolean>("plugin_dialog_confirm", options);
+  return callDialogApi<boolean>('plugin_dialog_confirm', options);
 }
 
 /**
@@ -187,24 +187,26 @@ export function showConfirm(options: ConfirmDialogOptions): Promise<boolean> {
  *   console.log('Selected files:', filePaths);
  * }
  */
-export async function showOpen(options?: OpenDialogOptions): Promise<string | string[] | null> {
-  const result = await callDialogApi<any>("plugin_dialog_open", options || {});
-  
+export async function showOpen(
+  options?: OpenDialogOptions,
+): Promise<string | string[] | null> {
+  const result = await callDialogApi<any>('plugin_dialog_open', options || {});
+
   // Handle return value type conversion
   if (result === null || result === undefined) {
     return null;
   }
-  
+
   // If it's an array, it means multiple file selection
   if (Array.isArray(result)) {
     return result as string[];
   }
-  
+
   // If it's a string, it means single file selection
   if (typeof result === 'string') {
     return result;
   }
-  
+
   return null;
 }
 
@@ -222,7 +224,7 @@ export async function showOpen(options?: OpenDialogOptions): Promise<string | st
  * }
  */
 export function showSave(options?: SaveDialogOptions): Promise<string | null> {
-  return callDialogApi<string | null>("plugin_dialog_save", options || {});
+  return callDialogApi<string | null>('plugin_dialog_save', options || {});
 }
 
 /**
@@ -234,7 +236,7 @@ export function info(message: string, title?: string): Promise<void> {
   return showMessage({
     message,
     title,
-    kind: 'info'
+    kind: 'info',
   });
 }
 
@@ -247,7 +249,7 @@ export function warning(message: string, title?: string): Promise<void> {
   return showMessage({
     message,
     title,
-    kind: 'warning'
+    kind: 'warning',
   });
 }
 
@@ -260,7 +262,7 @@ export function error(message: string, title?: string): Promise<void> {
   return showMessage({
     message,
     title,
-    kind: 'error'
+    kind: 'error',
   });
 }
 
@@ -273,7 +275,7 @@ export function error(message: string, title?: string): Promise<void> {
 export function confirm(message: string, title?: string): Promise<boolean> {
   return showConfirm({
     message,
-    title
+    title,
   });
 }
 
@@ -283,12 +285,15 @@ export function confirm(message: string, title?: string): Promise<boolean> {
  * @param defaultPath - Default path (optional)
  * @returns Selected file path, or null if cancelled
  */
-export function selectFile(filters?: DialogFilter[], defaultPath?: string): Promise<string | null> {
+export function selectFile(
+  filters?: DialogFilter[],
+  defaultPath?: string,
+): Promise<string | null> {
   return showOpen({
     filters,
     defaultPath,
     multiple: false,
-    directory: false
+    directory: false,
   }) as Promise<string | null>;
 }
 
@@ -298,12 +303,15 @@ export function selectFile(filters?: DialogFilter[], defaultPath?: string): Prom
  * @param defaultPath - Default path (optional)
  * @returns Array of selected file paths, or null if cancelled
  */
-export function selectFiles(filters?: DialogFilter[], defaultPath?: string): Promise<string[] | null> {
+export function selectFiles(
+  filters?: DialogFilter[],
+  defaultPath?: string,
+): Promise<string[] | null> {
   return showOpen({
     filters,
     defaultPath,
     multiple: true,
-    directory: false
+    directory: false,
   }) as Promise<string[] | null>;
 }
 
@@ -316,7 +324,7 @@ export function selectFolder(defaultPath?: string): Promise<string | null> {
   return showOpen({
     defaultPath,
     multiple: false,
-    directory: true
+    directory: true,
   }) as Promise<string | null>;
 }
 
@@ -326,29 +334,32 @@ export function selectFolder(defaultPath?: string): Promise<string | null> {
  * @param filters - File filters (optional)
  * @returns Selected save path, or null if cancelled
  */
-export function saveFile(defaultName?: string, filters?: DialogFilter[]): Promise<string | null> {
+export function saveFile(
+  defaultName?: string,
+  filters?: DialogFilter[],
+): Promise<string | null> {
   return showSave({
     defaultPath: defaultName,
-    filters
+    filters,
   });
 }
 
 /**
  * Dialog API namespace - provides native system dialog functionality
- * 
+ *
  * Supports various types of system dialogs including message boxes, file pickers,
  * and confirmation dialogs. All dialogs are native system dialogs that respect
  * the user's operating system theme and accessibility settings.
- * 
+ *
  * **Cross-Platform Support**: All dialog functions work consistently across
  * Windows, macOS, and Linux with platform-appropriate styling.
- * 
+ *
  * **Accessibility**: Native dialogs automatically support screen readers and
  * keyboard navigation according to system accessibility settings.
- * 
+ *
  * **User Experience**: Dialogs are modal and will block plugin execution until
  * the user responds, ensuring proper user interaction flow.
- * 
+ *
  * @namespace dialog
  * @version 0.1.0
  * @since 0.1.0
@@ -356,11 +367,11 @@ export function saveFile(defaultName?: string, filters?: DialogFilter[]): Promis
  * @see {@link parseDialogError} - For dialog error handling utilities
  * @example
  * ```typescript
- * import { dialog } from 'baize-plugin-sdk';
- * 
+ * import { dialog } from 'onin-plugin-sdk';
+ *
  * // Show information message
  * await dialog.info('Operation completed successfully!');
- * 
+ *
  * // Get user confirmation
  * const confirmed = await dialog.confirm(
  *   'Are you sure you want to delete this item?'
@@ -368,7 +379,7 @@ export function saveFile(defaultName?: string, filters?: DialogFilter[]): Promis
  * if (confirmed) {
  *   // Proceed with deletion
  * }
- * 
+ *
  * // File selection
  * const filePath = await dialog.selectFile([
  *   { name: 'Text Files', extensions: ['txt', 'md'] },
@@ -377,7 +388,7 @@ export function saveFile(defaultName?: string, filters?: DialogFilter[]): Promis
  * if (filePath) {
  *   console.log('Selected file:', filePath);
  * }
- * 
+ *
  * // Save file dialog
  * const savePath = await dialog.saveFile('document.txt', [
  *   { name: 'Text Files', extensions: ['txt'] }
@@ -393,7 +404,7 @@ export const dialog = {
   showConfirm,
   showOpen,
   showSave,
-  
+
   /** Convenience methods */
   info,
   warning,
@@ -403,7 +414,7 @@ export const dialog = {
   selectFiles,
   selectFolder,
   saveFile,
-  
+
   /** Error handling tools */
   parseDialogError,
 };

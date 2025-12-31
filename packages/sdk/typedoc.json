@@ -2,7 +2,7 @@
   "$schema": "https://typedoc.org/schema.json",
   "entryPoints": ["src/index.ts"],
   "out": "docs/html",
-  "name": "Baize Plugin SDK",
+  "name": "Onin Plugin SDK",
   "readme": "README.md",
   "excludePrivate": true,
   "excludeProtected": true,

@@ -20,7 +20,10 @@ export interface StorageError extends Error {
  * @param key - Optional storage key that caused the error
  * @returns StorageError instance
  */
-export function createStorageError(message: string, key?: string): StorageError {
+export function createStorageError(
+  message: string,
+  key?: string,
+): StorageError {
   const error = new Error(message) as StorageError;
   error.name = 'StorageError';
   error.key = key;
@@ -67,11 +70,11 @@ function callStorageApi<T = any>(method: string, args?: any): Promise<T> {
  * // Store simple values
  * await storage.setItem('username', 'JohnDoe');
  * await storage.setItem('theme', 'dark');
- * 
+ *
  * // Store complex objects
  * const user = { name: 'John', level: 10, preferences: { theme: 'dark' } };
  * await storage.setItem('playerProfile', user);
- * 
+ *
  * // Handle storage errors
  * try {
  *   await storage.setItem('large-data', hugDataObject);
@@ -85,7 +88,7 @@ function callStorageApi<T = any>(method: string, args?: any): Promise<T> {
  * @group API
  */
 export function setItem(key: string, value: any): Promise<void> {
-  return callStorageApi("plugin_storage_set", { key, value });
+  return callStorageApi('plugin_storage_set', { key, value });
 }
 
 /**
@@ -102,20 +105,20 @@ export function setItem(key: string, value: any): Promise<void> {
  * if (username) {
  *   console.log(`Hello, ${username}`);
  * }
- * 
+ *
  * // Get complex objects with type safety
  * interface UserProfile {
  *   name: string;
  *   level: number;
  *   preferences?: { theme: string };
  * }
- * 
+ *
  * const profile = await storage.getItem<UserProfile>('playerProfile');
  * if (profile) {
  *   console.log(`Player: ${profile.name}, Level: ${profile.level}`);
  *   console.log(`Theme: ${profile.preferences?.theme || 'default'}`);
  * }
- * 
+ *
  * // Handle missing keys gracefully
  * const config = await storage.getItem('appConfig') || { defaultSetting: true };
  * ```
@@ -123,7 +126,7 @@ export function setItem(key: string, value: any): Promise<void> {
  * @group API
  */
 export function getItem<T = any>(key: string): Promise<T | null> {
-  return callStorageApi<T | null>("plugin_storage_get", { key });
+  return callStorageApi<T | null>('plugin_storage_get', { key });
 }
 
 /**
@@ -137,7 +140,7 @@ export function getItem<T = any>(key: string): Promise<T | null> {
  * // Remove specific items
  * await storage.removeItem('sessionToken');
  * await storage.removeItem('temporaryData');
- * 
+ *
  * // Remove with error handling
  * try {
  *   await storage.removeItem('userCache');
@@ -150,7 +153,7 @@ export function getItem<T = any>(key: string): Promise<T | null> {
  * @group API
  */
 export function removeItem(key: string): Promise<void> {
-  return callStorageApi("plugin_storage_remove", { key });
+  return callStorageApi('plugin_storage_remove', { key });
 }
 
 /**
@@ -170,7 +173,7 @@ export function removeItem(key: string): Promise<void> {
  *   await storage.clear();
  *   console.log('All plugin data has been cleared.');
  * }
- * 
+ *
  * // Clear data on logout
  * async function logout() {
  *   try {
@@ -185,7 +188,7 @@ export function removeItem(key: string): Promise<void> {
  * @group API
  */
 export function clear(): Promise<void> {
-  return callStorageApi("plugin_storage_clear");
+  return callStorageApi('plugin_storage_clear');
 }
 
 /**
@@ -198,14 +201,14 @@ export function clear(): Promise<void> {
  * // List all stored keys
  * const allKeys = await storage.keys();
  * console.log('All stored keys:', allKeys);
- * 
+ *
  * // Check if specific data exists
  * const keys = await storage.keys();
  * if (keys.includes('userPreferences')) {
  *   const prefs = await storage.getItem('userPreferences');
  *   console.log('User preferences found:', prefs);
  * }
- * 
+ *
  * // Data migration example
  * const keys = await storage.keys();
  * const oldVersionKeys = keys.filter(key => key.startsWith('v1_'));
@@ -218,7 +221,7 @@ export function clear(): Promise<void> {
  * @group API
  */
 export function keys(): Promise<string[]> {
-  return callStorageApi<string[]>("plugin_storage_keys");
+  return callStorageApi<string[]>('plugin_storage_keys');
 }
 
 /**
@@ -237,7 +240,7 @@ export function keys(): Promise<string[]> {
  *   'language': 'en',
  *   'notifications': true
  * });
- * 
+ *
  * // Save user profile in one operation
  * await storage.setItems({
  *   'user.name': 'John Doe',
@@ -250,7 +253,7 @@ export function keys(): Promise<string[]> {
  * @group API
  */
 export function setItems(items: Record<string, any>): Promise<void> {
-  return callStorageApi("plugin_storage_set_items", { items });
+  return callStorageApi('plugin_storage_set_items', { items });
 }
 
 /**
@@ -267,11 +270,11 @@ export function setItems(items: Record<string, any>): Promise<void> {
  * console.log('Theme:', settings.theme); // 'dark'
  * console.log('Font size:', settings.fontSize); // 14
  * console.log('Language:', settings.language); // 'en'
- * 
+ *
  * // Get user profile components
  * const userKeys = ['user.name', 'user.email', 'user.preferences'];
  * const userData = await storage.getItems<string | object>(userKeys);
- * 
+ *
  * // Handle missing keys gracefully
  * const requiredKeys = ['apiKey', 'endpoint', 'timeout'];
  * const config = await storage.getItems(requiredKeys);
@@ -283,13 +286,15 @@ export function setItems(items: Record<string, any>): Promise<void> {
  * @group API
  */
 export function getItems<T = any>(keys: string[]): Promise<Record<string, T>> {
-  return callStorageApi<Record<string, T>>("plugin_storage_get_items", { keys });
+  return callStorageApi<Record<string, T>>('plugin_storage_get_items', {
+    keys,
+  });
 }
 
 /**
  * Gets all key-value pairs from the plugin's persistent storage.
  * Returns the complete JSON storage object for the current plugin.
- * 
+ *
  * @returns Promise that resolves to an object containing all stored key-value pairs
  * @throws {PluginError} With code `STORAGE_UNAVAILABLE` when storage is not accessible
  * @throws {PluginError} With code `PERMISSION_DENIED` when storage permission is denied
@@ -298,7 +303,7 @@ export function getItems<T = any>(keys: string[]): Promise<Record<string, T>> {
  * // Get all stored data
  * const allData = await storage.getAll();
  * console.log('All plugin data:', allData);
- * 
+ *
  * // Check if data exists before processing
  * const data = await storage.getAll();
  * if (Object.keys(data).length > 0) {
@@ -307,7 +312,7 @@ export function getItems<T = any>(keys: string[]): Promise<Record<string, T>> {
  * } else {
  *   console.log('No data stored yet');
  * }
- * 
+ *
  * // Backup all data
  * const backup = await storage.getAll();
  * await fs.writeFile('backup.json', JSON.stringify(backup, null, 2));
@@ -316,13 +321,13 @@ export function getItems<T = any>(keys: string[]): Promise<Record<string, T>> {
  * @group API
  */
 export function getAll(): Promise<Record<string, any>> {
-  return callStorageApi<Record<string, any>>("plugin_storage_get_all");
+  return callStorageApi<Record<string, any>>('plugin_storage_get_all');
 }
 
 /**
  * Replaces all storage data with the provided object.
  * This operation clears existing data and sets new data in a single atomic operation.
- * 
+ *
  * @param data - An object containing all key-value pairs to store
  * @returns Promise that resolves when the operation is complete
  * @throws {PluginError} With code `STORAGE_QUOTA_EXCEEDED` when storage limit is reached
@@ -340,11 +345,11 @@ export function getAll(): Promise<Record<string, any>> {
  *     preferences: { notifications: true }
  *   }
  * });
- * 
+ *
  * // Restore from backup
  * const backupData = JSON.parse(await fs.readFile('backup.json'));
  * await storage.setAll(backupData);
- * 
+ *
  * // Migration from old data format
  * const oldData = await storage.getAll();
  * const newData = {
@@ -361,25 +366,25 @@ export function getAll(): Promise<Record<string, any>> {
  * @group API
  */
 export function setAll(data: Record<string, any>): Promise<void> {
-  return callStorageApi("plugin_storage_set_all", { data });
+  return callStorageApi('plugin_storage_set_all', { data });
 }
 
 /**
  * Storage API namespace - provides persistent key-value storage for plugins
- * 
+ *
  * Each plugin has its own isolated storage space that persists across application restarts.
  * All data is automatically serialized to JSON format. The storage system supports both
  * individual key operations and batch operations for better performance.
- * 
+ *
  * **Storage Isolation**: Each plugin can only access its own storage data, ensuring
  * data privacy and security between different plugins.
- * 
+ *
  * **Data Persistence**: All stored data persists across application restarts and updates,
  * but may be cleared when the plugin is uninstalled.
- * 
+ *
  * **Storage Limits**: Storage space is limited to prevent abuse. Monitor storage usage
  * and handle quota exceeded errors gracefully.
- * 
+ *
  * @namespace storage
  * @version 0.1.0
  * @since 0.1.0
@@ -388,37 +393,37 @@ export function setAll(data: Record<string, any>): Promise<void> {
  * @see {@link isStorageError} - For checking storage error types
  * @example
  * ```typescript
- * import { storage } from 'baize-plugin-sdk';
- * 
+ * import { storage } from 'onin-plugin-sdk';
+ *
  * // Basic usage
  * await storage.setItem('username', 'john');
  * const username = await storage.getItem('username');
- * 
+ *
  * // Type-safe complex data
  * interface UserSettings {
  *   theme: 'light' | 'dark';
  *   fontSize: number;
  *   notifications: boolean;
  * }
- * 
+ *
  * const settings: UserSettings = {
  *   theme: 'dark',
  *   fontSize: 14,
  *   notifications: true
  * };
- * 
+ *
  * await storage.setItem('settings', settings);
  * const savedSettings = await storage.getItem<UserSettings>('settings');
- * 
+ *
  * // Batch operations for better performance
  * await storage.setItems({
  *   'config.apiKey': 'abc123',
  *   'config.endpoint': 'https://api.example.com',
  *   'config.timeout': 5000
  * });
- * 
+ *
  * const config = await storage.getItems(['config.apiKey', 'config.endpoint']);
- * 
+ *
  * // Full storage operations
  * const allData = await storage.getAll();
  * await storage.setAll({ version: '2.0', ...newData });
@@ -433,5 +438,5 @@ export const storage = {
   setItems,
   getItems,
   getAll,
-  setAll
+  setAll,
 };

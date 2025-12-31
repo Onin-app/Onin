@@ -1,6 +1,6 @@
-# Baize Monorepo
+# Onin Monorepo
 
-Baize 插件化桌面应用 - Tauri + SvelteKit
+Onin 插件化桌面应用 - Tauri + SvelteKit
 
 ## 快速开始
 
@@ -27,7 +27,7 @@ pnpm test:sdk         # 测试 SDK
 packages/
 ├── app/              # 主应用 (Tauri + SvelteKit)
 │   └── docs/         # 主应用设计文档
-├── sdk/              # 插件 SDK (发布为 baize-sdk)
+├── sdk/              # 插件 SDK (发布为 onin-sdk)
 │   ├── docs/         # SDK 设计文档
 │   └── examples/     # SDK 使用示例
 └── demo/             # SDK 测试项目
@@ -67,12 +67,14 @@ pnpm install
 ## 文档
 
 ### 主应用
+
 - [API 文档](packages/app/docs/API.md)
 - [插件系统](packages/app/docs/PLUGIN_COMMAND_USAGE.md)
 - [窗口管理](packages/app/docs/WINDOW_LIFECYCLE_FINAL.md)
 - [更多...](packages/app/docs/)
 
 ### SDK
+
 - [SDK README](packages/sdk/README.md)
 - [API 设计](packages/sdk/docs/)
 - [使用示例](packages/sdk/examples/)

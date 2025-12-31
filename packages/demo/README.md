@@ -1,6 +1,6 @@
-# Baize SDK Demo
+# Onin SDK Demo
 
-这是一个用于测试 Baize SDK 的演示项目。
+这是一个用于测试 Onin SDK 的演示项目。
 
 ## 功能
 
@@ -28,4 +28,4 @@ pnpm dev
 
 ## 注意事项
 
-此项目需要在 Baize 主应用的插件环境中运行才能正常工作。
+此项目需要在 Onin 主应用的插件环境中运行才能正常工作。

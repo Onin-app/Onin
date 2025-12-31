@@ -13,6 +13,6 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "baize-plugin-sdk": "^0.0.1"
+    "onin-plugin-sdk": "^0.0.1"
   }
 }

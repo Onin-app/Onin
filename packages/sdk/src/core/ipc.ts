@@ -1,5 +1,9 @@
 import { getEnvironment, RuntimeEnvironment } from './environment';
-import { type EventName, type EventCallback, type UnlistenFn } from '@tauri-apps/api/event';
+import {
+  type EventName,
+  type EventCallback,
+  type UnlistenFn,
+} from '@tauri-apps/api/event';
 
 /** --- invoke --- */
 
@@ -51,11 +55,11 @@ async function loadInvoke() {
 
 /**
  * Cross-environment invoke function for calling Tauri commands
- * 
+ *
  * Provides a unified interface for invoking Tauri commands that works seamlessly
  * in both webview and headless environments. Automatically handles environment
  * detection and uses the appropriate underlying implementation.
- * 
+ *
  * @typeParam T - The expected return type
  * @param method - The method name to invoke
  * @param arg - Arguments to pass to the method
@@ -65,10 +69,10 @@ async function loadInvoke() {
  * ```typescript
  * // Simple method call
  * const result = await invoke('get_app_version');
- * 
+ *
  * // Method call with arguments
  * const response = await invoke<UserData>('get_user_data', { userId: 123 });
- * 
+ *
  * // Error handling
  * try {
  *   const data = await invoke('risky_operation', { param: 'value' });
@@ -88,11 +92,12 @@ export async function invoke<T>(method: string, arg: any): Promise<T> {
   return fn(method, arg);
 }
 
-
 /** --- listen --- */
 
 /** Cache for the imported listen function */
-let listenFn: ((event: EventName, handler: EventCallback<any>) => Promise<UnlistenFn>) | null = null;
+let listenFn:
+  | ((event: EventName, handler: EventCallback<any>) => Promise<UnlistenFn>)
+  | null = null;
 
 /**
  * Asynchronously loads and caches the listen function
@@ -111,15 +116,20 @@ async function loadListen() {
     listenFn = listen;
   } else if (environment === RuntimeEnvironment.Headless) {
     // Headless environment simulates "listening" to specific events by mounting global variables
-    listenFn = (event: EventName, handler: EventCallback<any>): Promise<UnlistenFn> => {
+    listenFn = (
+      event: EventName,
+      handler: EventCallback<any>,
+    ): Promise<UnlistenFn> => {
       if (event === 'plugin_command_execute') {
         // This is special handling logic for registerCommandHandler
-        (globalThis as any).__BAIZE_COMMAND_HANDLER__ = handler;
+        (globalThis as any).__ONIN_COMMAND_HANDLER__ = handler;
         // Headless mode has no concept of unlisten, return an empty function
         return Promise.resolve(() => {});
       }
-      
-      console.warn(`Event listening for '${event.toString()}' is not supported in headless mode.`);
+
+      console.warn(
+        `Event listening for '${event.toString()}' is not supported in headless mode.`,
+      );
       return Promise.resolve(() => {}); // Return an empty unlisten function
     };
   } else {
@@ -130,12 +140,12 @@ async function loadListen() {
 
 /**
  * Cross-environment event listener for Tauri events
- * 
+ *
  * Provides a unified interface for listening to Tauri events that works in both
  * webview and headless environments. In webview mode, it uses the standard Tauri
  * event system. In headless mode, it provides limited event support for specific
  * plugin-related events.
- * 
+ *
  * @typeParam T - The event payload type
  * @param event - The event name to listen for
  * @param handler - The event handler function
@@ -147,20 +157,23 @@ async function loadListen() {
  * const unlisten = await listen<string>('my-event', (event) => {
  *   console.log('Received event:', event.payload);
  * });
- * 
+ *
  * // Listen for plugin command execution (special case)
  * await listen('plugin_command_execute', async (event) => {
  *   const { command, args } = event.payload;
  *   console.log(`Executing command: ${command}`, args);
  * });
- * 
+ *
  * // Clean up listener when done
  * unlisten();
  * ```
  * @since 0.1.0
  * @group Core
  */
-export async function listen<T>(event: EventName, handler: EventCallback<T>): Promise<UnlistenFn> {
+export async function listen<T>(
+  event: EventName,
+  handler: EventCallback<T>,
+): Promise<UnlistenFn> {
   const fn = await loadListen();
   if (!fn) {
     throw new Error('Listen function not loaded');

@@ -1,8 +1,8 @@
 {
-  "name": "baize-monorepo",
+  "name": "onin-monorepo",
   "version": "0.1.0",
   "private": true,
-  "description": "Baize monorepo - App, SDK and Demo",
+  "description": "Onin monorepo - App, SDK and Demo",
   "type": "module",
   "scripts": {
     "dev": "pnpm --filter app tauri:dev",

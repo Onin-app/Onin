@@ -41,16 +41,16 @@ export function _resetRegistrationState() {
  * @throws {Error} When handler registration fails or when called multiple times
  * @example
  * ```typescript
- * import { command } from 'baize-plugin-sdk';
+ * import { command } from 'onin-plugin-sdk';
  *
  * // Define command handler with routing
  * async function commandHandler(command: string, args: any) {
  *   console.log(`Received command: ${command}`, args);
- *   
+ *
  *   switch (command) {
  *     case 'greet':
  *       return `Hello, ${args.name || 'World'}!`;
- *     
+ *
  *     case 'calculate':
  *       const { operation, a, b } = args;
  *       switch (operation) {
@@ -58,12 +58,12 @@ export function _resetRegistrationState() {
  *         case 'multiply': return a * b;
  *         default: throw new Error(`Unknown operation: ${operation}`);
  *       }
- *     
+ *
  *     case 'async-task':
  *       // Simulate async work
  *       await new Promise(resolve => setTimeout(resolve, 1000));
  *       return { status: 'completed', data: args.input };
- *     
+ *
  *     default:
  *       throw new Error(`Unknown command: ${command}`);
  *   }
@@ -76,9 +76,13 @@ export function _resetRegistrationState() {
  * @since 0.1.0
  * @group API
  */
-export async function registerCommandHandler(handler: CommandHandler): Promise<void> {
+export async function registerCommandHandler(
+  handler: CommandHandler,
+): Promise<void> {
   if (isHandlerRegistered) {
-    console.warn("CommandHandler has already been registered. Ignoring subsequent calls.");
+    console.warn(
+      'CommandHandler has already been registered. Ignoring subsequent calls.',
+    );
     return;
   }
 
@@ -94,25 +98,29 @@ export async function registerCommandHandler(handler: CommandHandler): Promise<v
         try {
           const result = await handler(command, args);
           try {
-            await invoke("plugin_command_result", { requestId, success: true, result });
+            await invoke('plugin_command_result', {
+              requestId,
+              success: true,
+              result,
+            });
           } catch (invokeError) {
-            console.error("Failed to send command result:", invokeError);
+            console.error('Failed to send command result:', invokeError);
           }
         } catch (error) {
           try {
-            await invoke("plugin_command_result", {
+            await invoke('plugin_command_result', {
               requestId,
               success: false,
               error: error instanceof Error ? error.message : String(error),
             });
           } catch (invokeError) {
-            console.error("Failed to send command error:", invokeError);
+            console.error('Failed to send command error:', invokeError);
           }
         }
       };
-      return listen("plugin_command_execute", eventCallback);
+      return listen('plugin_command_execute', eventCallback);
     },
-    headless: () => listen("plugin_command_execute", handler as any),
+    headless: () => listen('plugin_command_execute', handler as any),
   });
 
   isHandlerRegistered = true;
@@ -128,28 +136,28 @@ export const register = registerCommandHandler;
 
 /**
  * Command API namespace - provides command handling functionality for plugins
- * 
+ *
  * Allows plugins to register handlers for commands sent from the main application
  * or other plugins. Commands provide a way for external code to invoke plugin
  * functionality with arguments and receive results.
- * 
+ *
  * **Single Handler**: Each plugin can only register one command handler. The handler
  * should implement internal routing to handle different command types.
- * 
+ *
  * **Async Support**: Command handlers can be synchronous or asynchronous. Results
  * are automatically serialized and sent back to the caller.
- * 
+ *
  * **Error Handling**: Errors thrown by command handlers are automatically caught
  * and sent back to the caller as error responses.
- * 
+ *
  * @namespace command
  * @version 0.1.0
  * @since 0.1.0
  * @group API
  * @example
  * ```typescript
- * import { command } from 'baize-plugin-sdk';
- * 
+ * import { command } from 'onin-plugin-sdk';
+ *
  * // Simple command handler
  * await command.register(async (cmd, args) => {
  *   if (cmd === 'ping') {
@@ -160,14 +168,14 @@ export const register = registerCommandHandler;
  *   }
  *   throw new Error(`Unknown command: ${cmd}`);
  * });
- * 
+ *
  * // Complex command handler with validation
  * await command.register(async (cmd, args) => {
  *   // Input validation
  *   if (!cmd || typeof cmd !== 'string') {
  *     throw new Error('Invalid command format');
  *   }
- *   
+ *
  *   // Command routing
  *   switch (cmd) {
  *     case 'user.create':
@@ -175,10 +183,10 @@ export const register = registerCommandHandler;
  *         throw new Error('Missing required fields: name, email');
  *       }
  *       return await createUser(args.name, args.email);
- *     
+ *
  *     case 'user.list':
  *       return await listUsers(args.limit || 10);
- *     
+ *
  *     default:
  *       throw new Error(`Command not supported: ${cmd}`);
  *   }

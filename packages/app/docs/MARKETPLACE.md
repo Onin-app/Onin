@@ -1,4 +1,4 @@
-# Baize 插件市场
+# Onin 插件市场
 
 > 插件市场完整指南：架构设计 + 开发者提交指南
 
@@ -15,7 +15,7 @@
 ### 整体流程
 
 ```
-开发者提交 PR → GitHub Registry → Webhook → 后端 API → Baize 应用
+开发者提交 PR → GitHub Registry → Webhook → 后端 API → Onin 应用
 ```
 
 ### manifest.json 格式
@@ -39,9 +39,11 @@
 ### 后端 API
 
 已实现接口：
+
 - `GET /api/v1/plugins` - 插件列表（支持搜索、分类、分页）
 
 返回格式：
+
 ```json
 {
   "data": [...],
@@ -67,7 +69,7 @@
 ### 2. 提交到 marketplace
 
 ```bash
-# Fork baize-launcher/marketplace 仓库
+# Fork onin-launcher/marketplace 仓库
 git clone https://github.com/YOUR_USERNAME/marketplace.git
 cd marketplace
 
@@ -96,25 +98,30 @@ git push origin main
 ### ✅ 已完成
 
 **前端**:
+
 - 插件市场 UI（列表、搜索、筛选）
 - API 客户端（已适配后端格式）
 
 **后端**:
+
 - 插件列表 API
 - 搜索和分类筛选
 
 ### 🚧 待实现
 
 **前端**:
+
 - 插件详情页
 - 下载安装功能
 
 **后端**:
+
 - 插件详情 API
 - GitHub Webhook 自动同步
 - 下载统计
 
 **GitHub Registry**:
+
 - 创建 marketplace 仓库
 - 配置 GitHub Actions 验证
 - 配置 Webhook
@@ -124,26 +131,30 @@ git push origin main
 ## 快速测试
 
 1. 启动后端（已完成）
+
    ```bash
    # 后端运行在 http://localhost:3001
    ```
 
 2. 配置前端
+
    ```bash
    # .env
    VITE_MARKETPLACE_API_URL=http://localhost:3001
    ```
 
 3. 启动前端
+
    ```bash
    npm run dev
    ```
 
 4. 查看效果
-   - 打开 Baize → 插件管理 → 插件市场
+   - 打开 Onin → 插件管理 → 插件市场
 
 ---
 
 **相关文档**:
+
 - 后端 API 文档: `BACKEND_API_MVP.md`
 - 后端接口文档: `API.md`

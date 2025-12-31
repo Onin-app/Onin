@@ -2,7 +2,7 @@
   "name": "demo",
   "version": "0.1.0",
   "private": true,
-  "description": "Baize SDK demo and testing project",
+  "description": "Onin SDK demo and testing project",
   "type": "module",
   "scripts": {
     "dev": "vite",

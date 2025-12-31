@@ -6,7 +6,14 @@ import { parseHttpError } from '../utils/error-parser';
 /**
  * HTTP method types
  */
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS';
+export type HttpMethod =
+  | 'GET'
+  | 'POST'
+  | 'PUT'
+  | 'DELETE'
+  | 'PATCH'
+  | 'HEAD'
+  | 'OPTIONS';
 
 /**
  * Response type options
@@ -100,12 +107,17 @@ export interface Response<T = any> {
  * @since 0.1.0
  * @group API
  */
-export async function request<T = any>(options: RequestOptions): Promise<Response<T>> {
+export async function request<T = any>(
+  options: RequestOptions,
+): Promise<Response<T>> {
   try {
     const response = await invoke<Response<T>>('plugin_request', options);
 
     // Handle ArrayBuffer response type
-    if (options.responseType === 'arraybuffer' && typeof response.body === 'string') {
+    if (
+      options.responseType === 'arraybuffer' &&
+      typeof response.body === 'string'
+    ) {
       const binaryString = atob(response.body);
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {
@@ -121,7 +133,7 @@ export async function request<T = any>(options: RequestOptions): Promise<Respons
       throw createError.http.httpError(response.status, response.statusText, {
         url: options.url,
         method: options.method || 'GET',
-        response: response
+        response: response,
       });
     }
   } catch (error: any) {
@@ -134,7 +146,7 @@ export async function request<T = any>(options: RequestOptions): Promise<Respons
     throw parseHttpError(error, {
       url: options.url,
       method: options.method || 'GET',
-      options
+      options,
     });
   }
 }
@@ -150,7 +162,10 @@ export async function request<T = any>(options: RequestOptions): Promise<Respons
  * @since 0.1.0
  * @group API
  */
-export async function get<T>(url: string, options?: Omit<RequestOptions, 'url' | 'method'>): Promise<Response<T>> {
+export async function get<T>(
+  url: string,
+  options?: Omit<RequestOptions, 'url' | 'method'>,
+): Promise<Response<T>> {
   return request<T>({ ...options, url, method: 'GET' });
 }
 
@@ -166,7 +181,11 @@ export async function get<T>(url: string, options?: Omit<RequestOptions, 'url' |
  * @since 0.1.0
  * @group API
  */
-export async function post<T>(url: string, body?: any, options?: Omit<RequestOptions, 'url' | 'method' | 'body'>): Promise<Response<T>> {
+export async function post<T>(
+  url: string,
+  body?: any,
+  options?: Omit<RequestOptions, 'url' | 'method' | 'body'>,
+): Promise<Response<T>> {
   return request<T>({ ...options, url, method: 'POST', body });
 }
 
@@ -182,7 +201,11 @@ export async function post<T>(url: string, body?: any, options?: Omit<RequestOpt
  * @since 0.1.0
  * @group API
  */
-export async function put<T>(url: string, body?: any, options?: Omit<RequestOptions, 'url' | 'method' | 'body'>): Promise<Response<T>> {
+export async function put<T>(
+  url: string,
+  body?: any,
+  options?: Omit<RequestOptions, 'url' | 'method' | 'body'>,
+): Promise<Response<T>> {
   return request<T>({ ...options, url, method: 'PUT', body });
 }
 
@@ -198,7 +221,11 @@ export async function put<T>(url: string, body?: any, options?: Omit<RequestOpti
  * @since 0.1.0
  * @group API
  */
-export async function patch<T>(url: string, body?: any, options?: Omit<RequestOptions, 'url' | 'method' | 'body'>): Promise<Response<T>> {
+export async function patch<T>(
+  url: string,
+  body?: any,
+  options?: Omit<RequestOptions, 'url' | 'method' | 'body'>,
+): Promise<Response<T>> {
   return request<T>({ ...options, url, method: 'PATCH', body });
 }
 
@@ -213,17 +240,20 @@ export async function patch<T>(url: string, body?: any, options?: Omit<RequestOp
  * @since 0.1.0
  * @group API
  */
-export async function del<T>(url: string, options?: Omit<RequestOptions, 'url' | 'method'>): Promise<Response<T>> {
+export async function del<T>(
+  url: string,
+  options?: Omit<RequestOptions, 'url' | 'method'>,
+): Promise<Response<T>> {
   return request<T>({ ...options, url, method: 'DELETE' });
 }
 
 /**
  * HTTP API namespace - provides functions for making HTTP requests
- * 
+ *
  * Supports all standard HTTP methods (GET, POST, PUT, PATCH, DELETE) with comprehensive
  * error handling and response type management. All requests return structured Response objects
  * and throw detailed PluginError instances on failure.
- * 
+ *
  * @namespace http
  * @version 0.1.0
  * @since 0.1.0
@@ -232,12 +262,12 @@ export async function del<T>(url: string, options?: Omit<RequestOptions, 'url' |
  * @see {@link createError.http} - For HTTP error creation functions
  * @example
  * ```typescript
- * import { http } from 'baize-plugin-sdk';
+ * import { http } from 'onin-plugin-sdk';
  *
  * // Simple GET request
  * const { body } = await http.get('https://api.example.com/posts/1');
  * console.log(body.title);
- * 
+ *
  * // POST with error handling
  * try {
  *   const response = await http.post('https://api.example.com/users', {

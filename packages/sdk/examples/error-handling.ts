@@ -43,10 +43,12 @@ async function exampleConvenientChecking() {
       // 检查是否为特定错误
       if (errorUtils.isErrorCode(error, errorCode.common.PERMISSION_DENIED)) {
         console.error('权限被拒绝');
-      } else if (errorUtils.isOneOfErrorCodes(error, [
-        errorCode.http.TIMEOUT, 
-        errorCode.http.NETWORK_ERROR
-      ])) {
+      } else if (
+        errorUtils.isOneOfErrorCodes(error, [
+          errorCode.http.TIMEOUT,
+          errorCode.http.NETWORK_ERROR,
+        ])
+      ) {
         console.error('网络相关错误');
       } else {
         console.error('其他错误:', error.message);
@@ -71,7 +73,7 @@ async function exampleOldErrorHandling() {
       console.error('HTTP 错误');
     } else if (isNetworkError(error)) {
       console.error('网络错误');
-    } else if (isBaizeRequestError(error)) {
+    } else if (isOninRequestError(error)) {
       console.error('请求错误');
     } else {
       console.error('未知错误');

@@ -113,7 +113,7 @@ jobs:
         with:
           projectPath: packages/app
           tagName: ${{ needs.release.outputs.tag }}
-          releaseName: 'Baize v${{ needs.release.outputs.version }}'
+          releaseName: 'Onin v${{ needs.release.outputs.version }}'
           releaseBody: 'See the assets to download and install this version.'
           releaseDraft: false
           prerelease: false

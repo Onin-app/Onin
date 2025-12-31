@@ -2,7 +2,7 @@
   "name": "app",
   "version": "0.1.0",
   "private": true,
-  "description": "Baize main application",
+  "description": "Onin main application",
   "type": "module",
   "scripts": {
     "dev": "vite dev",

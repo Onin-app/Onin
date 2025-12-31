@@ -753,7 +753,7 @@ async fn op_invoke(
 
 // 定义扩展
 deno_core::extension!(
-    baize_plugin_api,
+    onin_plugin_api,
     ops = [op_invoke, op_console_log],
     options = {
         app_handle: AppHandle,
@@ -773,7 +773,7 @@ pub fn create_runtime_with_plugin_id(
     app_handle: &AppHandle,
     plugin_id: &str,
 ) -> Result<JsRuntime, String> {
-    let ext = baize_plugin_api::init(app_handle.clone(), plugin_id.to_string());
+    let ext = onin_plugin_api::init(app_handle.clone(), plugin_id.to_string());
 
     let mut runtime = JsRuntime::new(RuntimeOptions {
         extensions: vec![ext],
@@ -979,8 +979,8 @@ impl PluginRuntimeManager {
             r#"
             (async () => {{
                 try {{
-                    if (typeof globalThis.__BAIZE_COMMAND_HANDLER__ === 'function') {{
-                        const result = await globalThis.__BAIZE_COMMAND_HANDLER__('{}', {});
+                    if (typeof globalThis.__ONIN_COMMAND_HANDLER__ === 'function') {{
+                        const result = await globalThis.__ONIN_COMMAND_HANDLER__('{}', {});
                         console.log('Command execution result:', JSON.stringify(result));
                         return result;
                     }} else {{
