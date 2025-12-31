@@ -23,8 +23,10 @@
     field.type === "select" && "multiple" in field && field.multiple === true,
   );
 
-  // 生成唯一的 ID
-  const fieldId = `setting-${field.key}-${Math.random().toString(36).substring(2, 9)}`;
+  // 生成唯一的 ID（使用 $derived 使其响应式）
+  const fieldId = $derived(
+    `setting-${field.key}-${Math.random().toString(36).substring(2, 9)}`,
+  );
 
   // 密码显示/隐藏状态
   let showPassword = $state(false);

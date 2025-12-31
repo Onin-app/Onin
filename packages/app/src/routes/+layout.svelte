@@ -59,15 +59,19 @@
 
     // The returned cleanup function will only run if the entire layout is destroyed.
     return () => {
-      listenersPromise.then(({ unlisten, unlistenVisibility, unlistenCommand }) => {
-        unlisten();
-        unlistenVisibility();
-        unlistenCommand();
-      });
+      listenersPromise.then(
+        ({ unlisten, unlistenVisibility, unlistenCommand }) => {
+          unlisten();
+          unlistenVisibility();
+          unlistenCommand();
+        },
+      );
     };
   });
+
+  let { children } = $props();
 </script>
 
-<slot />
+{@render children()}
 
 <Toaster richColors position="top-center" />

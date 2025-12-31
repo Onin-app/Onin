@@ -100,11 +100,17 @@
     })),
   );
 
-  let activeCategory = $state(commandCategories[0] || null);
-  $effect(() => {
-    if (!activeCategory && commandCategories.length > 0) {
-      activeCategory = commandCategories[0];
+  let selectedCategoryId = $state<string | null>(null);
+
+  // 使用 derived 来自动从 selectedCategoryId 获取完整的 category 对象
+  let activeCategory = $derived.by(() => {
+    if (selectedCategoryId) {
+      return (
+        commandCategories.find((cat) => cat.id === selectedCategoryId) || null
+      );
     }
+    // 如果没有选中的，默认返回第一个
+    return commandCategories[0] || null;
   });
 
   // 过滤出插件启动指令（打开插件本身）和插件功能指令
@@ -113,14 +119,18 @@
       if (cmd.source !== activeCategory?.id) return false;
       // 如果是插件分类，只显示插件启动指令（不显示功能指令）
       if (activeCategory?.id === "Plugin") {
-        return cmd.name.startsWith("plugin_") && !cmd.name.includes("plugin_cmd_");
+        return (
+          cmd.name.startsWith("plugin_") && !cmd.name.includes("plugin_cmd_")
+        );
       }
       return true;
     }),
   );
 
   // Type guard for PluginCommand action
-  function isPluginCommandAction(action: any): action is { PluginCommand: { plugin_id: string; command_code: string } } {
+  function isPluginCommandAction(
+    action: any,
+  ): action is { PluginCommand: { plugin_id: string; command_code: string } } {
     return action && typeof action === "object" && "PluginCommand" in action;
   }
 
@@ -132,7 +142,12 @@
   let pluginIdToNameMap = $derived.by(() => {
     const map = new Map<string, string>();
     commands
-      .filter((cmd) => cmd.source === "Plugin" && cmd.name.startsWith("plugin_") && !cmd.name.startsWith("plugin_cmd_"))
+      .filter(
+        (cmd) =>
+          cmd.source === "Plugin" &&
+          cmd.name.startsWith("plugin_") &&
+          !cmd.name.startsWith("plugin_cmd_"),
+      )
       .forEach((cmd) => {
         if (isPluginAction(cmd.action)) {
           map.set(cmd.action.Plugin, cmd.title);
@@ -143,32 +158,38 @@
 
   // 获取所有插件的名称列表（用于左侧菜单）
   let pluginNames = $derived(
-    Array.from(new Set(
-      commands
-        .filter((cmd) => cmd.source === "Plugin" && cmd.name.startsWith("plugin_cmd_"))
-        .map((cmd) => {
-          if (isPluginCommandAction(cmd.action)) {
-            const pluginId = cmd.action.PluginCommand.plugin_id;
-            return pluginIdToNameMap.get(pluginId) || pluginId;
-          }
-          return null;
-        })
-        .filter((name): name is string => name !== null)
-    ))
+    Array.from(
+      new Set(
+        commands
+          .filter(
+            (cmd) =>
+              cmd.source === "Plugin" && cmd.name.startsWith("plugin_cmd_"),
+          )
+          .map((cmd) => {
+            if (isPluginCommandAction(cmd.action)) {
+              const pluginId = cmd.action.PluginCommand.plugin_id;
+              return pluginIdToNameMap.get(pluginId) || pluginId;
+            }
+            return null;
+          })
+          .filter((name): name is string => name !== null),
+      ),
+    ),
   );
 
   // 获取选中插件的功能指令
   let selectedPluginCommands = $derived(
     selectedPlugin
       ? commands.filter((cmd) => {
-          if (cmd.source !== "Plugin" || !cmd.name.startsWith("plugin_cmd_")) return false;
+          if (cmd.source !== "Plugin" || !cmd.name.startsWith("plugin_cmd_"))
+            return false;
           if (isPluginCommandAction(cmd.action)) {
             const pluginId = cmd.action.PluginCommand.plugin_id;
             return pluginIdToNameMap.get(pluginId) === selectedPlugin;
           }
           return false;
         })
-      : []
+      : [],
   );
 </script>
 
@@ -185,7 +206,7 @@
           <Button.Root
             class="h-full w-full cursor-pointer px-2 py-1 text-left"
             onclick={() => {
-              activeCategory = category;
+              selectedCategoryId = category.id;
               selectedPlugin = null; // 清除插件选择
             }}
           >
@@ -206,7 +227,7 @@
             class="h-full w-full cursor-pointer px-2 py-1 text-left"
             onclick={() => {
               selectedPlugin = pluginName;
-              activeCategory = null; // 清除内置指令选择
+              selectedCategoryId = null; // 清除内置指令选择
             }}
           >
             {pluginName}
@@ -281,7 +302,10 @@
                             <Button.Root
                               class="w-full"
                               onclick={() => {
-                                toggleKeywordDisabled(command.name, keyword.name);
+                                toggleKeywordDisabled(
+                                  command.name,
+                                  keyword.name,
+                                );
                               }}
                             >
                               {keyword.disabled ? "启用指令" : "禁用指令"}
@@ -362,7 +386,10 @@
                             <Button.Root
                               class="w-full"
                               onclick={() => {
-                                toggleKeywordDisabled(command.name, keyword.name);
+                                toggleKeywordDisabled(
+                                  command.name,
+                                  keyword.name,
+                                );
                               }}
                             >
                               {keyword.disabled ? "启用指令" : "禁用指令"}

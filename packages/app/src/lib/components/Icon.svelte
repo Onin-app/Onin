@@ -8,7 +8,7 @@
 
   const { icon, size, class: cls, style }: IconProps = $props();
 
-  const currentSize = typeof size === "number" ? `${size}px` : size;
+  const currentSize = $derived(typeof size === "number" ? `${size}px` : size);
 </script>
 
 <svg

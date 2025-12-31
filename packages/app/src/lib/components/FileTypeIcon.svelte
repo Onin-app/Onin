@@ -13,51 +13,60 @@
     return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : "";
   };
 
-  const ext = getExtension(fileName);
-
-  // 判断文件类型
-  const isFolder = !ext || fileName.endsWith("/"); // 文件夹通常没有扩展名或以/结尾
-  const isImage = fileType.startsWith("image/");
-  const isVideo = fileType.startsWith("video/");
-  const isAudio = fileType.startsWith("audio/");
-  const isPdf = fileType === "application/pdf" || ext === "pdf";
-  const isWord = fileType.includes("word") || ["doc", "docx"].includes(ext);
-  const isExcel = fileType.includes("excel") || ["xls", "xlsx"].includes(ext);
-  const isPowerPoint =
-    fileType.includes("presentation") || ["ppt", "pptx"].includes(ext);
-  const isZip =
+  // 使用 $derived 使变量响应式，正确追踪 props 变化
+  const ext = $derived(getExtension(fileName));
+  const isFolder = $derived(!ext || fileName.endsWith("/")); // 文件夹通常没有扩展名或以/结尾
+  const isImage = $derived(fileType.startsWith("image/"));
+  const isVideo = $derived(fileType.startsWith("video/"));
+  const isAudio = $derived(fileType.startsWith("audio/"));
+  const isPdf = $derived(fileType === "application/pdf" || ext === "pdf");
+  const isWord = $derived(
+    fileType.includes("word") || ["doc", "docx"].includes(ext),
+  );
+  const isExcel = $derived(
+    fileType.includes("excel") || ["xls", "xlsx"].includes(ext),
+  );
+  const isPowerPoint = $derived(
+    fileType.includes("presentation") || ["ppt", "pptx"].includes(ext),
+  );
+  const isZip = $derived(
     fileType.includes("zip") ||
-    fileType.includes("rar") ||
-    ["zip", "rar", "7z", "tar", "gz", "bz2", "xz"].includes(ext);
-  const isCode = [
-    "js",
-    "ts",
-    "jsx",
-    "tsx",
-    "py",
-    "java",
-    "cpp",
-    "c",
-    "h",
-    "css",
-    "html",
-    "json",
-    "xml",
-    "rs",
-    "go",
-    "php",
-    "rb",
-    "swift",
-    "kt",
-    "dart",
-    "vue",
-    "svelte",
-  ].includes(ext);
-  const isExecutable = ["exe", "app", "dmg", "msi", "apk", "deb", "rpm"].includes(ext);
-  const isFont = ["ttf", "otf", "woff", "woff2", "eot"].includes(ext);
-  const isMarkdown = ["md", "markdown"].includes(ext);
-  const isSvg = ext === "svg";
-  const isText = fileType.startsWith("text/") || ext === "txt";
+      fileType.includes("rar") ||
+      ["zip", "rar", "7z", "tar", "gz", "bz2", "xz"].includes(ext),
+  );
+  const isCode = $derived(
+    [
+      "js",
+      "ts",
+      "jsx",
+      "tsx",
+      "py",
+      "java",
+      "cpp",
+      "c",
+      "h",
+      "css",
+      "html",
+      "json",
+      "xml",
+      "rs",
+      "go",
+      "php",
+      "rb",
+      "swift",
+      "kt",
+      "dart",
+      "vue",
+      "svelte",
+    ].includes(ext),
+  );
+  const isExecutable = $derived(
+    ["exe", "app", "dmg", "msi", "apk", "deb", "rpm"].includes(ext),
+  );
+  const isFont = $derived(["ttf", "otf", "woff", "woff2", "eot"].includes(ext));
+  const isMarkdown = $derived(["md", "markdown"].includes(ext));
+  const isSvg = $derived(ext === "svg");
+  const isText = $derived(fileType.startsWith("text/") || ext === "txt");
 </script>
 
 {#if isFolder}
@@ -83,20 +92,9 @@
     xmlns="http://www.w3.org/2000/svg"
   >
     <rect x="3" y="3" width="18" height="18" rx="2" fill="#7C3AED" />
-    <path
-      d="M8 8H16V10H8V8Z"
-      fill="white"
-    />
-    <path
-      d="M8 11H16V13H8V11Z"
-      fill="white"
-      opacity="0.7"
-    />
-    <path
-      d="M8 14H13V16H8V14Z"
-      fill="white"
-      opacity="0.5"
-    />
+    <path d="M8 8H16V10H8V8Z" fill="white" />
+    <path d="M8 11H16V13H8V11Z" fill="white" opacity="0.7" />
+    <path d="M8 14H13V16H8V14Z" fill="white" opacity="0.5" />
     <circle cx="16" cy="15" r="2" fill="#22C55E" />
   </svg>
 {:else if isFont}

@@ -169,10 +169,10 @@
   const handleMaximize = async () => {
     if (isMaximized) {
       await invoke("plugin_unmaximize_window", { label: windowLabel });
-      isMaximized = false;  // 手动更新状态
+      isMaximized = false; // 手动更新状态
     } else {
       await invoke("plugin_maximize_window", { label: windowLabel });
-      isMaximized = true;   // 手动更新状态
+      isMaximized = true; // 手动更新状态
     }
   };
 
@@ -180,13 +180,17 @@
   function handleTitlebarMouseDown(event: MouseEvent) {
     // 只在左键点击时拖动
     if (event.button !== 0) return;
-    
+
     // 如果点击的是按钮或其他交互元素，不拖动
     const target = event.target as HTMLElement;
-    if (target.closest('button') || target.closest('input') || target.closest('select')) {
+    if (
+      target.closest("button") ||
+      target.closest("input") ||
+      target.closest("select")
+    ) {
       return;
     }
-    
+
     // 使用 Tauri API 开始拖动（需要 core:window:allow-start-dragging 权限）
     currentWindow.startDragging();
   }
@@ -245,7 +249,13 @@
 
 <div class="plugin-window-container">
   <!-- 自定义顶栏 -->
-  <div class="titlebar" onmousedown={handleTitlebarMouseDown}>
+  <div
+    class="titlebar"
+    role="toolbar"
+    tabindex="-1"
+    aria-label="窗口标题栏"
+    onmousedown={handleTitlebarMouseDown}
+  >
     <!-- 插件标题 -->
     <div class="titlebar-title">
       {pluginName || "Plugin"}
