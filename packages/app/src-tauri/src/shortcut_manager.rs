@@ -163,7 +163,35 @@ pub fn setup_shortcuts(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let shortcuts = load_shortcuts_from_disk(&app.handle());
+    let mut shortcuts = load_shortcuts_from_disk(&app.handle());
+    
+    // 设置默认快捷键（如果用户从未设置过）
+    let has_toggle_window = shortcuts.iter().any(|s| s.command_name == "toggle_window");
+    let has_detach_window = shortcuts.iter().any(|s| s.command_name == "detach_window");
+    
+    // 默认显示/隐藏窗口快捷键: Option+Space (因为 Cmd+Space 被系统 Spotlight 占用)
+    if !has_toggle_window {
+        shortcuts.push(AppShortcut {
+            shortcut: "alt+Space".to_string(),
+            command_name: "toggle_window".to_string(),
+            command_title: Some("显示/隐藏窗口".to_string()),
+        });
+    }
+    
+    // 默认分离窗口快捷键: Cmd+Shift+D (D for Detach)
+    if !has_detach_window {
+        shortcuts.push(AppShortcut {
+            shortcut: "cmd+shift+D".to_string(),
+            command_name: "detach_window".to_string(),
+            command_title: Some("分离窗口".to_string()),
+        });
+    }
+    
+    // 保存更新后的快捷键到磁盘（如果有新增默认快捷键）
+    if !has_toggle_window || !has_detach_window {
+        save_shortcuts_to_disk(&app.handle(), &shortcuts);
+    }
+    
     let state: State<ShortcutState> = app.state();
     *state.shortcuts.lock().unwrap() = shortcuts.clone();
 
