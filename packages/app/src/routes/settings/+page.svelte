@@ -4,6 +4,14 @@
   import { Button } from "bits-ui";
 
   import { goto } from "$app/navigation";
+  import {
+    Gear,
+    RocketLaunch,
+    TerminalWindow,
+    Keyboard,
+    PlugsConnected,
+  } from "phosphor-svelte";
+
   import GeneralSettings from "$lib/components/settings/GeneralSettings.svelte";
   import FileCommandSettings from "$lib/components/settings/FileCommandSettings.svelte";
   import CommandSettings from "$lib/components/settings/CommandSettings.svelte";
@@ -18,7 +26,7 @@
       | typeof FileCommandSettings
       | typeof CommandSettings
       | typeof ShortcutSettings;
-    icon: string;
+    icon: any;
   }
 
   const settings: SettingItem[] = [
@@ -26,25 +34,25 @@
       name: "通用设置",
       id: "general",
       component: GeneralSettings,
-      icon: "icon-general",
+      icon: Gear,
     },
     {
       name: "文件启动",
       id: "startup",
       component: FileCommandSettings,
-      icon: "icon-startup",
+      icon: RocketLaunch,
     },
     {
       name: "指令设置",
       id: "commands",
       component: CommandSettings,
-      icon: "icon-commands",
+      icon: TerminalWindow,
     },
     {
       name: "全局快捷键",
       id: "shortcuts",
       component: ShortcutSettings,
-      icon: "icon-shortcuts",
+      icon: Keyboard,
     },
   ];
 
@@ -75,36 +83,44 @@
 </script>
 
 <main
-  class="flex h-[100vh] w-full bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100"
+  class="flex h-screen w-full overflow-hidden bg-neutral-50 text-neutral-900 selection:bg-neutral-200 dark:bg-neutral-900 dark:text-neutral-100 dark:selection:bg-neutral-700"
   data-tauri-drag-region
 >
-  <div
-    class="left relative h-full w-1/5 border-r border-neutral-200 p-4 dark:border-neutral-700"
+  <aside
+    class="flex w-52 flex-col border-r border-neutral-200 bg-neutral-100/50 p-3 pt-6 dark:border-neutral-800 dark:bg-neutral-900/50"
   >
-    <ul class="flex h-full w-full flex-col justify-center">
+    <div class="mb-6 px-3 text-sm font-medium text-neutral-500">设置</div>
+    <nav class="flex flex-1 flex-col gap-1">
       {#each settings as setting}
-        <li
-          class="rounded {activeSetting.id === setting.id
-            ? 'bg-neutral-300 dark:bg-neutral-600'
-            : 'hover:bg-neutral-200 dark:hover:bg-neutral-700'}"
+        <Button.Root
+          class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors {activeSetting.id ===
+          setting.id
+            ? 'bg-white text-neutral-900 shadow-sm dark:bg-neutral-800 dark:text-white'
+            : 'text-neutral-600 hover:bg-neutral-200/50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white'}"
+          onclick={() => handleClickSetting(setting)}
         >
-          <Button.Root
-            class="w-full cursor-pointer p-2 text-left"
-            onclick={() => handleClickSetting(setting)}
-          >
-            {setting.name}
-          </Button.Root>
-        </li>
+          <svelte:component this={setting.icon} size={18} />
+          {setting.name}
+        </Button.Root>
       {/each}
-    </ul>
-    <Button.Root
-      class="absolute right-[0] bottom-[0] left-[0] w-full cursor-pointer p-2 hover:bg-neutral-200 dark:hover:bg-neutral-700"
-      onclick={() => goto("/plugins")}
+    </nav>
+
+    <div
+      class="mt-auto border-t border-neutral-200 pt-4 dark:border-neutral-800"
     >
-      插件管理
-    </Button.Root>
-  </div>
-  <div class="main h-full flex-1">
-    <ActiveComponent />
+      <Button.Root
+        class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-200/50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white"
+        onclick={() => goto("/plugins")}
+      >
+        <PlugsConnected size={18} />
+        插件管理
+      </Button.Root>
+    </div>
+  </aside>
+
+  <div class="flex-1 overflow-hidden bg-white p-6 dark:bg-neutral-950">
+    <div class="mx-auto flex h-full max-w-3xl flex-col">
+      <ActiveComponent />
+    </div>
   </div>
 </main>

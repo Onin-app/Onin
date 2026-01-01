@@ -160,7 +160,7 @@
   });
 </script>
 
-<main class="flex h-full w-full flex-col p-4">
+<main class="flex h-full w-full flex-col">
   <h2 class="mb-2 text-xl font-bold">文件启动设置</h2>
   {#if fileCommands.length > 0}
     <div class="mb-2 flex items-center text-sm text-neutral-500">
@@ -178,7 +178,7 @@
   {/if}
 
   <ScrollArea.Root
-    class="bg-background-alt shadow-card relative overflow-hidden rounded-[10px] border border-2 border-dashed  px-2 py-2 {isDraggingOver
+    class="bg-background-alt shadow-card relative flex-1 overflow-hidden rounded-[10px] border border-2 border-dashed px-2 py-2 {isDraggingOver
       ? 'border-blue-500'
       : 'border-neutral-300 dark:border-neutral-600'}"
   >
@@ -243,7 +243,7 @@
                 <Popover.Root>
                   <Popover.Trigger>
                     <button
-                      class="ml-2 rounded-full p-1 text-neutral-400 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-500"
+                      class="ml-2 rounded-full p-1 text-neutral-400 opacity-0 transition-opacity hover:text-red-500 group-hover:opacity-100"
                       aria-label="删除 {item.name}"
                     >
                       <Trash size={20} />
@@ -251,12 +251,12 @@
                   </Popover.Trigger>
                   <Popover.Portal>
                     <Popover.Content
-                      class="border-dark-10 bg-background shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-30 w-full max-w-[328px] origin-(--bits-popover-content-transform-origin) rounded-[12px] border p-4"
+                      class="border-dark-10 bg-background shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-(--bits-popover-content-transform-origin) z-30 w-full max-w-[328px] rounded-[12px] border p-4"
                       sideOffset={8}
                     >
                       <Popover.Arrow />
                       <h3
-                        class="mb-2 text-[14px] leading-5 font-semibold tracking-[-0.01em]"
+                        class="mb-2 text-[14px] font-semibold leading-5 tracking-[-0.01em]"
                       >
                         确认删除？
                       </h3>
@@ -297,13 +297,13 @@
     </ScrollArea.Viewport>
     <ScrollArea.Scrollbar
       orientation="vertical"
-      class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-2.5 touch-none rounded-full border-l border-l-transparent p-px transition-all duration-200 select-none hover:w-3"
+      class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-2.5 touch-none select-none rounded-full border-l border-l-transparent p-px transition-all duration-200 hover:w-3"
     >
       <ScrollArea.Thumb class="bg-muted-foreground flex-1 rounded-full" />
     </ScrollArea.Scrollbar>
     <ScrollArea.Scrollbar
       orientation="horizontal"
-      class="bg-muted hover:bg-dark-10 flex h-2.5 touch-none rounded-full border-t border-t-transparent p-px transition-all duration-200 select-none hover:h-3 "
+      class="bg-muted hover:bg-dark-10 flex h-2.5 touch-none select-none rounded-full border-t border-t-transparent p-px transition-all duration-200 hover:h-3 "
     >
       <ScrollArea.Thumb class="bg-muted-foreground rounded-full" />
     </ScrollArea.Scrollbar>

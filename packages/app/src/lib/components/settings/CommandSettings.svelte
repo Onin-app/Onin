@@ -2,7 +2,23 @@
   import { Button, DropdownMenu, Tabs } from "bits-ui";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
+  import {
+    Command as CommandIcon,
+    RocketLaunch,
+    File,
+    Plugs,
+    User,
+    PuzzlePiece,
+  } from "phosphor-svelte";
   import type { Command } from "$lib/type";
+
+  const iconMap: Record<string, any> = {
+    Command: CommandIcon,
+    Application: RocketLaunch,
+    FileCommand: File,
+    Plugin: Plugs,
+    Custom: User,
+  };
 
   let commands = $state<Command[]>([]);
   let selectedPlugin = $state<string | null>(null);
@@ -193,243 +209,303 @@
   );
 </script>
 
-<main class="flex h-full">
-  <div class="w-36 border-r border-neutral-200 dark:border-neutral-700">
-    <h3 class="text-jgray-500 p-2 text-sm dark:text-gray-400">内置指令</h3>
-    <ul class="flex w-full flex-col justify-center">
-      {#each commandCategories as category}
-        <li
-          class={activeCategory?.id === category.id
-            ? "bg-neutral-300 dark:bg-neutral-600"
-            : "hover:bg-neutral-200 dark:hover:bg-neutral-700"}
-        >
+<main class="flex h-full w-full gap-6">
+  <!-- Internal Sidebar -->
+  <div
+    class="flex w-36 shrink-0 flex-col gap-4 border-r border-neutral-100 pr-4 dark:border-neutral-800"
+  >
+    <div class="flex flex-col gap-1">
+      <h3
+        class="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500"
+      >
+        内置指令
+      </h3>
+      <div class="flex flex-col gap-0.5">
+        {#each commandCategories as category}
           <Button.Root
-            class="h-full w-full cursor-pointer px-2 py-1 text-left"
+            class="flex w-full items-center justify-start gap-2 rounded-md px-2 py-1 text-sm font-medium transition-colors {activeCategory?.id ===
+            category.id
+              ? 'bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-white'
+              : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-neutral-200'}"
             onclick={() => {
               selectedCategoryId = category.id;
-              selectedPlugin = null; // 清除插件选择
+              selectedPlugin = null;
             }}
           >
+            <svelte:component
+              this={iconMap[category.id] || CommandIcon}
+              size={15}
+            />
             {category.name}
           </Button.Root>
-        </li>
-      {/each}
-    </ul>
-    <h3 class="text-jgray-500 mt-4 p-2 text-sm dark:text-gray-400">插件指令</h3>
-    <ul class="flex w-full flex-col justify-center">
-      {#each pluginNames as pluginName}
-        <li
-          class={selectedPlugin === pluginName
-            ? "bg-neutral-300 dark:bg-neutral-600"
-            : "hover:bg-neutral-200 dark:hover:bg-neutral-700"}
+        {/each}
+      </div>
+    </div>
+
+    {#if pluginNames.length > 0}
+      <div class="flex flex-col gap-1">
+        <h3
+          class="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500"
         >
-          <Button.Root
-            class="h-full w-full cursor-pointer px-2 py-1 text-left"
-            onclick={() => {
-              selectedPlugin = pluginName;
-              selectedCategoryId = null; // 清除内置指令选择
-            }}
-          >
-            {pluginName}
-          </Button.Root>
-        </li>
-      {/each}
-    </ul>
+          插件指令
+        </h3>
+        <div class="flex flex-col gap-0.5">
+          {#each pluginNames as pluginName}
+            <Button.Root
+              class="flex w-full items-center justify-start gap-2 truncate rounded-md px-2 py-1 text-left text-sm font-medium transition-colors {selectedPlugin ===
+              pluginName
+                ? 'bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-white'
+                : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-neutral-200'}"
+              onclick={() => {
+                selectedPlugin = pluginName;
+                selectedCategoryId = null;
+              }}
+            >
+              <PuzzlePiece size={15} class="shrink-0" />
+              <span class="truncate">{pluginName}</span>
+            </Button.Root>
+          {/each}
+        </div>
+      </div>
+    {/if}
   </div>
-  <div class="flex-1 overflow-y-auto p-3">
-    <Tabs.Root value="function" class="flex h-full flex-col">
+
+  <!-- Content Area -->
+  <div class="flex h-full min-w-0 flex-1 flex-col">
+    <Tabs.Root value="function" class="flex h-full flex-col gap-4">
       <Tabs.List
-        class="rounded-9px bg-dark-10 shadow-mini-inset dark:bg-background grid w-full grid-cols-2 gap-1 p-1 text-sm leading-[0.01em] font-semibold dark:border dark:border-neutral-600/30"
+        class="flex w-full border-b border-neutral-200 dark:border-neutral-800"
       >
         <Tabs.Trigger
           value="function"
-          class="data-[state=active]:shadow-mini dark:data-[state=active]:bg-muted h-8 rounded-[7px] bg-transparent py-2 data-[state=active]:bg-white"
+          class="relative px-4 py-2 text-sm font-medium text-neutral-500 transition-colors after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full 
+          after:scale-x-0 after:bg-neutral-900 after:transition-transform after:duration-200 hover:text-neutral-700 data-[state=active]:text-neutral-900 data-[state=active]:after:scale-x-100 dark:text-neutral-400 dark:after:bg-white dark:hover:text-neutral-200 dark:data-[state=active]:text-white"
         >
           功能指令
         </Tabs.Trigger>
         <Tabs.Trigger
           value="match"
-          class="data-[state=active]:shadow-mini dark:data-[state=active]:bg-muted h-8 rounded-[7px] bg-transparent py-2 data-[state=active]:bg-white"
+          class="relative px-4 py-2 text-sm font-medium text-neutral-500 transition-colors after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full
+          after:scale-x-0 after:bg-neutral-900 after:transition-transform after:duration-200 hover:text-neutral-700 data-[state=active]:text-neutral-900 data-[state=active]:after:scale-x-100 dark:text-neutral-400 dark:after:bg-white dark:hover:text-neutral-200 dark:data-[state=active]:text-white"
         >
           匹配指令
         </Tabs.Trigger>
       </Tabs.List>
-      <Tabs.Content
-        value="function"
-        class="flex-1 overflow-y-auto pt-3 select-none"
-      >
-        {#if selectedPlugin}
-          <!-- 显示插件指令 -->
-          {#each selectedPluginCommands as command}
-            <div class="group/box mb-4">
-              <div class="mb-2">
-                <h4 class="text-sm font-semibold">
-                  {command.title}
-                </h4>
-              </div>
-              <div class="flex flex-wrap gap-2">
-                {#each command.keywords as keyword}
-                  <div
-                    class="group/button border-input text-foreground shadow-btn hover:bg-muted relative inline-flex cursor-pointer items-center justify-center rounded-full border px-2 py-1 text-sm font-medium select-none active:scale-[0.98] {keyword.disabled
-                      ? 'bg-neutral-200 text-neutral-500 line-through dark:bg-neutral-700 dark:text-neutral-400'
-                      : 'bg-white dark:bg-neutral-800'}"
+
+      <Tabs.Content value="function" class="-mr-2 flex-1 overflow-y-auto pr-2">
+        <div class="flex flex-col gap-3 pb-8">
+          {#if selectedPlugin}
+            <!-- 插件指令列表 -->
+            {#each selectedPluginCommands as command}
+              <div
+                class="group/card flex flex-col gap-2 rounded-xl border border-neutral-200 bg-white p-3 transition-all hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700"
+              >
+                <div class="flex items-center justify-between">
+                  <h4
+                    class="text-sm font-semibold text-neutral-900 dark:text-neutral-100"
                   >
-                    <DropdownMenu.Root>
-                      <DropdownMenu.Trigger>
-                        {keyword.name}
-                      </DropdownMenu.Trigger>
-                      <DropdownMenu.Portal>
-                        <DropdownMenu.Content
-                          class="border-muted bg-background shadow-popover w-[229px] rounded-xl border px-1 py-1.5 outline-hidden focus-visible:outline-hidden"
-                          sideOffset={8}
-                          align="start"
+                    {command.title}
+                  </h4>
+                </div>
+                <div class="flex flex-wrap gap-1.5">
+                  {#each command.keywords as keyword}
+                    <div
+                      class="group/chip relative inline-flex items-center rounded-md border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-sm font-medium text-neutral-600 transition-colors dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300
+                      {keyword.disabled
+                        ? 'line-through opacity-50'
+                        : 'hover:bg-neutral-100 dark:hover:bg-neutral-700/80'}"
+                    >
+                      <DropdownMenu.Root>
+                        <DropdownMenu.Trigger class="select-none outline-none">
+                          {keyword.name}
+                        </DropdownMenu.Trigger>
+                        <DropdownMenu.Portal>
+                          <DropdownMenu.Content
+                            class="animate-in fade-in-0 zoom-in-95 z-50 min-w-[140px] overflow-hidden rounded-lg border border-neutral-200 bg-white p-1 shadow-lg dark:border-neutral-800 dark:bg-neutral-900"
+                            sideOffset={4}
+                            align="start"
+                          >
+                            <DropdownMenu.Item
+                              class="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-xs text-neutral-700 outline-none transition-colors hover:bg-neutral-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                            >
+                              <Button.Root
+                                class="w-full text-left"
+                                onclick={() =>
+                                  executePluginCommand(command.name)}
+                              >
+                                执行指令
+                              </Button.Root>
+                            </DropdownMenu.Item>
+                            <DropdownMenu.Item
+                              class="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-xs text-neutral-700 outline-none transition-colors hover:bg-neutral-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                            >
+                              <Button.Root
+                                class="w-full text-left"
+                                onclick={() =>
+                                  toggleKeywordDisabled(
+                                    command.name,
+                                    keyword.name,
+                                  )}
+                              >
+                                {keyword.disabled ? "启用指令" : "禁用指令"}
+                              </Button.Root>
+                            </DropdownMenu.Item>
+                          </DropdownMenu.Content>
+                        </DropdownMenu.Portal>
+                      </DropdownMenu.Root>
+
+                      {#if !keyword.is_default}
+                        <button
+                          class="-mr-0.5 ml-1 rounded-full p-0.5 text-neutral-400 opacity-0 transition-all hover:bg-neutral-200 hover:text-red-500 group-hover/chip:opacity-100 dark:text-neutral-500 dark:hover:bg-neutral-700"
+                          onclick={(e) => {
+                            e.stopPropagation();
+                            removeKeyword(command.name, keyword.name);
+                          }}
                         >
-                          <DropdownMenu.Item
-                            class="rounded-button data-highlighted:bg-muted flex h-10 items-center py-3 pr-1.5 pl-3 text-sm font-medium ring-0! ring-transparent! select-none focus-visible:outline-none"
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="10"
+                            height="10"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            ><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg
                           >
-                            <Button.Root
-                              class="w-full"
-                              onclick={() => {
-                                executePluginCommand(command.name);
-                              }}
-                            >
-                              执行指令
-                            </Button.Root>
-                          </DropdownMenu.Item>
-                          <DropdownMenu.Item
-                            class="rounded-button data-highlighted:bg-muted flex h-10 items-center py-3 pr-1.5 pl-3 text-sm font-medium ring-0! ring-transparent! select-none focus-visible:outline-none"
-                          >
-                            <Button.Root
-                              class="w-full"
-                              onclick={() => {
-                                toggleKeywordDisabled(
-                                  command.name,
-                                  keyword.name,
-                                );
-                              }}
-                            >
-                              {keyword.disabled ? "启用指令" : "禁用指令"}
-                            </Button.Root>
-                          </DropdownMenu.Item>
-                        </DropdownMenu.Content>
-                      </DropdownMenu.Portal>
-                    </DropdownMenu.Root>
-                    {#if !keyword.is_default}
-                      <Button.Root
-                        class="absolute -top-1 -right-1 hidden h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white group-hover/button:flex"
-                        onclick={() => {
-                          removeKeyword(command.name, keyword.name);
-                        }}
-                      >
-                        &times;
-                      </Button.Root>
-                    {/if}
+                        </button>
+                      {/if}
+                    </div>
+                  {/each}
+
+                  <div class="relative flex items-center">
+                    <input
+                      type="text"
+                      placeholder="+ 添加"
+                      class="h-[24px] w-14 rounded-md border border-dashed border-neutral-300 bg-transparent px-2 text-[10px] text-neutral-500 transition-all placeholder:text-neutral-400 focus:w-20 focus:border-solid focus:border-neutral-400 focus:bg-white focus:text-neutral-900 focus:outline-none dark:border-neutral-700 dark:text-neutral-400 dark:focus:border-neutral-600 dark:focus:bg-neutral-900 dark:focus:text-neutral-100"
+                      onkeydown={(e) => {
+                        if (e.key === "Enter") {
+                          addKeyword(command.name, e.currentTarget.value);
+                          e.currentTarget.value = "";
+                        }
+                      }}
+                    />
                   </div>
-                {/each}
-                <div class="hidden group-hover/box:block">
-                  <input
-                    type="text"
-                    placeholder="添加关键字"
-                    class="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-7 w-24 rounded-md border px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                    onkeydown={(e) => {
-                      if (e.key === "Enter") {
-                        addKeyword(command.name, e.currentTarget.value);
-                        e.currentTarget.value = "";
-                      }
-                    }}
-                  />
                 </div>
               </div>
-            </div>
-          {/each}
-        {:else}
-          <!-- 显示内置指令 -->
-          {#each filteredCommands as command}
-            <div class="group/box mb-4">
-              <div class="mb-2">
-                <h4 class="text-sm font-semibold">
-                  {command.title}
-                </h4>
-              </div>
-              <div class="flex flex-wrap gap-2">
-                {#each command.keywords as keyword}
-                  <div
-                    class="group/button border-input text-foreground shadow-btn hover:bg-muted relative inline-flex cursor-pointer items-center justify-center rounded-full border px-2 py-1 text-sm font-medium select-none active:scale-[0.98] {keyword.disabled
-                      ? 'bg-neutral-200 text-neutral-500 line-through dark:bg-neutral-700 dark:text-neutral-400'
-                      : 'bg-white dark:bg-neutral-800'}"
+            {/each}
+          {:else}
+            <!-- 内置指令列表 -->
+            {#each filteredCommands as command}
+              <div
+                class="group/card flex flex-col gap-2 rounded-xl border border-neutral-200 bg-white p-3 transition-all hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700"
+              >
+                <div class="flex items-center justify-between">
+                  <h4
+                    class="text-sm font-semibold text-neutral-900 dark:text-neutral-100"
                   >
-                    <DropdownMenu.Root>
-                      <DropdownMenu.Trigger>
-                        {keyword.name}
-                      </DropdownMenu.Trigger>
-                      <DropdownMenu.Portal>
-                        <DropdownMenu.Content
-                          class="border-muted bg-background shadow-popover w-[229px] rounded-xl border px-1 py-1.5 outline-hidden focus-visible:outline-hidden"
-                          sideOffset={8}
-                          align="start"
+                    {command.title}
+                  </h4>
+                </div>
+                <div class="flex flex-wrap gap-1.5">
+                  {#each command.keywords as keyword}
+                    <div
+                      class="group/chip relative inline-flex items-center rounded-md border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-sm font-medium text-neutral-600 transition-colors dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300
+                      {keyword.disabled
+                        ? 'line-through opacity-50'
+                        : 'hover:bg-neutral-100 dark:hover:bg-neutral-700/80'}"
+                    >
+                      <DropdownMenu.Root>
+                        <DropdownMenu.Trigger
+                          class="cursor-default select-none outline-none"
                         >
-                          <DropdownMenu.Item
-                            class="rounded-button data-highlighted:bg-muted flex h-10 items-center py-3 pr-1.5 pl-3 text-sm font-medium ring-0! ring-transparent! select-none focus-visible:outline-none"
+                          {keyword.name}
+                        </DropdownMenu.Trigger>
+                        <DropdownMenu.Portal>
+                          <DropdownMenu.Content
+                            class="animate-in fade-in-0 zoom-in-95 z-50 min-w-[140px] overflow-hidden rounded-lg border border-neutral-200 bg-white p-1 shadow-lg dark:border-neutral-800 dark:bg-neutral-900"
+                            sideOffset={4}
+                            align="start"
                           >
-                            <Button.Root
-                              class="w-full"
-                              onclick={() => {
-                                executeCommand(command.name);
-                              }}
+                            <DropdownMenu.Item
+                              class="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-xs text-neutral-700 outline-none transition-colors hover:bg-neutral-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 dark:text-neutral-200 dark:hover:bg-neutral-800"
                             >
-                              执行指令
-                            </Button.Root>
-                          </DropdownMenu.Item>
-                          <DropdownMenu.Item
-                            class="rounded-button data-highlighted:bg-muted flex h-10 items-center py-3 pr-1.5 pl-3 text-sm font-medium ring-0! ring-transparent! select-none focus-visible:outline-none"
+                              <Button.Root
+                                class="w-full text-left"
+                                onclick={() => executeCommand(command.name)}
+                              >
+                                执行指令
+                              </Button.Root>
+                            </DropdownMenu.Item>
+                            <DropdownMenu.Item
+                              class="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-xs text-neutral-700 outline-none transition-colors hover:bg-neutral-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                            >
+                              <Button.Root
+                                class="w-full text-left"
+                                onclick={() =>
+                                  toggleKeywordDisabled(
+                                    command.name,
+                                    keyword.name,
+                                  )}
+                              >
+                                {keyword.disabled ? "启用指令" : "禁用指令"}
+                              </Button.Root>
+                            </DropdownMenu.Item>
+                          </DropdownMenu.Content>
+                        </DropdownMenu.Portal>
+                      </DropdownMenu.Root>
+
+                      {#if !keyword.is_default}
+                        <button
+                          class="-mr-0.5 ml-1 rounded-full p-0.5 text-neutral-400 opacity-0 transition-all hover:bg-neutral-200 hover:text-red-500 group-hover/chip:opacity-100 dark:text-neutral-500 dark:hover:bg-neutral-700"
+                          onclick={(e) => {
+                            e.stopPropagation();
+                            removeKeyword(command.name, keyword.name);
+                          }}
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="10"
+                            height="10"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            ><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg
                           >
-                            <Button.Root
-                              class="w-full"
-                              onclick={() => {
-                                toggleKeywordDisabled(
-                                  command.name,
-                                  keyword.name,
-                                );
-                              }}
-                            >
-                              {keyword.disabled ? "启用指令" : "禁用指令"}
-                            </Button.Root>
-                          </DropdownMenu.Item>
-                        </DropdownMenu.Content>
-                      </DropdownMenu.Portal>
-                    </DropdownMenu.Root>
-                    {#if !keyword.is_default}
-                      <Button.Root
-                        class="absolute -top-1 -right-1 hidden h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white group-hover/button:flex"
-                        onclick={() => {
-                          removeKeyword(command.name, keyword.name);
-                        }}
-                      >
-                        &times;
-                      </Button.Root>
-                    {/if}
+                        </button>
+                      {/if}
+                    </div>
+                  {/each}
+
+                  <div class="relative flex items-center">
+                    <input
+                      type="text"
+                      placeholder="+ 添加"
+                      class="h-[28px] w-16 rounded-md border border-dashed border-neutral-300 bg-transparent px-2 text-sm text-neutral-500 transition-all placeholder:text-neutral-400 focus:w-24 focus:border-solid focus:border-neutral-400 focus:bg-white focus:text-neutral-900 focus:outline-none dark:border-neutral-700 dark:text-neutral-400 dark:focus:border-neutral-600 dark:focus:bg-neutral-900 dark:focus:text-neutral-100"
+                      onkeydown={(e) => {
+                        if (e.key === "Enter") {
+                          addKeyword(command.name, e.currentTarget.value);
+                          e.currentTarget.value = "";
+                        }
+                      }}
+                    />
                   </div>
-                {/each}
-                <div class="hidden group-hover/box:block">
-                  <input
-                    type="text"
-                    placeholder="添加关键字"
-                    class="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-7 w-24 rounded-md border px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                    onkeydown={(e) => {
-                      if (e.key === "Enter") {
-                        addKeyword(command.name, e.currentTarget.value);
-                        e.currentTarget.value = "";
-                      }
-                    }}
-                  />
                 </div>
               </div>
-            </div>
-          {/each}
-        {/if}
+            {/each}
+          {/if}
+        </div>
       </Tabs.Content>
-      <Tabs.Content value="match" class="pt-3 select-none">
-        <!-- Placeholder for match commands -->
+      <Tabs.Content value="match" class="-mr-2 flex-1 overflow-y-auto pr-2">
+        <div
+          class="flex h-full flex-col items-center justify-center text-neutral-400"
+        >
+          <p>暂无匹配指令</p>
+        </div>
       </Tabs.Content>
     </Tabs.Root>
   </div>

@@ -1,7 +1,5 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
-  import { Tooltip } from "bits-ui";
-  import { Question } from "phosphor-svelte";
 
   interface SetItemProps {
     title: string;
@@ -12,23 +10,20 @@
   const { title, description, content }: SetItemProps = $props();
 </script>
 
-<div class="mt-2 flex items-center justify-between">
-  <div class="label flex items-center">
-    <p class="title mr-2">{title}</p>
+<div
+  class="flex min-h-[44px] items-center justify-between gap-4 border-b border-neutral-100 py-2.5 last:border-0 dark:border-neutral-800"
+>
+  <div class="flex flex-col gap-1">
+    <span class="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+      {title}
+    </span>
     {#if description}
-      <Tooltip.Provider>
-        <Tooltip.Root delayDuration={200}>
-          <Tooltip.Trigger class="">
-            <Question size={20} />
-          </Tooltip.Trigger>
-          <Tooltip.Content sideOffset={8}>
-            <div class="">{description}</div>
-          </Tooltip.Content>
-        </Tooltip.Root>
-      </Tooltip.Provider>
+      <span class="text-xs text-neutral-500 dark:text-neutral-400">
+        {description}
+      </span>
     {/if}
   </div>
-  <div class="content">
+  <div class="flex items-center">
     {@render content()}
   </div>
 </div>
