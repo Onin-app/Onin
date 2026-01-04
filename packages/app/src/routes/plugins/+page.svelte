@@ -447,6 +447,7 @@
     <!-- Header -->
     <div
       class="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-700"
+      data-tauri-drag-region
     >
       <div class="flex items-center gap-2">
         <Button.Root

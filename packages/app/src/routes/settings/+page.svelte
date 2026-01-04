@@ -88,8 +88,14 @@
 >
   <aside
     class="flex w-52 flex-col border-r border-neutral-200 bg-neutral-100/50 p-3 pt-6 dark:border-neutral-800 dark:bg-neutral-900/50"
+    data-tauri-drag-region
   >
-    <div class="mb-6 px-3 text-sm font-medium text-neutral-500">设置</div>
+    <div
+      class="mb-6 px-3 text-sm font-medium text-neutral-500"
+      data-tauri-drag-region
+    >
+      设置
+    </div>
     <nav class="flex flex-1 flex-col gap-1">
       {#each settings as setting}
         <Button.Root
@@ -118,7 +124,10 @@
     </div>
   </aside>
 
-  <div class="flex-1 overflow-hidden bg-white p-6 dark:bg-neutral-950">
+  <div
+    class="flex-1 overflow-hidden bg-white p-6 dark:bg-neutral-950"
+    data-tauri-drag-region
+  >
     <div class="mx-auto flex h-full max-w-3xl flex-col">
       <ActiveComponent />
     </div>
