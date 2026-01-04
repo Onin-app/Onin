@@ -444,55 +444,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "onin"
-version = "0.1.0"
-dependencies = [
- "axum",
- "base64 0.22.1",
- "chrono",
- "clipboard-rs",
- "deno_core",
- "futures",
- "icns",
- "image",
- "lnk",
- "num_cpus",
- "once_cell",
- "opener",
- "plist",
- "rdev",
- "regex",
- "reqwest",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-autostart",
- "tauri-plugin-clipboard-manager",
- "tauri-plugin-dialog",
- "tauri-plugin-global-shortcut",
- "tauri-plugin-notification",
- "tauri-plugin-opener",
- "tauri-plugin-os",
- "tauri-plugin-store",
- "tempfile",
- "tokio",
- "tokio-cron-scheduler",
- "tower 0.4.13",
- "tower-http 0.5.2",
- "tracing",
- "tracing-subscriber",
- "url",
- "uuid",
- "walkdir",
- "whoami",
- "widestring",
- "windows 0.57.0",
- "winreg 0.55.0",
- "zip",
-]
-
-[[package]]
 name = "base64"
 version = "0.21.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3891,6 +3842,55 @@ name = "once_cell"
 version = "1.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
+
+[[package]]
+name = "onin"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "base64 0.22.1",
+ "chrono",
+ "clipboard-rs",
+ "deno_core",
+ "futures",
+ "icns",
+ "image",
+ "lnk",
+ "num_cpus",
+ "once_cell",
+ "opener",
+ "plist",
+ "rdev",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-autostart",
+ "tauri-plugin-clipboard-manager",
+ "tauri-plugin-dialog",
+ "tauri-plugin-global-shortcut",
+ "tauri-plugin-notification",
+ "tauri-plugin-opener",
+ "tauri-plugin-os",
+ "tauri-plugin-store",
+ "tempfile",
+ "tokio",
+ "tokio-cron-scheduler",
+ "tower 0.4.13",
+ "tower-http 0.5.2",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+ "uuid",
+ "walkdir",
+ "whoami",
+ "widestring",
+ "windows 0.57.0",
+ "winreg 0.55.0",
+ "zip",
+]
 
 [[package]]
 name = "open"

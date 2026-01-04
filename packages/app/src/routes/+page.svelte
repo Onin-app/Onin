@@ -8,7 +8,6 @@
   import { listen } from "@tauri-apps/api/event";
   import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
   import {
-    ArrowsClockwise,
     AppWindow,
     DotsThreeVertical,
     X,
@@ -70,7 +69,7 @@
   let currentPluginAutoDetach = $state<boolean>(false);
   let pluginIframeElement = $state<HTMLIFrameElement | null>(null);
 
-  // Refresh state
+  // Refresh state for progress indicator
   let isRefreshing = $state<boolean>(false);
 
   // Input element reference
@@ -261,6 +260,18 @@
       showAllFiles = false;
     });
 
+    // Listen for refresh events for progress indicator
+    const unlistenRefreshStarted = await listen("refresh_started", () => {
+      console.log("Refresh started");
+      isRefreshing = true;
+    });
+
+    const unlistenRefreshEnded = await listen("commands_refreshed", () => {
+      console.log("Refresh ended");
+      isRefreshing = false;
+      fetchApps(); // Refetch the updated list
+    });
+
     unlisten = () => {
       unlistenAppsUpdated();
       unlistenCommandsReady();
@@ -268,6 +279,8 @@
       unlistenDetachWindow();
       unlistenWindowShow();
       unlistenClearClipboard();
+      unlistenRefreshStarted();
+      unlistenRefreshEnded();
     };
   });
 
@@ -685,39 +698,6 @@
     goto("/settings");
   };
 
-  const handleRefresh = async () => {
-    if (isRefreshing) return;
-
-    isRefreshing = true;
-    try {
-      console.log("Refreshing all launchable items...");
-      // Trigger backend to refresh commands (rescan apps, plugins, etc.)
-      await invoke("refresh_commands");
-      // Fetch the updated list
-      await fetchApps();
-      console.log("Refresh completed successfully");
-
-      // Show success notification
-      await invoke("show_notification", {
-        options: {
-          title: "刷新完成",
-          body: `已更新 ${appList.length} 个项目`,
-        },
-      });
-    } catch (error) {
-      console.error("Failed to refresh:", error);
-      // Show error notification
-      await invoke("show_notification", {
-        options: {
-          title: "刷新失败",
-          body: "请稍后重试",
-        },
-      });
-    } finally {
-      isRefreshing = false;
-    }
-  };
-
   const handleClosePlugin = () => {
     showPluginInline = false;
     currentPluginUrl = "";
@@ -884,7 +864,7 @@
           bind:this={inputElement}
           class="{showAllFiles
             ? 'w-full'
-            : 'min-w-0 flex-1'} h-[34px] bg-transparent text-2xl focus:outline-none focus:ring-0 active:outline-none active:ring-0"
+            : 'min-w-0 flex-1'} h-[34px] bg-transparent text-2xl focus:ring-0 focus:outline-none active:ring-0 active:outline-none"
           type="text"
           placeholder="Hi Onin!"
           bind:value={inputValue}
@@ -917,11 +897,11 @@
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
               <DropdownMenu.Content
-                class="border-muted bg-background shadow-popover outline-hidden focus-visible:outline-hidden rounded-xl border px-1 py-1.5"
+                class="border-muted bg-background shadow-popover rounded-xl border px-1 py-1.5 outline-hidden focus-visible:outline-hidden"
                 sideOffset={8}
               >
                 <DropdownMenu.Item
-                  class="rounded-button data-highlighted:bg-muted ring-0! ring-transparent! flex h-10 select-none items-center py-3 pl-3 pr-1.5 text-sm font-medium focus-visible:outline-none"
+                  class="rounded-button data-highlighted:bg-muted flex h-10 items-center py-3 pr-1.5 pl-3 text-sm font-medium ring-0! ring-transparent! select-none focus-visible:outline-none"
                 >
                   <button
                     class="flex w-full cursor-pointer items-center"
@@ -939,7 +919,7 @@
                   </button>
                 </DropdownMenu.Item>
                 <DropdownMenu.Item
-                  class="rounded-button data-highlighted:bg-muted ring-0! ring-transparent! flex h-10 select-none items-center py-3 pl-3 pr-1.5 text-sm font-medium focus-visible:outline-none"
+                  class="rounded-button data-highlighted:bg-muted flex h-10 items-center py-3 pr-1.5 pl-3 text-sm font-medium ring-0! ring-transparent! select-none focus-visible:outline-none"
                 >
                   <button
                     class="flex w-full cursor-pointer items-center"
@@ -956,7 +936,7 @@
                 </DropdownMenu.Item>
                 <DropdownMenu.CheckboxItem
                   bind:checked={currentPluginAutoDetach}
-                  class="rounded-button data-highlighted:bg-muted ring-0! ring-transparent! flex h-10 cursor-pointer select-none items-center py-3 pl-3 pr-1.5 text-sm font-medium focus-visible:outline-none"
+                  class="rounded-button data-highlighted:bg-muted flex h-10 cursor-pointer items-center py-3 pr-1.5 pl-3 text-sm font-medium ring-0! ring-transparent! select-none focus-visible:outline-none"
                   onCheckedChange={handleToggleAutoDetach}
                 >
                   {#snippet children({ checked })}
@@ -974,17 +954,21 @@
               </DropdownMenu.Content>
             </DropdownMenu.Portal>
           </DropdownMenu.Root>
-        {:else}
-          <ArrowsClockwise
-            class="ml-2 size-8 cursor-pointer transition-transform {isRefreshing
-              ? 'animate-spin'
-              : ''}"
-            onclick={handleRefresh}
-          />
         {/if}
       </div>
     </div>
+
     <div class="relative flex-1 overflow-hidden">
+      <!-- Refresh progress bar (absolute positioned, no layout shift) -->
+      {#if isRefreshing}
+        <div
+          class="absolute top-0 left-0 z-10 h-0.5 w-full overflow-hidden bg-neutral-200 dark:bg-neutral-700"
+        >
+          <div
+            class="refresh-progress-bar h-full w-1/3 bg-gradient-to-r from-blue-400 via-blue-500 to-blue-400"
+          ></div>
+        </div>
+      {/if}
       {#if showPluginInline}
         <!-- Plugin inline display area -->
         <!-- 使用本地 HTTP 服务器加载插件，支持所有资源和动态导入 -->
@@ -1067,13 +1051,13 @@
           </ScrollArea.Viewport>
           <ScrollArea.Scrollbar
             orientation="vertical"
-            class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-2.5 touch-none select-none rounded-full border-l border-l-transparent p-px transition-all duration-200 hover:w-3"
+            class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-2.5 touch-none rounded-full border-l border-l-transparent p-px transition-all duration-200 select-none hover:w-3"
           >
             <ScrollArea.Thumb class="bg-muted-foreground flex-1 rounded-full" />
           </ScrollArea.Scrollbar>
           <ScrollArea.Scrollbar
             orientation="horizontal"
-            class="bg-muted hover:bg-dark-10 flex h-2.5 touch-none select-none rounded-full border-t border-t-transparent p-px transition-all duration-200 hover:h-3 "
+            class="bg-muted hover:bg-dark-10 flex h-2.5 touch-none rounded-full border-t border-t-transparent p-px transition-all duration-200 select-none hover:h-3 "
           >
             <ScrollArea.Thumb class="bg-muted-foreground rounded-full" />
           </ScrollArea.Scrollbar>

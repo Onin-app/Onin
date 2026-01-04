@@ -165,7 +165,6 @@
   }
 
   @keyframes caret-blink {
-
     0%,
     70%,
     100% {
@@ -271,8 +270,17 @@
   }
 }
 
-@layer base {
+/* 刷新进度条动画 */
+@keyframes slideProgress {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
 
+@layer base {
   *,
   ::after,
   ::before,
@@ -309,12 +317,16 @@
     outline: none !important;
 
     &:focus-visible {
-      @apply focus-visible:ring-foreground focus-visible:ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-1;
+      @apply focus-visible:ring-foreground focus-visible:ring-offset-background focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-hidden;
     }
   }
 
   .link {
-    @apply hover:text-foreground/80 focus-visible:ring-foreground focus-visible:ring-offset-background rounded-xs focus-visible:outline-hidden inline-flex items-center gap-1 font-medium underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-offset-2;
+    @apply hover:text-foreground/80 focus-visible:ring-foreground focus-visible:ring-offset-background inline-flex items-center gap-1 rounded-xs font-medium underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-hidden;
+  }
+
+  .refresh-progress-bar {
+    animation: slideProgress 1s ease-in-out infinite;
   }
 }
 
@@ -427,19 +439,31 @@
     margin-bottom: 0.75em;
   }
 
-  .prose :where(.prose > ol > li > *:first-child):not(:where([class~="not-prose"] *)) {
+  .prose
+    :where(.prose > ol > li > *:first-child):not(
+      :where([class~="not-prose"] *)
+    ) {
     margin-top: 1.25em;
   }
 
-  .prose :where(.prose > ol > li > *:last-child):not(:where([class~="not-prose"] *)) {
+  .prose
+    :where(.prose > ol > li > *:last-child):not(
+      :where([class~="not-prose"] *)
+    ) {
     margin-bottom: 1.25em;
   }
 
-  .prose :where(.prose > ul > li > *:first-child):not(:where([class~="not-prose"] *)) {
+  .prose
+    :where(.prose > ul > li > *:first-child):not(
+      :where([class~="not-prose"] *)
+    ) {
     margin-top: 1.25em;
   }
 
-  .prose :where(.prose > ul > li > *:last-child):not(:where([class~="not-prose"] *)) {
+  .prose
+    :where(.prose > ul > li > *:last-child):not(
+      :where([class~="not-prose"] *)
+    ) {
     margin-bottom: 1.25em;
   }
 
@@ -518,7 +542,7 @@
     color: var(--color-foreground);
     border-left-width: 0.25rem;
     border-left-color: var(--color-border-input);
-    quotes: "\201C""\201D""\2018""\2019";
+    quotes: "\201C" "\201D" "\2018" "\2019";
     margin-top: 1.6em;
     margin-bottom: 1.6em;
     padding-left: 1em;

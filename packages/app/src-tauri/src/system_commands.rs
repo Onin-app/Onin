@@ -1,7 +1,7 @@
 use crate::command_manager;
 use crate::{installed_apps, plugin_manager};
 use crate::shared_types::{Command, CommandAction, };
-use tauri::{command, AppHandle, Manager};
+use tauri::{command, AppHandle, Manager, async_runtime};
 
 // --- 1. Single Source of Truth ---
 
@@ -62,6 +62,14 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
         keywords: &["数据目录"],
         icon: "folder",
         action: |app| open_app_data_dir(app),
+    },
+    SystemCommandInfo {
+        name: "refresh_list",
+        title: "刷新列表",
+        english_name: "Refresh List",
+        keywords: &["refresh", "刷新"],
+        icon: "arrowsClockwise",
+        action: |app| refresh_list(app),
     },
 ];
 
@@ -260,4 +268,18 @@ fn open_app_data_dir(app: AppHandle) {
             eprintln!("Failed to open app data dir: {}", e);
         }
     }
+}
+
+fn refresh_list(app: AppHandle) {
+    async_runtime::spawn(async move {
+        command_manager::refresh_commands(app.clone()).await;
+        // Show notification after refresh completes
+        let options = crate::plugin_api::notification::NotificationOptions {
+            title: "刷新完成".to_string(),
+            body: Some("列表已更新".to_string()),
+        };
+        if let Err(e) = crate::plugin_api::notification::show_notification(app, options) {
+            eprintln!("Failed to show notification: {}", e);
+        }
+    });
 }

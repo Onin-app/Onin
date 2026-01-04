@@ -2,7 +2,11 @@ use crate::shared_types::{Command, CommandAction, CommandKeyword, ItemSource};
 use crate::{file_command_manager, installed_apps, plugin_manager, system_commands};
 use std::fs;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter, Manager};
+
+// Global flag to prevent concurrent refreshes
+static IS_REFRESHING: AtomicBool = AtomicBool::new(false);
 
 fn get_commands_file_path(app: &AppHandle) -> PathBuf {
     let path = app.path().app_data_dir().unwrap();
@@ -41,35 +45,59 @@ pub async fn load_commands(app: &AppHandle) -> Vec<Command> {
             let result: Result<Vec<Command>, serde_json::Error> = serde_json::from_str(&json_str);
             match result {
                 Ok(commands) => {
+                    // Get current system commands
+                    let current_system_commands = get_initial_system_commands();
+                    let current_system_map: std::collections::HashMap<_, _> = current_system_commands
+                        .into_iter()
+                        .map(|c| (c.name.clone(), c))
+                        .collect();
+
+                    // Get installed plugins
                     let installed_plugins = get_initial_plugin_commands(app);
                     let installed_plugins_map: std::collections::HashMap<_, _> = installed_plugins
                         .into_iter()
                         .map(|p| (p.name.clone(), p))
                         .collect();
 
-                    let final_commands: Vec<Command> = commands
+                    // Filter out system commands and plugins from saved commands (keep app/file commands)
+                    let other_commands: Vec<Command> = commands
                         .iter()
-                        .filter(|c| c.source != ItemSource::Plugin)
+                        .filter(|c| c.source != ItemSource::Plugin && c.source != ItemSource::Command)
                         .cloned()
                         .collect();
 
+                    // Merge system commands (preserve user customizations, add new commands)
+                    let mut final_system_commands: Vec<Command> = Vec::new();
+                    for (name, system_command) in &current_system_map {
+                        let existing_command = commands
+                            .iter()
+                            .find(|c| c.source == ItemSource::Command && &c.name == name);
+
+                        if let Some(existing) = existing_command {
+                            // Keep saved version with user changes
+                            final_system_commands.push(existing.clone());
+                        } else {
+                            // New system command, add it
+                            final_system_commands.push(system_command.clone());
+                        }
+                    }
+
+                    // Merge plugin commands
                     let mut final_plugins: Vec<Command> = Vec::new();
                     for (name, plugin_command) in installed_plugins_map {
-                        // Find if this plugin command already exists in the saved commands
                         let existing_command = commands
                             .iter()
                             .find(|c| c.source == ItemSource::Plugin && c.name == name);
 
                         if let Some(existing) = existing_command {
-                            // If it exists, keep the saved version (with user changes)
                             final_plugins.push(existing.clone());
                         } else {
-                            // If it's a new plugin, add it
                             final_plugins.push(plugin_command);
                         }
                     }
 
-                    let mut mutable_final_commands = final_commands;
+                    let mut mutable_final_commands = final_system_commands;
+                    mutable_final_commands.extend(other_commands);
                     mutable_final_commands.extend(final_plugins);
                     save_commands(app, &mutable_final_commands);
                     mutable_final_commands
@@ -118,9 +146,21 @@ pub async fn update_command(app: AppHandle, command_to_update: Command) {
 
 #[tauri::command]
 pub async fn refresh_commands(app: AppHandle) {
+    // Prevent concurrent refreshes using compare_exchange
+    if IS_REFRESHING.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_err() {
+        return; // Already refreshing, skip this request
+    }
+    
+    // Emit refresh started event for frontend progress bar
+    let _ = app.emit("refresh_started", ());
+    
     let _commands = generate_and_save_commands(&app).await;
-    // Emit an event to notify the frontend that commands have been refreshed
-    app.emit("commands_refreshed", ()).unwrap();
+    
+    // Emit refresh completed event (also serves as "refresh_ended")
+    let _ = app.emit("commands_refreshed", ());
+    
+    // Reset the flag
+    IS_REFRESHING.store(false, Ordering::SeqCst);
 }
 
 fn get_initial_system_commands() -> Vec<Command> {
