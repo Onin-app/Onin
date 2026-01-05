@@ -144,6 +144,13 @@ pub async fn update_command(app: AppHandle, command_to_update: Command) {
     }
 }
 
+#[derive(Clone, serde::Serialize)]
+pub struct RefreshResult {
+    pub previous_count: usize,
+    pub current_count: usize,
+    pub added: i32,
+}
+
 #[tauri::command]
 pub async fn refresh_commands(app: AppHandle) {
     // Prevent concurrent refreshes using compare_exchange
@@ -154,10 +161,33 @@ pub async fn refresh_commands(app: AppHandle) {
     // Emit refresh started event for frontend progress bar
     let _ = app.emit("refresh_started", ());
     
-    let _commands = generate_and_save_commands(&app).await;
+    // Get previous count before refresh
+    let path = get_commands_file_path(&app);
+    let previous_count = if path.exists() {
+        match fs::read_to_string(&path) {
+            Ok(json_str) => {
+                serde_json::from_str::<Vec<Command>>(&json_str)
+                    .map(|cmds| cmds.len())
+                    .unwrap_or(0)
+            }
+            Err(_) => 0,
+        }
+    } else {
+        0
+    };
     
-    // Emit refresh completed event (also serves as "refresh_ended")
-    let _ = app.emit("commands_refreshed", ());
+    let commands = generate_and_save_commands(&app).await;
+    let current_count = commands.len();
+    let added = current_count as i32 - previous_count as i32;
+    
+    let result = RefreshResult {
+        previous_count,
+        current_count,
+        added,
+    };
+    
+    // Emit refresh completed event with count information
+    let _ = app.emit("commands_refreshed", result);
     
     // Reset the flag
     IS_REFRESHING.store(false, Ordering::SeqCst);

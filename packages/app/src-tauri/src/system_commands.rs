@@ -273,13 +273,6 @@ fn open_app_data_dir(app: AppHandle) {
 fn refresh_list(app: AppHandle) {
     async_runtime::spawn(async move {
         command_manager::refresh_commands(app.clone()).await;
-        // Show notification after refresh completes
-        let options = crate::plugin_api::notification::NotificationOptions {
-            title: "刷新完成".to_string(),
-            body: Some("列表已更新".to_string()),
-        };
-        if let Err(e) = crate::plugin_api::notification::show_notification(app, options) {
-            eprintln!("Failed to show notification: {}", e);
-        }
+        // Notification is now handled by frontend after receiving commands_refreshed event
     });
 }

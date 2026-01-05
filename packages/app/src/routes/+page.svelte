@@ -266,10 +266,29 @@
       isRefreshing = true;
     });
 
-    const unlistenRefreshEnded = await listen("commands_refreshed", () => {
-      console.log("Refresh ended");
+    const unlistenRefreshEnded = await listen<{
+      previous_count: number;
+      current_count: number;
+      added: number;
+    }>("commands_refreshed", async (event) => {
+      console.log("Refresh ended", event.payload);
       isRefreshing = false;
       fetchApps(); // Refetch the updated list
+
+      // Show notification with count information
+      const { current_count, added } = event.payload;
+      let message = `共 ${current_count} 项`;
+      if (added > 0) {
+        message += `，新增 ${added} 项`;
+      } else if (added < 0) {
+        message += `，减少 ${Math.abs(added)} 项`;
+      }
+      await invoke("show_notification", {
+        options: {
+          title: "刷新成功",
+          body: message,
+        },
+      });
     });
 
     unlisten = () => {
