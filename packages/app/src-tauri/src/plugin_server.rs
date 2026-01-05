@@ -143,11 +143,15 @@ async fn serve_plugin_file(
         _ => "application/octet-stream",
     };
 
-    // For HTML files, always inject Tauri bridge and plugin ID
-    // Both inline and window modes need the bridge for communication
+    // 对于 HTML 文件，始终注入 Tauri 桥接脚本和插件 ID
+    // 同时修复 Vite 构建插件的绝对路径为相对路径
     let final_content = if full_path.extension().and_then(|s| s.to_str()) == Some("html") {
         if let Ok(html) = String::from_utf8(content.clone()) {
-            inject_tauri_bridge(&html, &plugin_id).into_bytes()
+            // 首先，修复绝对路径为相对路径
+            // Vite 构建通常使用 /assets/... 这样的绝对路径，在我们的服务器上无法正常工作
+            let fixed_html = fix_asset_paths(&html);
+            // 然后注入 Tauri 桥接脚本
+            inject_tauri_bridge(&fixed_html, &plugin_id).into_bytes()
         } else {
             content
         }
@@ -156,6 +160,19 @@ async fn serve_plugin_file(
     };
 
     ([(header::CONTENT_TYPE, content_type)], final_content).into_response()
+}
+
+/// 修复 HTML 中的绝对路径为相对路径
+/// 
+/// Vite 构建的插件使用绝对路径（如 /assets/...），但在我们的插件服务器中：
+/// - 插件 HTML 的 URL 是：http://127.0.0.1:3457/plugin/plugin-id/dist/index.html
+/// - 如果 HTML 中引用 /assets/style.css，浏览器会解析为 http://127.0.0.1:3457/assets/style.css（错误）
+/// - 实际文件路径应该是：http://127.0.0.1:3457/plugin/plugin-id/dist/assets/style.css
+/// 
+/// 因此需要将绝对路径 / 转换为相对路径 ./，让浏览器相对于 HTML 文件所在目录解析资源
+fn fix_asset_paths(html: &str) -> String {
+    html.replace("=\"/", "=\"./")
+        .replace("='/", "='./")
 }
 
 /// Inject Tauri API bridge for inline plugins
