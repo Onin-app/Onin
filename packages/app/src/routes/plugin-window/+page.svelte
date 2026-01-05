@@ -85,6 +85,13 @@
 
           const eventType = event.payload ? "show" : "hide";
           try {
+            // 验证 pluginUrl 是否有效，避免 new URL() 报错
+            if (!pluginUrl || pluginUrl.trim() === "") {
+              console.warn(
+                "[PluginWindow] Cannot send lifecycle event: pluginUrl is empty",
+              );
+              return;
+            }
             const targetOrigin = new URL(pluginUrl).origin;
             iframe.contentWindow.postMessage(
               { type: "plugin-lifecycle-event", event: eventType },
@@ -111,9 +118,16 @@
     const iframe = pluginIframeElement;
     if (!iframe?.contentWindow) return;
 
-    // Send plugin ID to iframe via postMessage
-    // Use specific origin for better security
+    // 通过 postMessage 发送插件 ID 给 iframe
+    // 使用具体的 origin 以提高安全性
     try {
+      // 验证 pluginUrl 是否有效，避免 new URL() 报错
+      if (!pluginUrl || pluginUrl.trim() === "") {
+        console.warn(
+          "[PluginWindow] Cannot send plugin ID: pluginUrl is empty",
+        );
+        return;
+      }
       const targetOrigin = new URL(pluginUrl).origin;
       iframe.contentWindow.postMessage(
         { type: "set-plugin-id", pluginId },

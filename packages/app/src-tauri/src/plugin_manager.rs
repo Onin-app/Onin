@@ -1268,10 +1268,20 @@ async fn create_or_show_plugin_window(
     }
 
     // 使用 Svelte 页面加载插件窗口，页面内部会用 iframe 加载插件
+    // 开发模式：使用 localhost:1420
+    // 生产模式：使用 tauri://localhost 提供打包后的资源
+    #[cfg(debug_assertions)]
     let plugin_url = format!(
         "http://localhost:1420/plugin-window?plugin_id={}",
         plugin.manifest.id
     );
+    
+    #[cfg(not(debug_assertions))]
+    let plugin_url = format!(
+        "tauri://localhost/plugin-window?plugin_id={}",
+        plugin.manifest.id
+    );
+    
     println!(
         "[plugin_manager] Loading plugin window from: {}",
         plugin_url
@@ -2649,6 +2659,17 @@ pub async fn download_and_install_plugin(
         .map_err(|e| format!("Failed to read manifest: {}", e))?;
     let mut manifest: PluginManifest = serde_json::from_str(&manifest_content)
         .map_err(|e| format!("Invalid manifest format: {}", e))?;
+
+    // 重要：强制将市场插件的 devMode 设为 false
+    // 市场插件不应处于开发模式，因为用户没有运行插件的开发服务器
+    if manifest.dev_mode {
+        println!(
+            "[plugin_manager] Plugin {} has devMode=true in manifest, forcing to false for marketplace install",
+            manifest.id
+        );
+        manifest.dev_mode = false;
+        manifest.dev_server = None;
+    }
 
     // 如果市场提供了 icon URL，使用它覆盖 manifest 中的 icon
     if let Some(icon) = icon_url {
