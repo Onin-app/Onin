@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import { Label, RadioGroup, Switch, Button } from "bits-ui";
+  import { Label, RadioGroup, Switch, Button, ScrollArea } from "bits-ui";
   import { toast } from "svelte-sonner";
 
   import { theme, toggleTheme } from "$lib/utils/theme";
@@ -173,250 +173,264 @@
   onDestroy(unsubscribe);
 </script>
 
-<main class="h-full w-full overflow-y-auto pb-8 pr-2">
-  <section class="mb-6">
-    <h2
-      class="mb-3 px-1 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400"
-    >
-      主题设置
-    </h2>
-    <div
-      class="overflow-hidden rounded-xl border border-neutral-200 bg-white px-4 dark:border-neutral-800 dark:bg-neutral-900"
-    >
-      <SetItem title="主题">
-        {#snippet content()}
-          <RadioGroup.Root
-            class="flex gap-1 rounded-lg bg-neutral-100 p-1 dark:bg-neutral-800"
-            bind:value={getTheme, setTheme}
-          >
-            {#each themeList as theme}
-              <div class="relative">
-                <RadioGroup.Item
-                  id={theme.value}
-                  value={theme.value}
-                  class="peer sr-only"
+<ScrollArea.Root class="h-full w-full" type="hover">
+  <ScrollArea.Viewport class="h-full w-full">
+    <main class="h-full w-full pr-2 pb-8">
+      <section class="mb-6">
+        <h2
+          class="mb-3 px-1 text-xs font-semibold tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
+        >
+          主题设置
+        </h2>
+        <div
+          class="overflow-hidden rounded-xl border border-neutral-200 bg-white px-4 dark:border-neutral-800 dark:bg-neutral-900"
+        >
+          <SetItem title="主题">
+            {#snippet content()}
+              <RadioGroup.Root
+                class="flex gap-1 rounded-lg bg-neutral-100 p-1 dark:bg-neutral-800"
+                bind:value={getTheme, setTheme}
+              >
+                {#each themeList as theme}
+                  <div class="relative">
+                    <RadioGroup.Item
+                      id={theme.value}
+                      value={theme.value}
+                      class="peer sr-only"
+                    />
+                    <Label.Root
+                      for={theme.value}
+                      class="cursor-pointer rounded-md px-3 py-1.5 text-xs font-medium text-neutral-600 transition-all peer-data-[state=checked]:bg-white peer-data-[state=checked]:text-neutral-900 peer-data-[state=checked]:shadow-sm hover:bg-white/50 dark:text-neutral-400 dark:peer-data-[state=checked]:bg-neutral-700 dark:peer-data-[state=checked]:text-white dark:hover:bg-neutral-700/50"
+                    >
+                      {theme.label}
+                    </Label.Root>
+                  </div>
+                {/each}
+              </RadioGroup.Root>
+            {/snippet}
+          </SetItem>
+        </div>
+      </section>
+
+      <section class="mb-6">
+        <h2
+          class="mb-3 px-1 text-xs font-semibold tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
+        >
+          系统设置
+        </h2>
+        <div
+          class="overflow-hidden rounded-xl border border-neutral-200 bg-white px-4 dark:border-neutral-800 dark:bg-neutral-900"
+        >
+          <SetItem title="开机自启">
+            {#snippet content()}
+              <Switch.Root
+                bind:checked={autostartEnabled}
+                onCheckedChange={handleAutostartToggle}
+                class="peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:ring-offset-2 focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-neutral-900 data-[state=unchecked]:bg-neutral-200 dark:focus-visible:ring-neutral-300 dark:data-[state=checked]:bg-neutral-50 dark:data-[state=unchecked]:bg-neutral-700"
+              >
+                <Switch.Thumb
+                  class="pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0 dark:bg-neutral-950"
                 />
-                <Label.Root
-                  for={theme.value}
-                  class="cursor-pointer rounded-md px-3 py-1.5 text-xs font-medium text-neutral-600 transition-all hover:bg-white/50 peer-data-[state=checked]:bg-white peer-data-[state=checked]:text-neutral-900 peer-data-[state=checked]:shadow-sm dark:text-neutral-400 dark:hover:bg-neutral-700/50 dark:peer-data-[state=checked]:bg-neutral-700 dark:peer-data-[state=checked]:text-white"
-                >
-                  {theme.label}
-                </Label.Root>
+              </Switch.Root>
+            {/snippet}
+          </SetItem>
+          <SetItem title="任务栏中显示图标">
+            {#snippet content()}
+              <Switch.Root
+                bind:checked={trayIconEnabled}
+                onCheckedChange={handleTrayIconToggle}
+                class="peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:ring-offset-2 focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-neutral-900 data-[state=unchecked]:bg-neutral-200 dark:focus-visible:ring-neutral-300 dark:data-[state=checked]:bg-neutral-50 dark:data-[state=unchecked]:bg-neutral-700"
+              >
+                <Switch.Thumb
+                  class="pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0 dark:bg-neutral-950"
+                />
+              </Switch.Root>
+            {/snippet}
+          </SetItem>
+          <SetItem title="显示/隐藏窗口快捷键">
+            {#snippet content()}
+              <ShortcutInput
+                bind:value={shortcut}
+                onSave={() =>
+                  invoke("set_toggle_shortcut", { shortcutStr: shortcut })}
+                showPresets={true}
+              />
+            {/snippet}
+          </SetItem>
+          <SetItem title="分离窗口快捷键">
+            {#snippet content()}
+              <ShortcutInput
+                bind:value={$detachWindowShortcut}
+                onSave={() =>
+                  detachWindowShortcut.setShortcut($detachWindowShortcut)}
+                showPresets={false}
+              />
+            {/snippet}
+          </SetItem>
+        </div>
+      </section>
+
+      <section class="mb-6">
+        <h2
+          class="mb-3 px-1 text-xs font-semibold tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
+        >
+          剪贴板设置
+        </h2>
+        <div
+          class="overflow-hidden rounded-xl border border-neutral-200 bg-white px-4 dark:border-neutral-800 dark:bg-neutral-900"
+        >
+          <SetItem
+            title="自动粘贴时间限制（秒）"
+            description="复制内容后在此时间内自动粘贴"
+          >
+            {#snippet content()}
+              <div class="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  max="60"
+                  bind:value={autoPasteTimeLimit}
+                  onchange={updateConfig}
+                  class="h-8 w-16 rounded-md border border-neutral-200 bg-transparent px-2 text-center text-sm focus:border-neutral-900 focus:outline-hidden dark:border-neutral-700 dark:focus:border-neutral-100"
+                />
+                <span class="text-xs text-neutral-500">
+                  {autoPasteTimeLimit === 0 ? "不限制" : "秒"}
+                </span>
               </div>
-            {/each}
-          </RadioGroup.Root>
-        {/snippet}
-      </SetItem>
-    </div>
-  </section>
-
-  <section class="mb-6">
-    <h2
-      class="mb-3 px-1 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400"
-    >
-      系统设置
-    </h2>
-    <div
-      class="overflow-hidden rounded-xl border border-neutral-200 bg-white px-4 dark:border-neutral-800 dark:bg-neutral-900"
-    >
-      <SetItem title="开机自启">
-        {#snippet content()}
-          <Switch.Root
-            bind:checked={autostartEnabled}
-            onCheckedChange={handleAutostartToggle}
-            class="focus-visible:outline-hidden peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-neutral-900 data-[state=unchecked]:bg-neutral-200 dark:focus-visible:ring-neutral-300 dark:data-[state=checked]:bg-neutral-50 dark:data-[state=unchecked]:bg-neutral-700"
+            {/snippet}
+          </SetItem>
+          <SetItem
+            title="自动清空剪贴板时间限制（秒）"
+            description="在此时间后自动清空剪贴板内容，保护隐私"
           >
-            <Switch.Thumb
-              class="pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0 dark:bg-neutral-950"
-            />
-          </Switch.Root>
-        {/snippet}
-      </SetItem>
-      <SetItem title="任务栏中显示图标">
-        {#snippet content()}
-          <Switch.Root
-            bind:checked={trayIconEnabled}
-            onCheckedChange={handleTrayIconToggle}
-            class="focus-visible:outline-hidden peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-neutral-900 data-[state=unchecked]:bg-neutral-200 dark:focus-visible:ring-neutral-300 dark:data-[state=checked]:bg-neutral-50 dark:data-[state=unchecked]:bg-neutral-700"
-          >
-            <Switch.Thumb
-              class="pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0 dark:bg-neutral-950"
-            />
-          </Switch.Root>
-        {/snippet}
-      </SetItem>
-      <SetItem title="显示/隐藏窗口快捷键">
-        {#snippet content()}
-          <ShortcutInput
-            bind:value={shortcut}
-            onSave={() =>
-              invoke("set_toggle_shortcut", { shortcutStr: shortcut })}
-            showPresets={true}
-          />
-        {/snippet}
-      </SetItem>
-      <SetItem title="分离窗口快捷键">
-        {#snippet content()}
-          <ShortcutInput
-            bind:value={$detachWindowShortcut}
-            onSave={() =>
-              detachWindowShortcut.setShortcut($detachWindowShortcut)}
-            showPresets={false}
-          />
-        {/snippet}
-      </SetItem>
-    </div>
-  </section>
+            {#snippet content()}
+              <div class="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  max="300"
+                  bind:value={autoClearTimeLimit}
+                  onchange={updateConfig}
+                  class="h-8 w-16 rounded-md border border-neutral-200 bg-transparent px-2 text-center text-sm focus:border-neutral-900 focus:outline-hidden dark:border-neutral-700 dark:focus:border-neutral-100"
+                />
+                <span class="text-xs text-neutral-500">
+                  {autoClearTimeLimit === 0 ? "不自动清空" : "秒"}
+                </span>
+              </div>
+            {/snippet}
+          </SetItem>
+        </div>
+      </section>
 
-  <section class="mb-6">
-    <h2
-      class="mb-3 px-1 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400"
-    >
-      剪贴板设置
-    </h2>
-    <div
-      class="overflow-hidden rounded-xl border border-neutral-200 bg-white px-4 dark:border-neutral-800 dark:bg-neutral-900"
-    >
-      <SetItem
-        title="自动粘贴时间限制（秒）"
-        description="复制内容后在此时间内自动粘贴"
-      >
-        {#snippet content()}
-          <div class="flex items-center gap-2">
-            <input
-              type="number"
-              min="0"
-              max="60"
-              bind:value={autoPasteTimeLimit}
-              onchange={updateConfig}
-              class="focus:outline-hidden h-8 w-16 rounded-md border border-neutral-200 bg-transparent px-2 text-center text-sm focus:border-neutral-900 dark:border-neutral-700 dark:focus:border-neutral-100"
-            />
-            <span class="text-xs text-neutral-500">
-              {autoPasteTimeLimit === 0 ? "不限制" : "秒"}
-            </span>
-          </div>
-        {/snippet}
-      </SetItem>
-      <SetItem
-        title="自动清空剪贴板时间限制（秒）"
-        description="在此时间后自动清空剪贴板内容，保护隐私"
-      >
-        {#snippet content()}
-          <div class="flex items-center gap-2">
-            <input
-              type="number"
-              min="0"
-              max="300"
-              bind:value={autoClearTimeLimit}
-              onchange={updateConfig}
-              class="focus:outline-hidden h-8 w-16 rounded-md border border-neutral-200 bg-transparent px-2 text-center text-sm focus:border-neutral-900 dark:border-neutral-700 dark:focus:border-neutral-100"
-            />
-            <span class="text-xs text-neutral-500">
-              {autoClearTimeLimit === 0 ? "不自动清空" : "秒"}
-            </span>
-          </div>
-        {/snippet}
-      </SetItem>
-    </div>
-  </section>
-
-  <section class="mb-6">
-    <h2
-      class="mb-3 px-1 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400"
-    >
-      指令排序
-    </h2>
-    <div
-      class="overflow-hidden rounded-xl border border-neutral-200 bg-white px-4 dark:border-neutral-800 dark:bg-neutral-900"
-    >
-      <SetItem title="启用使用频率追踪" description="根据使用习惯优化指令排序">
-        {#snippet content()}
-          <Switch.Root
-            bind:checked={enableUsageTracking}
-            onCheckedChange={updateConfig}
-            class="focus-visible:outline-hidden peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-neutral-900 data-[state=unchecked]:bg-neutral-200 dark:focus-visible:ring-neutral-300 dark:data-[state=checked]:bg-neutral-50 dark:data-[state=unchecked]:bg-neutral-700"
+      <section class="mb-6">
+        <h2
+          class="mb-3 px-1 text-xs font-semibold tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
+        >
+          指令排序
+        </h2>
+        <div
+          class="overflow-hidden rounded-xl border border-neutral-200 bg-white px-4 dark:border-neutral-800 dark:bg-neutral-900"
+        >
+          <SetItem
+            title="启用使用频率追踪"
+            description="根据使用习惯优化指令排序"
           >
-            <Switch.Thumb
-              class="pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0 dark:bg-neutral-950"
-            />
-          </Switch.Root>
-        {/snippet}
-      </SetItem>
-      <SetItem title="排序模式">
-        {#snippet content()}
-          <div class="flex flex-col gap-1 text-right">
-            <select
-              bind:value={sortMode}
-              onchange={updateConfig}
-              disabled={!enableUsageTracking}
-              class="h-8 rounded-md border border-neutral-200 bg-transparent px-2 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900"
-            >
-              {#each sortModeOptions as option}
-                <option value={option.value}>{option.label}</option>
-              {/each}
-            </select>
-            <span class="text-[10px] text-neutral-400">
-              {sortModeOptions.find((o) => o.value === sortMode)?.description ||
-                ""}
-            </span>
-          </div>
-        {/snippet}
-      </SetItem>
-      <SetItem title="使用记录">
-        {#snippet content()}
-          <Button.Root
-            class="focus-visible:outline-hidden inline-flex h-8 items-center justify-center rounded-md border border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-900 shadow-sm transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:ring-1 focus-visible:ring-neutral-950 disabled:pointer-events-none disabled:opacity-50 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-50 dark:hover:bg-neutral-800 dark:hover:text-neutral-50 dark:focus-visible:ring-neutral-300"
-            onclick={handleClearUsageStats}
-          >
-            清除使用记录
-          </Button.Root>
-        {/snippet}
-      </SetItem>
-    </div>
-  </section>
+            {#snippet content()}
+              <Switch.Root
+                bind:checked={enableUsageTracking}
+                onCheckedChange={updateConfig}
+                class="peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:ring-offset-2 focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-neutral-900 data-[state=unchecked]:bg-neutral-200 dark:focus-visible:ring-neutral-300 dark:data-[state=checked]:bg-neutral-50 dark:data-[state=unchecked]:bg-neutral-700"
+              >
+                <Switch.Thumb
+                  class="pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0 dark:bg-neutral-950"
+                />
+              </Switch.Root>
+            {/snippet}
+          </SetItem>
+          <SetItem title="排序模式">
+            {#snippet content()}
+              <div class="flex flex-col gap-1 text-right">
+                <select
+                  bind:value={sortMode}
+                  onchange={updateConfig}
+                  disabled={!enableUsageTracking}
+                  class="h-8 rounded-md border border-neutral-200 bg-transparent px-2 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900"
+                >
+                  {#each sortModeOptions as option}
+                    <option value={option.value}>{option.label}</option>
+                  {/each}
+                </select>
+                <span class="text-[10px] text-neutral-400">
+                  {sortModeOptions.find((o) => o.value === sortMode)
+                    ?.description || ""}
+                </span>
+              </div>
+            {/snippet}
+          </SetItem>
+          <SetItem title="使用记录">
+            {#snippet content()}
+              <Button.Root
+                class="inline-flex h-8 items-center justify-center rounded-md border border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-900 shadow-sm transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:ring-1 focus-visible:ring-neutral-950 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-50 dark:hover:bg-neutral-800 dark:hover:text-neutral-50 dark:focus-visible:ring-neutral-300"
+                onclick={handleClearUsageStats}
+              >
+                清除使用记录
+              </Button.Root>
+            {/snippet}
+          </SetItem>
+        </div>
+      </section>
 
-  <section class="mb-6">
-    <h2
-      class="mb-3 px-1 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400"
-    >
-      插件市场
-    </h2>
-    <div
-      class="overflow-hidden rounded-xl border border-neutral-200 bg-white px-4 dark:border-neutral-800 dark:bg-neutral-900"
-    >
-      <SetItem title="API 地址">
-        {#snippet content()}
-          <input
-            type="text"
-            bind:value={marketplaceApiUrl}
-            onchange={updateConfig}
-            placeholder="https://..."
-            class="focus:outline-hidden h-8 w-64 rounded-md border border-neutral-200 bg-transparent px-3 text-sm placeholder:text-neutral-400 focus:border-neutral-900 dark:border-neutral-700 dark:focus:border-neutral-100"
-          />
-        {/snippet}
-      </SetItem>
-    </div>
-  </section>
+      <section class="mb-6">
+        <h2
+          class="mb-3 px-1 text-xs font-semibold tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
+        >
+          插件市场
+        </h2>
+        <div
+          class="overflow-hidden rounded-xl border border-neutral-200 bg-white px-4 dark:border-neutral-800 dark:bg-neutral-900"
+        >
+          <SetItem title="API 地址">
+            {#snippet content()}
+              <input
+                type="text"
+                bind:value={marketplaceApiUrl}
+                onchange={updateConfig}
+                placeholder="https://..."
+                class="h-8 w-64 rounded-md border border-neutral-200 bg-transparent px-3 text-sm placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-hidden dark:border-neutral-700 dark:focus:border-neutral-100"
+              />
+            {/snippet}
+          </SetItem>
+        </div>
+      </section>
 
-  <section class="mb-6">
-    <h2
-      class="mb-3 px-1 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400"
-    >
-      数据存储
-    </h2>
-    <div
-      class="overflow-hidden rounded-xl border border-neutral-200 bg-white px-4 dark:border-neutral-800 dark:bg-neutral-900"
-    >
-      <SetItem title="应用数据">
-        {#snippet content()}
-          <Button.Root
-            class="focus-visible:outline-hidden inline-flex h-8 items-center justify-center rounded-md border border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-900 shadow-sm transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:ring-1 focus-visible:ring-neutral-950 disabled:pointer-events-none disabled:opacity-50 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-50 dark:hover:bg-neutral-800 dark:hover:text-neutral-50 dark:focus-visible:ring-neutral-300"
-            onclick={() => invoke("open_app_data_dir")}
-          >
-            打开数据目录
-          </Button.Root>
-        {/snippet}
-      </SetItem>
-    </div>
-  </section>
-</main>
+      <section class="mb-6">
+        <h2
+          class="mb-3 px-1 text-xs font-semibold tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
+        >
+          数据存储
+        </h2>
+        <div
+          class="overflow-hidden rounded-xl border border-neutral-200 bg-white px-4 dark:border-neutral-800 dark:bg-neutral-900"
+        >
+          <SetItem title="应用数据">
+            {#snippet content()}
+              <Button.Root
+                class="inline-flex h-8 items-center justify-center rounded-md border border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-900 shadow-sm transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:ring-1 focus-visible:ring-neutral-950 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-50 dark:hover:bg-neutral-800 dark:hover:text-neutral-50 dark:focus-visible:ring-neutral-300"
+                onclick={() => invoke("open_app_data_dir")}
+              >
+                打开数据目录
+              </Button.Root>
+            {/snippet}
+          </SetItem>
+        </div>
+      </section>
+    </main>
+  </ScrollArea.Viewport>
+  <ScrollArea.Scrollbar
+    orientation="vertical"
+    class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none rounded-full border-l border-l-transparent p-px transition-all duration-200 select-none hover:w-3"
+  >
+    <ScrollArea.Thumb class="bg-muted-foreground flex-1 rounded-full" />
+  </ScrollArea.Scrollbar>
+  <ScrollArea.Corner />
+</ScrollArea.Root>
