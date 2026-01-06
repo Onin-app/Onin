@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import { Label, RadioGroup, Switch, Button, ScrollArea } from "bits-ui";
+  import { Tabs, Switch, Button, ScrollArea } from "bits-ui";
   import { toast } from "svelte-sonner";
 
   import { theme, toggleTheme } from "$lib/utils/theme";
@@ -187,26 +187,23 @@
         >
           <SetItem title="主题">
             {#snippet content()}
-              <RadioGroup.Root
-                class="flex gap-1 rounded-lg bg-neutral-100 p-1 dark:bg-neutral-800"
-                bind:value={getTheme, setTheme}
+              <Tabs.Root
+                value={currentTheme}
+                onValueChange={(v) => v && setTheme(v as Theme)}
               >
-                {#each themeList as theme}
-                  <div class="relative">
-                    <RadioGroup.Item
-                      id={theme.value}
+                <Tabs.List
+                  class="flex gap-1 rounded-lg bg-neutral-100 p-1 dark:bg-neutral-800"
+                >
+                  {#each themeList as theme}
+                    <Tabs.Trigger
                       value={theme.value}
-                      class="peer sr-only"
-                    />
-                    <Label.Root
-                      for={theme.value}
-                      class="cursor-pointer rounded-md px-3 py-1.5 text-xs font-medium text-neutral-600 transition-all peer-data-[state=checked]:bg-white peer-data-[state=checked]:text-neutral-900 peer-data-[state=checked]:shadow-sm hover:bg-white/50 dark:text-neutral-400 dark:peer-data-[state=checked]:bg-neutral-700 dark:peer-data-[state=checked]:text-white dark:hover:bg-neutral-700/50"
+                      class="rounded-md px-3 py-1.5 text-xs font-medium text-neutral-600 transition-all hover:bg-white/50 data-[state=active]:bg-white data-[state=active]:text-neutral-900 data-[state=active]:shadow-sm dark:text-neutral-400 dark:hover:bg-neutral-700/50 dark:data-[state=active]:bg-neutral-700 dark:data-[state=active]:text-white"
                     >
                       {theme.label}
-                    </Label.Root>
-                  </div>
-                {/each}
-              </RadioGroup.Root>
+                    </Tabs.Trigger>
+                  {/each}
+                </Tabs.List>
+              </Tabs.Root>
             {/snippet}
           </SetItem>
         </div>
