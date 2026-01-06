@@ -206,83 +206,87 @@
             添加
           </div>
         {:else}
-          <ul class="h-full w-full overflow-y-auto text-left">
+          <ul class="flex h-full w-full flex-col gap-1 text-left">
             {#each fileCommands as item, index (item.path)}
               <li
-                class="group flex items-center rounded-lg p-2 hover:bg-neutral-200 dark:hover:bg-neutral-700"
+                class="group grid grid-cols-[1fr_auto] items-center gap-2 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-700"
               >
-                {#if item.icon && item.icon_type === "Base64"}
-                  <img
-                    src={`data:image/png;base64,${item.icon}`}
-                    alt="{item.name} icon"
-                    class="mr-4 h-8 w-8 flex-shrink-0"
-                  />
-                {:else if item.icon}
-                  <div
-                    class="mr-4 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-gray-200 dark:bg-gray-700"
-                  >
-                    <PhosphorIcon icon={item.icon} class="h-6 w-6" />
+                <div class="flex min-w-0 items-center overflow-hidden p-2">
+                  {#if item.icon && item.icon_type === "Base64"}
+                    <img
+                      src={`data:image/png;base64,${item.icon}`}
+                      alt="{item.name} icon"
+                      class="mr-4 h-8 w-8 flex-shrink-0"
+                    />
+                  {:else if item.icon}
+                    <div
+                      class="mr-4 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-gray-200 dark:bg-gray-700"
+                    >
+                      <PhosphorIcon icon={item.icon} class="h-6 w-6" />
+                    </div>
+                  {:else}
+                    <div
+                      class="mr-4 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-300"
+                    >
+                      {#if item.item_type === "Folder"}
+                        <Folder size={24} />
+                      {:else if item.item_type === "File"}
+                        <File size={24} />
+                      {:else}
+                        <AppWindow size={24} />
+                      {/if}
+                    </div>
+                  {/if}
+                  <div class="min-w-0 flex-1 overflow-hidden">
+                    <p class="truncate font-semibold">{item.name}</p>
+                    <p class="truncate text-sm text-neutral-500">{item.path}</p>
                   </div>
-                {:else}
-                  <div
-                    class="mr-4 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-300"
-                  >
-                    {#if item.item_type === "Folder"}
-                      <Folder size={24} />
-                    {:else if item.item_type === "File"}
-                      <File size={24} />
-                    {:else}
-                      <AppWindow size={24} />
-                    {/if}
-                  </div>
-                {/if}
-                <div class="flex-1 overflow-hidden">
-                  <p class="truncate font-semibold">{item.name}</p>
-                  <p class="truncate text-sm text-neutral-500">{item.path}</p>
                 </div>
 
-                <Popover.Root>
-                  <Popover.Trigger>
-                    <button
-                      class="ml-2 rounded-full p-1 text-neutral-400 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-500"
-                      aria-label="删除 {item.name}"
-                    >
-                      <Trash size={20} />
-                    </button>
-                  </Popover.Trigger>
-                  <Popover.Portal>
-                    <Popover.Content
-                      class="border-dark-10 bg-background shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-30 w-full max-w-[328px] origin-(--bits-popover-content-transform-origin) rounded-[12px] border p-4"
-                      sideOffset={8}
-                    >
-                      <Popover.Arrow />
-                      <h3
-                        class="mb-2 text-[14px] leading-5 font-semibold tracking-[-0.01em]"
+                <div class="flex items-center justify-center pr-2">
+                  <Popover.Root>
+                    <Popover.Trigger>
+                      <button
+                        class="rounded-full p-1 text-neutral-400 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-500"
+                        aria-label="删除 {item.name}"
                       >
-                        确认删除？
-                      </h3>
-                      <div>
-                        <Popover.Close>
+                        <Trash size={20} />
+                      </button>
+                    </Popover.Trigger>
+                    <Popover.Portal>
+                      <Popover.Content
+                        class="border-dark-10 bg-background shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-30 w-full max-w-[328px] origin-(--bits-popover-content-transform-origin) rounded-[12px] border p-4"
+                        sideOffset={8}
+                      >
+                        <Popover.Arrow />
+                        <h3
+                          class="mb-2 text-[14px] leading-5 font-semibold tracking-[-0.01em]"
+                        >
+                          确认删除？
+                        </h3>
+                        <div>
+                          <Popover.Close>
+                            <Button.Root
+                              class="rounded-input bg-dark text-background shadow-mini hover:bg-dark/95 inline-flex
+	h-6 items-center justify-center px-[12px] text-[10px]
+	font-semibold active:scale-[0.98] active:transition-all"
+                            >
+                              取消
+                            </Button.Root>
+                          </Popover.Close>
                           <Button.Root
                             class="rounded-input bg-dark text-background shadow-mini hover:bg-dark/95 inline-flex
 	h-6 items-center justify-center px-[12px] text-[10px]
 	font-semibold active:scale-[0.98] active:transition-all"
+                            onclick={() => deleteItem(item.path)}
                           >
-                            取消
+                            确认
                           </Button.Root>
-                        </Popover.Close>
-                        <Button.Root
-                          class="rounded-input bg-dark text-background shadow-mini hover:bg-dark/95 inline-flex
-	h-6 items-center justify-center px-[12px] text-[10px]
-	font-semibold active:scale-[0.98] active:transition-all"
-                          onclick={() => deleteItem(item.path)}
-                        >
-                          确认
-                        </Button.Root>
-                      </div>
-                    </Popover.Content>
-                  </Popover.Portal>
-                </Popover.Root>
+                        </div>
+                      </Popover.Content>
+                    </Popover.Portal>
+                  </Popover.Root>
+                </div>
               </li>
             {/each}
           </ul>
