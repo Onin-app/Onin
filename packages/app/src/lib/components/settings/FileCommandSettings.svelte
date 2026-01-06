@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
-  import { Popover, Button, ScrollArea } from "bits-ui";
+  import { Popover, Button, ScrollArea, Accordion } from "bits-ui";
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
   import type { LaunchableItem } from "$lib/type";
@@ -8,10 +8,11 @@
   // import { Webview } from "@tauri-apps/api/webview";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
   import { TauriEvent } from "@tauri-apps/api/event";
-  import { Trash, Folder, File, AppWindow } from "phosphor-svelte";
+  import { Trash, Folder, File, AppWindow, CaretDown } from "phosphor-svelte";
 
   let fileCommands = $state<LaunchableItem[]>([]);
   let listContainerEl: HTMLDivElement | undefined = $state();
+  let mainContainerEl: HTMLElement | undefined = $state();
   let isLoading = $state(true);
   let isProcessing = $state(false);
   let isDraggingOver = $state(false);
@@ -47,13 +48,29 @@
 
   async function handlePaste(event: ClipboardEvent) {
     event.preventDefault();
-    const text = event.clipboardData?.getData("text/plain");
-    if (!text) return;
+
+    const clipboardData = event.clipboardData;
+    if (!clipboardData) return;
+
+    // 只支持文本路径，不支持从 Finder 复制的文件对象
+    // 因为浏览器安全限制，无法读取文件对象的完整路径
+    const text = clipboardData.getData("text/plain");
+
+    if (!text) {
+      console.log(
+        "提示：从 Finder 复制的文件无法直接粘贴。请右键文件选择'拷贝路径'，或使用拖放功能。",
+      );
+      return;
+    }
+
     const paths = text
       .split("\n")
       .map((p) => p.trim())
       .filter(Boolean);
-    await addItems(paths);
+
+    if (paths.length > 0) {
+      await addItems(paths);
+    }
   }
 
   async function deleteItem(path: string) {
@@ -81,7 +98,7 @@
     try {
       const selected = await open({
         multiple: true,
-        directory: false,
+        directory: true,
       });
 
       if (!selected || selected.length === 0) {
@@ -141,7 +158,7 @@
 
   // 使用 $effect 可以安全地在元素绑定后添加/移除事件监听器
   $effect(() => {
-    const el = listContainerEl;
+    const el = mainContainerEl;
     if (el) {
       el.addEventListener("paste", handlePaste);
       return () => {
@@ -160,21 +177,53 @@
   });
 </script>
 
-<main class="flex h-full w-full flex-col">
+<main
+  class="flex h-full w-full flex-col"
+  bind:this={mainContainerEl}
+  tabindex="0"
+>
   <h2 class="mb-2 text-xl font-bold">文件启动设置</h2>
   {#if fileCommands.length > 0}
-    <div class="mb-2 flex items-center text-sm text-neutral-500">
-      可以通过拖放或者粘贴文件/文件夹路径来添加文件，也可以点击
-      <Button.Root
-        class="rounded-input bg-dark text-background shadow-mini hover:bg-dark/95 mx-1
+    <Accordion.Root class="mb-2" type="single">
+      <Accordion.Item value="help">
+        <Accordion.Header>
+          <Accordion.Trigger
+            class="flex w-full items-center justify-between rounded-lg px-2 py-1 text-sm text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+          >
+            <span>如何添加文件/文件夹？</span>
+            <CaretDown
+              class="transition-transform duration-200 [[data-state=open]_&]:rotate-180"
+              size={16}
+            />
+          </Accordion.Trigger>
+        </Accordion.Header>
+        <Accordion.Content
+          class="data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down overflow-hidden"
+        >
+          <div class="px-2 pb-2 pt-1 text-sm text-neutral-500">
+            <ul class="ml-4 list-disc space-y-1">
+              <li>
+                <strong>拖放</strong>：从 Finder 拖放文件/文件夹到下方区域
+              </li>
+              <li>
+                <strong>粘贴路径</strong>：复制文件/文件夹的完整路径后按
+                Cmd+V（如 /Users/xxx/file.txt）
+              </li>
+              <li>
+                <strong>点击按钮</strong>：点击 <Button.Root
+                  class="rounded-input bg-dark text-background shadow-mini hover:bg-dark/95 mx-1
 	inline-flex h-5 items-center justify-center px-[6px]
 	text-[10px] font-semibold active:scale-[0.98] active:transition-all"
-        onclick={handleOpenFolder}
-      >
-        按钮
-      </Button.Root>
-      添加
-    </div>
+                  onclick={handleOpenFolder}
+                >
+                  按钮
+                </Button.Root> 选择文件/文件夹
+              </li>
+            </ul>
+          </div>
+        </Accordion.Content>
+      </Accordion.Item>
+    </Accordion.Root>
   {/if}
 
   <ScrollArea.Root
@@ -188,23 +237,50 @@
         bind:this={listContainerEl}
         class="list-container relative rounded-lg text-center transition-colors"
         role="group"
-        tabindex="-1"
       >
         {#if isLoading}
           <p class="text-neutral-500">正在加载...</p>
         {:else if fileCommands.length === 0}
-          <div class="mb-2 flex items-center text-sm text-neutral-500">
-            可以通过拖放或者粘贴文件/文件夹路径来添加文件指令，也可以点击
-            <Button.Root
-              class="rounded-input bg-dark text-background shadow-mini hover:bg-dark/95 mx-1
+          <Accordion.Root class="mb-2" type="single">
+            <Accordion.Item value="help">
+              <Accordion.Header>
+                <Accordion.Trigger
+                  class="flex w-full items-center justify-between rounded-lg px-2 py-1 text-sm text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                >
+                  <span>如何添加文件/文件夹？</span>
+                  <CaretDown
+                    class="transition-transform duration-200 [[data-state=open]_&]:rotate-180"
+                    size={16}
+                  />
+                </Accordion.Trigger>
+              </Accordion.Header>
+              <Accordion.Content
+                class="data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down overflow-hidden"
+              >
+                <div class="px-2 pb-2 pt-1 text-sm text-neutral-500">
+                  <ul class="ml-4 list-disc space-y-1">
+                    <li>
+                      <strong>拖放</strong>：从 Finder 拖放文件/文件夹到此区域
+                    </li>
+                    <li>
+                      <strong>粘贴路径</strong>：复制文件/文件夹的完整路径后按
+                      Cmd+V（如 /Users/xxx/file.txt）
+                    </li>
+                    <li>
+                      <strong>点击按钮</strong>：点击 <Button.Root
+                        class="rounded-input bg-dark text-background shadow-mini hover:bg-dark/95 mx-1
 	inline-flex h-5 items-center justify-center px-[6px]
 	text-[10px] font-semibold active:scale-[0.98] active:transition-all"
-              onclick={handleOpenFolder}
-            >
-              按钮
-            </Button.Root>
-            添加
-          </div>
+                        onclick={handleOpenFolder}
+                      >
+                        按钮
+                      </Button.Root> 选择文件/文件夹
+                    </li>
+                  </ul>
+                </div>
+              </Accordion.Content>
+            </Accordion.Item>
+          </Accordion.Root>
         {:else}
           <ul class="flex h-full w-full flex-col gap-1 text-left">
             {#each fileCommands as item, index (item.path)}
@@ -247,7 +323,7 @@
                   <Popover.Root>
                     <Popover.Trigger>
                       <button
-                        class="rounded-full p-1 text-neutral-400 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-500"
+                        class="rounded-full p-1 text-neutral-400 opacity-0 transition-opacity hover:text-red-500 group-hover:opacity-100"
                         aria-label="删除 {item.name}"
                       >
                         <Trash size={20} />
@@ -255,12 +331,12 @@
                     </Popover.Trigger>
                     <Popover.Portal>
                       <Popover.Content
-                        class="border-dark-10 bg-background shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-30 w-full max-w-[328px] origin-(--bits-popover-content-transform-origin) rounded-[12px] border p-4"
+                        class="border-dark-10 bg-background shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-(--bits-popover-content-transform-origin) z-30 w-full max-w-[328px] rounded-[12px] border p-4"
                         sideOffset={8}
                       >
                         <Popover.Arrow />
                         <h3
-                          class="mb-2 text-[14px] leading-5 font-semibold tracking-[-0.01em]"
+                          class="mb-2 text-[14px] font-semibold leading-5 tracking-[-0.01em]"
                         >
                           确认删除？
                         </h3>
@@ -302,13 +378,13 @@
     </ScrollArea.Viewport>
     <ScrollArea.Scrollbar
       orientation="vertical"
-      class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none rounded-full border-l border-l-transparent p-px transition-all duration-200 select-none hover:w-3"
+      class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none select-none rounded-full border-l border-l-transparent p-px transition-all duration-200 hover:w-3"
     >
       <ScrollArea.Thumb class="bg-muted-foreground flex-1 rounded-full" />
     </ScrollArea.Scrollbar>
     <ScrollArea.Scrollbar
       orientation="horizontal"
-      class="bg-muted hover:bg-dark-10 flex h-1.5 touch-none rounded-full border-t border-t-transparent p-px transition-all duration-200 select-none hover:h-3"
+      class="bg-muted hover:bg-dark-10 flex h-1.5 touch-none select-none rounded-full border-t border-t-transparent p-px transition-all duration-200 hover:h-3"
     >
       <ScrollArea.Thumb class="bg-muted-foreground rounded-full" />
     </ScrollArea.Scrollbar>
