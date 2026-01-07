@@ -16,7 +16,7 @@ pub mod icon_utils;
 mod installed_apps;
 mod js_runtime;
 mod plugin_api;
-mod plugin_manager;
+mod plugin;
 mod plugin_server;
 pub mod shared_types;
 mod shortcut_manager;
@@ -75,11 +75,11 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_clipboard_manager::init())
-        .manage(plugin_manager::PluginStore(Default::default()))
-        .manage(plugin_manager::ActivePluginWindow(Mutex::new(None)))
-        .manage(plugin_manager::PluginWindowCreating(Mutex::new(std::collections::HashSet::new())))
-        .manage(plugin_manager::PluginServerPort(Mutex::new(None)))
-        .manage(plugin_manager::PluginWindowToggleDebounce(Mutex::new(std::collections::HashMap::new())))
+        .manage(plugin::PluginStore(Default::default()))
+        .manage(plugin::ActivePluginWindow(Mutex::new(None)))
+        .manage(plugin::PluginWindowCreating(Mutex::new(std::collections::HashSet::new())))
+        .manage(plugin::PluginServerPort(Mutex::new(None)))
+        .manage(plugin::PluginWindowToggleDebounce(Mutex::new(std::collections::HashMap::new())))
         .manage(plugin_api::command::CommandExecutionStore(
             Default::default(),
         ))
@@ -88,7 +88,7 @@ pub fn run() {
             app_config::AppConfig::default(),
         )))
         .manage(usage_tracker::UsageTrackerState(Mutex::new(None)))
-        .register_uri_scheme_protocol("plugin", plugin_manager::handle_plugin_protocol)
+        .register_uri_scheme_protocol("plugin", plugin::handle_plugin_protocol)
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(
@@ -171,31 +171,31 @@ pub fn run() {
             system_commands::execute_command,
             system_commands::get_basic_commands,
             // 注册插件相关命令
-            plugin_manager::load_plugins,
-            plugin_manager::get_loaded_plugins,
-            plugin_manager::refresh_plugins,
-            plugin_manager::open_plugin_in_window,
-            plugin_manager::execute_plugin_entry,
-            plugin_manager::toggle_plugin,
-            plugin_manager::toggle_plugin_auto_detach,
-            plugin_manager::register_plugin_settings_schema,
-            plugin_manager::get_plugin_settings,
-            plugin_manager::save_plugin_settings,
-            plugin_manager::get_plugin_with_schema,
-            plugin_manager::get_plugin_detail,
-            plugin_manager::get_plugin_server_port,
-            plugin_manager::import_plugin,
-            plugin_manager::uninstall_plugin,
-            plugin_manager::download_and_install_plugin,
+            plugin::loader::load_plugins,
+            plugin::loader::get_loaded_plugins,
+            plugin::loader::refresh_plugins,
+            plugin::window::open_plugin_in_window,
+            plugin::executor::execute_plugin_entry,
+            plugin::settings::toggle_plugin,
+            plugin::settings::toggle_plugin_auto_detach,
+            plugin::settings::register_plugin_settings_schema,
+            plugin::settings::get_plugin_settings,
+            plugin::settings::save_plugin_settings,
+            plugin::settings::get_plugin_with_schema,
+            plugin::settings::get_plugin_detail,
+            plugin::settings::get_plugin_server_port,
+            plugin::installer::import_plugin,
+            plugin::installer::uninstall_plugin,
+            plugin::installer::download_and_install_plugin,
             // 插件窗口控制命令
-            plugin_manager::plugin_close_window,
-            plugin_manager::plugin_minimize_window,
-            plugin_manager::plugin_maximize_window,
-            plugin_manager::plugin_unmaximize_window,
-            plugin_manager::plugin_is_maximized,
-            plugin_manager::plugin_show_window,
-            plugin_manager::plugin_set_focus,
-            plugin_manager::plugin_start_dragging,
+            plugin::window::plugin_close_window,
+            plugin::window::plugin_minimize_window,
+            plugin::window::plugin_maximize_window,
+            plugin::window::plugin_unmaximize_window,
+            plugin::window::plugin_is_maximized,
+            plugin::window::plugin_show_window,
+            plugin::window::plugin_set_focus,
+            plugin::window::plugin_start_dragging,
             // 注册 notification 命令
             plugin_api::notification::show_notification,
             plugin_api::command::execute_plugin_command,
@@ -300,7 +300,7 @@ pub fn run() {
                     Ok(port) => {
                         println!("[INFO] Plugin server started on port {}", port);
                         // 保存端口到状态
-                        let server_port = app_handle.state::<plugin_manager::PluginServerPort>();
+                        let server_port = app_handle.state::<plugin::PluginServerPort>();
                         *server_port.0.lock().unwrap() = Some(port);
                     }
                     Err(e) => {
@@ -309,8 +309,8 @@ pub fn run() {
                 }
                 
                 // 1. 先加载插件
-                let plugin_store = app_handle.state::<plugin_manager::PluginStore>();
-                if let Err(e) = plugin_manager::load_plugins(app_handle.clone(), plugin_store) {
+                let plugin_store = app_handle.state::<plugin::PluginStore>();
+                if let Err(e) = plugin::load_plugins(app_handle.clone(), plugin_store) {
                     eprintln!("[ERROR] Failed to load plugins on startup: {}", e);
                 }
                 

@@ -715,7 +715,7 @@ async fn op_invoke(
             };
 
             // 反序列化 schema
-            let schema: crate::plugin_manager::PluginSettingsSchema =
+            let schema: crate::plugin::PluginSettingsSchema =
                 match serde_json::from_value(schema_value) {
                     Ok(s) => s,
                     Err(e) => {
@@ -726,8 +726,8 @@ async fn op_invoke(
                 };
 
             // 调用 plugin_manager 的函数
-            let store = app_handle.state::<crate::plugin_manager::PluginStore>();
-            match crate::plugin_manager::register_plugin_settings_schema(
+            let store = app_handle.state::<crate::plugin::PluginStore>();
+            match crate::plugin::register_plugin_settings_schema(
                 app_handle.clone(),
                 store,
                 plugin_id_from_arg,

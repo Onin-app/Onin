@@ -1,5 +1,5 @@
 use crate::shared_types::{Command, CommandAction, CommandKeyword, ItemSource};
-use crate::{file_command_manager, installed_apps, plugin_manager, system_commands};
+use crate::{file_command_manager, installed_apps, system_commands};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -303,9 +303,9 @@ fn sanitize_command_name_part(s: &str) -> String {
 }
 
 fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
-    let plugin_store: tauri::State<plugin_manager::PluginStore> = app.state();
+    let plugin_store: tauri::State<crate::plugin::PluginStore> = app.state();
     // 直接从 PluginStore 读取已加载的插件，避免重复初始化
-    match plugin_manager::get_loaded_plugins(plugin_store) {
+    match crate::plugin::loader::get_loaded_plugins(plugin_store) {
         Ok(plugins) => {
             let mut commands = Vec::new();
 
@@ -397,10 +397,10 @@ fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
 // 获取插件中定义的指令
 pub fn get_plugin_commands(
     app: &AppHandle,
-) -> Vec<(String, Vec<plugin_manager::PluginCommandManifest>)> {
-    let plugin_store: tauri::State<plugin_manager::PluginStore> = app.state();
+) -> Vec<(String, Vec<crate::plugin::PluginCommandManifest>)> {
+    let plugin_store: tauri::State<crate::plugin::PluginStore> = app.state();
     // 直接从 PluginStore 读取已加载的插件，避免重复初始化
-    match plugin_manager::get_loaded_plugins(plugin_store) {
+    match crate::plugin::get_loaded_plugins(plugin_store) {
         Ok(plugins) => plugins
             .into_iter()
             .filter(|plugin| plugin.enabled && !plugin.manifest.commands.is_empty())
@@ -415,9 +415,9 @@ pub fn get_plugin_commands(
 
 // 获取插件ID到名称的映射
 pub fn get_plugin_id_name_mapping(app: &AppHandle) -> Vec<(String, String)> {
-    let plugin_store: tauri::State<plugin_manager::PluginStore> = app.state();
+    let plugin_store: tauri::State<crate::plugin::PluginStore> = app.state();
     // 直接从 PluginStore 读取已加载的插件，避免重复初始化
-    match plugin_manager::get_loaded_plugins(plugin_store) {
+    match crate::plugin::loader::get_loaded_plugins(plugin_store) {
         Ok(plugins) => plugins
             .into_iter()
             .filter(|plugin| plugin.enabled && !plugin.manifest.commands.is_empty())
@@ -433,7 +433,7 @@ pub fn get_plugin_id_name_mapping(app: &AppHandle) -> Vec<(String, String)> {
 #[tauri::command]
 pub async fn get_plugin_commands_list(
     app: AppHandle,
-) -> Vec<(String, Vec<plugin_manager::PluginCommandManifest>)> {
+) -> Vec<(String, Vec<crate::plugin::PluginCommandManifest>)> {
     get_plugin_commands(&app)
 }
 

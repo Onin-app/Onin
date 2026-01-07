@@ -20,7 +20,7 @@ pub struct CommandExecutionResult {
 #[tauri::command]
 pub async fn execute_plugin_command(
     app: AppHandle,
-    plugin_store: State<'_, crate::plugin_manager::PluginStore>,
+    plugin_store: State<'_, crate::plugin::PluginStore>,
     execution_store: State<'_, CommandExecutionStore>,
     plugin_id: String,
     command_name: String,
@@ -52,7 +52,7 @@ pub async fn execute_plugin_command(
 
 async fn execute_headless_command(
     app: &AppHandle,
-    plugin: &crate::plugin_manager::LoadedPlugin,
+    plugin: &crate::plugin::LoadedPlugin,
     command_name: &str,
     args: Option<serde_json::Value>,
 ) -> Result<CommandExecutionResult, String> {
@@ -108,7 +108,7 @@ async fn execute_headless_command(
 
 async fn execute_webview_command(
     app: &AppHandle,
-    plugin: &crate::plugin_manager::LoadedPlugin,
+    plugin: &crate::plugin::LoadedPlugin,
     command_name: &str,
     args: Option<serde_json::Value>,
     execution_store: State<'_, CommandExecutionStore>,

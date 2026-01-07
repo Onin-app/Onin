@@ -326,7 +326,7 @@ pub fn handle_global_shortcut(
             println!("ESC key detected, checking for active plugin window");
             
             // 检查是否有活跃的插件窗口
-            if let Some(active_window_state) = app.try_state::<crate::plugin_manager::ActivePluginWindow>() {
+            if let Some(active_window_state) = app.try_state::<crate::plugin::ActivePluginWindow>() {
                 if let Ok(active) = active_window_state.0.lock() {
                     if let Some(window_label) = active.as_ref() {
                         println!("Active plugin window found: {}, minimizing it", window_label);

@@ -249,7 +249,7 @@ pub async fn schedule_task(
     app_handle: AppHandle,
     state: State<'_, SchedulerState>,
 ) -> Result<(), String> {
-    use crate::plugin_manager::PluginStore;
+    use crate::plugin::PluginStore;
 
     // 验证 cron 表达式
     validate_cron(&options.cron)?;

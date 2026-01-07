@@ -1,5 +1,5 @@
 use crate::command_manager;
-use crate::{installed_apps, plugin_manager};
+use crate::installed_apps;
 use crate::shared_types::{Command, CommandAction, };
 use tauri::{command, AppHandle, Manager, async_runtime};
 
@@ -117,14 +117,14 @@ pub async fn execute_command(
                 }
             }
             CommandAction::Plugin(plugin_id) => {
-                let plugin_store = app.state::<plugin_manager::PluginStore>();
-                if let Err(e) = plugin_manager::execute_plugin_entry(app.clone(), plugin_store, plugin_id.clone()) {
+                let plugin_store = app.state::<crate::plugin::PluginStore>();
+                if let Err(e) = crate::plugin::execute_plugin_entry(app.clone(), plugin_store, plugin_id.clone()) {
                     eprintln!("Failed to execute plugin {}: {}", plugin_id, e);
                 }
             }
             CommandAction::PluginCommand { plugin_id, command_code } => {
                 use crate::plugin_api::command::execute_plugin_command;
-                let plugin_store = app.state::<plugin_manager::PluginStore>();
+                let plugin_store = app.state::<crate::plugin::PluginStore>();
                 let execution_store = app.state::<crate::plugin_api::command::CommandExecutionStore>();
                 
                 match execute_plugin_command(

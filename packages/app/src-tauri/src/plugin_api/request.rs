@@ -154,7 +154,7 @@ pub async fn make_request(
 #[command]
 pub async fn plugin_request(
     _app: AppHandle,
-    _plugin_store: State<'_, crate::plugin_manager::PluginStore>,
+    _plugin_store: State<'_, crate::plugin::PluginStore>,
     options: RequestOptions,
 ) -> Result<Response, RequestError> {
     // 这个函数保留给 Webview 插件使用
@@ -168,7 +168,7 @@ pub async fn plugin_request(
 
 async fn check_http_permission(
     _app: &AppHandle,
-    plugin_store: &State<'_, crate::plugin_manager::PluginStore>,
+    plugin_store: &State<'_, crate::plugin::PluginStore>,
     plugin_id: &str,
     url: &str,
 ) -> Result<(), RequestError> {
