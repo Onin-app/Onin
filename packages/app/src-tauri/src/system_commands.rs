@@ -1,10 +1,13 @@
 use crate::command_manager;
 use crate::installed_apps;
-use crate::shared_types::{Command, CommandAction, };
-use tauri::{command, AppHandle, Manager, async_runtime};
+use crate::shared_types::{Command, CommandAction};
+use tauri::{async_runtime, command, AppHandle, Manager};
 
-// --- 1. Single Source of Truth ---
+// ============================================================================
+// 系统命令定义
+// ============================================================================
 
+/// 系统命令信息
 pub struct SystemCommandInfo {
     pub name: &'static str,
     pub title: &'static str,
@@ -14,6 +17,7 @@ pub struct SystemCommandInfo {
     pub action: fn(AppHandle),
 }
 
+/// 所有系统命令列表
 pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
     SystemCommandInfo {
         name: "shutdown",
@@ -61,7 +65,7 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
         english_name: "Open App Data Directory",
         keywords: &["数据目录"],
         icon: "folder",
-        action: |app| open_app_data_dir(app),
+        action: open_app_data_dir,
     },
     SystemCommandInfo {
         name: "refresh_list",
@@ -69,18 +73,18 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
         english_name: "Refresh List",
         keywords: &["refresh", "刷新"],
         icon: "arrowsClockwise",
-        action: |app| refresh_list(app),
+        action: refresh_list,
     },
 ];
 
-// --- 2. Derived Data Functions ---
+// ============================================================================
+// Tauri 命令
+// ============================================================================
 
 #[command]
 pub async fn get_basic_commands(app: AppHandle) -> Vec<Command> {
     command_manager::load_commands(&app).await
 }
-
-// --- 3. Unified Command Executor ---
 
 #[command]
 pub async fn execute_command(
@@ -89,12 +93,14 @@ pub async fn execute_command(
     window: tauri::WebviewWindow,
     args: Option<serde_json::Value>,
 ) {
-    // Record usage
+    // 记录使用情况
     let tracker_state = app.state::<crate::usage_tracker::UsageTrackerState>();
-    if let Err(e) = crate::usage_tracker::record_command_usage(app.clone(), tracker_state, name.clone()) {
+    if let Err(e) =
+        crate::usage_tracker::record_command_usage(app.clone(), tracker_state, name.clone())
+    {
         eprintln!("Failed to record command usage: {}", e);
     }
-    
+
     let commands = command_manager::load_commands(&app).await;
     if let Some(command) = commands.iter().find(|cmd| cmd.name == name) {
         match &command.action {
@@ -118,15 +124,21 @@ pub async fn execute_command(
             }
             CommandAction::Plugin(plugin_id) => {
                 let plugin_store = app.state::<crate::plugin::PluginStore>();
-                if let Err(e) = crate::plugin::execute_plugin_entry(app.clone(), plugin_store, plugin_id.clone()) {
+                if let Err(e) =
+                    crate::plugin::execute_plugin_entry(app.clone(), plugin_store, plugin_id.clone())
+                {
                     eprintln!("Failed to execute plugin {}: {}", plugin_id, e);
                 }
             }
-            CommandAction::PluginCommand { plugin_id, command_code } => {
+            CommandAction::PluginCommand {
+                plugin_id,
+                command_code,
+            } => {
                 use crate::plugin_api::command::execute_plugin_command;
                 let plugin_store = app.state::<crate::plugin::PluginStore>();
-                let execution_store = app.state::<crate::plugin_api::command::CommandExecutionStore>();
-                
+                let execution_store =
+                    app.state::<crate::plugin_api::command::CommandExecutionStore>();
+
                 match execute_plugin_command(
                     app.clone(),
                     plugin_store,
@@ -134,7 +146,9 @@ pub async fn execute_command(
                     plugin_id.clone(),
                     command_code.clone(),
                     args,
-                ).await {
+                )
+                .await
+                {
                     Ok(result) => {
                         if !result.success {
                             eprintln!("Plugin command failed: {:?}", result.error);
@@ -151,115 +165,97 @@ pub async fn execute_command(
     }
 }
 
-// --- 4. Private Implementation Details ---
-fn shutdown() {
-    println!("System shutdown initiated");
+// ============================================================================
+// 跨平台命令执行
+// ============================================================================
+
+/// 跨平台系统命令配置
+struct PlatformCommand {
+    log_message: &'static str,
+    windows: Option<(&'static str, &'static [&'static str])>,
+    macos: Option<(&'static str, &'static [&'static str])>,
+    linux: Option<(&'static str, &'static [&'static str])>,
+}
+
+/// 执行跨平台系统命令
+fn execute_platform_command(cmd: &PlatformCommand) {
+    println!("{}", cmd.log_message);
+
     #[cfg(target_os = "windows")]
-    {
-        if let Err(e) = std::process::Command::new("shutdown").args(&["/s", "/t", "0"]).output() {
-            eprintln!("Failed to execute shutdown on Windows: {}", e);
+    if let Some((program, args)) = cmd.windows {
+        if let Err(e) = std::process::Command::new(program).args(args).output() {
+            eprintln!("Failed to execute command on Windows: {}", e);
         }
     }
+
     #[cfg(target_os = "macos")]
-    {
-        if let Err(e) = std::process::Command::new("osascript").args(&["-e", "tell app \"System Events\" to shut down"]).output() {
-            eprintln!("Failed to execute shutdown on macOS: {}", e);
+    if let Some((program, args)) = cmd.macos {
+        if let Err(e) = std::process::Command::new(program).args(args).output() {
+            eprintln!("Failed to execute command on macOS: {}", e);
         }
     }
+
     #[cfg(target_os = "linux")]
-    {
-        if let Err(e) = std::process::Command::new("shutdown").arg("now").output() {
-            eprintln!("Failed to execute shutdown on Linux: {}", e);
+    if let Some((program, args)) = cmd.linux {
+        if let Err(e) = std::process::Command::new(program).args(args).output() {
+            eprintln!("Failed to execute command on Linux: {}", e);
         }
     }
+}
+
+// ============================================================================
+// 系统命令实现
+// ============================================================================
+
+fn shutdown() {
+    execute_platform_command(&PlatformCommand {
+        log_message: "System shutdown initiated",
+        windows: Some(("shutdown", &["/s", "/t", "0"])),
+        macos: Some(("osascript", &["-e", "tell app \"System Events\" to shut down"])),
+        linux: Some(("shutdown", &["now"])),
+    });
 }
 
 fn reboot() {
-    println!("System reboot initiated");
-    #[cfg(target_os = "windows")]
-    {
-        if let Err(e) = std::process::Command::new("shutdown").args(&["/r", "/t", "0"]).output() {
-            eprintln!("Failed to execute reboot on Windows: {}", e);
-        }
-    }
-    #[cfg(target_os = "macos")]
-    {
-        if let Err(e) = std::process::Command::new("osascript").args(&["-e", "tell app \"System Events\" to restart"]).output() {
-            eprintln!("Failed to execute reboot on macOS: {}", e);
-        }
-    }
-    #[cfg(target_os = "linux")]
-    {
-        if let Err(e) = std::process::Command::new("reboot").output() {
-            eprintln!("Failed to execute reboot on Linux: {}", e);
-        }
-    }
+    execute_platform_command(&PlatformCommand {
+        log_message: "System reboot initiated",
+        windows: Some(("shutdown", &["/r", "/t", "0"])),
+        macos: Some(("osascript", &["-e", "tell app \"System Events\" to restart"])),
+        linux: Some(("reboot", &[])),
+    });
 }
 
 fn sleep() {
-    println!("System sleep initiated");
-    #[cfg(target_os = "windows")]
-    {
-        if let Err(e) = std::process::Command::new("rundll32.exe").args(&["powrprof.dll,SetSuspendState", "0", "1", "0"]).output() {
-            eprintln!("Failed to execute sleep on Windows: {}", e);
-        }
-    }
-    #[cfg(target_os = "macos")]
-    {
-        if let Err(e) = std::process::Command::new("pmset").arg("sleepnow").output() {
-            eprintln!("Failed to execute sleep on macOS: {}", e);
-        }
-    }
-    #[cfg(target_os = "linux")]
-    {
-        if let Err(e) = std::process::Command::new("systemctl").arg("suspend").output() {
-            eprintln!("Failed to execute sleep on Linux: {}", e);
-        }
-    }
+    execute_platform_command(&PlatformCommand {
+        log_message: "System sleep initiated",
+        windows: Some(("rundll32.exe", &["powrprof.dll,SetSuspendState", "0", "1", "0"])),
+        macos: Some(("pmset", &["sleepnow"])),
+        linux: Some(("systemctl", &["suspend"])),
+    });
 }
 
 fn lock_screen() {
-    println!("Screen lock initiated");
-    #[cfg(target_os = "windows")]
-    {
-        if let Err(e) = std::process::Command::new("rundll32.exe").args(&["user32.dll,LockWorkStation"]).output() {
-            eprintln!("Failed to execute lock_screen on Windows: {}", e);
-        }
-    }
-    #[cfg(target_os = "macos")]
-    {
-        if let Err(e) = std::process::Command::new("pmset").arg("displaysleepnow").output() {
-            eprintln!("Failed to execute lock_screen on macOS: {}", e);
-        }
-    }
-    #[cfg(target_os = "linux")]
-    {
-        if let Err(e) = std::process::Command::new("xdg-screensaver").arg("lock").output() {
-            eprintln!("Failed to execute lock_screen on Linux with xdg-screensaver: {}. Trying other methods.", e);
-        }
-    }
+    execute_platform_command(&PlatformCommand {
+        log_message: "Screen lock initiated",
+        windows: Some(("rundll32.exe", &["user32.dll,LockWorkStation"])),
+        macos: Some(("pmset", &["displaysleepnow"])),
+        linux: Some(("xdg-screensaver", &["lock"])),
+    });
 }
 
 fn logout() {
-    println!("User logout initiated");
-    #[cfg(target_os = "windows")]
-    {
-        if let Err(e) = std::process::Command::new("shutdown").args(&["/l"]).output() {
-            eprintln!("Failed to execute logout on Windows: {}", e);
-        }
-    }
-    #[cfg(target_os = "macos")]
-    {
-        if let Err(e) = std::process::Command::new("osascript").args(&["-e", "tell app \"System Events\" to log out"]).output() {
-            eprintln!("Failed to execute logout on macOS: {}", e);
-        }
-    }
     #[cfg(target_os = "linux")]
-    {
-        if let Err(e) = std::process::Command::new("pkill").arg("-KILL").arg("-u").arg(whoami::username()).output() {
-            eprintln!("Failed to execute logout on Linux: {}", e);
-        }
-    }
+    let linux_args: &[&str] = &["-KILL", "-u", &whoami::username()];
+
+    execute_platform_command(&PlatformCommand {
+        log_message: "User logout initiated",
+        windows: Some(("shutdown", &["/l"])),
+        macos: Some(("osascript", &["-e", "tell app \"System Events\" to log out"])),
+        #[cfg(target_os = "linux")]
+        linux: Some(("pkill", linux_args)),
+        #[cfg(not(target_os = "linux"))]
+        linux: Some(("pkill", &["-KILL", "-u"])),
+    });
 }
 
 fn open_app_data_dir(app: AppHandle) {
@@ -273,6 +269,5 @@ fn open_app_data_dir(app: AppHandle) {
 fn refresh_list(app: AppHandle) {
     async_runtime::spawn(async move {
         command_manager::commands::refresh_commands(app.clone()).await;
-        // Notification is now handled by frontend after receiving commands_refreshed event
     });
 }
