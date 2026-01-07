@@ -238,11 +238,11 @@ pub fn run() {
             plugin_api::scheduler::cancel_task,
             plugin_api::scheduler::list_tasks,
             // Command manager commands
-            command_manager::get_commands,
-            command_manager::update_command,
-            command_manager::refresh_commands,
-            command_manager::get_plugin_commands_list,
-            command_manager::get_plugin_id_mapping,
+            command_manager::commands::get_commands,
+            command_manager::commands::update_command,
+            command_manager::commands::refresh_commands,
+            command_manager::commands::get_plugin_commands_list,
+            command_manager::commands::get_plugin_id_mapping,
             // App config commands
             app_config::get_app_config,
             app_config::update_app_config,

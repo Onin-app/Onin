@@ -272,7 +272,7 @@ fn open_app_data_dir(app: AppHandle) {
 
 fn refresh_list(app: AppHandle) {
     async_runtime::spawn(async move {
-        command_manager::refresh_commands(app.clone()).await;
+        command_manager::commands::refresh_commands(app.clone()).await;
         // Notification is now handled by frontend after receiving commands_refreshed event
     });
 }
