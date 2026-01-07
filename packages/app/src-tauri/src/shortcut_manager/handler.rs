@@ -1,0 +1,129 @@
+//! 全局快捷键处理模块
+
+use super::state::ShortcutState;
+use super::utils::normalize_shortcut_string;
+use tauri::{AppHandle, Emitter, Manager, State};
+use tauri_plugin_global_shortcut::{Shortcut, ShortcutState as GlobalShortcutPluginState};
+
+/// 处理全局快捷键事件
+pub fn handle_global_shortcut(
+    app: &AppHandle,
+    shortcut: &Shortcut,
+    event: GlobalShortcutPluginState,
+) {
+    if event != GlobalShortcutPluginState::Pressed {
+        return;
+    }
+
+    let shortcut_str = shortcut.to_string();
+    let triggered_shortcut = normalize_shortcut_string(&shortcut_str);
+
+    println!(
+        "Handling shortcut: {} (normalized: {})",
+        shortcut_str, triggered_shortcut
+    );
+
+    // 获取状态
+    let state: State<ShortcutState> = app.state();
+    let shortcuts = match state.shortcuts.lock() {
+        Ok(shortcuts) => shortcuts,
+        Err(e) => {
+            eprintln!("Failed to lock shortcuts state: {}", e);
+            return;
+        }
+    };
+
+    // 查找匹配的快捷键
+    let matching_shortcut = shortcuts.iter().find(|s| {
+        let stored_shortcut = normalize_shortcut_string(&s.shortcut);
+        println!(
+            "Comparing with stored shortcut: {} (normalized: {})",
+            s.shortcut, stored_shortcut
+        );
+        stored_shortcut == triggered_shortcut
+    });
+
+    if let Some(app_shortcut) = matching_shortcut {
+        println!(
+            "Found matching shortcut: {} -> {}",
+            app_shortcut.shortcut, app_shortcut.command_name
+        );
+        execute_shortcut_action(app, app_shortcut);
+    } else {
+        handle_special_keys(app, &triggered_shortcut);
+    }
+}
+
+/// 执行快捷键动作
+fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::Shortcut) {
+    if app_shortcut.command_name == "toggle_window" {
+        if let Some(window) = app.get_webview_window("main") {
+            match window.is_visible() {
+                Ok(true) => {
+                    let _ = window.hide();
+                    let _ = window.emit("window_visibility", &false);
+                }
+                Ok(false) => {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                    let _ = window.emit("window_visibility", &true);
+                }
+                Err(e) => {
+                    eprintln!("Error checking window visibility: {}", e);
+                }
+            }
+        }
+    } else if app_shortcut.command_name == "detach_window" {
+        println!("Executing detach window command");
+        if let Some(window) = app.get_webview_window("main") {
+            if let Err(e) = window.emit("detach_window_shortcut", ()) {
+                eprintln!("Error emitting detach window command: {}", e);
+            }
+        }
+    } else {
+        println!("Executing command: {}", app_shortcut.command_name);
+        if let Some(window) = app.get_webview_window("main") {
+            if let Err(e) = window.emit("execute_command_by_name", &app_shortcut.command_name) {
+                eprintln!("Error emitting command: {}", e);
+            }
+        }
+    }
+}
+
+/// 处理特殊按键（如 ESC）
+fn handle_special_keys(app: &AppHandle, triggered_shortcut: &str) {
+    if triggered_shortcut.to_uppercase() == "ESCAPE" {
+        println!("ESC key detected, checking for active plugin window");
+
+        // 检查是否有活跃的插件窗口
+        if let Some(active_window_state) = app.try_state::<crate::plugin::ActivePluginWindow>() {
+            if let Ok(active) = active_window_state.0.lock() {
+                if let Some(window_label) = active.as_ref() {
+                    println!(
+                        "Active plugin window found: {}, minimizing it",
+                        window_label
+                    );
+                    if let Some(window) = app.get_webview_window(window_label) {
+                        if let Err(e) = window.minimize() {
+                            eprintln!("Failed to minimize plugin window: {}", e);
+                        }
+                        return;
+                    }
+                }
+            }
+        }
+
+        // 如果没有活跃的插件窗口，则隐藏主窗口
+        println!("No active plugin window, hiding main window");
+        if let Some(window) = app.get_webview_window("main") {
+            let state: State<crate::window_manager::WindowState> = app.state();
+            state
+                .hiding_initiated_by_command
+                .store(true, std::sync::atomic::Ordering::Relaxed);
+            let _ = window.hide();
+            let _ = window.emit("window_visibility", &false);
+        }
+    } else {
+        println!("No matching shortcut found for: {}", triggered_shortcut);
+    }
+}
