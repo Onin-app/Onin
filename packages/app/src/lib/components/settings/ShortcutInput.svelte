@@ -9,6 +9,7 @@
     showPresets = false,
   } = $props();
   let previousShortcut = "";
+  let isFocused = $state(false);
 
   // 立即初始化平台信息，不要等到 onMount
   let currentPlatform = "";
@@ -149,10 +150,12 @@
   };
 
   const handleFocus = () => {
+    isFocused = true;
     previousShortcut = value;
   };
 
   const handleBlur = () => {
+    isFocused = false;
     const modifiers = [
       "commandorcontrol",
       "control",
@@ -181,17 +184,35 @@
 </script>
 
 <div class="flex flex-col gap-2">
-  <input
-    type="text"
-    readonly
-    value={formatShortcutForDisplay(value)}
-    onkeydown={handleKeydown}
-    onfocus={handleFocus}
-    onblur={handleBlur}
-    placeholder="点击设置快捷键"
-    class="bg-background text-foreground w-40 rounded border p-1"
-    {disabled}
-  />
+  <div class="relative w-full">
+    <input
+      type="text"
+      readonly
+      value={formatShortcutForDisplay(value)}
+      onkeydown={handleKeydown}
+      onfocus={handleFocus}
+      onblur={handleBlur}
+      placeholder={isFocused ? "请按下组合键..." : "点击设置"}
+      class="h-8 w-full rounded-md border bg-transparent px-2 text-sm font-medium transition-all placeholder:text-xs placeholder:text-neutral-400 focus:outline-none {isFocused
+        ? 'border-neutral-800 ring-4 ring-neutral-900/5 placeholder:text-neutral-500 dark:border-neutral-200 dark:ring-neutral-100/10'
+        : 'border-neutral-200 hover:border-neutral-300 dark:border-neutral-800 dark:hover:border-neutral-700'} text-neutral-900 dark:text-neutral-100 dark:placeholder:text-neutral-600"
+      {disabled}
+    />
+    {#if isFocused}
+      <div
+        class="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2"
+      >
+        <span class="flex h-1.5 w-1.5">
+          <span
+            class="absolute inline-flex h-full w-full animate-ping rounded-full bg-neutral-400 opacity-75 dark:bg-neutral-500"
+          ></span>
+          <span
+            class="relative inline-flex h-1.5 w-1.5 rounded-full bg-neutral-900 dark:bg-neutral-100"
+          ></span>
+        </span>
+      </div>
+    {/if}
+  </div>
   {#if showPresets}
     <div class="flex gap-2">
       {#each presetShortcuts as preset}
