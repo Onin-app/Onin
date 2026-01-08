@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import { Tabs, Switch, Button, ScrollArea } from "bits-ui";
+  import { Tabs, Switch, Button, ScrollArea, Slider } from "bits-ui";
   import { toast } from "svelte-sonner";
 
   import { theme, toggleTheme } from "$lib/utils/theme";
@@ -281,17 +281,35 @@
             description="复制内容后在此时间内自动粘贴"
           >
             {#snippet content()}
-              <div class="flex items-center gap-2">
-                <input
-                  type="number"
-                  min="0"
-                  max="60"
-                  bind:value={autoPasteTimeLimit}
-                  onchange={updateConfig}
-                  class="h-8 w-16 rounded-md border border-neutral-200 bg-transparent px-2 text-center text-sm focus:border-neutral-900 focus:outline-hidden dark:border-neutral-700 dark:focus:border-neutral-100"
-                />
-                <span class="text-xs text-neutral-500">
-                  {autoPasteTimeLimit === 0 ? "不限制" : "秒"}
+              <div class="flex w-48 items-center gap-3">
+                <Slider.Root
+                  type="single"
+                  value={autoPasteTimeLimit}
+                  min={0}
+                  max={60}
+                  step={1}
+                  onValueChange={(v) => (autoPasteTimeLimit = v)}
+                  onValueCommit={updateConfig}
+                  class="relative flex w-full touch-none items-center select-none"
+                >
+                  <span
+                    class="relative h-2 w-full grow cursor-pointer overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-700"
+                  >
+                    <Slider.Range
+                      class="absolute h-full bg-neutral-900 dark:bg-neutral-100"
+                    />
+                  </span>
+                  <Slider.Thumb
+                    index={0}
+                    class="block size-5 cursor-pointer rounded-full border border-neutral-300 bg-white shadow-sm transition-colors hover:border-neutral-400 focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2 focus-visible:outline-hidden dark:border-neutral-600 dark:bg-neutral-800"
+                  />
+                </Slider.Root>
+                <span
+                  class="w-20 shrink-0 text-right text-xs text-neutral-600 dark:text-neutral-400"
+                >
+                  {autoPasteTimeLimit === 0
+                    ? "不限制"
+                    : `${autoPasteTimeLimit}秒`}
                 </span>
               </div>
             {/snippet}
@@ -301,17 +319,35 @@
             description="在此时间后自动清空剪贴板内容，保护隐私"
           >
             {#snippet content()}
-              <div class="flex items-center gap-2">
-                <input
-                  type="number"
-                  min="0"
-                  max="300"
-                  bind:value={autoClearTimeLimit}
-                  onchange={updateConfig}
-                  class="h-8 w-16 rounded-md border border-neutral-200 bg-transparent px-2 text-center text-sm focus:border-neutral-900 focus:outline-hidden dark:border-neutral-700 dark:focus:border-neutral-100"
-                />
-                <span class="text-xs text-neutral-500">
-                  {autoClearTimeLimit === 0 ? "不自动清空" : "秒"}
+              <div class="flex w-48 items-center gap-3">
+                <Slider.Root
+                  type="single"
+                  value={autoClearTimeLimit}
+                  min={0}
+                  max={300}
+                  step={5}
+                  onValueChange={(v) => (autoClearTimeLimit = v)}
+                  onValueCommit={updateConfig}
+                  class="relative flex w-full touch-none items-center select-none"
+                >
+                  <span
+                    class="relative h-2 w-full grow cursor-pointer overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-700"
+                  >
+                    <Slider.Range
+                      class="absolute h-full bg-neutral-900 dark:bg-neutral-100"
+                    />
+                  </span>
+                  <Slider.Thumb
+                    index={0}
+                    class="block size-5 cursor-pointer rounded-full border border-neutral-300 bg-white shadow-sm transition-colors hover:border-neutral-400 focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2 focus-visible:outline-hidden dark:border-neutral-600 dark:bg-neutral-800"
+                  />
+                </Slider.Root>
+                <span
+                  class="w-20 shrink-0 text-right text-xs text-neutral-600 dark:text-neutral-400"
+                >
+                  {autoClearTimeLimit === 0
+                    ? "不自动清空"
+                    : `${autoClearTimeLimit}秒`}
                 </span>
               </div>
             {/snippet}
