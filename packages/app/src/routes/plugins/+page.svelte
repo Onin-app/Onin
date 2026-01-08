@@ -98,7 +98,7 @@
   />
 {:else}
   <main
-    class="flex h-[100vh] w-full flex-col bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100"
+    class="flex h-[100vh] w-full flex-col overflow-hidden rounded-xl bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100"
     data-tauri-drag-region
   >
     <!-- Header -->

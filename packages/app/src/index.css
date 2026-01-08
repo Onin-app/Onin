@@ -297,10 +297,14 @@
     -webkit-text-size-adjust: 100%;
     font-variation-settings: normal;
     scrollbar-color: var(--bg-muted);
+    /* 透明窗口支持 - 让圆角区域外完全透明 */
+    background: transparent;
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    /* 透明窗口支持 - body 背景透明，让 main 容器自己处理背景 */
+    background: transparent;
     font-feature-settings:
       "rlig" 1,
       "calt" 1;
