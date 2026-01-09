@@ -8,6 +8,7 @@
   import { Tabs, ScrollArea } from "bits-ui";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
+  import { toast } from "svelte-sonner";
   import type { Command } from "$lib/type";
 
   // 子组件
@@ -77,6 +78,7 @@
       });
       commands = [...commands];
       updateCommand(command);
+      toast.success(`已添加别名「${newKeyword}」`);
     }
   }
 
@@ -92,6 +94,7 @@
         );
         commands = [...commands];
         updateCommand(command);
+        toast.success(`已删除别名「${keywordName}」`);
       }
     }
   }

@@ -120,6 +120,12 @@
             e.currentTarget.value = "";
           }
         }}
+        onblur={(e) => {
+          if (e.currentTarget.value.trim()) {
+            onAddKeyword(command.name, e.currentTarget.value);
+            e.currentTarget.value = "";
+          }
+        }}
       />
     </div>
   </div>
