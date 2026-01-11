@@ -12,11 +12,56 @@ import { dispatch } from '../core/dispatch';
 export type CommandHandler = (command: string, args: any) => any | Promise<any>;
 
 /**
- * Command handler function type
- * @typeParam T - The return type of the command handler
- * @since 0.1.0
- * @group Types
+ * Command keyword definition
+ * @interface CommandKeyword
+ * @since 0.2.0
  */
+export interface CommandKeyword {
+  /** Keyword name */
+  name: string;
+  /** Keyword type: "prefix" | "fuzzy" | "exact" */
+  type?: string;
+}
+
+/**
+ * Command match definition for content-based matching
+ * @interface CommandMatchDefinition
+ * @since 0.2.0
+ */
+export interface CommandMatchDefinition {
+  /** Match type: "text" | "image" | "file" | "folder" */
+  type: 'text' | 'image' | 'file' | 'folder';
+  /** Match name */
+  name: string;
+  /** Match description */
+  description?: string;
+  /** Regular expression for text matching */
+  regexp?: string;
+  /** Minimum count */
+  min?: number;
+  /** Maximum count */
+  max?: number;
+  /** File extensions filter */
+  extensions?: string[];
+}
+
+/**
+ * Command definition for dynamic registration
+ * @interface CommandDefinition
+ * @since 0.2.0
+ */
+export interface CommandDefinition {
+  /** Unique command code */
+  code: string;
+  /** Display name */
+  name: string;
+  /** Command description */
+  description?: string;
+  /** Trigger keywords */
+  keywords?: CommandKeyword[];
+  /** Content match rules */
+  matches?: CommandMatchDefinition[];
+}
 
 let isHandlerRegistered = false;
 
@@ -44,10 +89,10 @@ export function _resetRegistrationState() {
  * import { command } from 'onin-plugin-sdk';
  *
  * // Define command handler with routing
- * async function commandHandler(command: string, args: any) {
- *   console.log(`Received command: ${command}`, args);
+ * await command.handle(async (code, args) => {
+ *   console.log(`Received command: ${code}`, args);
  *
- *   switch (command) {
+ *   switch (code) {
  *     case 'greet':
  *       return `Hello, ${args.name || 'World'}!`;
  *
@@ -59,24 +104,15 @@ export function _resetRegistrationState() {
  *         default: throw new Error(`Unknown operation: ${operation}`);
  *       }
  *
- *     case 'async-task':
- *       // Simulate async work
- *       await new Promise(resolve => setTimeout(resolve, 1000));
- *       return { status: 'completed', data: args.input };
- *
  *     default:
- *       throw new Error(`Unknown command: ${command}`);
+ *       throw new Error(`Unknown command: ${code}`);
  *   }
- * }
- *
- * // Register the handler
- * await command.register(commandHandler);
- * console.log('Command handler registered successfully');
+ * });
  * ```
  * @since 0.1.0
  * @group API
  */
-export async function registerCommandHandler(
+export async function handleCommand(
   handler: CommandHandler,
 ): Promise<void> {
   if (isHandlerRegistered) {
@@ -127,72 +163,138 @@ export async function registerCommandHandler(
 }
 
 /**
- * Simplified method name alias for registerCommandHandler
- * @see {@link registerCommandHandler} - For detailed documentation
- * @since 0.1.0
+ * Dynamically register a command for the current plugin.
+ * 
+ * This allows plugins to create commands at runtime based on user data,
+ * external APIs, or other dynamic sources. Registered commands are persisted
+ * and will appear in the command list.
+ *
+ * @param definition - The command definition including code, name, keywords, and matches
+ * @returns Promise that resolves when the command is successfully registered
+ * @throws {Error} When command registration fails
+ * @example
+ * ```typescript
+ * import { command } from 'onin-plugin-sdk';
+ *
+ * // Register a dynamic command
+ * await command.register({
+ *   code: 'open-bookmark-1',
+ *   name: 'My Favorite Site',
+ *   keywords: [{ name: 'bookmark' }, { name: 'favorite' }],
+ * });
+ *
+ * // Handle all commands
+ * await command.handle((code, args) => {
+ *   if (code.startsWith('open-bookmark-')) {
+ *     // Open the bookmark
+ *   }
+ * });
+ * ```
+ * @since 0.2.0
  * @group API
  */
-export const register = registerCommandHandler;
+export async function registerCommand(
+  definition: CommandDefinition,
+): Promise<void> {
+  if (!definition.code) {
+    throw new Error('Command code is required');
+  }
+  if (!definition.name) {
+    throw new Error('Command name is required');
+  }
+
+  await invoke('register_dynamic_command', {
+    command: definition,
+  });
+}
+
+/**
+ * Remove a dynamically registered command.
+ *
+ * @param code - The unique command code to remove
+ * @returns Promise that resolves when the command is successfully removed
+ * @throws {Error} When command removal fails or command doesn't exist
+ * @example
+ * ```typescript
+ * import { command } from 'onin-plugin-sdk';
+ *
+ * // Remove a previously registered command
+ * await command.remove('open-bookmark-1');
+ * ```
+ * @since 0.2.0
+ * @group API
+ */
+export async function removeCommand(code: string): Promise<void> {
+  if (!code) {
+    throw new Error('Command code is required');
+  }
+
+  await invoke('remove_dynamic_command', {
+    commandCode: code,
+  });
+}
+
+/**
+ * Simplified method name alias for handleCommand
+ * @see {@link handleCommand} - For detailed documentation
+ * @since 0.2.0
+ * @group API
+ */
+export const handle = handleCommand;
+
+/**
+ * Simplified method name alias for registerCommand
+ * @see {@link registerCommand} - For detailed documentation
+ * @since 0.2.0
+ * @group API
+ */
+export const register = registerCommand;
+
+/**
+ * Simplified method name alias for removeCommand
+ * @see {@link removeCommand} - For detailed documentation
+ * @since 0.2.0
+ * @group API
+ */
+export const remove = removeCommand;
 
 /**
  * Command API namespace - provides command handling functionality for plugins
  *
- * Allows plugins to register handlers for commands sent from the main application
- * or other plugins. Commands provide a way for external code to invoke plugin
- * functionality with arguments and receive results.
- *
- * **Single Handler**: Each plugin can only register one command handler. The handler
- * should implement internal routing to handle different command types.
- *
- * **Async Support**: Command handlers can be synchronous or asynchronous. Results
- * are automatically serialized and sent back to the caller.
- *
- * **Error Handling**: Errors thrown by command handlers are automatically caught
- * and sent back to the caller as error responses.
+ * Allows plugins to:
+ * - **register**: Dynamically register commands at runtime
+ * - **handle**: Register a handler to process command executions
+ * - **remove**: Remove dynamically registered commands
  *
  * @namespace command
- * @version 0.1.0
+ * @version 0.2.0
  * @since 0.1.0
  * @group API
  * @example
  * ```typescript
  * import { command } from 'onin-plugin-sdk';
  *
- * // Simple command handler
- * await command.register(async (cmd, args) => {
- *   if (cmd === 'ping') {
- *     return 'pong';
- *   }
- *   if (cmd === 'echo') {
- *     return args.message;
- *   }
- *   throw new Error(`Unknown command: ${cmd}`);
+ * // Register dynamic commands
+ * await command.register({
+ *   code: 'search-google',
+ *   name: 'Search Google',
+ *   keywords: [{ name: 'google' }],
+ *   matches: [{ type: 'text', name: 'Search text', min: 1 }]
  * });
  *
- * // Complex command handler with validation
- * await command.register(async (cmd, args) => {
- *   // Input validation
- *   if (!cmd || typeof cmd !== 'string') {
- *     throw new Error('Invalid command format');
- *   }
- *
- *   // Command routing
- *   switch (cmd) {
- *     case 'user.create':
- *       if (!args.name || !args.email) {
- *         throw new Error('Missing required fields: name, email');
- *       }
- *       return await createUser(args.name, args.email);
- *
- *     case 'user.list':
- *       return await listUsers(args.limit || 10);
- *
- *     default:
- *       throw new Error(`Command not supported: ${cmd}`);
+ * // Handle command execution
+ * await command.handle(async (code, args) => {
+ *   if (code === 'search-google') {
+ *     window.open(`https://google.com/search?q=${encodeURIComponent(args.text)}`);
  *   }
  * });
+ *
+ * // Remove a command when no longer needed
+ * await command.remove('search-google');
  * ```
  */
 export const command = {
-  register: registerCommandHandler,
+  register: registerCommand,
+  handle: handleCommand,
+  remove: removeCommand,
 };

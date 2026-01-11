@@ -133,3 +133,33 @@ pub fn get_plugin_id_name_mapping(app: &AppHandle) -> Vec<(String, String)> {
         }
     }
 }
+
+/// 生成动态命令列表
+///
+/// 从 dynamic_commands.json 加载插件动态注册的命令
+pub fn get_initial_dynamic_commands(app: &AppHandle) -> Vec<Command> {
+    let dynamic_commands = crate::command_manager::dynamic_commands::get_all_dynamic_commands(app);
+
+    dynamic_commands
+        .into_iter()
+        .map(|dc| {
+            let safe_plugin_id = sanitize_command_name_part(&dc.plugin_id);
+            let safe_code = sanitize_command_name_part(&dc.code);
+
+            Command {
+                name: format!("dynamic_{}_{}", safe_plugin_id, safe_code),
+                title: dc.name.clone(),
+                english_name: dc.name,
+                keywords: dc.keywords,
+                icon: "icon-plugin".to_string(),
+                source: ItemSource::Plugin,
+                action: CommandAction::PluginCommand {
+                    plugin_id: dc.plugin_id,
+                    command_code: dc.code,
+                },
+                origin: None,
+                matches: dc.matches,
+            }
+        })
+        .collect()
+}

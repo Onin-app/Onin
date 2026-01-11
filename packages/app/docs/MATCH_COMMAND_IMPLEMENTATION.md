@@ -6,9 +6,10 @@
 
 ## 核心概念
 
-### 匹配指令 vs 注册指令
+### 匹配指令 vs 功能指令
 
-- **注册指令**：在 manifest 中定义，通过 `command.register` 注册，用户通过关键词主动调用
+- **静态指令**：在 manifest.json 中定义，用户通过关键词主动调用
+- **动态指令**：通过 `command.register()` SDK API 动态注册
 - **匹配指令**：自动检测输入框中粘贴的内容，当内容符合条件时自动在列表中显示
 
 ### 一切皆指令
@@ -253,7 +254,10 @@
 ### index.js
 
 ```javascript
-command.register((commandCode, args) => {
+import { command, notification } from 'onin-plugin-sdk';
+
+// 处理命令执行
+command.handle((commandCode, args) => {
   console.log('命令被调用 >>>', commandCode, args);
   
   if (commandCode === 'process-url') {
@@ -263,6 +267,25 @@ command.register((commandCode, args) => {
     });
   }
 });
+```
+
+### 动态注册命令（可选）
+
+除了在 manifest.json 中静态声明命令，插件也可以通过 SDK 动态注册命令：
+
+```javascript
+import { command } from 'onin-plugin-sdk';
+
+// 动态注册命令
+await command.register({
+  code: 'bookmark-1',
+  name: '我的书签',
+  keywords: [{ name: '书签' }],
+  matches: [{ type: 'text', name: 'URL', regexp: '^https?://' }]
+});
+
+// 移除命令
+await command.remove('bookmark-1');
 ```
 
 ## 参数结构
@@ -377,7 +400,7 @@ export interface PluginCommand {
 ### 场景 1：区分输入和粘贴
 
 ```javascript
-command.register((commandCode, args) => {
+command.handle((commandCode, args) => {
   if (commandCode === 'search') {
     // 优先使用输入框内容，其次使用粘贴内容
     const query = args?.input || args?.text || '';
@@ -411,7 +434,7 @@ command.register((commandCode, args) => {
 ### 场景 3：处理纯文本文件
 
 ```javascript
-command.register((commandCode, args) => {
+command.handle((commandCode, args) => {
   if (commandCode === 'process-text-files') {
     const textFiles = args?.textFiles || [];
     

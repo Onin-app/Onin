@@ -70,7 +70,7 @@ pub struct LaunchableItem {
 }
 
 /// 命令匹配配置
-/// 
+///
 /// 三层优雅降级模型：
 /// 1. 开发者层：只需配置 extensions
 /// 2. 系统层：自动映射为内部 MIME 类型
@@ -159,4 +159,29 @@ pub enum CommandResult {
     Success(String),
     /// Indicates that the command failed to execute, returning an error message.
     Error(String),
+}
+
+/// Dynamic command registered by a plugin at runtime.
+///
+/// Unlike static commands defined in manifest.json, dynamic commands
+/// can be created and removed programmatically by plugins.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DynamicCommand {
+    /// Unique command code within the plugin
+    pub code: String,
+    /// Display name
+    pub name: String,
+    /// Optional description
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Trigger keywords
+    #[serde(default)]
+    pub keywords: Vec<CommandKeyword>,
+    /// Content match rules
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub matches: Option<Vec<CommandMatch>>,
+    /// Plugin ID that registered this command
+    pub plugin_id: String,
+    /// Timestamp when the command was created (milliseconds since epoch)
+    pub created_at: u64,
 }

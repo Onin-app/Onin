@@ -117,6 +117,9 @@ pub fn get_invoke_handler(
         command_manager::commands::refresh_commands,
         command_manager::commands::get_plugin_commands_list,
         command_manager::commands::get_plugin_id_mapping,
+        // Dynamic commands
+        command_manager::dynamic_commands::register_dynamic_command,
+        command_manager::dynamic_commands::remove_dynamic_command,
         // App config
         app_config::get_app_config,
         app_config::update_app_config,

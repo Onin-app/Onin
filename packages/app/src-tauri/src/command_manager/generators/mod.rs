@@ -9,7 +9,10 @@ mod system;
 
 pub use app::get_initial_app_commands;
 pub use file::get_initial_file_commands;
-pub use plugin::{get_initial_plugin_commands, get_plugin_commands, get_plugin_id_name_mapping};
+pub use plugin::{
+    get_initial_dynamic_commands, get_initial_plugin_commands, get_plugin_commands,
+    get_plugin_id_name_mapping,
+};
 pub use system::get_initial_system_commands;
 
 /// 清理命令名称部分

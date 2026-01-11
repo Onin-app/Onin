@@ -28,6 +28,8 @@ pub async fn generate_and_save_commands(app: &AppHandle) -> Vec<Command> {
     initial_commands.extend(file_commands);
     let plugin_commands = generators::get_initial_plugin_commands(app);
     initial_commands.extend(plugin_commands);
+    let dynamic_commands = generators::get_initial_dynamic_commands(app);
+    initial_commands.extend(dynamic_commands);
     save_commands(app, &initial_commands);
     initial_commands
 }

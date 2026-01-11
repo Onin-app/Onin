@@ -75,7 +75,7 @@ if (typeof window !== 'undefined') {
  * });
  *
  * // Command handling
- * await command.register(async (cmd, args) => {
+ * await command.handle(async (cmd, args) => {
  *   if (cmd === 'get-status') {
  *     return { status: 'ready', config };
  *   }

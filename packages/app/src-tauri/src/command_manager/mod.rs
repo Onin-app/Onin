@@ -7,8 +7,10 @@
 //! - `refresh`: 刷新逻辑和事件
 //! - `commands`: Tauri 命令
 //! - `generators`: 命令生成器
+//! - `dynamic_commands`: 动态命令存储
 
 pub mod commands;
+pub mod dynamic_commands;
 mod generators;
 mod refresh;
 mod storage;
