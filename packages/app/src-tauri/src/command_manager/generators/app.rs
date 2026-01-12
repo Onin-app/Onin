@@ -18,6 +18,7 @@ pub async fn get_initial_app_commands() -> Vec<Command> {
                     Command {
                         name: format!("app_{}", app_info.name),
                         title: app_info.name.clone(),
+                        description: None,
                         english_name: app_info.name.clone(),
                         keywords: final_keywords
                             .into_iter()

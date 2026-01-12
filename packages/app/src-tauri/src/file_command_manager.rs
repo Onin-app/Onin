@@ -158,6 +158,7 @@ impl FileCommandManager {
 
         Some(LaunchableItem {
             name: name.clone(),
+            description: None,
             keywords: vec![CommandKeyword {
                 name,
                 disabled: None,

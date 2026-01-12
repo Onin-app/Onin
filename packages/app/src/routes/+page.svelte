@@ -63,10 +63,25 @@
   };
 
   // ===== Computed =====
-  // 优先显示匹配命令
-  const displayList = $derived(
-    matchedCommands.length > 0 ? matchedCommands : appListManager.state.appList,
-  );
+  // 合并匹配命令和搜索结果，匹配命令优先显示在顶部
+  const displayList = $derived.by(() => {
+    if (matchedCommands.length === 0) {
+      return appListManager.state.appList;
+    }
+
+    // 获取匹配命令的 action 集合，用于去重
+    const matchedActions = new Set(
+      matchedCommands.map((cmd) => cmd.action).filter(Boolean),
+    );
+
+    // 过滤掉 appList 中已经在匹配命令中的项
+    const filteredAppList = appListManager.state.appList.filter(
+      (app) => !app.action || !matchedActions.has(app.action),
+    );
+
+    // 匹配命令排在前面，然后是过滤后的搜索结果
+    return [...matchedCommands, ...filteredAppList];
+  });
 
   // ===== Effects =====
   // 监听 focus 请求

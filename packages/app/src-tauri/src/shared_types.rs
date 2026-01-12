@@ -52,6 +52,9 @@ pub enum AppOrigin {
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct LaunchableItem {
     pub name: String,
+    /// 描述信息，用于前端显示
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
     pub keywords: Vec<CommandKeyword>,
     pub path: String,
     pub icon: String,
@@ -118,6 +121,9 @@ pub enum CommandAction {
 pub struct Command {
     pub name: String, // A unique identifier, e.g., "shutdown" or a hash for an app
     pub title: String,
+    /// 描述信息，用于前端显示
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
     pub english_name: String,
     pub keywords: Vec<CommandKeyword>,
     pub icon: String,

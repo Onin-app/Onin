@@ -10,6 +10,7 @@ export type AppOrigin = "Hkey" | "Shortcut" | "Uwp";
 
 export interface LaunchableItem {
   name: string;
+  description?: string;
   keywords: CommandKeyword[];
   path: string;
   icon: string;

@@ -26,6 +26,7 @@ pub fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
                 commands.push(Command {
                     name: format!("plugin_{}", safe_plugin_id),
                     title: plugin.manifest.name.clone(),
+                    description: Some(plugin.manifest.description.clone()),
                     english_name: plugin.manifest.name.clone(),
                     keywords: vec![CommandKeyword {
                         name: plugin.manifest.name.clone(),
@@ -75,6 +76,7 @@ pub fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
                     commands.push(Command {
                         name: format!("plugin_cmd_{}_{}", safe_plugin_id, safe_cmd_code),
                         title: cmd.name.clone(),
+                        description: Some(cmd.description.clone()),
                         english_name: cmd.name.clone(),
                         keywords,
                         icon: "icon-plugin".to_string(),
@@ -149,6 +151,7 @@ pub fn get_initial_dynamic_commands(app: &AppHandle) -> Vec<Command> {
             Command {
                 name: format!("dynamic_{}_{}", safe_plugin_id, safe_code),
                 title: dc.name.clone(),
+                description: dc.description,
                 english_name: dc.name,
                 keywords: dc.keywords,
                 icon: "icon-plugin".to_string(),

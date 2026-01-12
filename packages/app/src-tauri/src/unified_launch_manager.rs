@@ -66,6 +66,7 @@ pub async fn get_all_launchable_items(
 
             Some(LaunchableItem {
                 name: cmd.title,
+                description: cmd.description,
                 keywords: enabled_keywords,
                 path: match &cmd.action {
                     crate::shared_types::CommandAction::App(path) => path.clone(),

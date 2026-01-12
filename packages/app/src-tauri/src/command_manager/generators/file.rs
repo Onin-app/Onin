@@ -14,6 +14,7 @@ pub async fn get_initial_file_commands(app: &AppHandle) -> Vec<Command> {
         .map(|item| Command {
             name: format!("file_{}", item.path),
             title: item.name.clone(),
+            description: None,
             english_name: item.name.clone(),
             keywords: vec![CommandKeyword {
                 name: item.name,
