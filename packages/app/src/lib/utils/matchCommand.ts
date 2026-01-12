@@ -1,20 +1,24 @@
 import type { LaunchableItem, CommandMatch } from "$lib/type";
-import { extensionsToMimes, getFileExtension, inferMimeType } from "./mimeTypeMap";
+import {
+  extensionsToMimes,
+  getFileExtension,
+  inferMimeType,
+} from "./mimeTypeMap";
 
 /**
  * 三层优雅降级模型 - 匹配逻辑
- * 
+ *
  * 设计理念：
  * 1. 开发者只需配置扩展名（如 [".png", ".jpg"]）
  * 2. 系统自动将扩展名映射为 MIME 类型
  * 3. 运行时优先使用 MIME 类型判断，fallback 到扩展名
- * 
+ *
  * 这个文件实现了运行层（判断层）的逻辑
  */
 
 /**
  * 检查 MIME 类型是否匹配
- * 
+ *
  * 运行层逻辑：
  * - 优先基于文件的 MIME 类型进行判断
  * - 支持通配符（如 "image/*"）
@@ -40,7 +44,7 @@ function matchMimeType(fileMimeType: string, patterns: string[]): boolean {
 
 /**
  * 检查文件扩展名是否匹配
- * 
+ *
  * Fallback 逻辑：
  * - 当 MIME 类型不可靠或不存在时使用
  * - 支持通配符（如 "*"）
@@ -57,7 +61,9 @@ function matchExtension(fileName: string, patterns: string[]): boolean {
     const patternLower = pattern.toLowerCase();
 
     // 确保 pattern 以点号开头
-    const normalizedPattern = patternLower.startsWith('.') ? patternLower : `.${patternLower}`;
+    const normalizedPattern = patternLower.startsWith(".")
+      ? patternLower
+      : `.${patternLower}`;
 
     if (fileExt === normalizedPattern) return true;
   }
@@ -67,16 +73,13 @@ function matchExtension(fileName: string, patterns: string[]): boolean {
 
 /**
  * 检查文本是否匹配
- * 
+ *
  * 逻辑说明：
  * - min/max 始终表示文本的字符数
  * - regexp 是额外的匹配条件
  * - 执行顺序：先检查 min/max（字符数），通过后再检查 regexp
  */
-function matchText(
-  text: string,
-  match: CommandMatch
-): boolean {
+function matchText(text: string, match: CommandMatch): boolean {
   // 1. 首先检查字符数限制（min/max 优先）
   const textLength = text.length;
   if (match.min !== undefined && textLength < match.min) return false;
@@ -100,11 +103,14 @@ function matchText(
  * 根据类型过滤文件
  */
 function filterFilesByType(files: File[], type: string): File[] {
-  return files.filter(file => {
+  return files.filter((file) => {
     if (type === "image") {
       return file.type.startsWith("image/");
     } else if (type === "file") {
-      return !file.type.startsWith("image/") && file.type !== "application/x-directory";
+      return (
+        !file.type.startsWith("image/") &&
+        file.type !== "application/x-directory"
+      );
     } else if (type === "folder") {
       return file.type === "application/x-directory";
     }
@@ -114,22 +120,19 @@ function filterFilesByType(files: File[], type: string): File[] {
 
 /**
  * 检查文件是否匹配
- * 
+ *
  * 三层降级模型的核心实现：
- * 
+ *
  * 1. 加载层处理：
  *    - 开发者只需配置 extensions（如 [".png", ".jpg"]）
  *    - 系统自动将 extensions 转换为 MIME 类型
- * 
+ *
  * 2. 运行层判断：
  *    - 优先使用文件的 MIME 类型进行判断（更准确）
  *    - 如果 MIME 类型不存在或不可靠，fallback 到扩展名判断
  *    - 双重保障，确保匹配的可靠性
  */
-function matchFiles(
-  files: File[],
-  match: CommandMatch
-): boolean {
+function matchFiles(files: File[], match: CommandMatch): boolean {
   // 根据类型过滤文件
   const filteredFiles = filterFilesByType(files, match.type);
 
@@ -182,21 +185,33 @@ function matchFiles(
 
 /**
  * 检查命令是否匹配当前输入内容
+ * @param item 命令项
+ * @param attachedText 粘贴/附件文本
+ * @param attachedFiles 附件文件
+ * @param inputText 手动输入的文本（可选）
  */
 export function checkCommandMatch(
   item: LaunchableItem,
   attachedText: string,
-  attachedFiles: File[]
+  attachedFiles: File[],
+  inputText: string = "",
 ): boolean {
   if (!item.matches || item.matches.length === 0) return false;
+
+  // 合并文本：优先使用附件文本，其次使用输入文本
+  const effectiveText = attachedText || inputText;
 
   // 只要有一个匹配条件满足即可
   for (const match of item.matches) {
     let isMatch = false;
 
-    if (match.type === "text" && attachedText) {
-      isMatch = matchText(attachedText, match);
-    } else if (match.type === "image" || match.type === "file" || match.type === "folder") {
+    if (match.type === "text" && effectiveText) {
+      isMatch = matchText(effectiveText, match);
+    } else if (
+      match.type === "image" ||
+      match.type === "file" ||
+      match.type === "folder"
+    ) {
       if (attachedFiles.length > 0) {
         isMatch = matchFiles(attachedFiles, match);
       }
@@ -210,14 +225,21 @@ export function checkCommandMatch(
 
 /**
  * 过滤出所有匹配的命令
+ * @param items 所有命令列表
+ * @param attachedText 粘贴/附件文本
+ * @param attachedFiles 附件文件
+ * @param inputText 手动输入的文本（可选）
  */
 export function getMatchedCommands(
   items: LaunchableItem[],
   attachedText: string,
-  attachedFiles: File[]
+  attachedFiles: File[],
+  inputText: string = "",
 ): LaunchableItem[] {
-  // 如果没有附件内容，返回空数组
-  if (!attachedText && attachedFiles.length === 0) return [];
+  // 如果没有任何内容，返回空数组
+  if (!attachedText && attachedFiles.length === 0 && !inputText) return [];
 
-  return items.filter(item => checkCommandMatch(item, attachedText, attachedFiles));
+  return items.filter((item) =>
+    checkCommandMatch(item, attachedText, attachedFiles, inputText),
+  );
 }

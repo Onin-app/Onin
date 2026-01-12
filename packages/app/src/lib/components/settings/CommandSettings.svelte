@@ -199,6 +199,21 @@
         })
       : [],
   );
+
+  // 判断命令是否为匹配指令（有 matches 配置）
+  function isMatchCommand(cmd: Command): boolean {
+    return cmd.matches != null && cmd.matches.length > 0;
+  }
+
+  // 功能指令列表（没有 matches 配置的插件指令）
+  let functionCommands = $derived(
+    selectedPluginCommands.filter((cmd) => !isMatchCommand(cmd)),
+  );
+
+  // 匹配指令列表（有 matches 配置的插件指令）
+  let matchCommands = $derived(
+    selectedPluginCommands.filter((cmd) => isMatchCommand(cmd)),
+  );
 </script>
 
 <main class="flex h-full w-full gap-6">
@@ -239,8 +254,8 @@
           <ScrollArea.Viewport class="h-full w-full pr-2">
             <div class="flex flex-col gap-3 pb-8">
               {#if selectedPlugin}
-                <!-- 插件指令列表 -->
-                {#each selectedPluginCommands as command}
+                <!-- 插件功能指令列表 -->
+                {#each functionCommands as command}
                   <CommandCard
                     {command}
                     onExecute={executeCommand}
@@ -249,6 +264,13 @@
                     onRemoveKeyword={removeKeyword}
                   />
                 {/each}
+                {#if functionCommands.length === 0}
+                  <div
+                    class="flex h-full flex-col items-center justify-center text-neutral-400"
+                  >
+                    <p>暂无功能指令</p>
+                  </div>
+                {/if}
               {:else}
                 <!-- 内置指令列表 -->
                 {#each filteredCommands as command}
@@ -276,10 +298,32 @@
       <Tabs.Content value="match" class="-mr-2 flex-1 overflow-hidden">
         <ScrollArea.Root class="h-full w-full" type="hover">
           <ScrollArea.Viewport class="h-full w-full pr-2">
-            <div
-              class="flex h-full flex-col items-center justify-center text-neutral-400"
-            >
-              <p>暂无匹配指令</p>
+            <div class="flex flex-col gap-3 pb-8">
+              {#if selectedPlugin}
+                <!-- 插件匹配指令列表 -->
+                {#each matchCommands as command}
+                  <CommandCard
+                    {command}
+                    onExecute={executeCommand}
+                    onToggleKeyword={toggleKeywordDisabled}
+                    onAddKeyword={addKeyword}
+                    onRemoveKeyword={removeKeyword}
+                  />
+                {/each}
+                {#if matchCommands.length === 0}
+                  <div
+                    class="flex h-full flex-col items-center justify-center text-neutral-400"
+                  >
+                    <p>暂无匹配指令</p>
+                  </div>
+                {/if}
+              {:else}
+                <div
+                  class="flex h-full flex-col items-center justify-center text-neutral-400"
+                >
+                  <p>请选择一个插件</p>
+                </div>
+              {/if}
             </div>
           </ScrollArea.Viewport>
           <ScrollArea.Scrollbar

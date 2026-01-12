@@ -1,8 +1,12 @@
-export type ItemType = 'App' | 'Folder' | 'File';
-export type Source = 'Application' | 'Custom' | 'Command' | 'FileCommand' | 'Plugin'
-export type IconType = 'Base64' | 'Iconfont'
-export type AppOrigin = 'Hkey' | 'Shortcut' | 'Uwp';
-
+export type ItemType = "App" | "Folder" | "File";
+export type Source =
+  | "Application"
+  | "Custom"
+  | "Command"
+  | "FileCommand"
+  | "Plugin";
+export type IconType = "Base64" | "Iconfont";
+export type AppOrigin = "Hkey" | "Shortcut" | "Uwp";
 
 export interface LaunchableItem {
   name: string;
@@ -26,14 +30,14 @@ export interface CommandKeyword {
 
 /**
  * 命令匹配配置
- * 
+ *
  * 三层优雅降级模型：
  * 1. 开发者层：只需配置 extensions（如 [".png", ".jpg"]）
  * 2. 系统层：自动将 extensions 映射为内部 MIME 类型
  * 3. 运行层：优先使用 MIME 类型判断，fallback 到 extensions
  */
 export interface CommandMatch {
-  type: 'text' | 'image' | 'file' | 'folder';
+  type: "text" | "image" | "file" | "folder";
   name: string;
   description: string;
   /** 正则表达式（仅 type="text" 时使用，作为额外的匹配条件） */
@@ -63,6 +67,7 @@ export interface Command {
   action: CommandAction;
   path?: string;
   origin?: AppOrigin;
+  matches?: CommandMatch[];
 }
 
 export enum Theme {
@@ -78,7 +83,7 @@ export interface Shortcut {
   readonly?: boolean;
 }
 
-export type SortMode = 'smart' | 'frequency' | 'recent' | 'default';
+export type SortMode = "smart" | "frequency" | "recent" | "default";
 
 export interface CommandUsageStats {
   command_name: string;

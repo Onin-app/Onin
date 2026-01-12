@@ -40,8 +40,10 @@ pub async fn get_all_launchable_items(
                 .filter(|keyword| !keyword.disabled.unwrap_or(false))
                 .collect();
 
-            // If all keywords are disabled, don't include this command at all
-            if enabled_keywords.is_empty() {
+            // 如果没有启用的关键词，且没有 matches 规则，则不包含此命令
+            // 有 matches 规则的命令可以通过内容匹配触发，即使没有关键词
+            let has_matches = cmd.matches.as_ref().map_or(false, |m| !m.is_empty());
+            if enabled_keywords.is_empty() && !has_matches {
                 return None;
             }
 
