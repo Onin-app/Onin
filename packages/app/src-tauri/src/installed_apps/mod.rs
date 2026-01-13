@@ -4,6 +4,8 @@ pub mod exe_to_icon;
 mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
+#[cfg(target_os = "macos")]
+pub mod macos_icon;
 #[cfg(target_os = "windows")]
 mod windows;
 

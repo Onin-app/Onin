@@ -1,6 +1,9 @@
 #[cfg(target_os = "windows")]
 use crate::installed_apps::exe_to_icon;
 
+#[cfg(target_os = "macos")]
+use crate::installed_apps::macos_icon;
+
 #[cfg(target_os = "windows")]
 pub fn extract_icon_from_path(path: &str) -> Option<String> {
     if path.to_lowercase().ends_with(".exe") {
@@ -11,7 +14,13 @@ pub fn extract_icon_from_path(path: &str) -> Option<String> {
     }
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "macos")]
+pub fn extract_icon_from_path(path: &str) -> Option<String> {
+    // Use NSWorkspace.iconForFile to get icon for any file type
+    macos_icon::extract_icon_from_file(path)
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 pub fn extract_icon_from_path(_path: &str) -> Option<String> {
     // TODO: Implement icon extraction for other platforms
     None
