@@ -10,7 +10,7 @@ pub fn get_initial_system_commands() -> Vec<Command> {
         .map(|cmd_info| Command {
             name: cmd_info.name.to_string(),
             title: cmd_info.title.to_string(),
-            description: None,
+            description: Some(cmd_info.description.to_string()),
             english_name: cmd_info.english_name.to_string(),
             keywords: build_system_keywords(cmd_info),
             icon: cmd_info.icon.to_string(),

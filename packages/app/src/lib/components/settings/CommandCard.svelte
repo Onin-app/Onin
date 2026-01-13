@@ -36,6 +36,13 @@
     </h4>
   </div>
 
+  <!-- 描述信息 -->
+  {#if command.description}
+    <p class="text-xs text-neutral-500 dark:text-neutral-400">
+      {command.description}
+    </p>
+  {/if}
+
   <!-- 匹配规则显示区域 -->
   {#if command.matches && command.matches.length > 0}
     <div class="flex flex-col gap-1.5">

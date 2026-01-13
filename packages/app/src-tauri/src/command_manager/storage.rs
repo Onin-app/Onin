@@ -98,8 +98,16 @@ async fn merge_commands(app: &AppHandle, saved_commands: Vec<Command>) -> Vec<Co
             .find(|c| c.source == ItemSource::Command && &c.name == name);
 
         if let Some(existing) = existing_command {
-            // 保留已保存的版本（含用户修改）
-            final_system_commands.push(existing.clone());
+            // 保留已保存的版本（含用户修改），但更新系统定义的字段
+            let mut merged = existing.clone();
+            merged.title = system_command.title.clone();
+            merged.description = system_command.description.clone();
+            merged.english_name = system_command.english_name.clone();
+            merged.icon = system_command.icon.clone();
+            merged.action = system_command.action.clone();
+            // keywords 保持用户的配置（已保存的）
+            
+            final_system_commands.push(merged);
         } else {
             // 新系统命令，添加
             final_system_commands.push(system_command.clone());

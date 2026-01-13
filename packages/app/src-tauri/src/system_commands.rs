@@ -11,6 +11,7 @@ use tauri::{async_runtime, command, AppHandle, Manager};
 pub struct SystemCommandInfo {
     pub name: &'static str,
     pub title: &'static str,
+    pub description: &'static str,
     pub english_name: &'static str,
     pub keywords: &'static [&'static str],
     pub icon: &'static str,
@@ -22,6 +23,7 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
     SystemCommandInfo {
         name: "shutdown",
         title: "关机",
+        description: "关闭计算机",
         english_name: "Shutdown",
         keywords: &["shutdown", "关机"],
         icon: "shutdown",
@@ -30,6 +32,7 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
     SystemCommandInfo {
         name: "reboot",
         title: "重启",
+        description: "重新启动计算机",
         english_name: "Restart",
         keywords: &["restart", "reboot", "重启"],
         icon: "restart",
@@ -38,6 +41,7 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
     SystemCommandInfo {
         name: "sleep",
         title: "睡眠",
+        description: "使计算机进入睡眠模式",
         english_name: "Sleep",
         keywords: &["sleep", "睡眠"],
         icon: "sleep",
@@ -46,6 +50,7 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
     SystemCommandInfo {
         name: "lock_screen",
         title: "锁屏",
+        description: "锁定计算机屏幕",
         english_name: "Lock Screen",
         keywords: &["lock", "锁屏"],
         icon: "lock",
@@ -54,6 +59,7 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
     SystemCommandInfo {
         name: "logout",
         title: "注销",
+        description: "注销当前用户",
         english_name: "Logout",
         keywords: &["logout", "注销"],
         icon: "logout",
@@ -62,6 +68,7 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
     SystemCommandInfo {
         name: "open_app_data_dir",
         title: "打开应用数据目录",
+        description: "打开应用程序的数据存储目录",
         english_name: "Open App Data Directory",
         keywords: &["数据目录"],
         icon: "folder",
@@ -70,6 +77,7 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
     SystemCommandInfo {
         name: "refresh_list",
         title: "刷新列表",
+        description: "刷新应用和命令列表",
         english_name: "Refresh List",
         keywords: &["refresh", "刷新"],
         icon: "arrowsClockwise",
