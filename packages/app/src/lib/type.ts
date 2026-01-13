@@ -5,7 +5,7 @@ export type Source =
   | "Command"
   | "FileCommand"
   | "Plugin";
-export type IconType = "Base64" | "Iconfont";
+export type IconType = "Base64" | "Iconfont" | "Url";
 export type AppOrigin = "Hkey" | "Shortcut" | "Uwp";
 
 export interface LaunchableItem {

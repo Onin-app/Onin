@@ -1,9 +1,104 @@
 //! 插件命令生成器
 
 use crate::shared_types::{Command, CommandAction, CommandKeyword, ItemSource};
+use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
+use std::path::Path;
 use tauri::{AppHandle, Manager};
 
 use super::sanitize_command_name_part;
+
+/// 获取插件图标
+///
+/// 支持三种图标格式：
+/// 1. HTTP/HTTPS URL（市场插件） - 直接返回 URL
+/// 2. Data URL（已编码的图标） - 直接返回
+/// 3. 本地文件路径（本地插件） - 读取并编码为 Data URL
+fn get_plugin_icon_base64(app: &AppHandle, dir_name: &str, icon_path: &Option<String>) -> String {
+    // 如果没有配置图标，返回空字符串
+    let icon_value = match icon_path {
+        Some(path) if !path.is_empty() => path,
+        _ => {
+            println!("[plugin/icon] 插件 {} 未配置图标", dir_name);
+            return String::new();
+        }
+    };
+
+    // 如果图标已经是 URL 或 Data URL，直接返回
+    if icon_value.starts_with("http://")
+        || icon_value.starts_with("https://")
+        || icon_value.starts_with("data:")
+    {
+        println!(
+            "[plugin/icon] 插件 {} 使用 URL 图标: {}",
+            dir_name,
+            if icon_value.len() > 50 {
+                format!("{}...", &icon_value[..50])
+            } else {
+                icon_value.clone()
+            }
+        );
+        return icon_value.clone();
+    }
+
+    // 本地文件：获取插件目录
+    let plugins_dir = match app.path().app_data_dir() {
+        Ok(dir) => dir.join("plugins"),
+        Err(e) => {
+            eprintln!("[plugin/icon] 获取 app_data_dir 失败: {}", e);
+            return String::new();
+        }
+    };
+
+    let icon_full_path = plugins_dir.join(dir_name).join(icon_value);
+
+    println!(
+        "[plugin/icon] 尝试读取插件图标: {} (路径: {})",
+        dir_name,
+        icon_full_path.display()
+    );
+
+    // 根据扩展名确定 MIME 类型
+    let mime_type = match Path::new(icon_value)
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|s| s.to_lowercase())
+        .as_deref()
+    {
+        Some("svg") => "image/svg+xml",
+        Some("png") => "image/png",
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("ico") => "image/x-icon",
+        Some("gif") => "image/gif",
+        Some("webp") => "image/webp",
+        _ => "image/png", // 默认使用 PNG
+    };
+
+    // 读取图标文件并编码为 Data URL
+    match std::fs::read(&icon_full_path) {
+        Ok(bytes) => {
+            println!(
+                "[plugin/icon] 成功读取插件图标: {} ({} 字节, MIME: {})",
+                dir_name,
+                bytes.len(),
+                mime_type
+            );
+            format!(
+                "data:{};base64,{}",
+                mime_type,
+                BASE64_STANDARD.encode(&bytes)
+            )
+        }
+        Err(e) => {
+            eprintln!(
+                "[plugin/icon] 读取插件图标失败: {} - {} (路径: {})",
+                dir_name,
+                e,
+                icon_full_path.display()
+            );
+            String::new()
+        }
+    }
+}
 
 /// 生成插件命令列表
 pub fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
@@ -21,6 +116,10 @@ pub fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
 
                 let safe_plugin_id = sanitize_command_name_part(&plugin.manifest.id);
 
+                // 获取插件图标的 Base64 编码
+                let icon_base64 =
+                    get_plugin_icon_base64(app, &plugin.dir_name, &plugin.manifest.icon);
+
                 // 1. 为插件本身创建一个 Command（用于打开插件）
                 #[allow(deprecated)]
                 commands.push(Command {
@@ -33,7 +132,7 @@ pub fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
                         disabled: None,
                         is_default: Some(true),
                     }],
-                    icon: "".to_string(),
+                    icon: icon_base64.clone(),
                     source: ItemSource::Plugin,
                     action: CommandAction::Plugin(plugin.manifest.id.clone()),
                     origin: None,
@@ -79,7 +178,7 @@ pub fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
                         description: Some(cmd.description.clone()),
                         english_name: cmd.name.clone(),
                         keywords,
-                        icon: "icon-plugin".to_string(),
+                        icon: icon_base64.clone(),
                         source: ItemSource::Plugin,
                         action: CommandAction::PluginCommand {
                             plugin_id: plugin.manifest.id.clone(),

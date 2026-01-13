@@ -34,6 +34,7 @@ impl Default for ItemType {
 pub enum IconType {
     Base64,
     Iconfont,
+    Url, // HTTP/HTTPS URL for remote icons (marketplace plugins)
 }
 
 impl Default for IconType {

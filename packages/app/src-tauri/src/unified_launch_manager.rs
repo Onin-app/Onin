@@ -64,6 +64,23 @@ pub async fn get_all_launchable_items(
                 None
             };
 
+            // 先计算 icon_type，避免借用移动后的值
+            let icon_type = match cmd.source {
+                ItemSource::Application => IconType::Base64,
+                ItemSource::FileCommand => IconType::Base64,
+                // 插件：根据图标格式选择类型
+                ItemSource::Plugin if cmd.icon.starts_with("http://") || cmd.icon.starts_with("https://") => {
+                    IconType::Url
+                }
+                ItemSource::Plugin
+                    if cmd.icon.starts_with("data:")
+                        || (!cmd.icon.is_empty() && !cmd.icon.starts_with("icon-")) =>
+                {
+                    IconType::Base64
+                }
+                _ => IconType::Iconfont,
+            };
+
             Some(LaunchableItem {
                 name: cmd.title,
                 description: cmd.description,
@@ -74,11 +91,7 @@ pub async fn get_all_launchable_items(
                     _ => "".to_string(),
                 },
                 icon: cmd.icon,
-                icon_type: match cmd.source {
-                    ItemSource::Application => IconType::Base64,
-                    ItemSource::FileCommand => IconType::Base64,
-                    _ => IconType::Iconfont,
-                },
+                icon_type,
                 item_type: match cmd.source {
                     ItemSource::FileCommand => ItemType::File,
                     _ => ItemType::App,

@@ -36,7 +36,15 @@
   {#if app.icon}
     {#if app.icon_type === "Base64"}
       <img
-        src={`data:image/png;base64,${app.icon}`}
+        src={app.icon.startsWith("data:")
+          ? app.icon
+          : `data:image/png;base64,${app.icon}`}
+        class="mr-2 inline-block h-8 w-8 flex-shrink-0"
+        alt=""
+      />
+    {:else if app.icon_type === "Url"}
+      <img
+        src={app.icon}
         class="mr-2 inline-block h-8 w-8 flex-shrink-0"
         alt=""
       />
