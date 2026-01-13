@@ -1,0 +1,135 @@
+{
+  "id": "plugin-demo",
+  "name": "Plugin SDK Demo",
+  "version": "0.1.0",
+  "description": "Onin SDK 完整演示插件，涵盖所有 API 功能",
+  "entry": "dist/index.html",
+  "devMode": true,
+  "devServer": "http://localhost:5174",
+  "type": "webview",
+  "icon": "icon.svg",
+  "commands": [
+    {
+      "code": "demo-hello",
+      "name": "Demo Hello",
+      "description": "演示基本命令触发",
+      "keywords": [
+        {
+          "name": "hello",
+          "type": "exact"
+        },
+        {
+          "name": "hi",
+          "type": "prefix"
+        },
+        {
+          "name": "你好",
+          "type": "fuzzy"
+        }
+      ],
+      "matches": []
+    },
+    {
+      "code": "demo-search",
+      "name": "Demo Search",
+      "description": "演示文本匹配命令",
+      "keywords": [
+        {
+          "name": "search",
+          "type": "prefix"
+        }
+      ],
+      "matches": [
+        {
+          "type": "text",
+          "name": "搜索文本",
+          "description": "输入要搜索的文本",
+          "min": 1,
+          "max": 100
+        }
+      ]
+    },
+    {
+      "code": "demo-url",
+      "name": "Demo URL Handler",
+      "description": "演示正则匹配 URL",
+      "keywords": [],
+      "matches": [
+        {
+          "type": "text",
+          "name": "URL",
+          "description": "匹配 URL 格式",
+          "regexp": "^https?://[\\w.-]+",
+          "min": 1
+        }
+      ]
+    },
+    {
+      "code": "demo-file-handler",
+      "name": "Demo File Handler",
+      "description": "演示文件匹配命令",
+      "keywords": [],
+      "matches": [
+        {
+          "type": "file",
+          "name": "文件",
+          "description": "选择文件进行处理",
+          "extensions": [".txt", ".md", ".json", ".pdf"],
+          "min": 1,
+          "max": 10
+        }
+      ]
+    },
+    {
+      "code": "demo-folder-handler",
+      "name": "Demo Folder Handler",
+      "description": "演示文件夹匹配命令",
+      "keywords": [],
+      "matches": [
+        {
+          "type": "folder",
+          "name": "文件夹",
+          "description": "选择文件夹",
+          "min": 1,
+          "max": 1
+        }
+      ]
+    },
+    {
+      "code": "demo-image-handler",
+      "name": "Demo Image Handler",
+      "description": "演示图片匹配命令",
+      "keywords": [],
+      "matches": [
+        {
+          "type": "image",
+          "name": "图片",
+          "description": "处理剪贴板中的图片",
+          "min": 1
+        }
+      ]
+    }
+  ],
+  "permissions": {
+    "http": {
+      "enable": true,
+      "allowUrls": ["*"],
+      "timeout": 30000
+    },
+    "storage": {
+      "enable": true,
+      "local": true,
+      "session": true,
+      "maxSize": "10MB"
+    },
+    "notification": {
+      "enable": true,
+      "sound": true,
+      "badge": true
+    },
+    "scheduler": {
+      "enable": true,
+      "maxTasks": 10
+    }
+  }
+}

@@ -6,11 +6,11 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm --filter app tauri:dev",
-    "dev:demo": "pnpm --filter demo dev",
+    "dev:demo": "pnpm --filter plugin-demo dev",
     "build": "pnpm -r build",
     "build:app": "pnpm --filter app tauri:build",
     "build:sdk": "pnpm --filter sdk build",
-    "build:demo": "pnpm --filter demo build",
+    "build:demo": "pnpm --filter plugin-demo build",
     "test": "pnpm -r test",
     "test:sdk": "pnpm --filter sdk test",
     "check": "pnpm --filter app check",

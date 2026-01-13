@@ -1,0 +1,29 @@
+{
+  "name": "plugin-demo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Onin SDK demo and testing project",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.json"
+  },
+  "dependencies": {
+    "sdk": "workspace:*",
+    "@tauri-apps/api": "^2.8.0"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^6.2.1",
+    "svelte": "^5.43.8",
+    "svelte-check": "^4.3.4",
+    "typescript": "~5.8.3",
+    "vite": "npm:rolldown-vite@7.2.5"
+  },
+  "pnpm": {
+    "overrides": {
+      "vite": "npm:rolldown-vite@7.2.5"
+    }
+  }
+}
