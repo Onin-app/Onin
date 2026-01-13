@@ -10,7 +10,7 @@ use windows::{
             BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP,
         },
         UI::{
-            Shell::ExtractIconW,
+            Shell::{ExtractIconW, SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON},
             WindowsAndMessaging::{DestroyIcon, GetIconInfo, ICONINFO},
         },
     },
@@ -56,6 +56,61 @@ pub fn extract_icon_from_exe(exe_path: &str) -> Option<String> {
 
         // 将位图数据转换为 PNG 格式的 base64
         bitmap_to_base64(bitmap_data)
+    }
+}
+
+/// Extract icon for any file type using SHGetFileInfo API.
+/// This retrieves the system-associated icon based on file extension.
+pub fn extract_icon_from_file(file_path: &str) -> Option<String> {
+    unsafe {
+        let h_path = HSTRING::from(file_path);
+        let c_path = PCWSTR(h_path.as_ptr());
+
+        let mut shfi: SHFILEINFOW = std::mem::zeroed();
+        let shfi_size = std::mem::size_of::<SHFILEINFOW>() as u32;
+
+        // Use SHGetFileInfoW to get the icon associated with the file type
+        let result = SHGetFileInfoW(
+            c_path,
+            windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_NORMAL,
+            Some(&mut shfi),
+            shfi_size,
+            SHGFI_ICON | SHGFI_LARGEICON,
+        );
+
+        if result == 0 {
+            tracing::warn!("SHGetFileInfoW failed for {}", file_path);
+            return None;
+        }
+
+        let hicon = shfi.hIcon;
+        if hicon.is_invalid() {
+            tracing::warn!("SHGetFileInfoW returned invalid icon for {}", file_path);
+            return None;
+        }
+
+        // Get icon info
+        let mut icon_info = ICONINFO::default();
+        if GetIconInfo(hicon, &mut icon_info).is_err() {
+            let err = windows::core::Error::from_win32();
+            tracing::error!("GetIconInfo failed for {}: {:?}", file_path, err);
+            let _ = DestroyIcon(hicon);
+            return None;
+        }
+
+        // Extract bitmap data
+        let bitmap_data = extract_bitmap_data(icon_info.hbmColor);
+
+        // Cleanup resources
+        if !icon_info.hbmMask.is_invalid() {
+            let _ = DeleteObject(icon_info.hbmMask);
+        }
+        if !icon_info.hbmColor.is_invalid() {
+            let _ = DeleteObject(icon_info.hbmColor);
+        }
+        let _ = DestroyIcon(hicon);
+
+        bitmap_data.and_then(bitmap_to_base64)
     }
 }
 
