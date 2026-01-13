@@ -56,6 +56,16 @@
         <PhosphorIcon icon={app.icon} class="h-6 w-6" />
       </div>
     {/if}
+  {:else if app.source === "Application"}
+    <!-- 应用程序默认图标 -->
+    <div
+      class="mr-2 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-blue-100 dark:bg-blue-900"
+    >
+      <PhosphorIcon
+        icon="cube"
+        class="h-5 w-5 text-blue-600 dark:text-blue-400"
+      />
+    </div>
   {/if}
   <div class="flex min-w-0 flex-1 flex-col">
     <!-- 第一行：名称 + 别名 + 来源 -->

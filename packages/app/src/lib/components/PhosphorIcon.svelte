@@ -6,6 +6,7 @@
     Lock,
     SignOut,
     Folder,
+    Cube,
   } from "phosphor-svelte";
 
   interface PhosphorIconProps {
@@ -19,10 +20,13 @@
   const iconMap: Record<string, any> = {
     shutdown: Power,
     restart: ArrowsClockwise,
+    arrowsClockwise: ArrowsClockwise,
     sleep: Moon,
     lock: Lock,
     logout: SignOut,
     folder: Folder,
+    cube: Cube,
+    package: Cube,
   };
 
   const IconComponent = $derived(iconMap[icon] || Power);

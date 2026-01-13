@@ -182,13 +182,26 @@ struct BitmapData {
 fn bitmap_to_base64(bitmap_data: BitmapData) -> Option<String> {
     // Windows 位图数据是 BGRA 格式，需要转换为 RGBA
     let mut rgba_data = Vec::with_capacity(bitmap_data.data.len());
+    let mut has_visible_pixels = false;
 
-    // BGRA -> RGBA
+    // BGRA -> RGBA，同时检测是否有可见像素
     for chunk in bitmap_data.data.chunks_exact(4) {
+        let alpha = chunk[3];
         rgba_data.push(chunk[2]); // R (from B position)
         rgba_data.push(chunk[1]); // G
         rgba_data.push(chunk[0]); // B (from R position)
-        rgba_data.push(chunk[3]); // A
+        rgba_data.push(alpha); // A
+
+        // 如果有任何不完全透明的像素，标记为有可见内容
+        if alpha > 0 {
+            has_visible_pixels = true;
+        }
+    }
+
+    // 如果图标完全透明，返回 None
+    if !has_visible_pixels {
+        tracing::warn!("Icon is fully transparent, skipping");
+        return None;
     }
 
     // 创建 RGBA 图像
