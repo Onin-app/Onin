@@ -222,33 +222,27 @@ pub async fn create_or_show_plugin_window(
     }
 
     // 如果窗口已存在，切换显示状态
+    // 核心逻辑：最小化/隐藏的窗口必然没有焦点，所以只需检查 is_focused
     if let Some(window) = app.get_webview_window(&window_label) {
-        let is_minimized = window.is_minimized().unwrap_or(false);
-        let is_visible = window.is_visible().unwrap_or(false);
+        let is_focused = window.is_focused().unwrap_or(false);
 
         println!(
-            "[plugin/window] 窗口 {} 状态 - 最小化: {}, 可见: {}",
-            window_label, is_minimized, is_visible
+            "[plugin/window] 窗口 {} 焦点状态: {}",
+            window_label, is_focused
         );
 
-        if is_minimized || !is_visible {
-            // 窗口被最小化或隐藏，显示并聚焦
-            println!("[plugin/window] 显示窗口 {}", window_label);
-            if is_minimized {
-                if let Err(e) = window.unminimize() {
-                    eprintln!("取消最小化插件窗口失败: {}", e);
-                }
-            }
-            if let Err(e) = window.show() {
-                eprintln!("显示插件窗口失败: {}", e);
-            }
-            if let Err(e) = window.set_focus() {
-                eprintln!("聚焦插件窗口失败: {}", e);
-            }
+        if !is_focused {
+            // 窗口无焦点（可能最小化、隐藏或在后台），恢复并聚焦
+            println!("[plugin/window] 显示并聚焦窗口 {}", window_label);
+            
+            // 依次尝试恢复窗口状态
+            let _ = window.unminimize();
+            let _ = window.show();
+            let _ = window.set_focus();
 
             trigger_window_visibility_event(&window, true);
         } else {
-            // 窗口已显示，最小化它
+            // 窗口已聚焦，最小化它
             println!("[plugin/window] 最小化窗口 {}", window_label);
             if let Err(e) = window.minimize() {
                 eprintln!("最小化插件窗口失败: {}", e);
