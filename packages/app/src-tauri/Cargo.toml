@@ -77,7 +77,7 @@ winreg = "0.55"
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
 objc2-foundation = { version = "0.3", features = ["NSString", "NSData", "NSObject", "NSDictionary", "std"] }
-objc2-app-kit = { version = "0.3", features = ["NSWorkspace", "NSImage", "NSBitmapImageRep", "NSGraphicsContext"] }
+objc2-app-kit = { version = "0.3", features = ["NSWorkspace", "NSImage", "NSBitmapImageRep", "NSGraphicsContext", "NSOpenPanel", "NSSavePanel", "NSWindow", "NSResponder", "NSApplication", "NSRunningApplication"] }
 
 [target.'cfg(any(target_os = "macos", target_os = "windows"))'.dependencies]
 clipboard-rs = "0.2"

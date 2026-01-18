@@ -25,6 +25,9 @@ mod unified_launch_manager;
 mod usage_tracker;
 mod window_manager;
 
+#[cfg(target_os = "macos")]
+mod macos_dialog;
+
 /// 创建全局快捷键处理器
 fn create_shortcut_handler(
     close_window_shortcut: Shortcut,

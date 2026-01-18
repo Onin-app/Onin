@@ -128,6 +128,8 @@ pub fn get_invoke_handler(
         usage_tracker::record_command_usage,
         usage_tracker::get_usage_stats,
         usage_tracker::clear_usage_stats,
+        // Dialog
+        open_file_or_folder_dialog,
     ]
 }
 
@@ -135,4 +137,23 @@ pub fn get_invoke_handler(
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
+}
+
+/// 打开一个可以同时选择文件和文件夹的对话框
+///
+/// 在 macOS 上使用原生 NSOpenPanel，支持同时选择文件和文件夹
+/// 在其他平台上使用 Tauri 的对话框插件（仅支持文件选择）
+#[tauri::command]
+pub fn open_file_or_folder_dialog() -> Vec<String> {
+    #[cfg(target_os = "macos")]
+    {
+        crate::macos_dialog::open_file_and_folder_dialog()
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        // 在非 macOS 平台上，返回空列表，让前端使用 Tauri 的对话框
+        // 或者可以在这里实现 Windows 的对话框逻辑
+        Vec::new()
+    }
 }

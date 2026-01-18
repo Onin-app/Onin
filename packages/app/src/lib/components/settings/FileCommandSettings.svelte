@@ -91,18 +91,25 @@
     }
   }
 
-  const handleOpenFolder = async () => {
-    // 解决问题 #2：在打开文件对话框前，请求后端锁定窗口
+  const handleOpenFileOrFolder = async () => {
     await invoke("acquire_window_close_lock");
     isProcessing = true;
     try {
-      const selected = await open({
-        multiple: true,
-        directory: true,
-      });
+      // 先尝试使用自定义的原生对话框（macOS 支持同时选择文件和文件夹）
+      let selected = await invoke<string[]>("open_file_or_folder_dialog");
 
-      if (!selected || selected.length === 0) {
-        // 用户取消了选择，直接返回。finally 块会确保锁被释放。
+      // 如果返回空数组（可能是非 macOS 平台或用户取消），回退到 Tauri 对话框
+      if (selected.length === 0) {
+        const tauriSelected = await open({
+          multiple: true,
+          directory: false, // 非 macOS 平台只能选择文件
+        });
+        if (tauriSelected && tauriSelected.length > 0) {
+          selected = tauriSelected;
+        }
+      }
+
+      if (selected.length === 0) {
         return;
       }
 
@@ -114,7 +121,6 @@
       console.error("Failed to add file commands:", e);
     } finally {
       isProcessing = false;
-      // 确保操作结束后（无论成功、失败还是取消），都释放锁
       await invoke("release_window_close_lock");
     }
   };
@@ -214,7 +220,7 @@
                   class="rounded-input bg-dark text-background shadow-mini hover:bg-dark/95 mx-1
 	inline-flex h-5 items-center justify-center px-[6px]
 	text-[10px] font-semibold active:scale-[0.98] active:transition-all"
-                  onclick={handleOpenFolder}
+                  onclick={handleOpenFileOrFolder}
                 >
                   按钮
                 </Button.Root> 选择文件/文件夹
@@ -271,7 +277,7 @@
                         class="rounded-input bg-dark text-background shadow-mini hover:bg-dark/95 mx-1
 	inline-flex h-5 items-center justify-center px-[6px]
 	text-[10px] font-semibold active:scale-[0.98] active:transition-all"
-                        onclick={handleOpenFolder}
+                        onclick={handleOpenFileOrFolder}
                       >
                         按钮
                       </Button.Root> 选择文件/文件夹
