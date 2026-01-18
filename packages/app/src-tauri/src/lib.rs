@@ -1,8 +1,6 @@
-use once_cell::sync::Lazy;
 use std::str::FromStr;
 use tauri::{Emitter, Manager};
 use tauri_plugin_global_shortcut::{Shortcut, ShortcutState};
-use tokio::sync::broadcast;
 
 use tracing_subscriber;
 use tracing_subscriber::fmt::format::FmtSpan;
@@ -26,36 +24,6 @@ mod tray_manager;
 mod unified_launch_manager;
 mod usage_tracker;
 mod window_manager;
-
-// 创建一个全局的、一次性的通道，用于广播 rdev 的输入事件。
-// 这样我们只需要一个系统监听线程，而不是每次失焦都创建一个。
-pub static RDEV_EVENT_CHANNEL: Lazy<(
-    broadcast::Sender<rdev::Event>,
-    broadcast::Receiver<rdev::Event>,
-)> = Lazy::new(|| broadcast::channel(128));
-
-/// 启动 rdev 全局事件监听器
-///
-/// 在一个单独的线程中监听全局输入事件，并通过 channel 广播出去。
-/// macOS 上暂时禁用以避免崩溃问题。
-fn start_rdev_listener() {
-    #[cfg(not(target_os = "macos"))]
-    {
-        std::thread::spawn(|| {
-            let sender = RDEV_EVENT_CHANNEL.0.clone();
-            if let Err(e) = rdev::listen(move |event| {
-                let _ = sender.send(event);
-            }) {
-                eprintln!("[ERROR] rdev could not listen for events: {:?}", e);
-            }
-        });
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        eprintln!("[INFO] rdev listener disabled on macOS to prevent crashes");
-    }
-}
 
 /// 创建全局快捷键处理器
 fn create_shortcut_handler(
@@ -97,9 +65,6 @@ pub fn run() {
         .with_span_events(FmtSpan::FULL)
         .try_init()
         .ok();
-
-    // 启动全局事件监听器
-    start_rdev_listener();
 
     // 解析关闭窗口快捷键
     let close_window_shortcut =

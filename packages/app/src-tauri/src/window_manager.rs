@@ -119,40 +119,20 @@ fn setup_file_drop_listeners(window: &tauri::WebviewWindow, app_handle: &AppHand
 // 智能隐藏任务
 // ============================================================================
 
-/// 创建智能隐藏任务
-/// 
-/// 等待鼠标释放或超时后隐藏窗口，具有以下特性：
-/// - 监听全局鼠标释放事件
-/// - 2秒超时机制作为后备
-/// - 隐藏前最终检查窗口状态
+/// 创建隐藏任务
+///
+/// 短延迟后隐藏窗口，具有以下特性：
+/// - 50ms 延迟防止闪烁
+/// - 隐藏前最终检查窗口状态（焦点和锁定）
+/// - 文件拖拽期间由 WindowCloseLockState 保护
 fn spawn_smart_hide_task(
     window: tauri::WebviewWindow,
     app_handle: AppHandle,
 ) -> tauri::async_runtime::JoinHandle<()> {
     tauri::async_runtime::spawn(async move {
-        let mut rx = crate::RDEV_EVENT_CHANNEL.0.subscribe();
-
-        // 等待鼠标释放
-        let hide_on_mouse_release = async {
-            loop {
-                if let Ok(event) = rx.recv().await {
-                    if let rdev::EventType::ButtonRelease(rdev::Button::Left) = event.event_type {
-                        break;
-                    }
-                }
-            }
-        };
-
-        // 等待鼠标释放或超时
-        tokio::select! {
-            _ = hide_on_mouse_release => {
-                sleep(Duration::from_millis(50)).await;
-                println!("Global mouse release detected. Attempting to hide window.");
-            }
-            _ = sleep(Duration::from_millis(2000)) => {
-                println!("Timeout reached after focus loss. Attempting to hide window.");
-            }
-        }
+        // 短延迟后尝试隐藏
+        sleep(Duration::from_millis(50)).await;
+        println!("Short delay after focus loss. Attempting to hide window.");
 
         // 最终检查并隐藏
         let lock_state: State<WindowCloseLockState> = app_handle.state();
