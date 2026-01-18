@@ -388,8 +388,8 @@
           class="h-full w-full rounded-[10px] border px-2 py-2"
           type="hover"
         >
-          <ScrollArea.Viewport class="h-full w-full">
-            <div class="app-list">
+          <ScrollArea.Viewport class="h-full w-full overflow-x-hidden">
+            <div class="app-list overflow-hidden">
               <div use:animate>
                 {#each displayList as app, index (app.path + app.name)}
                   <AppListItem
@@ -407,12 +407,7 @@
           >
             <ScrollArea.Thumb class="bg-muted-foreground flex-1 rounded-full" />
           </ScrollArea.Scrollbar>
-          <ScrollArea.Scrollbar
-            orientation="horizontal"
-            class="bg-muted hover:bg-dark-10 flex h-1.5 touch-none select-none rounded-full border-t border-t-transparent p-px transition-all duration-200 hover:h-3"
-          >
-            <ScrollArea.Thumb class="bg-muted-foreground rounded-full" />
-          </ScrollArea.Scrollbar>
+
           <ScrollArea.Corner />
         </ScrollArea.Root>
       {/if}

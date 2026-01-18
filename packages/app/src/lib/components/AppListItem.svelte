@@ -28,7 +28,7 @@
 <button
   role="option"
   aria-selected={isSelected}
-  class="flex w-full rounded p-2 text-left text-2xl transition-all duration-200 {!isSelected
+  class="flex w-full overflow-hidden rounded p-2 text-left text-2xl transition-all duration-200 {!isSelected
     ? 'hover:bg-neutral-200 dark:hover:bg-neutral-700'
     : ''} {isSelected ? 'bg-neutral-300 dark:bg-neutral-600' : ''}"
   onclick={onClick}
@@ -67,14 +67,21 @@
       />
     </div>
   {/if}
-  <div class="flex min-w-0 flex-1 flex-col">
-    <!-- 第一行：名称 + 别名 + 来源 -->
-    <div class="flex items-center gap-2">
-      <span class="flex-shrink-0">{app.name}</span>
+  <div class="relative min-w-0 flex-1">
+    <!-- 来源标签（绝对定位固定右上角） -->
+    <span
+      class="absolute right-0 top-0 rounded-md bg-neutral-200 px-1.5 py-0.5 text-xs text-neutral-700 dark:bg-neutral-700 dark:text-neutral-300"
+    >
+      {app.source_display || app.source}
+    </span>
+
+    <!-- 第一行：名称 + 别名 -->
+    <div class="flex items-center gap-2 overflow-hidden pr-24">
+      <span class="truncate">{app.name}</span>
 
       <!-- 别名标签 -->
       {#if displayAliases.length > 0}
-        <div class="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
+        <div class="flex min-w-0 items-center gap-1 overflow-hidden">
           {#each displayAliases as alias}
             <span
               class="flex-shrink-0 rounded bg-neutral-200/70 px-1.5 py-0.5 text-xs text-neutral-500 dark:bg-neutral-700/70 dark:text-neutral-400"
@@ -91,25 +98,18 @@
           {/if}
         </div>
       {/if}
-
-      <!-- 来源标签 -->
-      <span
-        class="ml-auto flex-shrink-0 rounded-md bg-neutral-200 px-1.5 py-0.5 text-xs text-neutral-700 dark:bg-neutral-700 dark:text-neutral-300"
-      >
-        {app.source_display || app.source}
-      </span>
     </div>
 
     <!-- 第二行：描述信息 -->
     {#if app.description}
       <span
-        class="mt-0.5 truncate text-sm text-neutral-500 dark:text-neutral-400"
+        class="mt-0.5 block truncate pr-24 text-sm text-neutral-500 dark:text-neutral-400"
       >
         {app.description}
       </span>
     {:else if app.source !== "Command" && app.path}
       <span
-        class="mt-0.5 truncate text-xs text-neutral-400 dark:text-neutral-500"
+        class="mt-0.5 block truncate pr-24 text-xs text-neutral-400 dark:text-neutral-500"
       >
         {app.path}
       </span>
