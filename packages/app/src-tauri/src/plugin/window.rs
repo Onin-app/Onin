@@ -34,7 +34,10 @@ pub fn plugin_close_window(app: tauri::AppHandle, label: String) -> Result<(), S
 #[tauri::command]
 pub fn plugin_minimize_window(app: tauri::AppHandle, label: String) -> Result<(), String> {
     if let Some(window) = app.get_webview_window(&label) {
-        window.minimize().map_err(|e| e.to_string())
+        window.minimize().map_err(|e| e.to_string())?;
+        // 触发窗口隐藏事件
+        trigger_window_visibility_event(&window, false);
+        Ok(())
     } else {
         Err(format!("窗口未找到: {}", label))
     }
@@ -74,7 +77,23 @@ pub fn plugin_is_maximized(app: tauri::AppHandle, label: String) -> Result<bool,
 #[tauri::command]
 pub fn plugin_show_window(app: tauri::AppHandle, label: String) -> Result<(), String> {
     if let Some(window) = app.get_webview_window(&label) {
-        window.show().map_err(|e| e.to_string())
+        window.show().map_err(|e| e.to_string())?;
+        // 触发窗口显示事件
+        trigger_window_visibility_event(&window, true);
+        Ok(())
+    } else {
+        Err(format!("窗口未找到: {}", label))
+    }
+}
+
+/// 取消最小化插件窗口（恢复窗口）
+#[tauri::command]
+pub fn plugin_unminimize_window(app: tauri::AppHandle, label: String) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window(&label) {
+        window.unminimize().map_err(|e| e.to_string())?;
+        // 触发窗口显示事件
+        trigger_window_visibility_event(&window, true);
+        Ok(())
     } else {
         Err(format!("窗口未找到: {}", label))
     }
@@ -141,19 +160,22 @@ pub fn open_plugin_in_window(
 ///
 /// 向插件窗口发送可见性变化事件
 pub fn trigger_window_visibility_event(window: &tauri::WebviewWindow, is_visible: bool) {
-    let eval_script = format!(
-        r#"
-        if (window.__TAURI__?.event?._trigger) {{
-            window.__TAURI__.event._trigger('window_visibility', {});
-        }}
-        "#,
-        is_visible
-    );
-    if let Err(e) = window.eval(&eval_script) {
-        eprintln!(
-            "触发 window_visibility ({}) 失败: {}",
-            is_visible, e
-        );
+    use tauri::Emitter;
+    
+    // 发送具体的 show/hide 事件
+    if is_visible {
+        if let Err(e) = window.emit("window_show", ()) {
+            eprintln!("[plugin/window] 发送 window_show 事件失败: {}", e);
+        }
+    } else {
+        if let Err(e) = window.emit("window_hide", ()) {
+            eprintln!("[plugin/window] 发送 window_hide 事件失败: {}", e);
+        }
+    }
+    
+    // 同时发送通用的 visibility 事件（带 payload）
+    if let Err(e) = window.emit("window_visibility", is_visible) {
+        eprintln!("[plugin/window] 发送 window_visibility 事件失败: {}", e);
     }
 }
 
@@ -413,9 +435,10 @@ fn setup_window_events(
                     }
                 }
 
-                // 发送窗口可见性事件
-                if let Err(e) = window_for_event.emit("window_visibility", true) {
-                    eprintln!("[plugin/window] 发送 window_visibility 事件失败: {}", e);
+                // 只发送焦点事件，不发送可见性事件
+                // 焦点变化不等于可见性变化：窗口可以失去焦点但仍然可见
+                if let Err(e) = window_for_event.emit("window_focus", ()) {
+                    eprintln!("[plugin/window] 发送 window_focus 事件失败: {}", e);
                 }
 
                 // 重新注册 ESC 快捷键
@@ -434,9 +457,10 @@ fn setup_window_events(
                     }
                 }
 
-                // 发送窗口可见性事件
-                if let Err(e) = window_for_event.emit("window_visibility", false) {
-                    eprintln!("[plugin/window] 发送 window_visibility 事件失败: {}", e);
+                // 只发送失焦事件，不发送可见性事件
+                // 焦点变化不等于可见性变化：窗口可以失去焦点但仍然可见
+                if let Err(e) = window_for_event.emit("window_blur", ()) {
+                    eprintln!("[plugin/window] 发送 window_blur 事件失败: {}", e);
                 }
 
                 // 注销 ESC 快捷键

@@ -86,7 +86,7 @@ pub use settings::{
 pub use window::{
     open_plugin_in_window, plugin_close_window, plugin_is_maximized, plugin_maximize_window,
     plugin_minimize_window, plugin_set_focus, plugin_show_window, plugin_start_dragging,
-    plugin_unmaximize_window,
+    plugin_unmaximize_window, plugin_unminimize_window,
 };
 
 // 执行器命令

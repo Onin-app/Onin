@@ -17,6 +17,7 @@
   import { ScrollArea } from "bits-ui";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
+  import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
   import { goto } from "$app/navigation";
 
   // Stores
@@ -53,6 +54,7 @@
 
   // Component references
   let searchInputRef: SearchInput;
+  let pluginIframeRef = $state<PluginIframe | null>(null);
 
   // AutoAnimate action
   const animate: Action<HTMLElement> = (node) => {
@@ -273,6 +275,16 @@
       clipboard.clearAttachments();
     });
 
+    // 监听窗口焦点事件并转发给插件
+    const currentWindow = getCurrentWebviewWindow();
+    const unlistenFocus = await currentWindow.onFocusChanged(
+      ({ payload: focused }) => {
+        if (plugin.state.showPluginInline) {
+          plugin.sendLifecycleEvent(focused ? "focus" : "blur");
+        }
+      },
+    );
+
     // 设置 composables 的事件监听
     const unlistenPlugin = await plugin.setupListeners();
     const unlistenAppList = await appListManager.setupListeners();
@@ -280,6 +292,7 @@
     unlisten = () => {
       unlistenWindowShow();
       unlistenClearClipboard();
+      unlistenFocus();
       unlistenPlugin();
       unlistenAppList();
     };
@@ -361,7 +374,14 @@
 
       {#if plugin.state.showPluginInline}
         <!-- Plugin Iframe -->
-        <PluginIframe url={plugin.state.currentPluginUrl} />
+        <PluginIframe
+          bind:this={pluginIframeRef}
+          url={plugin.state.currentPluginUrl}
+          pluginId={plugin.state.currentPluginId}
+          onLoad={() => {
+            plugin.setIframeElement(pluginIframeRef?.getElement() ?? null);
+          }}
+        />
       {:else}
         <!-- App List -->
         <ScrollArea.Root
@@ -383,13 +403,13 @@
           </ScrollArea.Viewport>
           <ScrollArea.Scrollbar
             orientation="vertical"
-            class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none rounded-full border-l border-l-transparent p-px transition-all duration-200 select-none hover:w-3"
+            class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none select-none rounded-full border-l border-l-transparent p-px transition-all duration-200 hover:w-3"
           >
             <ScrollArea.Thumb class="bg-muted-foreground flex-1 rounded-full" />
           </ScrollArea.Scrollbar>
           <ScrollArea.Scrollbar
             orientation="horizontal"
-            class="bg-muted hover:bg-dark-10 flex h-1.5 touch-none rounded-full border-t border-t-transparent p-px transition-all duration-200 select-none hover:h-3"
+            class="bg-muted hover:bg-dark-10 flex h-1.5 touch-none select-none rounded-full border-t border-t-transparent p-px transition-all duration-200 hover:h-3"
           >
             <ScrollArea.Thumb class="bg-muted-foreground rounded-full" />
           </ScrollArea.Scrollbar>

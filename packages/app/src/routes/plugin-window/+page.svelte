@@ -46,9 +46,10 @@
 
         // 根据开发模式决定使用哪个 URL
         if (plugin.devMode && plugin.devServer) {
-          // 开发模式：使用开发服务器，添加 plugin_id 参数
+          // 开发模式：使用开发服务器，添加参数
           const url = new URL(plugin.devServer);
           url.searchParams.set("plugin_id", pluginId);
+          url.searchParams.set("mode", "window"); // 添加模式参数
           pluginUrl = url.toString();
           console.log(
             "[PluginWindow] Loading plugin from dev server:",
@@ -75,67 +76,127 @@
       // 监听来自 iframe 的消息（Tauri API 调用）
       window.addEventListener("message", handlePluginMessage);
 
-      // 监听来自后端的窗口可见性事件，转发给 iframe 中的插件
+      // 事件状态跟踪和防抖
+      let lastFocusState: boolean | null = null;
+      let lastVisibilityState: boolean | null = null;
+      let focusDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+      const FOCUS_DEBOUNCE_MS = 50; // 50ms 防抖
+
+      // 辅助函数：安全地发送 postMessage
+      const sendToIframe = (eventType: "show" | "hide" | "focus" | "blur") => {
+        const iframe = document.querySelector("iframe");
+        if (!iframe?.contentWindow || !pluginUrl) return;
+
+        try {
+          if (!pluginUrl || pluginUrl.trim() === "") return;
+          const targetOrigin = new URL(pluginUrl).origin;
+          iframe.contentWindow.postMessage(
+            { type: "plugin-lifecycle-event", event: eventType },
+            targetOrigin,
+          );
+          console.log("[PluginWindow] Sent lifecycle event:", eventType);
+        } catch (error) {
+          console.error(
+            "[PluginWindow] Failed to send lifecycle event:",
+            error,
+          );
+        }
+      };
+
+      // 监听来自后端的事件
       const { listen } = await import("@tauri-apps/api/event");
+
+      // 监听可见性事件（不需要防抖，只需要去重）
       const unlistenVisibility = await listen<boolean>(
         "window_visibility",
         (event) => {
-          const iframe = document.querySelector("iframe");
-          if (!iframe?.contentWindow || !pluginUrl) return;
-
-          const eventType = event.payload ? "show" : "hide";
-          try {
-            // 验证 pluginUrl 是否有效，避免 new URL() 报错
-            if (!pluginUrl || pluginUrl.trim() === "") {
-              console.warn(
-                "[PluginWindow] Cannot send lifecycle event: pluginUrl is empty",
-              );
-              return;
-            }
-            const targetOrigin = new URL(pluginUrl).origin;
-            iframe.contentWindow.postMessage(
-              { type: "plugin-lifecycle-event", event: eventType },
-              targetOrigin,
+          if (lastVisibilityState === event.payload) {
+            console.log(
+              "[PluginWindow] Skipping duplicate visibility:",
+              event.payload,
             );
-          } catch (error) {
-            console.error(
-              "[PluginWindow] Failed to send lifecycle event:",
-              error,
-            );
+            return;
           }
+          lastVisibilityState = event.payload;
+          sendToIframe(event.payload ? "show" : "hide");
         },
       );
 
+      // 监听焦点事件（带防抖）
+      const unlistenFocus = await listen("window_focus", () => {
+        // 清除之前的定时器
+        if (focusDebounceTimer) clearTimeout(focusDebounceTimer);
+
+        focusDebounceTimer = setTimeout(() => {
+          if (lastFocusState === true) {
+            console.log("[PluginWindow] Skipping duplicate focus");
+            return;
+          }
+          lastFocusState = true;
+          sendToIframe("focus");
+        }, FOCUS_DEBOUNCE_MS);
+      });
+
+      // 监听失焦事件（带防抖）
+      const unlistenBlur = await listen("window_blur", () => {
+        // 清除之前的定时器
+        if (focusDebounceTimer) clearTimeout(focusDebounceTimer);
+
+        focusDebounceTimer = setTimeout(() => {
+          if (lastFocusState === false) {
+            console.log("[PluginWindow] Skipping duplicate blur");
+            return;
+          }
+          lastFocusState = false;
+          sendToIframe("blur");
+        }, FOCUS_DEBOUNCE_MS);
+      });
+
       return () => {
         unlistenVisibility();
+        unlistenFocus();
+        unlistenBlur();
         window.removeEventListener("message", handlePluginMessage);
       };
     })();
   });
 
-  // 监听 iframe 加载完成，注入 plugin ID
+  // 监听 iframe 加载完成，注入运行时信息
   const handleIframeLoad = () => {
+    console.log(
+      "[PluginWindow] handleIframeLoad called, pluginUrl:",
+      pluginUrl,
+    );
     const iframe = pluginIframeElement;
-    if (!iframe?.contentWindow) return;
-
-    // 通过 postMessage 发送插件 ID 给 iframe
-    // 使用具体的 origin 以提高安全性
-    try {
-      // 验证 pluginUrl 是否有效，避免 new URL() 报错
-      if (!pluginUrl || pluginUrl.trim() === "") {
-        console.warn(
-          "[PluginWindow] Cannot send plugin ID: pluginUrl is empty",
-        );
-        return;
-      }
-      const targetOrigin = new URL(pluginUrl).origin;
-      iframe.contentWindow.postMessage(
-        { type: "set-plugin-id", pluginId },
-        targetOrigin,
-      );
-    } catch (error) {
-      console.error("[PluginWindow] Failed to send plugin ID:", error);
+    if (!iframe?.contentWindow) {
+      console.warn("[PluginWindow] No iframe contentWindow");
+      return;
     }
+
+    // 发送运行时初始化信息 - 使用 "*" 确保开发模式下也能发送
+    const runtimeInit = {
+      type: "plugin-runtime-init",
+      runtime: {
+        mode: "window" as const,
+        pluginId: pluginId || "unknown",
+        version: "0.1.0",
+        mainWindowLabel: "main",
+      },
+    };
+
+    iframe.contentWindow.postMessage(runtimeInit, "*");
+    console.log("[PluginWindow] Sent runtime init:", runtimeInit.runtime);
+
+    // 发送初始 show 和 focus 事件
+    iframe.contentWindow.postMessage(
+      { type: "plugin-lifecycle-event", event: "show" },
+      "*",
+    );
+    iframe.contentWindow.postMessage(
+      { type: "plugin-lifecycle-event", event: "focus" },
+      "*",
+    );
+    console.log("[PluginWindow] Sent initial show + focus events");
   };
 
   // 处理来自插件 iframe 的 Tauri API 调用

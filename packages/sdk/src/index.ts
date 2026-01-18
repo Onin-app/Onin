@@ -93,6 +93,7 @@ import { clipboard } from './api/clipboard';
 import { settings } from './api/settings';
 import { lifecycle } from './api/lifecycle';
 import { scheduler } from './api/scheduler';
+import { pluginWindow } from './api/window';
 
 import { invoke, listen } from './core/ipc';
 import { debug } from './utils/debug';
@@ -161,6 +162,7 @@ export {
   settings,
   lifecycle,
   scheduler,
+  pluginWindow,
   invoke,
   listen,
   debug,

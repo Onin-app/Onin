@@ -49,6 +49,7 @@ pub fn get_invoke_handler(
         plugin::window::plugin_minimize_window,
         plugin::window::plugin_maximize_window,
         plugin::window::plugin_unmaximize_window,
+        plugin::window::plugin_unminimize_window,
         plugin::window::plugin_is_maximized,
         plugin::window::plugin_show_window,
         plugin::window::plugin_set_focus,

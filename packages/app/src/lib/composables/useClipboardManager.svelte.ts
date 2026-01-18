@@ -27,7 +27,7 @@ export interface ClipboardManagerReturn {
   removeFile: (index: number) => void;
   editTextAttachment: (onEdit: (text: string) => void) => void;
   toggleShowAllFiles: () => void;
-  getMatchedCommands: (originAppList: LaunchableItem[]) => LaunchableItem[];
+  getMatchedCommands: (originAppList: LaunchableItem[], inputText?: string) => LaunchableItem[];
 }
 
 /**

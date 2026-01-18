@@ -125,8 +125,16 @@ pub fn inject_tauri_bridge(html: &str, plugin_id: &str) -> String {
 (function() {{
   console.log('[Plugin Inline] 正在初始化 Tauri API 桥接');
   
-  // 在全局上下文中设置插件 ID
+  // 在全局上下文中设置插件 ID (保留兼容性)
   window.__PLUGIN_ID__ = '{}';
+  
+  // 注入运行时环境信息
+  window.__ONIN_RUNTIME__ = {{
+    mode: 'inline',
+    pluginId: '{}',
+    version: '0.1.0',
+    mainWindowLabel: 'main'
+  }};
   
   const createProxy = (command) => {{
     return (...args) => {{
@@ -174,11 +182,11 @@ pub fn inject_tauri_bridge(html: &str, plugin_id: &str) -> String {
   
   window.__TAURI_INVOKE__ = invokeProxy;
   
-  console.log('[Plugin Inline] Tauri API 桥接就绪');
+  console.log('[Plugin Inline] Tauri API 桥接就绪, mode: inline');
 }})();
 </script>
 "#,
-        plugin_id
+        plugin_id, plugin_id
     );
 
     if html.contains("<head>") {

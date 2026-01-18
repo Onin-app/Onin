@@ -5,6 +5,7 @@
    */
   import {
     lifecycle,
+    pluginWindow,
     command,
     storage,
     notification,
@@ -24,9 +25,14 @@
     { time: string; message: string; type: 'info' | 'success' | 'error' }[]
   >([]);
 
-  // 日志函数
+  // 日志函数（带毫秒精度）
   function log(message: string, type: 'info' | 'success' | 'error' = 'info') {
-    const time = new Date().toLocaleTimeString();
+    const now = new Date();
+    const h = now.getHours().toString().padStart(2, '0');
+    const m = now.getMinutes().toString().padStart(2, '0');
+    const s = now.getSeconds().toString().padStart(2, '0');
+    const ms = now.getMilliseconds().toString().padStart(3, '0');
+    const time = `${h}:${m}:${s}.${ms}`;
     logs = [...logs, { time, message, type }];
     setTimeout(() => {
       const logContainer = document.getElementById('log-container');
@@ -56,7 +62,8 @@
 
   // API 模块列表
   const modules = [
-    { id: 'lifecycle', name: 'Lifecycle', icon: '🔄', count: 4 },
+    { id: 'lifecycle', name: 'Lifecycle', icon: '🔄', count: 2 },
+    { id: 'window', name: 'Window', icon: '🪟', count: 4 },
     { id: 'command', name: 'Command', icon: '⌨️', count: 3 },
     { id: 'storage', name: 'Storage', icon: '💾', count: 9 },
     { id: 'notification', name: 'Notification', icon: '🔔', count: 1 },
@@ -115,6 +122,8 @@
       <section class="test-panel">
         {#if currentModule === 'lifecycle'}
           {@render lifecycleTests()}
+        {:else if currentModule === 'window'}
+          {@render windowTests()}
         {:else if currentModule === 'command'}
           {@render commandTests()}
         {:else if currentModule === 'storage'}
@@ -183,25 +192,69 @@
         <span class="api-name">onUnload</span>
         <span class="api-desc">注册卸载回调</span>
       </button>
+    </div>
+  </div>
+{/snippet}
+
+<!-- Window Tests -->
+{#snippet windowTests()}
+  <div class="api-group">
+    <h3>窗口事件</h3>
+    <div class="test-grid">
       <button
         class="test-btn"
         onclick={() => {
-          lifecycle.onWindowShow(() => log('窗口显示了!'));
-          log('✓ onWindowShow 回调已注册', 'success');
+          pluginWindow.onShow(() => log('窗口显示了!'));
+          log('✓ onShow 回调已注册', 'success');
         }}
       >
-        <span class="api-name">onWindowShow</span>
+        <span class="api-name">onShow</span>
         <span class="api-desc">注册窗口显示回调</span>
       </button>
       <button
         class="test-btn"
         onclick={() => {
-          lifecycle.onWindowHide(() => log('窗口隐藏了!'));
-          log('✓ onWindowHide 回调已注册', 'success');
+          pluginWindow.onHide(() => log('窗口隐藏了!'));
+          log('✓ onHide 回调已注册', 'success');
         }}
       >
-        <span class="api-name">onWindowHide</span>
+        <span class="api-name">onHide</span>
         <span class="api-desc">注册窗口隐藏回调</span>
+      </button>
+      <button
+        class="test-btn"
+        onclick={() => {
+          pluginWindow.onFocus(() => log('窗口获得焦点!'));
+          log('✓ onFocus 回调已注册', 'success');
+        }}
+      >
+        <span class="api-name">onFocus</span>
+        <span class="api-desc">注册焦点获得回调</span>
+      </button>
+      <button
+        class="test-btn"
+        onclick={() => {
+          pluginWindow.onBlur(() => log('窗口失去焦点!'));
+          log('✓ onBlur 回调已注册', 'success');
+        }}
+      >
+        <span class="api-name">onBlur</span>
+        <span class="api-desc">注册焦点失去回调</span>
+      </button>
+    </div>
+  </div>
+  <div class="api-group">
+    <h3>运行模式</h3>
+    <div class="test-grid">
+      <button
+        class="test-btn"
+        onclick={() => {
+          const mode = pluginWindow.getMode();
+          log(`当前运行模式: ${mode}`, 'success');
+        }}
+      >
+        <span class="api-name">getMode</span>
+        <span class="api-desc">获取当前运行模式</span>
       </button>
     </div>
   </div>
@@ -711,8 +764,8 @@
       <button
         class="test-btn"
         onclick={() =>
-          runTest('settings.useSchema', () =>
-            settings.useSchema([
+          runTest('settings.useSettingsSchema', () =>
+            settings.useSettingsSchema([
               {
                 key: 'apiKey',
                 type: 'text',
@@ -738,24 +791,23 @@
             ]),
           )}
       >
-        <span class="api-name">useSchema</span>
+        <span class="api-name">useSettingsSchema</span>
         <span class="api-desc">注册定义</span>
       </button>
       <button
         class="test-btn"
         onclick={() =>
-          runTest('settings.getSchema', () => settings.getSchema())}
+          runTest('settings.getSchema', async () => settings.getSchema())}
       >
         <span class="api-name">getSchema</span>
         <span class="api-desc">获取定义</span>
       </button>
       <button
         class="test-btn"
-        onclick={() =>
-          runTest('settings.getValues', () => settings.getValues())}
+        onclick={() => runTest('settings.getAll', () => settings.getAll())}
       >
-        <span class="api-name">getValues</span>
-        <span class="api-desc">获取值</span>
+        <span class="api-name">getAll</span>
+        <span class="api-desc">获取所有值</span>
       </button>
     </div>
   </div>

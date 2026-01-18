@@ -18,7 +18,7 @@ describe('Lifecycle API', () => {
       lifecycle.onLoad(mockCallback);
 
       // Wait for microtask to execute
-      await new Promise<void>(resolve => queueMicrotask(resolve));
+      await new Promise<void>((resolve) => queueMicrotask(resolve));
 
       expect(mockCallback).toHaveBeenCalledTimes(1);
     });
@@ -41,7 +41,7 @@ describe('Lifecycle API', () => {
       });
 
       // Wait for microtasks to execute
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       expect(executionOrder).toEqual([1, 2, 3]);
     });
@@ -52,12 +52,12 @@ describe('Lifecycle API', () => {
       let value = 0;
 
       lifecycle.onLoad(async () => {
-        await new Promise(resolve => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 10));
         value = 42;
       });
 
       // Wait for callback to complete
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       expect(value).toBe(42);
     });
@@ -65,14 +65,16 @@ describe('Lifecycle API', () => {
     it('should handle errors in callbacks', async () => {
       const { lifecycle } = await import('../lifecycle');
 
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
 
       lifecycle.onLoad(async () => {
         throw new Error('Test error');
       });
 
       // Wait for callback to execute
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       expect(consoleErrorSpy).toHaveBeenCalled();
 
@@ -88,7 +90,7 @@ describe('Lifecycle API', () => {
       lifecycle.onLoad(mockCallback);
 
       // Wait for microtasks
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       // Each registration should execute once
       expect(mockCallback).toHaveBeenCalledTimes(2);
@@ -121,7 +123,9 @@ describe('Lifecycle API', () => {
     it('should handle errors in unload callbacks gracefully', async () => {
       const { lifecycle } = await import('../lifecycle');
 
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
 
       lifecycle.onUnload(async () => {
         throw new Error('Unload error');
@@ -135,60 +139,8 @@ describe('Lifecycle API', () => {
     });
   });
 
-  describe('Window lifecycle hooks', () => {
-    it('should register onWindowShow callback', async () => {
-      const { lifecycle } = await import('../lifecycle');
-
-      const mockCallback = vi.fn();
-
-      expect(() => {
-        lifecycle.onWindowShow(mockCallback);
-      }).not.toThrow();
-    });
-
-    it('should register onWindowHide callback', async () => {
-      const { lifecycle } = await import('../lifecycle');
-
-      const mockCallback = vi.fn();
-
-      expect(() => {
-        lifecycle.onWindowHide(mockCallback);
-      }).not.toThrow();
-    });
-
-    it('should register multiple window callbacks', async () => {
-      const { lifecycle } = await import('../lifecycle');
-
-      const showCallback1 = vi.fn();
-      const showCallback2 = vi.fn();
-      const hideCallback1 = vi.fn();
-      const hideCallback2 = vi.fn();
-
-      lifecycle.onWindowShow(showCallback1);
-      lifecycle.onWindowShow(showCallback2);
-      lifecycle.onWindowHide(hideCallback1);
-      lifecycle.onWindowHide(hideCallback2);
-
-      // Callbacks should be registered but not called yet
-      expect(showCallback1).not.toHaveBeenCalled();
-      expect(showCallback2).not.toHaveBeenCalled();
-      expect(hideCallback1).not.toHaveBeenCalled();
-      expect(hideCallback2).not.toHaveBeenCalled();
-    });
-
-    it('should handle async window callbacks', async () => {
-      const { lifecycle } = await import('../lifecycle');
-
-      const mockCallback = vi.fn(async () => {
-        await new Promise(resolve => setTimeout(resolve, 10));
-      });
-
-      lifecycle.onWindowShow(mockCallback);
-
-      // Callback should be registered but not called yet
-      expect(mockCallback).not.toHaveBeenCalled();
-    });
-  });
+  // Note: Window lifecycle tests (onWindowShow, onWindowHide) have been moved to window.test.ts
+  // The window module now handles these APIs via pluginWindow.onShow/onHide/onFocus/onBlur
 
   describe('Integration', () => {
     it('should work with settings registration', async () => {
@@ -198,12 +150,12 @@ describe('Lifecycle API', () => {
 
       lifecycle.onLoad(async () => {
         // Simulate settings registration
-        await new Promise(resolve => setTimeout(resolve, 5));
+        await new Promise((resolve) => setTimeout(resolve, 5));
         settingsRegistered = true;
       });
 
       // Wait for callback
-      await new Promise(resolve => setTimeout(resolve, 20));
+      await new Promise((resolve) => setTimeout(resolve, 20));
 
       expect(settingsRegistered).toBe(true);
     });
@@ -220,7 +172,7 @@ describe('Lifecycle API', () => {
       });
 
       // Wait for callback
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       expect(commands).toEqual(['command1', 'command2']);
     });

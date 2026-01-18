@@ -124,10 +124,18 @@ pub fn handle_plugin_protocol<R: tauri::Runtime>(
             let plugin_opt = store_lock.values().find(|p| p.dir_name == plugin_dir_name);
 
             if let Some(plugin) = plugin_opt {
-                // 注入 plugin ID 和窗口控制
+                // 注入 plugin ID 和运行时信息（窗口模式）
                 let plugin_id_script = format!(
-                    r#"<script>window.__PLUGIN_ID__ = '{}';</script>"#,
-                    plugin.manifest.id
+                    r#"<script>
+window.__PLUGIN_ID__ = '{}';
+window.__ONIN_RUNTIME__ = {{
+  mode: 'window',
+  pluginId: '{}',
+  version: '{}',
+  mainWindowLabel: 'main'
+}};
+</script>"#,
+                    plugin.manifest.id, plugin.manifest.id, plugin.manifest.version
                 );
 
                 let topbar_html = format!(
