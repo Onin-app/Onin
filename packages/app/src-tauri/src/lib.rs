@@ -8,6 +8,8 @@ use tracing_subscriber::fmt::format::FmtSpan;
 mod app_config;
 mod command_manager;
 mod commands;
+mod extension;
+mod extensions;
 mod file_command_manager;
 pub mod icon_utils;
 mod installed_apps;

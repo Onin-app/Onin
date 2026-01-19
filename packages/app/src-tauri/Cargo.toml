@@ -70,6 +70,7 @@ tower = "0.4"
 tower-http = { version = "0.5", features = ["fs", "cors"] }
 zip = "2.2"
 tempfile = "3.13"
+meval = "0.2"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"

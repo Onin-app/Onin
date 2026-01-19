@@ -4,8 +4,9 @@
 //! 使 `lib.rs` 更加简洁，同时方便统一管理和查找命令。
 
 use crate::{
-    app_config, command_manager, file_command_manager, plugin, plugin_api, shortcut_manager,
-    system_commands, tray_manager, unified_launch_manager, usage_tracker, window_manager,
+    app_config, command_manager, extension, file_command_manager, plugin, plugin_api,
+    shortcut_manager, system_commands, tray_manager, unified_launch_manager, usage_tracker,
+    window_manager,
 };
 use tauri::Manager;
 
@@ -130,6 +131,9 @@ pub fn get_invoke_handler(
         usage_tracker::clear_usage_stats,
         // Dialog
         open_file_or_folder_dialog,
+        // Extension API
+        extension::api::get_extension_preview,
+        extension::api::execute_extension,
     ]
 }
 

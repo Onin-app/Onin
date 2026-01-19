@@ -31,6 +31,7 @@
   import { usePluginManager } from "$lib/composables/usePluginManager.svelte";
   import { useClipboardManager } from "$lib/composables/useClipboardManager.svelte";
   import { useAppList } from "$lib/composables/useAppList.svelte";
+  import { useExtensionManager } from "$lib/composables/useExtensionManager.svelte";
 
   // Components
   import SearchInput from "$lib/components/SearchInput.svelte";
@@ -38,6 +39,7 @@
   import PluginMenu from "$lib/components/PluginMenu.svelte";
   import RefreshProgressBar from "$lib/components/RefreshProgressBar.svelte";
   import PluginIframe from "$lib/components/PluginIframe.svelte";
+  import ExtensionResultItem from "$lib/components/ExtensionResultItem.svelte";
 
   import "../index.css";
 
@@ -45,10 +47,12 @@
   const plugin = usePluginManager();
   const clipboard = useClipboardManager();
   const appListManager = useAppList();
+  const extensionManager = useExtensionManager();
 
   // ===== Local State =====
   let inputValue = $state<string>("");
   let matchedCommands = $state<LaunchableItem[]>([]);
+  let extensionPreviewItem = $state<LaunchableItem | null>(null);
   let currentTheme = $state<Theme>(Theme.DARK);
   let unlisten = $state<null | (() => void)>(null);
 
@@ -67,8 +71,15 @@
   // ===== Computed =====
   // 合并匹配命令和搜索结果，匹配命令优先显示在顶部
   const displayList = $derived.by(() => {
+    const result: LaunchableItem[] = [];
+
+    // Extension 预览优先显示在最顶部
+    if (extensionPreviewItem) {
+      result.push(extensionPreviewItem);
+    }
+
     if (matchedCommands.length === 0) {
-      return appListManager.state.appList;
+      return [...result, ...appListManager.state.appList];
     }
 
     // 获取匹配命令的 action 集合，用于去重
@@ -81,8 +92,8 @@
       (app) => !app.action || !matchedActions.has(app.action),
     );
 
-    // 匹配命令排在前面，然后是过滤后的搜索结果
-    return [...matchedCommands, ...filteredAppList];
+    // Extension 预览 -> 匹配命令 -> 过滤后的搜索结果
+    return [...result, ...matchedCommands, ...filteredAppList];
   });
 
   // ===== Effects =====
@@ -112,10 +123,19 @@
     invoke("close_main_window");
   };
 
-  const handleInput = (value: string) => {
+  const handleInput = async (value: string) => {
     inputValue = value;
     appListManager.handleInput(value);
     updateMatchedCommands();
+    await updateExtensionPreview();
+  };
+
+  // 更新 Extension 预览（计算器等）
+  const updateExtensionPreview = async () => {
+    // 优先使用粘贴的文本，其次使用输入框的值
+    const effectiveText = clipboard.state.attachedText || inputValue;
+    await extensionManager.getPreview(effectiveText);
+    extensionPreviewItem = extensionManager.getPreviewAsItem();
   };
 
   const updateMatchedCommands = () => {
@@ -128,6 +148,7 @@
   const handlePaste = async (e: ClipboardEvent) => {
     await clipboard.handlePaste(e);
     updateMatchedCommands();
+    await updateExtensionPreview();
   };
 
   const handleDrop = (e: DragEvent) => {
@@ -172,6 +193,12 @@
   };
 
   const handleOpenApp = async (app: LaunchableItem) => {
+    // 检查是否是 Extension 项目（如计算器结果）
+    if (app.path.startsWith("extension:")) {
+      await handleExtensionClick(app);
+      return;
+    }
+
     // 准备参数
     const args: any = {};
 
@@ -224,8 +251,40 @@
       inputValue = "";
       clipboard.clearAttachments();
       matchedCommands = [];
+      extensionPreviewItem = null;
       appListManager.resetToOriginList();
     });
+  };
+
+  // 处理 Extension 项目点击（如计算器结果）
+  const handleExtensionClick = async (app: LaunchableItem) => {
+    // 获取 Extension ID
+    const parts = app.path.split(":");
+    if (parts.length >= 2) {
+      const extensionId = parts[1];
+      // 使用有效文本（粘贴文本或输入框值）
+      const effectiveText = clipboard.state.attachedText || inputValue;
+      const result = await extensionManager.execute(extensionId, effectiveText);
+
+      if (result) {
+        // 复制结果到剪贴板
+        try {
+          await navigator.clipboard.writeText(result);
+          console.log("[Extension] Copied to clipboard:", result);
+        } catch (e) {
+          console.error("[Extension] Failed to copy:", e);
+        }
+      }
+    }
+
+    // 清理状态并关闭窗口
+    inputValue = "";
+    clipboard.clearAttachments();
+    extensionPreviewItem = null;
+    extensionManager.clearPreview();
+    matchedCommands = [];
+    appListManager.resetToOriginList();
+    invoke("close_main_window");
   };
 
   const handleKeyDown = (e: KeyboardEvent) => {
@@ -261,6 +320,7 @@
         if (event.payload) {
           await clipboard.autoPasteClipboard();
           updateMatchedCommands();
+          await updateExtensionPreview(); // 更新 Extension 预览（如计算器）
           queueMicrotask(() => searchInputRef?.focus());
         }
 
@@ -392,11 +452,22 @@
             <div class="app-list overflow-hidden">
               <div use:animate>
                 {#each displayList as app, index (app.path + app.name)}
-                  <AppListItem
-                    {app}
-                    isSelected={appListManager.state.selectedIndex === index}
-                    onClick={() => handleOpenApp(app)}
-                  />
+                  {#if app.path.startsWith("extension:")}
+                    <!-- Extension 预览项（如计算器结果） -->
+                    <ExtensionResultItem
+                      title={app.name}
+                      description={app.description || ""}
+                      icon={app.icon}
+                      isSelected={appListManager.state.selectedIndex === index}
+                      onClick={() => handleOpenApp(app)}
+                    />
+                  {:else}
+                    <AppListItem
+                      {app}
+                      isSelected={appListManager.state.selectedIndex === index}
+                      onClick={() => handleOpenApp(app)}
+                    />
+                  {/if}
                 {/each}
               </div>
             </div>

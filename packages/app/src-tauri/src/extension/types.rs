@@ -1,0 +1,134 @@
+//! # Extension 类型定义模块
+//!
+//! 定义 Extension 系统使用的所有数据结构，包括：
+//! - Extension 清单
+//! - Extension 命令
+//! - Extension 匹配规则
+//! - Extension 执行结果
+
+use serde::{Deserialize, Serialize};
+
+// ============================================================================
+// Extension 清单类型
+// ============================================================================
+
+/// Extension 清单
+///
+/// 使用静态字符串，编译时确定，无需运行时解析
+#[derive(Debug, Clone)]
+pub struct ExtensionManifest {
+    /// 扩展唯一标识符，如 "calculator"
+    pub id: &'static str,
+    /// 扩展显示名称，如 "计算器"
+    pub name: &'static str,
+    /// 扩展描述
+    pub description: &'static str,
+    /// 扩展图标（Iconfont 名称）
+    pub icon: &'static str,
+    /// 扩展提供的命令列表
+    pub commands: &'static [ExtensionCommand],
+}
+
+/// Extension 命令定义
+#[derive(Debug, Clone)]
+pub struct ExtensionCommand {
+    /// 命令代码，如 "calculate"
+    pub code: &'static str,
+    /// 命令显示名称，如 "计算"
+    pub name: &'static str,
+    /// 命令描述
+    pub description: &'static str,
+    /// 触发关键词
+    pub keywords: &'static [&'static str],
+    /// 匹配规则（可选）
+    pub matches: Option<ExtensionMatch>,
+}
+
+/// Extension 匹配规则
+#[derive(Debug, Clone)]
+pub struct ExtensionMatch {
+    /// 正则表达式模式
+    pub pattern: &'static str,
+    /// 最小输入长度
+    pub min_length: Option<usize>,
+    /// 最大输入长度
+    pub max_length: Option<usize>,
+}
+
+// ============================================================================
+// Extension 执行结果
+// ============================================================================
+
+/// Extension 命令执行结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtensionResult {
+    /// 是否成功
+    pub success: bool,
+    /// 结果值（用于显示）
+    pub value: Option<String>,
+    /// 结果类型
+    pub result_type: ExtensionResultType,
+    /// 可复制到剪贴板的文本
+    pub copyable: Option<String>,
+    /// 错误信息
+    pub error: Option<String>,
+}
+
+/// Extension 结果类型
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExtensionResultType {
+    /// 计算结果
+    Calculation,
+    /// 转换结果
+    Conversion,
+    /// 日期时间结果
+    DateTime,
+    /// 错误
+    Error,
+}
+
+impl ExtensionResult {
+    /// 创建成功的计算结果
+    pub fn calculation(value: String) -> Self {
+        Self {
+            success: true,
+            value: Some(value.clone()),
+            result_type: ExtensionResultType::Calculation,
+            copyable: Some(value),
+            error: None,
+        }
+    }
+
+    /// 创建错误结果
+    pub fn error(message: String) -> Self {
+        Self {
+            success: false,
+            value: None,
+            result_type: ExtensionResultType::Error,
+            copyable: None,
+            error: Some(message),
+        }
+    }
+}
+
+// ============================================================================
+// Extension 实时预览
+// ============================================================================
+
+/// Extension 预览结果（用于搜索列表实时显示）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtensionPreview {
+    /// 扩展 ID
+    pub extension_id: String,
+    /// 命令代码
+    pub command_code: String,
+    /// 预览标题（如 "= 42"）
+    pub title: String,
+    /// 预览描述（如 "计算结果"）
+    pub description: String,
+    /// 图标
+    pub icon: String,
+    /// 可复制的值
+    pub copyable: String,
+}

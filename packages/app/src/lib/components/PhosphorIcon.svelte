@@ -7,6 +7,7 @@
     SignOut,
     Folder,
     Cube,
+    Calculator,
   } from "phosphor-svelte";
 
   interface PhosphorIconProps {
@@ -27,6 +28,7 @@
     folder: Folder,
     cube: Cube,
     package: Cube,
+    calculator: Calculator,
   };
 
   const IconComponent = $derived(iconMap[icon] || Power);
