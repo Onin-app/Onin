@@ -244,6 +244,10 @@ pub fn uninstall_plugin(
     }
 
     println!("[plugin/installer] 成功卸载插件: {}", plugin_id);
+    
+    // 发送事件通知前端插件已卸载
+    let _ = app.emit("plugin-uninstalled", &plugin_id);
+    
     Ok(())
 }
 

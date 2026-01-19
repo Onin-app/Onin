@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
+  import { listen, type UnlistenFn } from "@tauri-apps/api/event";
   import {
     MagnifyingGlass,
     Package,
@@ -170,8 +171,30 @@
     detailDialogOpen = false;
   }
 
-  onMount(() => {
+  // 事件监听清理函数
+  let unlistenFns: UnlistenFn[] = [];
+
+  onMount(async () => {
     loadPlugins();
+
+    // 监听插件卸载事件，刷新已安装列表
+    const unlistenUninstalled = await listen<string>("plugin-uninstalled", async () => {
+      console.log("[Marketplace] Plugin uninstalled, refreshing installed list");
+      await loadInstalledPlugins();
+    });
+    unlistenFns.push(unlistenUninstalled);
+
+    // 监听插件安装事件，刷新已安装列表
+    const unlistenInstalled = await listen<string>("plugin-installed", async () => {
+      console.log("[Marketplace] Plugin installed, refreshing installed list");
+      await loadInstalledPlugins();
+    });
+    unlistenFns.push(unlistenInstalled);
+  });
+
+  onDestroy(() => {
+    // 清理事件监听
+    unlistenFns.forEach(fn => fn());
   });
 
   // 搜索和筛选变化时重新加载
