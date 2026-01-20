@@ -52,7 +52,8 @@ pub static CALCULATOR_EXTENSION: CalculatorExtension = CalculatorExtension;
 /// 编译后的正则表达式（延迟初始化）
 static MATH_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
     // 匹配至少包含一个运算符的表达式
-    Regex::new(r"^[\d\s]*[\+\-\*\/\^%][\d\s\+\-\*\/\(\)\.\^%]*$").unwrap()
+    // 支持以数字、括号或负号开头
+    Regex::new(r"^[\d\(\-][\d\s\+\-\*\/\(\)\.\^%]*[\+\-\*\/\^%][\d\s\+\-\*\/\(\)\.\^%]*$").unwrap()
 });
 
 impl Extension for CalculatorExtension {
