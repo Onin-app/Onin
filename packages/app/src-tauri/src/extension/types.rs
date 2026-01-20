@@ -111,6 +111,17 @@ impl ExtensionResult {
         }
     }
 
+    /// 创建成功的日期时间结果
+    pub fn datetime(value: String) -> Self {
+        Self {
+            success: true,
+            value: Some(value.clone()),
+            result_type: ExtensionResultType::DateTime,
+            copyable: Some(value),
+            error: None,
+        }
+    }
+
     /// 创建错误结果
     pub fn error(message: String) -> Self {
         Self {
