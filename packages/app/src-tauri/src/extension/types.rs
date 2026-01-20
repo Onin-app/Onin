@@ -100,6 +100,17 @@ impl ExtensionResult {
         }
     }
 
+    /// 创建成功的转换结果
+    pub fn conversion(value: String) -> Self {
+        Self {
+            success: true,
+            value: Some(value.clone()),
+            result_type: ExtensionResultType::Conversion,
+            copyable: Some(value),
+            error: None,
+        }
+    }
+
     /// 创建错误结果
     pub fn error(message: String) -> Self {
         Self {

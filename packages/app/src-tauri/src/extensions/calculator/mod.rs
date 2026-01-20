@@ -1,12 +1,13 @@
 //! # 计算器扩展
 //!
-//! 提供数学表达式计算功能，支持：
+//! 提供计算功能，支持：
 //! - 基础运算：加减乘除
-//! - 括号嵌套
-//! - 幂运算
-//! - 取余运算
+//! - 括号嵌套、幂运算
+//! - 百分比语法：100+20% → 120
+//! - 单位转换：10 km to m → 10000 m
 
 mod engine;
+mod units;
 
 use crate::extension::registry::Extension;
 use crate::extension::types::{
@@ -23,16 +24,16 @@ use std::sync::LazyLock;
 pub static CALCULATOR_MANIFEST: ExtensionManifest = ExtensionManifest {
     id: "calculator",
     name: "计算器",
-    description: "数学计算",
+    description: "数学计算与单位转换",
     icon: "calculator",
     commands: &[ExtensionCommand {
         code: "calculate",
         name: "计算",
-        description: "计算数学表达式",
-        keywords: &["calc", "计算", "="],
+        description: "计算数学表达式或转换单位",
+        keywords: &["calc", "计算", "=", "convert", "转换"],
         matches: Some(ExtensionMatch {
-            // 匹配数学表达式：数字、运算符、括号、小数点、空格
-            pattern: r"^[\d\+\-\*\/\(\)\s\.\^%]+$",
+            // 匹配数学表达式或单位转换
+            pattern: r"^[\d\+\-\*\/\(\)\s\.\^%a-zA-Z]+$",
             min_length: Some(1),
             max_length: None,
         }),
@@ -56,6 +57,30 @@ static MATH_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^[\d\(\-][\d\s\+\-\*\/\(\)\.\^%]*[\+\-\*\/\^%][\d\s\+\-\*\/\(\)\.\^%]*$").unwrap()
 });
 
+/// 输入类型
+enum InputType {
+    UnitConversion,
+    MathExpression,
+    Unknown,
+}
+
+/// 识别输入类型
+fn detect_input_type(input: &str) -> InputType {
+    let trimmed = input.trim();
+
+    // 优先检查单位转换（包含 to/in/= 关键词）
+    if units::matches(trimmed) {
+        return InputType::UnitConversion;
+    }
+
+    // 检查数学表达式
+    if MATH_PATTERN.is_match(trimmed) {
+        return InputType::MathExpression;
+    }
+
+    InputType::Unknown
+}
+
 impl Extension for CalculatorExtension {
     fn manifest(&self) -> &'static ExtensionManifest {
         &CALCULATOR_MANIFEST
@@ -67,29 +92,51 @@ impl Extension for CalculatorExtension {
             return false;
         }
 
-        // 必须包含至少一个运算符
-        MATH_PATTERN.is_match(trimmed)
+        !matches!(detect_input_type(trimmed), InputType::Unknown)
     }
 
     fn execute(&self, input: &str) -> ExtensionResult {
-        engine::evaluate(input)
+        match detect_input_type(input) {
+            InputType::UnitConversion => units::convert(input),
+            InputType::MathExpression => engine::evaluate(input),
+            InputType::Unknown => ExtensionResult::error("无法识别的表达式".to_string()),
+        }
     }
 
     fn preview(&self, input: &str) -> Option<ExtensionPreview> {
-        if !self.matches(input) {
+        let input_type = detect_input_type(input);
+
+        let result = match input_type {
+            InputType::UnitConversion => units::convert(input),
+            InputType::MathExpression => engine::evaluate(input),
+            InputType::Unknown => return None,
+        };
+
+        if !result.success {
             return None;
         }
 
-        match engine::evaluate(input) {
-            result if result.success => Some(ExtensionPreview {
-                extension_id: "calculator".to_string(),
-                command_code: "calculate".to_string(),
-                title: format!("= {}", result.value.as_ref().unwrap_or(&String::new())),
-                description: "计算结果 · 回车复制".to_string(),
-                icon: "calculator".to_string(),
-                copyable: result.copyable.unwrap_or_default(),
-            }),
-            _ => None, // 计算失败时不显示预览
-        }
+        let (title, description, icon) = match input_type {
+            InputType::UnitConversion => (
+                format!("= {}", result.value.as_ref().unwrap_or(&String::new())),
+                "单位转换 · 回车复制".to_string(),
+                "ruler".to_string(),
+            ),
+            InputType::MathExpression => (
+                format!("= {}", result.value.as_ref().unwrap_or(&String::new())),
+                "计算结果 · 回车复制".to_string(),
+                "calculator".to_string(),
+            ),
+            InputType::Unknown => return None,
+        };
+
+        Some(ExtensionPreview {
+            extension_id: "calculator".to_string(),
+            command_code: "calculate".to_string(),
+            title,
+            description,
+            icon,
+            copyable: result.copyable.unwrap_or_default(),
+        })
     }
 }
