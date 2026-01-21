@@ -9,6 +9,8 @@
     Cube,
     Calculator,
     Ruler,
+    CurrencyDollar,
+    CalendarBlank,
   } from "phosphor-svelte";
 
   interface PhosphorIconProps {
@@ -31,6 +33,8 @@
     package: Cube,
     calculator: Calculator,
     ruler: Ruler,
+    currencyDollar: CurrencyDollar,
+    calendar: CalendarBlank,
   };
 
   const IconComponent = $derived(iconMap[icon] || Power);

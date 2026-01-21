@@ -70,6 +70,8 @@ pub struct ExtensionResult {
     pub result_type: ExtensionResultType,
     /// 可复制到剪贴板的文本
     pub copyable: Option<String>,
+    /// 副标题/元数据（如汇率更新日期）
+    pub subtitle: Option<String>,
     /// 错误信息
     pub error: Option<String>,
 }
@@ -84,6 +86,8 @@ pub enum ExtensionResultType {
     Conversion,
     /// 日期时间结果
     DateTime,
+    /// 货币转换结果
+    Currency,
     /// 错误
     Error,
 }
@@ -96,6 +100,7 @@ impl ExtensionResult {
             value: Some(value.clone()),
             result_type: ExtensionResultType::Calculation,
             copyable: Some(value),
+            subtitle: None,
             error: None,
         }
     }
@@ -107,6 +112,7 @@ impl ExtensionResult {
             value: Some(value.clone()),
             result_type: ExtensionResultType::Conversion,
             copyable: Some(value),
+            subtitle: None,
             error: None,
         }
     }
@@ -118,6 +124,31 @@ impl ExtensionResult {
             value: Some(value.clone()),
             result_type: ExtensionResultType::DateTime,
             copyable: Some(value),
+            subtitle: None,
+            error: None,
+        }
+    }
+
+    /// 创建成功的货币转换结果
+    pub fn currency(value: String, rate_date: Option<String>) -> Self {
+        Self {
+            success: true,
+            value: Some(value.clone()),
+            result_type: ExtensionResultType::Currency,
+            copyable: Some(value),
+            subtitle: rate_date,
+            error: None,
+        }
+    }
+
+    /// 创建加载中的货币结果
+    pub fn currency_loading() -> Self {
+        Self {
+            success: true,
+            value: Some("正在获取汇率...".to_string()),
+            result_type: ExtensionResultType::Currency,
+            copyable: None,
+            subtitle: None,
             error: None,
         }
     }
@@ -129,6 +160,7 @@ impl ExtensionResult {
             value: None,
             result_type: ExtensionResultType::Error,
             copyable: None,
+            subtitle: None,
             error: Some(message),
         }
     }
