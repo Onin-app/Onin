@@ -134,6 +134,7 @@ pub fn get_invoke_handler(
         // Extension API
         extension::api::get_extension_preview,
         extension::api::execute_extension,
+        extension::api::get_emoji_data,
     ]
 }
 

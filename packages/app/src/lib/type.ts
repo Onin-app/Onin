@@ -4,7 +4,8 @@ export type Source =
   | "Custom"
   | "Command"
   | "FileCommand"
-  | "Plugin";
+  | "Plugin"
+  | "Extension";
 export type IconType = "Base64" | "Iconfont" | "Url";
 export type AppOrigin = "Hkey" | "Shortcut" | "Uwp";
 
@@ -56,7 +57,8 @@ export type CommandAction =
   | { App: string }
   | { File: string }
   | { Plugin: string }
-  | { PluginCommand: { plugin_id: string; command_code: string } };
+  | { PluginCommand: { plugin_id: string; command_code: string } }
+  | { Extension: { extension_id: string; command_code: string } };
 
 export interface Command {
   name: string;

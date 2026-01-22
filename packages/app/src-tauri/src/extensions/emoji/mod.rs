@@ -5,7 +5,7 @@
 //! - 搜索 emoji 名称
 //! - 复制选中的 emoji
 
-mod data;
+pub mod data;
 
 use crate::extension::registry::Extension;
 use crate::extension::types::{
@@ -27,12 +27,8 @@ pub static EMOJI_MANIFEST: ExtensionManifest = ExtensionManifest {
         code: "search",
         name: "搜索 Emoji",
         description: "浏览和搜索 Emoji 表情",
-        keywords: &["/emoji", "emoji", "表情", "😀", "smiley", "emoticon"],
-        matches: Some(ExtensionMatch {
-            pattern: r"^/emoji\b",
-            min_length: Some(6),
-            max_length: None,
-        }),
+        keywords: &["emoji", "表情", "😀", "smiley", "emoticon"],
+        matches: None, // 移除正则匹配，使用关键字匹配
     }],
 };
 
@@ -51,9 +47,10 @@ impl Extension for EmojiExtension {
         &EMOJI_MANIFEST
     }
 
-    fn matches(&self, input: &str) -> bool {
-        let trimmed = input.trim().to_lowercase();
-        trimmed.starts_with("/emoji")
+    fn matches(&self, _input: &str) -> bool {
+        // Emoji 现在作为命令出现在列表中，不再需要 preview 匹配
+        // Preview 只用于 calculator 这类需要即时显示结果的 extension
+        false
     }
 
     fn execute(&self, input: &str) -> ExtensionResult {
@@ -72,13 +69,17 @@ impl Extension for EmojiExtension {
     fn preview(&self, input: &str) -> Option<ExtensionPreview> {
         let trimmed = input.trim().to_lowercase();
 
-        // 检查是否以 /emoji 开头
-        if !trimmed.starts_with("/emoji") {
+        // 检查是否匹配 emoji 关键字
+        if !self.matches(input) {
             return None;
         }
 
-        // 提取搜索关键词（/emoji 后面的部分）
-        let search_query = trimmed.strip_prefix("/emoji").unwrap_or("").trim();
+        // 提取搜索关键词（emoji 后面的部分）
+        let search_query = if trimmed.starts_with("emoji ") {
+            trimmed.strip_prefix("emoji ").unwrap_or("").trim()
+        } else {
+            ""
+        };
 
         // 获取 emoji 数据
         let groups = if search_query.is_empty() {
@@ -97,12 +98,8 @@ impl Extension for EmojiExtension {
         Some(ExtensionPreview {
             extension_id: "emoji".to_string(),
             command_code: "search".to_string(),
-            title: if search_query.is_empty() {
-                "Emoji".to_string()
-            } else {
-                format!("Emoji: {}", search_query)
-            },
-            description: "选择 emoji · 回车复制".to_string(),
+            title: "Emoji".to_string(),
+            description: "选择 emoji · 回车进入".to_string(),
             icon: "smiley".to_string(),
             copyable: String::new(),
             view_type: PreviewViewType::Grid,

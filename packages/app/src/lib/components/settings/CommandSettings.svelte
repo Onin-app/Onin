@@ -23,6 +23,7 @@
   // ===== Constants =====
   const sourceNameMap: Record<string, string> = {
     Command: "基础常用",
+    Extension: "内置扩展",
     Application: "程序启动",
     FileCommand: "文件启动",
     Plugin: "已安装插件",

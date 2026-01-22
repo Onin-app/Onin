@@ -167,6 +167,18 @@ pub async fn execute_command(
                     }
                 }
             }
+            CommandAction::Extension {
+                extension_id,
+                command_code,
+            } => {
+                // Extension 命令由前端处理（导航到独立页面）
+                // 后端只需记录日志
+                tracing::info!(
+                    "Extension command triggered: {}:{}",
+                    extension_id,
+                    command_code
+                );
+            }
         }
     } else {
         eprintln!("Command not found: {}", name);

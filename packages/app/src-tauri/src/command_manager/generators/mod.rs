@@ -3,11 +3,13 @@
 //! 按类型生成各种命令
 
 mod app;
+mod extension;
 mod file;
 mod plugin;
 mod system;
 
 pub use app::get_initial_app_commands;
+pub use extension::get_initial_extension_commands;
 pub use file::get_initial_file_commands;
 pub use plugin::{
     get_initial_dynamic_commands, get_initial_plugin_commands, get_plugin_commands,

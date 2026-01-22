@@ -40,8 +40,6 @@
   import RefreshProgressBar from "$lib/components/RefreshProgressBar.svelte";
   import PluginIframe from "$lib/components/PluginIframe.svelte";
   import ExtensionResultItem from "$lib/components/ExtensionResultItem.svelte";
-  import EmojiGridView from "$lib/components/EmojiGridView.svelte";
-  import type { EmojiItem } from "$lib/composables/useExtensionManager.svelte";
 
   import "../index.css";
 
@@ -71,11 +69,12 @@
   };
 
   // ===== Computed =====
-  // 合并匹配命令和搜索结果，匹配命令优先显示在顶部
+  // 合并匹配命令和搜索结果
+  // 优先级：Extension 预览 -> 精确/模糊匹配 -> 插件通配符匹配
   const displayList = $derived.by(() => {
     const result: LaunchableItem[] = [];
 
-    // Extension 预览优先显示在最顶部
+    // Extension 预览优先显示在最顶部（如计算器结果）
     if (extensionPreviewItem) {
       result.push(extensionPreviewItem);
     }
@@ -94,8 +93,8 @@
       (app) => !app.action || !matchedActions.has(app.action),
     );
 
-    // Extension 预览 -> 匹配命令 -> 过滤后的搜索结果
-    return [...result, ...matchedCommands, ...filteredAppList];
+    // Extension 预览 -> 精确/模糊匹配(appList) -> 插件通配符匹配(matchedCommands)
+    return [...result, ...filteredAppList, ...matchedCommands];
   });
 
   // ===== Effects =====
@@ -194,8 +193,43 @@
     matchedCommands = [];
   };
 
+  // 解析 Extension Action
+  const parseExtensionAction = (action: string | undefined): { extensionId: string, commandCode: string } | null => {
+    if (!action || !action.startsWith("extension:")) return null;
+    
+    const parts = action.split(":");
+    // 格式: extension:id:code
+    if (parts.length >= 3) {
+      return {
+        extensionId: parts[1],
+        commandCode: parts[2]
+      };
+    }
+    return null;
+  };
+
   const handleOpenApp = async (app: LaunchableItem) => {
-    // 检查是否是 Extension 项目（如计算器结果）
+    // 1. 优先处理 Extension 命令
+    if (app.source === "Extension") {
+      const extensionInfo = parseExtensionAction(app.action);
+      if (extensionInfo) {
+        const { extensionId } = extensionInfo;
+        // Emoji Extension 特殊处理：导航到独立页面
+        if (extensionId === "emoji") {
+          inputValue = "";
+          clipboard.clearAttachments();
+          extensionPreviewItem = null;
+          extensionManager.clearPreview();
+          matchedCommands = [];
+          goto("/extensions/emoji");
+          return;
+        }
+        // 其他 Extension 可以在这里扩展...
+      }
+    }
+
+    // 2. 检查 Preview 项目（如计算器结果）
+    // 注意：Preview 项目的 path 通常以 "extension:" 开头，但不一定是 source="Extension"
     if (app.path.startsWith("extension:")) {
       await handleExtensionClick(app);
       return;
@@ -258,12 +292,26 @@
     });
   };
 
-  // 处理 Extension 项目点击（如计算器结果）
+  // 处理 Extension 项目点击（如计算器结果或 emoji）
   const handleExtensionClick = async (app: LaunchableItem) => {
     // 获取 Extension ID
     const parts = app.path.split(":");
     if (parts.length >= 2) {
       const extensionId = parts[1];
+      
+      // 检查是否是 grid 类型的 extension（如 emoji）
+      const preview = extensionManager.state.currentPreview;
+      if (preview?.view_type === "grid" && extensionId === "emoji") {
+        // 导航到 emoji 页面
+        inputValue = "";
+        clipboard.clearAttachments();
+        extensionPreviewItem = null;
+        extensionManager.clearPreview();
+        matchedCommands = [];
+        goto("/extensions/emoji");
+        return;
+      }
+      
       // 使用有效文本（粘贴文本或输入框值）
       const effectiveText = clipboard.state.attachedText || inputValue;
       const result = await extensionManager.execute(extensionId, effectiveText);
@@ -289,24 +337,7 @@
     invoke("close_main_window");
   };
 
-  // 处理 Emoji 选择
-  const handleEmojiSelect = async (emoji: EmojiItem) => {
-    try {
-      await navigator.clipboard.writeText(emoji.emoji);
-      console.log("[Emoji] Copied to clipboard:", emoji.emoji);
-    } catch (e) {
-      console.error("[Emoji] Failed to copy:", e);
-    }
 
-    // 清理状态并关闭窗口
-    inputValue = "";
-    clipboard.clearAttachments();
-    extensionPreviewItem = null;
-    extensionManager.clearPreview();
-    matchedCommands = [];
-    appListManager.resetToOriginList();
-    invoke("close_main_window");
-  };
 
   const handleKeyDown = (e: KeyboardEvent) => {
     appListManager.handleKeyDown(e, displayList, handleOpenApp);
@@ -463,12 +494,7 @@
             plugin.setIframeElement(pluginIframeRef?.getElement() ?? null);
           }}
         />
-      {:else if extensionManager.state.currentPreview?.view_type === "grid" && extensionManager.state.currentPreview?.grid_data}
-        <!-- Emoji Grid View -->
-        <EmojiGridView
-          data={extensionManager.state.currentPreview.grid_data}
-          onSelect={handleEmojiSelect}
-        />
+
       {:else}
         <!-- App List -->
         <ScrollArea.Root

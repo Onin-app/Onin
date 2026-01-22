@@ -22,6 +22,8 @@ pub fn get_commands_file_path(app: &AppHandle) -> PathBuf {
 /// 生成并保存所有命令
 pub async fn generate_and_save_commands(app: &AppHandle) -> Vec<Command> {
     let mut initial_commands = generators::get_initial_system_commands();
+    let extension_commands = generators::get_initial_extension_commands();
+    initial_commands.extend(extension_commands);
     let app_commands = generators::get_initial_app_commands().await;
     initial_commands.extend(app_commands);
     let file_commands = generators::get_initial_file_commands(app).await;

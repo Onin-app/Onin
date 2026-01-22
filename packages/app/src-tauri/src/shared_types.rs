@@ -7,6 +7,7 @@ pub enum ItemSource {
     Command,     // System commands
     FileCommand, // User-defined file commands
     Plugin,      // Plugins
+    Extension,   // Internal extensions (emoji, calculator, etc.)
 }
 
 impl Default for ItemSource {
@@ -116,6 +117,10 @@ pub enum CommandAction {
         plugin_id: String,
         command_code: String,
     }, // Plugin command with plugin id and command code
+    Extension {
+        extension_id: String,
+        command_code: String,
+    }, // Internal extension command (e.g., emoji, calculator)
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

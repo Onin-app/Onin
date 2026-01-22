@@ -13,11 +13,13 @@
     Plugs,
     User,
     PuzzlePiece,
+    Sparkle,
   } from "phosphor-svelte";
 
   // 分类图标映射
   const iconMap: Record<string, any> = {
     Command: CommandIcon,
+    Extension: Sparkle,
     Application: RocketLaunch,
     FileCommand: File,
     Plugin: Plugs,
