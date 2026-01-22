@@ -170,6 +170,44 @@ impl ExtensionResult {
 // Extension 实时预览
 // ============================================================================
 
+/// 预览视图类型
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum PreviewViewType {
+    /// 单项预览（如计算器结果）
+    #[default]
+    Single,
+    /// Grid 网格视图（如 emoji 选择器）
+    Grid,
+}
+
+/// Emoji Grid 数据
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmojiGridData {
+    /// 分类分组
+    pub groups: Vec<EmojiGroup>,
+}
+
+/// Emoji 分组
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmojiGroup {
+    /// 分类名称
+    pub name: String,
+    /// 分类 slug
+    pub slug: String,
+    /// emoji 列表
+    pub emojis: Vec<EmojiItem>,
+}
+
+/// 单个 Emoji 项
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmojiItem {
+    /// emoji 字符
+    pub emoji: String,
+    /// 名称（用于搜索和显示）
+    pub name: String,
+}
+
 /// Extension 预览结果（用于搜索列表实时显示）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExtensionPreview {
@@ -185,4 +223,10 @@ pub struct ExtensionPreview {
     pub icon: String,
     /// 可复制的值
     pub copyable: String,
+    /// 视图类型
+    #[serde(default)]
+    pub view_type: PreviewViewType,
+    /// Grid 数据（仅 Grid 视图使用）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grid_data: Option<EmojiGridData>,
 }

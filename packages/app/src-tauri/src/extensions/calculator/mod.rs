@@ -9,6 +9,7 @@ mod units;
 use crate::extension::registry::Extension;
 use crate::extension::types::{
     ExtensionCommand, ExtensionManifest, ExtensionMatch, ExtensionPreview, ExtensionResult,
+    PreviewViewType,
 };
 use regex::Regex;
 use std::sync::LazyLock;
@@ -139,6 +140,8 @@ impl Extension for CalculatorExtension {
                 description,
                 icon: "currencyDollar".to_string(),
                 copyable: result.copyable.unwrap_or_default(),
+                view_type: PreviewViewType::Single,
+                grid_data: None,
             });
         }
 
@@ -192,6 +195,8 @@ impl Extension for CalculatorExtension {
             description,
             icon,
             copyable: result.copyable.unwrap_or_default(),
+            view_type: PreviewViewType::Single,
+            grid_data: None,
         })
     }
 }

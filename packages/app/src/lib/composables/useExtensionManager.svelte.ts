@@ -19,12 +19,41 @@ export interface ExtensionPreview {
   description: string;
   icon: string;
   copyable: string;
+  view_type?: "single" | "grid";
+  grid_data?: EmojiGridData;
+}
+
+/**
+ * Emoji Grid 数据
+ */
+export interface EmojiGridData {
+  groups: EmojiGroup[];
+}
+
+/**
+ * Emoji 分组
+ */
+export interface EmojiGroup {
+  name: string;
+  slug: string;
+  emojis: EmojiItem[];
+}
+
+/**
+ * 单个 Emoji 项
+ */
+export interface EmojiItem {
+  emoji: string;
+  name: string;
 }
 
 /**
  * 将 ExtensionPreview 转换为 LaunchableItem 用于显示
  */
-function previewToLaunchableItem(preview: ExtensionPreview): LaunchableItem {
+function previewToLaunchableItem(preview: ExtensionPreview): LaunchableItem & {
+  view_type?: "single" | "grid";
+  grid_data?: EmojiGridData;
+} {
   return {
     name: preview.title,
     description: preview.description,
@@ -36,6 +65,8 @@ function previewToLaunchableItem(preview: ExtensionPreview): LaunchableItem {
     source: "Command",
     action: `extension:${preview.extension_id}`,
     source_display: "Extension",
+    view_type: preview.view_type,
+    grid_data: preview.grid_data,
   };
 }
 

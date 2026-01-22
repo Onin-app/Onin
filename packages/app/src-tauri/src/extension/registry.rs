@@ -26,7 +26,10 @@ pub trait Extension: Send + Sync {
 
 /// 获取所有已注册的扩展
 pub fn get_all_extensions() -> Vec<&'static dyn Extension> {
-    vec![&extensions::calculator::CALCULATOR_EXTENSION]
+    vec![
+        &extensions::calculator::CALCULATOR_EXTENSION,
+        &extensions::emoji::EMOJI_EXTENSION,
+    ]
 }
 
 /// 根据 ID 获取扩展

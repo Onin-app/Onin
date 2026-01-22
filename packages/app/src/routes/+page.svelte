@@ -40,6 +40,8 @@
   import RefreshProgressBar from "$lib/components/RefreshProgressBar.svelte";
   import PluginIframe from "$lib/components/PluginIframe.svelte";
   import ExtensionResultItem from "$lib/components/ExtensionResultItem.svelte";
+  import EmojiGridView from "$lib/components/EmojiGridView.svelte";
+  import type { EmojiItem } from "$lib/composables/useExtensionManager.svelte";
 
   import "../index.css";
 
@@ -287,6 +289,25 @@
     invoke("close_main_window");
   };
 
+  // 处理 Emoji 选择
+  const handleEmojiSelect = async (emoji: EmojiItem) => {
+    try {
+      await navigator.clipboard.writeText(emoji.emoji);
+      console.log("[Emoji] Copied to clipboard:", emoji.emoji);
+    } catch (e) {
+      console.error("[Emoji] Failed to copy:", e);
+    }
+
+    // 清理状态并关闭窗口
+    inputValue = "";
+    clipboard.clearAttachments();
+    extensionPreviewItem = null;
+    extensionManager.clearPreview();
+    matchedCommands = [];
+    appListManager.resetToOriginList();
+    invoke("close_main_window");
+  };
+
   const handleKeyDown = (e: KeyboardEvent) => {
     appListManager.handleKeyDown(e, displayList, handleOpenApp);
   };
@@ -441,6 +462,12 @@
           onLoad={() => {
             plugin.setIframeElement(pluginIframeRef?.getElement() ?? null);
           }}
+        />
+      {:else if extensionManager.state.currentPreview?.view_type === "grid" && extensionManager.state.currentPreview?.grid_data}
+        <!-- Emoji Grid View -->
+        <EmojiGridView
+          data={extensionManager.state.currentPreview.grid_data}
+          onSelect={handleEmojiSelect}
         />
       {:else}
         <!-- App List -->
