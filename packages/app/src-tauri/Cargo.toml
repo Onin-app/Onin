@@ -81,7 +81,7 @@ objc2 = "0.6"
 objc2-foundation = { version = "0.3", features = ["NSString", "NSData", "NSObject", "NSDictionary", "std"] }
 objc2-app-kit = { version = "0.3", features = ["NSWorkspace", "NSImage", "NSBitmapImageRep", "NSGraphicsContext", "NSOpenPanel", "NSSavePanel", "NSWindow", "NSResponder", "NSApplication", "NSRunningApplication"] }
 
-[target.'cfg(any(target_os = "macos", target_os = "windows"))'.dependencies]
+[target.'cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))'.dependencies]
 clipboard-rs = "0.2"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]

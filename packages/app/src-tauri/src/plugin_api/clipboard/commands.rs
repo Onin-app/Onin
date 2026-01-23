@@ -111,8 +111,8 @@ pub async fn plugin_clipboard_get_metadata(
     let mut text: Option<String> = None;
     let mut files: Option<Vec<ClipboardFile>> = None;
 
-    // 先尝试读取文件路径（Windows）
-    #[cfg(target_os = "windows")]
+    // 先尝试读取文件路径（Windows/Linux）
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
     {
         use clipboard_rs::{Clipboard, ClipboardContext};
         use std::path::Path;
@@ -159,7 +159,7 @@ pub async fn plugin_clipboard_get_metadata(
     }
 
     // 检测是否有图片
-    #[cfg(target_os = "windows")]
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
     {
         use clipboard_rs::{Clipboard, ClipboardContext};
 
@@ -198,7 +198,7 @@ pub async fn get_clipboard_content(
     let timestamp = get_clipboard_timestamp();
 
     // 先尝试读取文件路径
-    #[cfg(target_os = "windows")]
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
     {
         use clipboard_rs::{Clipboard, ClipboardContext};
         use std::path::Path;
