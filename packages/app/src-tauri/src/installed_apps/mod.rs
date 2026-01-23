@@ -39,7 +39,17 @@ pub async fn fetch_installed_apps() -> Result<Vec<AppInfo>, String> {
 
     #[cfg(target_os = "linux")]
     {
-        linux::get_apps()
+        linux::get_apps().map(|apps| {
+            apps.into_iter()
+                .map(|(name, _)| AppInfo {
+                    name: name.clone(),
+                    keywords: vec![name.clone()],
+                    path: None, // Linux specific path handling if needed
+                    icon: None, // Linux specific icon handling if needed
+                    origin: None,
+                })
+                .collect()
+        })
     }
 
     #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]

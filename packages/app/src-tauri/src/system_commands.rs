@@ -190,11 +190,11 @@ pub async fn execute_command(
 // ============================================================================
 
 /// 跨平台系统命令配置
-struct PlatformCommand {
+struct PlatformCommand<'a> {
     log_message: &'static str,
-    windows: Option<(&'static str, &'static [&'static str])>,
-    macos: Option<(&'static str, &'static [&'static str])>,
-    linux: Option<(&'static str, &'static [&'static str])>,
+    windows: Option<(&'static str, &'a [&'a str])>,
+    macos: Option<(&'static str, &'a [&'a str])>,
+    linux: Option<(&'static str, &'a [&'a str])>,
 }
 
 /// 执行跨平台系统命令
@@ -265,7 +265,9 @@ fn lock_screen() {
 
 fn logout() {
     #[cfg(target_os = "linux")]
-    let linux_args: &[&str] = &["-KILL", "-u", &whoami::username()];
+    let username = whoami::username();
+    #[cfg(target_os = "linux")]
+    let linux_args: &[&str] = &["-KILL", "-u", &username];
 
     execute_platform_command(&PlatformCommand {
         log_message: "User logout initiated",
@@ -274,7 +276,7 @@ fn logout() {
         #[cfg(target_os = "linux")]
         linux: Some(("pkill", linux_args)),
         #[cfg(not(target_os = "linux"))]
-        linux: Some(("pkill", &["-KILL", "-u"])),
+        linux: None,
     });
 }
 
