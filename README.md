@@ -1,84 +1,92 @@
-# Onin Monorepo
+<div align="center">
+  <img src="logo.png" width="128" height="128" alt="Onin Logo" />
+  <h1>Onin</h1>
+  <p>
+    <b>The extensible, command-centric launcher for pro users.</b>
+  </p>
+  <p>
+    <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" />
+    <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-yellowgreen" alt="Platform" />
+  </p>
+  <p>
+    <a href="README_zh.md">🇨🇳 中文文档</a>
+  </p>
+</div>
 
-Onin 插件化桌面应用 - Tauri + SvelteKit
+<br/>
 
-## 快速开始
+## Introduction
+
+**Onin** is a modern productivity tool designed to keep your hands on the keyboard. Inspired by tools like Raycast and uTools, Onin provides a blazing fast, extensible interface to launch apps, search files, and run commands. Built with **Tauri** and **SvelteKit**, it combines the performance of Rust with the flexibility of modern web technologies.
+
+Onin is more than just a launcher; it's a platform. With a powerful **Plugin SDK**, developers can extend its capabilities to fit any workflow.
+
+### ✨ Key Features
+
+- ⚡ **Blazing Fast** — Native performance powered by Rust and Tauri
+- 🔌 **Extensible** — Rich plugin system supporting any web technology (React, Vue, Svelte, etc.)
+- 🎨 **Beautiful UI** — Polished, modern interface with smooth animations
+- ⌨️ **Keyboard First** — Every action is just a few keystrokes away
+- 🛠️ **Developer Friendly** — Easy-to-use SDK for creating custom extensions
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+- Node.js >= 18
+- pnpm >= 8
+- Rust (latest stable)
+
+### Installation & Development
 
 ```bash
-# 安装
+# Install dependencies
 pnpm install
 
-# 开发
-pnpm dev              # Web 开发 (http://localhost:1420)
-pnpm tauri dev        # Tauri 桌面应用（首次需要 3-10 分钟编译 Rust）
-pnpm dev:demo         # SDK demo (http://localhost:5174)
-
-# 构建
-pnpm build            # 构建所有包
-pnpm build:sdk        # 只构建 SDK
-
-# 测试
-pnpm test:sdk         # 测试 SDK
+# Development
+pnpm dev              # Web Dev Mode (http://localhost:1420)
+pnpm tauri dev        # Desktop App (First build takes 3-10 mins)
+pnpm dev:demo         # SDK Demo (http://localhost:5174)
 ```
 
-## 项目结构
+### Build
+
+```bash
+pnpm build            # Build all packages
+pnpm build:sdk        # Build SDK only
+```
+
+---
+
+## 📁 Project Structure
+
+This is a **Monorepo** managed by pnpm workspaces:
 
 ```
 packages/
-├── app/              # 主应用 (Tauri + SvelteKit)
-│   └── docs/         # 主应用设计文档
-├── sdk/              # 插件 SDK (发布为 onin-sdk)
-│   ├── docs/         # SDK 设计文档
-│   └── examples/     # SDK 使用示例
-└── demo/             # SDK 测试项目
+├── app/              # Main Application (Tauri + SvelteKit)
+│   └── docs/         # App Documentation
+├── sdk/              # Plugin SDK (published as onin-sdk)
+│   ├── docs/         # SDK Documentation
+│   └── examples/     # Usage Examples
+└── demo/             # SDK Test Playground
 ```
 
-## SDK 开发流程
+---
 
-1. 修改 SDK: `packages/sdk/src/`
-2. 构建: `pnpm build:sdk`
-3. 测试: `pnpm dev:demo`
+## 📖 Documentation
 
-## 常见问题
+| Topic             | Link                                                                     |
+| ----------------- | ------------------------------------------------------------------------ |
+| API Documentation | [API.md](packages/app/docs/API.md)                                       |
+| Plugin System     | [PLUGIN_COMMAND_USAGE.md](packages/app/docs/PLUGIN_COMMAND_USAGE.md)     |
+| Window Management | [WINDOW_LIFECYCLE_FINAL.md](packages/app/docs/WINDOW_LIFECYCLE_FINAL.md) |
+| SDK Guide         | [SDK README](packages/sdk/README.md)                                     |
 
-### Tauri 启动失败
+---
 
-```bash
-# 清理构建缓存
-rm -rf packages/app/src-tauri/target
-pnpm tauri dev
-```
+## 📄 License
 
-### SDK 改动后 Demo 没更新
-
-```bash
-# 重新构建 SDK
-pnpm build:sdk
-```
-
-### 依赖问题
-
-```bash
-# 重新安装
-rm -rf node_modules packages/*/node_modules pnpm-lock.yaml
-pnpm install
-```
-
-## 文档
-
-### 主应用
-
-- [API 文档](packages/app/docs/API.md)
-- [插件系统](packages/app/docs/PLUGIN_COMMAND_USAGE.md)
-- [窗口管理](packages/app/docs/WINDOW_LIFECYCLE_FINAL.md)
-- [更多...](packages/app/docs/)
-
-### SDK
-
-- [SDK README](packages/sdk/README.md)
-- [API 设计](packages/sdk/docs/)
-- [使用示例](packages/sdk/examples/)
-
-## License
-
-MIT
+[MIT](LICENSE)

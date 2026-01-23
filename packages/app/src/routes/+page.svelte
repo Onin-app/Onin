@@ -439,11 +439,9 @@
     <div class="flex items-center gap-2 pb-2">
       <button class="flex-shrink-0 cursor-pointer" onclick={handleToSettings}>
         <img
-          src="/ff_logo_{getTheme(currentTheme) === Theme.DARK
-            ? Theme.LIGHT
-            : Theme.DARK}.svg"
+          src="/logo.png"
           class="h-10 w-10"
-          alt="Tauri logo"
+          alt="Onin logo"
         />
       </button>
 
