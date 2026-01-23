@@ -16,6 +16,7 @@
   let searchQuery = $state("");
   let emojiData = $state<EmojiGridData | null>(null);
   let headerRef: ExtensionHeader;
+  let gridRef: EmojiGridView;
 
   // 从 URL 参数获取初始搜索值
   const initialQuery = $derived($page.url.searchParams.get("q") || "");
@@ -46,6 +47,11 @@
     goto("/");
   };
 
+  // 处理键盘导航 - 从输入框转发到 grid
+  const handleKeyDown = (e: KeyboardEvent) => {
+    gridRef?.handleKeyDown(e);
+  };
+
   // 处理 emoji 选择
   const handleEmojiSelect = async (emoji: EmojiItem) => {
     try {
@@ -57,6 +63,16 @@
 
     // 关闭窗口
     invoke("close_main_window");
+
+    // 延迟后模拟 Ctrl+V 粘贴
+    setTimeout(async () => {
+      try {
+        await invoke("simulate_paste");
+        console.log("[Emoji] Simulated paste");
+      } catch (e) {
+        console.error("[Emoji] Failed to simulate paste:", e);
+      }
+    }, 100);
   };
 
   onMount(() => {
@@ -76,11 +92,12 @@
     bind:value={searchQuery}
     onInput={handleSearch}
     onBack={handleBack}
+    onKeyDown={handleKeyDown}
   />
 
   <div class="flex-1 overflow-hidden">
     {#if emojiData}
-      <EmojiGridView data={emojiData} onSelect={handleEmojiSelect} />
+      <EmojiGridView bind:this={gridRef} data={emojiData} onSelect={handleEmojiSelect} />
     {:else}
       <div class="flex h-full items-center justify-center text-neutral-500">
         加载中...
@@ -88,3 +105,4 @@
     {/if}
   </div>
 </div>
+

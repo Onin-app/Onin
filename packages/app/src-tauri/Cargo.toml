@@ -38,6 +38,7 @@ windows = { version = "0.57", features = [
   "Win32_UI_Shell_PropertiesSystem",
   "Win32_System_DataExchange",
   "Win32_Storage_FileSystem",
+  "Win32_UI_Input_KeyboardAndMouse",
 ] }
 base64 = "0.22"
 futures = "0.3" # 用于并发处理 futures

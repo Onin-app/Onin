@@ -291,3 +291,134 @@ fn refresh_list(app: AppHandle) {
         command_manager::commands::refresh_commands(app.clone()).await;
     });
 }
+
+// ============================================================================
+// 键盘模拟
+// ============================================================================
+
+/// 模拟 Ctrl+V 粘贴操作
+/// 用于在窗口关闭后将剪贴板内容粘贴到之前活动的应用
+#[tauri::command]
+pub fn simulate_paste() -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::mem;
+        use windows::Win32::UI::Input::KeyboardAndMouse::{
+            SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
+            KEYEVENTF_KEYUP, VIRTUAL_KEY, VK_CONTROL, VK_V,
+        };
+
+        unsafe {
+            let mut inputs: [INPUT; 4] = mem::zeroed();
+
+            // Key down: Ctrl
+            inputs[0] = INPUT {
+                r#type: INPUT_KEYBOARD,
+                Anonymous: INPUT_0 {
+                    ki: KEYBDINPUT {
+                        wVk: VK_CONTROL,
+                        wScan: 0,
+                        dwFlags: KEYBD_EVENT_FLAGS(0),
+                        time: 0,
+                        dwExtraInfo: 0,
+                    },
+                },
+            };
+
+            // Key down: V
+            inputs[1] = INPUT {
+                r#type: INPUT_KEYBOARD,
+                Anonymous: INPUT_0 {
+                    ki: KEYBDINPUT {
+                        wVk: VK_V,
+                        wScan: 0,
+                        dwFlags: KEYBD_EVENT_FLAGS(0),
+                        time: 0,
+                        dwExtraInfo: 0,
+                    },
+                },
+            };
+
+            // Key up: V
+            inputs[2] = INPUT {
+                r#type: INPUT_KEYBOARD,
+                Anonymous: INPUT_0 {
+                    ki: KEYBDINPUT {
+                        wVk: VK_V,
+                        wScan: 0,
+                        dwFlags: KEYEVENTF_KEYUP,
+                        time: 0,
+                        dwExtraInfo: 0,
+                    },
+                },
+            };
+
+            // Key up: Ctrl
+            inputs[3] = INPUT {
+                r#type: INPUT_KEYBOARD,
+                Anonymous: INPUT_0 {
+                    ki: KEYBDINPUT {
+                        wVk: VK_CONTROL,
+                        wScan: 0,
+                        dwFlags: KEYEVENTF_KEYUP,
+                        time: 0,
+                        dwExtraInfo: 0,
+                    },
+                },
+            };
+
+            let sent = SendInput(&inputs, mem::size_of::<INPUT>() as i32);
+            if sent != 4 {
+                return Err(format!("SendInput failed: only {} of 4 inputs sent", sent));
+            }
+        }
+
+        println!("[simulate_paste] Ctrl+V simulated on Windows");
+        Ok(())
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        // macOS: 使用 CGEvent 模拟 Cmd+V
+        use std::process::Command;
+        
+        // 使用 osascript 来模拟按键
+        let result = Command::new("osascript")
+            .args(["-e", "tell application \"System Events\" to keystroke \"v\" using command down"])
+            .output();
+        
+        match result {
+            Ok(output) => {
+                if output.status.success() {
+                    println!("[simulate_paste] Cmd+V simulated on macOS");
+                    Ok(())
+                } else {
+                    Err(format!("osascript failed: {:?}", String::from_utf8_lossy(&output.stderr)))
+                }
+            }
+            Err(e) => Err(format!("Failed to execute osascript: {}", e)),
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        // Linux: 使用 xdotool 模拟 Ctrl+V
+        use std::process::Command;
+        
+        let result = Command::new("xdotool")
+            .args(["key", "ctrl+v"])
+            .output();
+        
+        match result {
+            Ok(output) => {
+                if output.status.success() {
+                    println!("[simulate_paste] Ctrl+V simulated on Linux");
+                    Ok(())
+                } else {
+                    Err(format!("xdotool failed: {:?}", String::from_utf8_lossy(&output.stderr)))
+                }
+            }
+            Err(e) => Err(format!("Failed to execute xdotool: {}", e)),
+        }
+    }
+}

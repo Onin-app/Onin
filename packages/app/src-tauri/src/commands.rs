@@ -135,6 +135,8 @@ pub fn get_invoke_handler(
         extension::api::get_extension_preview,
         extension::api::execute_extension,
         extension::api::get_emoji_data,
+        // Keyboard simulation
+        system_commands::simulate_paste,
     ]
 }
 

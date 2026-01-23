@@ -15,6 +15,7 @@
     value?: string;
     onInput?: (value: string) => void;
     onBack?: () => void;
+    onKeyDown?: (e: KeyboardEvent) => void;
     right?: Snippet;
   }
 
@@ -25,6 +26,7 @@
     value = $bindable(""),
     onInput,
     onBack,
+    onKeyDown,
     right,
   }: Props = $props();
 
@@ -38,6 +40,13 @@
     const target = e.target as HTMLInputElement;
     value = target.value;
     onInput?.(target.value);
+  };
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    // Forward navigation keys to parent (arrow keys and Enter)
+    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter"].includes(e.key)) {
+      onKeyDown?.(e);
+    }
   };
 </script>
 
@@ -65,6 +74,7 @@
       {placeholder}
       {value}
       oninput={handleInput}
+      onkeydown={handleKeyDown}
     />
   </div>
 
