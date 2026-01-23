@@ -9,13 +9,13 @@ use std::sync::LazyLock;
 /// 原始 JSON 数据（编译时嵌入）
 const EMOJI_JSON: &str = include_str!("emoji_data.json");
 
-/// 原始 JSON emoji 项结构
+/// 原始 JSON emoji 项结构（emojibase 格式）
 #[derive(Debug, Deserialize)]
 struct RawEmoji {
     emoji: String,
     name: String,
     #[serde(default)]
-    skin_tone_support: bool,
+    tags: Vec<String>,
 }
 
 /// 原始 JSON 分组结构
@@ -39,11 +39,10 @@ static EMOJI_DATA: LazyLock<Vec<EmojiGroup>> = LazyLock::new(|| {
             emojis: group
                 .emojis
                 .into_iter()
-                // 过滤掉支持肤色变体的 emoji（避免重复，只保留基础版本）
-                .filter(|e| !e.skin_tone_support)
                 .map(|e| EmojiItem {
                     emoji: e.emoji,
                     name: e.name,
+                    tags: e.tags,
                 })
                 .collect(),
         })
@@ -55,7 +54,7 @@ pub fn get_all_groups() -> Vec<EmojiGroup> {
     EMOJI_DATA.clone()
 }
 
-/// 搜索 emoji（模糊匹配名称）
+/// 搜索 emoji（匹配名称和 tags）
 pub fn search_emojis(query: &str) -> Vec<EmojiGroup> {
     let query_lower = query.to_lowercase();
     let query_parts: Vec<&str> = query_lower.split_whitespace().collect();
@@ -68,8 +67,19 @@ pub fn search_emojis(query: &str) -> Vec<EmojiGroup> {
                 .iter()
                 .filter(|emoji| {
                     let name_lower = emoji.name.to_lowercase();
-                    // 所有搜索词都必须匹配
-                    query_parts.iter().all(|part| name_lower.contains(part))
+
+                    // 检查所有搜索词是否匹配 name 或 tags
+                    query_parts.iter().all(|part| {
+                        // 匹配名称
+                        if name_lower.contains(part) {
+                            return true;
+                        }
+                        // 匹配任一 tag
+                        emoji
+                            .tags
+                            .iter()
+                            .any(|tag| tag.to_lowercase().contains(part))
+                    })
                 })
                 .cloned()
                 .collect();

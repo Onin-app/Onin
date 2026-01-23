@@ -206,6 +206,9 @@ pub struct EmojiItem {
     pub emoji: String,
     /// 名称（用于搜索和显示）
     pub name: String,
+    /// 搜索关键词（不序列化到前端）
+    #[serde(default, skip_serializing)]
+    pub tags: Vec<String>,
 }
 
 /// Extension 预览结果（用于搜索列表实时显示）
