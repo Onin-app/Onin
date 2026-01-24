@@ -41,6 +41,7 @@ pub fn setup_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     TrayIconBuilder::with_id(TRAY_ICON_ID)
         .icon(app.default_window_icon().unwrap().clone())
         .menu(&menu)
+        .tooltip(app.config().product_name.clone().unwrap())
         .show_menu_on_left_click(true)
         .on_tray_icon_event(|tray, event| match event {
             TrayIconEvent::Click {
