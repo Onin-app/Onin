@@ -112,15 +112,6 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install
 
-      - name: Patch Cargo.toml for Linux
-        if: matrix.platform == 'ubuntu-latest'
-        run: |
-          echo "Content before patch:"
-          cat packages/app/src-tauri/Cargo.toml
-          sed -i 's/crate-type = \["staticlib", "cdylib", "rlib"\]/crate-type = ["staticlib", "rlib"]/g' packages/app/src-tauri/Cargo.toml
-          echo "Content after patch:"
-          cat packages/app/src-tauri/Cargo.toml
-
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
