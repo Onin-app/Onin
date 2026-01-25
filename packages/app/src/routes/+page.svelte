@@ -19,6 +19,7 @@
   import { listen } from "@tauri-apps/api/event";
   import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
   import { goto } from "$app/navigation";
+  import { page } from "$app/state";
 
   // Stores
   import { Theme, type LaunchableItem } from "$lib/type";
@@ -113,6 +114,9 @@
 
   // ===== Event Handlers =====
   const handleEsc = () => {
+    // Only handle ESC on main page
+    if (page.route.id !== "/") return;
+
     if (plugin.state.showPluginInline) {
       plugin.closePlugin();
       return;
@@ -194,15 +198,17 @@
   };
 
   // 解析 Extension Action
-  const parseExtensionAction = (action: string | undefined): { extensionId: string, commandCode: string } | null => {
+  const parseExtensionAction = (
+    action: string | undefined,
+  ): { extensionId: string; commandCode: string } | null => {
     if (!action || !action.startsWith("extension:")) return null;
-    
+
     const parts = action.split(":");
     // 格式: extension:id:code
     if (parts.length >= 3) {
       return {
         extensionId: parts[1],
-        commandCode: parts[2]
+        commandCode: parts[2],
       };
     }
     return null;
@@ -298,7 +304,7 @@
     const parts = app.path.split(":");
     if (parts.length >= 2) {
       const extensionId = parts[1];
-      
+
       // 检查是否是 grid 类型的 extension（如 emoji）
       const preview = extensionManager.state.currentPreview;
       if (preview?.view_type === "grid" && extensionId === "emoji") {
@@ -311,7 +317,7 @@
         goto("/extensions/emoji");
         return;
       }
-      
+
       // 使用有效文本（粘贴文本或输入框值）
       const effectiveText = clipboard.state.attachedText || inputValue;
       const result = await extensionManager.execute(extensionId, effectiveText);
@@ -336,8 +342,6 @@
     appListManager.resetToOriginList();
     invoke("close_main_window");
   };
-
-
 
   const handleKeyDown = (e: KeyboardEvent) => {
     appListManager.handleKeyDown(e, displayList, handleOpenApp);
@@ -438,11 +442,7 @@
     <!-- Header: Logo + Search Input + Plugin Menu -->
     <div class="flex items-center gap-2 pb-2">
       <button class="flex-shrink-0 cursor-pointer" onclick={handleToSettings}>
-        <img
-          src="/logo.png"
-          class="h-10 w-10"
-          alt="Onin logo"
-        />
+        <img src="/logo.png" class="h-10 w-10" alt="Onin logo" />
       </button>
 
       <SearchInput
@@ -492,7 +492,6 @@
             plugin.setIframeElement(pluginIframeRef?.getElement() ?? null);
           }}
         />
-
       {:else}
         <!-- App List -->
         <ScrollArea.Root

@@ -29,12 +29,17 @@
   onMount(() => {
     const listenersPromise = (async () => {
       const unlisten = await listen("esc_key_pressed", () => {
-        console.log(
-          "Layout: esc_key_pressed received. Delegating to current handler.",
-        );
-        // Get the current handler function from the store and execute it.
-        const handler = get(escapeHandler);
-        handler();
+        console.log("Layout: esc_key_pressed received. Delegating to logic.");
+
+        // Check if we are on the main page
+        if (page.route.id === "/") {
+          // Get the current handler function from the store and execute it.
+          const handler = get(escapeHandler);
+          handler();
+        } else {
+          // If not on main page, default behavior is to go back
+          window.history.back();
+        }
       });
 
       const unlistenVisibility = await listen<boolean>(

@@ -114,15 +114,17 @@ fn handle_special_keys(app: &AppHandle, triggered_shortcut: &str) {
         }
 
         // 如果没有活跃的插件窗口，则隐藏主窗口
-        println!("No active plugin window, hiding main window");
-        if let Some(window) = app.get_webview_window("main") {
-            let state: State<crate::window_manager::WindowState> = app.state();
-            state
-                .hiding_initiated_by_command
-                .store(true, std::sync::atomic::Ordering::Relaxed);
-            let _ = window.hide();
-            let _ = window.emit("window_visibility", &false);
-        }
+        // MODIFY: 移除后端自动隐藏逻辑，交由前端控制
+        // println!("No active plugin window, hiding main window");
+        // if let Some(window) = app.get_webview_window("main") {
+        //     let state: State<crate::window_manager::WindowState> = app.state();
+        //     state
+        //         .hiding_initiated_by_command
+        //         .store(true, std::sync::atomic::Ordering::Relaxed);
+        //     let _ = window.hide();
+        //     let _ = window.emit("window_visibility", &false);
+        // }
+        println!("ESC detected in backend. Delegating to frontend.");
     } else {
         println!("No matching shortcut found for: {}", triggered_shortcut);
     }
