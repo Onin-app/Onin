@@ -32,6 +32,9 @@ pub fn on_app_setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(target_os = "windows")]
     plugin_api::clipboard::start_clipboard_monitor(app.handle().clone());
 
+    // Initialize Clipboard Extension (Native)
+    crate::extensions::clipboard::init(app.handle());
+
     // 4. 初始化调度器状态
     init_scheduler_state(app);
 

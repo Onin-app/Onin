@@ -89,7 +89,7 @@ async fn merge_commands(app: &AppHandle, saved_commands: Vec<Command>) -> Vec<Co
     // 应用命令的图标已经在生成时通过透明度检测修复，无需每次加载都重新扫描
     let other_commands: Vec<Command> = saved_commands
         .iter()
-        .filter(|c| c.source != ItemSource::Plugin && c.source != ItemSource::Command)
+        .filter(|c| c.source != ItemSource::Plugin && c.source != ItemSource::Command && c.source != ItemSource::Extension)
         .cloned()
         .collect();
 
@@ -117,6 +117,32 @@ async fn merge_commands(app: &AppHandle, saved_commands: Vec<Command>) -> Vec<Co
         }
     }
 
+    // 合并 Extension 命令 (类似系统命令)
+    let current_extension_commands = generators::get_initial_extension_commands();
+    let current_extension_map: HashMap<_, _> = current_extension_commands
+        .into_iter()
+        .map(|c| (c.name.clone(), c))
+        .collect();
+
+    let mut final_extensions: Vec<Command> = Vec::new();
+    for (name, ext_command) in &current_extension_map {
+        let existing = saved_commands
+            .iter()
+            .find(|c| c.source == ItemSource::Extension && &c.name == name);
+
+        if let Some(saved) = existing {
+            let mut merged = saved.clone();
+            // 更新元数据，保留用户配置（如 keywords）
+            merged.title = ext_command.title.clone();
+            merged.description = ext_command.description.clone();
+            merged.icon = ext_command.icon.clone();
+            merged.action = ext_command.action.clone();
+            final_extensions.push(merged);
+        } else {
+            final_extensions.push(ext_command.clone());
+        }
+    }
+
     // 合并插件命令
     let mut final_plugins: Vec<Command> = Vec::new();
     for (name, plugin_command) in installed_plugins_map {
@@ -134,6 +160,7 @@ async fn merge_commands(app: &AppHandle, saved_commands: Vec<Command>) -> Vec<Co
     let mut final_commands = final_system_commands;
     final_commands.extend(other_commands);
     final_commands.extend(final_plugins);
+    final_commands.extend(final_extensions);
     save_commands(app, &final_commands);
     final_commands
 }

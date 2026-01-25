@@ -230,6 +230,16 @@
           goto("/extensions/emoji");
           return;
         }
+        // Clipboard Extension
+        if (extensionId === "clipboard") {
+          inputValue = "";
+          clipboard.clearAttachments();
+          extensionPreviewItem = null;
+          extensionManager.clearPreview();
+          matchedCommands = [];
+          goto("/extensions/clipboard");
+          return;
+        }
         // 其他 Extension 可以在这里扩展...
       }
     }
