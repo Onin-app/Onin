@@ -43,17 +43,23 @@
   };
 
   const handleKeyDown = (e: KeyboardEvent) => {
-    // Forward navigation keys to parent (arrow keys and Enter)
-    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter"].includes(e.key)) {
+    // Forward navigation keys to parent (arrow keys, Enter, Backspace)
+    if (
+      [
+        "ArrowUp",
+        "ArrowDown",
+        "ArrowLeft",
+        "ArrowRight",
+        "Enter",
+        "Backspace",
+      ].includes(e.key)
+    ) {
       onKeyDown?.(e);
     }
   };
 </script>
 
-<div
-  class="flex items-center gap-2 pb-2"
-  role="banner"
->
+<div class="flex items-center gap-2 pb-2" role="banner">
   <!-- Back Button -->
   <button
     class="flex h-10 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-lg text-neutral-600 transition-colors hover:bg-neutral-200 dark:text-neutral-400 dark:hover:bg-neutral-700"
@@ -69,7 +75,7 @@
   >
     <input
       bind:this={inputElement}
-      class="min-w-0 flex-1 h-[34px] bg-transparent text-2xl focus:outline-none focus:ring-0 active:outline-none active:ring-0"
+      class="h-[34px] min-w-0 flex-1 bg-transparent text-2xl focus:outline-none focus:ring-0 active:outline-none active:ring-0"
       type="text"
       {placeholder}
       {value}

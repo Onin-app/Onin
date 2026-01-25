@@ -11,7 +11,10 @@
   import { invoke } from "@tauri-apps/api/core";
   import ExtensionHeader from "$lib/components/ExtensionHeader.svelte";
   import EmojiGridView from "$lib/components/EmojiGridView.svelte";
-  import type { EmojiGridData, EmojiItem } from "$lib/composables/useExtensionManager.svelte";
+  import type {
+    EmojiGridData,
+    EmojiItem,
+  } from "$lib/composables/useExtensionManager.svelte";
 
   let searchQuery = $state("");
   let emojiData = $state<EmojiGridData | null>(null);
@@ -49,6 +52,11 @@
 
   // 处理键盘导航 - 从输入框转发到 grid
   const handleKeyDown = (e: KeyboardEvent) => {
+    // 如果是退格键且搜索框为空，则返回主页
+    if (e.key === "Backspace" && searchQuery === "") {
+      handleBack();
+      return;
+    }
     gridRef?.handleKeyDown(e);
   };
 
@@ -97,7 +105,11 @@
 
   <div class="flex-1 overflow-hidden">
     {#if emojiData}
-      <EmojiGridView bind:this={gridRef} data={emojiData} onSelect={handleEmojiSelect} />
+      <EmojiGridView
+        bind:this={gridRef}
+        data={emojiData}
+        onSelect={handleEmojiSelect}
+      />
     {:else}
       <div class="flex h-full items-center justify-center text-neutral-500">
         加载中...
@@ -105,4 +117,3 @@
     {/if}
   </div>
 </div>
-
