@@ -80,11 +80,11 @@
   const handleItemSelect = async (item: ClipboardItem) => {
     try {
       // 1. Set to clipboard
-      await invoke("set_clipboard_item", { text: item.text });
+      await invoke("set_clipboard_item", { item });
       console.log("[Clipboard] Copied item:", item.id);
 
       // 2. Hide window
-      await invoke("close_main_window");
+      invoke("close_main_window");
 
       // 3. Simulate paste
       setTimeout(async () => {
@@ -263,12 +263,6 @@
                 >{selectedItem.item_type}</span
               >
             </div>
-            <button
-              class="rounded-md bg-blue-500 px-3 py-1 text-xs font-medium text-white shadow-sm transition-colors hover:bg-blue-600"
-              onclick={() => handleItemSelect(selectedItem)}
-            >
-              Paste
-            </button>
           </div>
 
           <!-- Fixed File Path Info (if applicable) -->
