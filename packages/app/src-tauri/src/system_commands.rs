@@ -301,7 +301,7 @@ fn refresh_list(app: AppHandle) {
 /// 模拟 Ctrl+V 粘贴操作
 /// 用于在窗口关闭后将剪贴板内容粘贴到之前活动的应用
 #[tauri::command]
-pub fn simulate_paste() -> Result<(), String> {
+pub fn simulate_paste(app: AppHandle) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         use std::mem;
@@ -375,27 +375,43 @@ pub fn simulate_paste() -> Result<(), String> {
             }
         }
 
-        println!("[simulate_paste] Ctrl+V simulated on Windows");
         Ok(())
     }
 
     #[cfg(target_os = "macos")]
     {
-        // macOS: 使用 CGEvent 模拟 Cmd+V
         use std::process::Command;
+        use std::thread;
+        use std::time::Duration;
         
-        // 使用 osascript 来模拟按键
+        // 获取记录的前一个应用的 Bundle ID
+        let bundle_id = app.state::<MacOSPreviousApp>()
+            .0.lock().ok()
+            .and_then(|guard| guard.clone());
+        
+        if let Some(bundle_id) = bundle_id {
+            // 激活应用
+            let _ = Command::new("osascript")
+                .args(["-e", &format!(r#"tell application id "{}" to activate"#, bundle_id)])
+                .output();
+            thread::sleep(Duration::from_millis(100));
+        } else {
+            thread::sleep(Duration::from_millis(200));
+        }
+        
+        // 模拟按键
         let result = Command::new("osascript")
             .args(["-e", "tell application \"System Events\" to keystroke \"v\" using command down"])
             .output();
         
         match result {
+            Ok(output) if output.status.success() => Ok(()),
             Ok(output) => {
-                if output.status.success() {
-                    println!("[simulate_paste] Cmd+V simulated on macOS");
-                    Ok(())
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                if stderr.contains("not allowed") || stderr.contains("not permitted") {
+                    Err("需要辅助功能权限。请前往 系统设置 > 隐私与安全性 > 辅助功能，添加此应用。".to_string())
                 } else {
-                    Err(format!("osascript failed: {:?}", String::from_utf8_lossy(&output.stderr)))
+                    Err(format!("osascript failed: {}", stderr))
                 }
             }
             Err(e) => Err(format!("Failed to execute osascript: {}", e)),
@@ -404,7 +420,6 @@ pub fn simulate_paste() -> Result<(), String> {
 
     #[cfg(target_os = "linux")]
     {
-        // Linux: 使用 xdotool 模拟 Ctrl+V
         use std::process::Command;
         
         let result = Command::new("xdotool")
@@ -412,15 +427,28 @@ pub fn simulate_paste() -> Result<(), String> {
             .output();
         
         match result {
-            Ok(output) => {
-                if output.status.success() {
-                    println!("[simulate_paste] Ctrl+V simulated on Linux");
-                    Ok(())
-                } else {
-                    Err(format!("xdotool failed: {:?}", String::from_utf8_lossy(&output.stderr)))
-                }
-            }
+            Ok(output) if output.status.success() => Ok(()),
+            Ok(output) => Err(format!("xdotool failed: {:?}", String::from_utf8_lossy(&output.stderr))),
             Err(e) => Err(format!("Failed to execute xdotool: {}", e)),
         }
+    }
+}
+
+// ============================================================================
+// macOS 特定：记录前一个应用
+// ============================================================================
+
+#[cfg(target_os = "macos")]
+pub struct MacOSPreviousApp(pub std::sync::Mutex<Option<String>>);
+
+#[cfg(target_os = "macos")]
+pub fn get_frontmost_app_bundle_id() -> Option<String> {
+    use objc2_app_kit::NSWorkspace;
+    
+    unsafe {
+        let workspace = NSWorkspace::sharedWorkspace();
+        workspace.frontmostApplication()
+            .and_then(|app| app.bundleIdentifier())
+            .map(|id| id.to_string())
     }
 }

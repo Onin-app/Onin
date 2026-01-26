@@ -9,7 +9,7 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 
 use crate::{
     app_config, command_manager, file_command_manager, js_runtime, plugin, plugin_api,
-    plugin_server, shortcut_manager, tray_manager, window_manager,
+    plugin_server, shortcut_manager, system_commands, tray_manager, window_manager,
 };
 
 /// 应用启动时的主要初始化逻辑
@@ -74,6 +74,10 @@ fn load_app_config(app: &App) {
 
 /// 初始化调度器状态
 fn init_scheduler_state(app: &mut App) {
+    // macOS: 初始化前一个应用追踪器
+    #[cfg(target_os = "macos")]
+    app.manage(system_commands::MacOSPreviousApp(std::sync::Mutex::new(None)));
+    
     let scheduler_state = tauri::async_runtime::block_on(async {
         plugin_api::scheduler::SchedulerState::new().await
     });

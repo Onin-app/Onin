@@ -64,6 +64,16 @@ fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::
                     let _ = window.emit("window_visibility", &false);
                 }
                 Ok(false) => {
+                    // macOS: 在显示窗口前记录当前应用
+                    #[cfg(target_os = "macos")]
+                    {
+                        if let Some(bundle_id) = crate::system_commands::get_frontmost_app_bundle_id() {
+                            if let Some(state) = app.try_state::<crate::system_commands::MacOSPreviousApp>() {
+                                *state.0.lock().unwrap() = Some(bundle_id);
+                            }
+                        }
+                    }
+                    
                     let _ = window.show();
                     let _ = window.set_focus();
                     let _ = window.emit("window_visibility", &true);
