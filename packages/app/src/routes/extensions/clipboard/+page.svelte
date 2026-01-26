@@ -140,7 +140,7 @@
       const parts = item.text.split(/[/\\]/);
       return parts[parts.length - 1] || item.text;
     }
-    return item.text.replace(/\n/g, ' ');
+    return item.text.replace(/\n/g, " ");
   }
 </script>
 
@@ -156,159 +156,203 @@
 
   <div class="flex flex-1 overflow-hidden">
     <!-- Left List Pane -->
-    <div 
+    <div
       class="flex w-1/3 flex-col border-r border-neutral-200 dark:border-neutral-700"
     >
       <ScrollArea.Root class="h-full w-full" type="hover">
         <ScrollArea.Viewport class="h-full w-full p-2">
-            {#if filteredItems.length === 0}
-            <div class="flex h-full items-center justify-center text-sm text-neutral-500">
-                {#if searchQuery}
+          {#if filteredItems.length === 0}
+            <div
+              class="flex h-full items-center justify-center text-sm text-neutral-500"
+            >
+              {#if searchQuery}
                 No matches
-                {:else}
+              {:else}
                 Empty
-                {/if}
+              {/if}
             </div>
-            {:else}
+          {:else}
             <div class="flex flex-col gap-1">
-                {#each filteredItems as item, index (item.id)}
+              {#each filteredItems as item, index (item.id)}
                 <button
-                    id="item-{index}"
-                    class="group flex w-full flex-col items-start gap-1 rounded-md p-2 text-left text-sm transition-colors border border-transparent
+                  id="item-{index}"
+                  class="group flex w-full flex-row items-center gap-3 rounded-md border border-transparent px-3 py-2 text-left font-sans text-sm transition-colors
                     {selectedIndex === index
-                    ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
-                    : 'hover:bg-neutral-100 dark:hover:bg-neutral-800 border-transparent'}"
-                    onclick={() => (selectedIndex = index)}
-                    ondblclick={() => handleItemSelect(item)}
+                    ? 'bg-neutral-200 dark:bg-neutral-700/50'
+                    : 'hover:bg-neutral-200/50 dark:hover:bg-neutral-800'}"
+                  onclick={() => (selectedIndex = index)}
+                  ondblclick={() => handleItemSelect(item)}
                 >
-                    <div class="flex w-full items-center justify-between gap-2">
-                    <span
-                        class="rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wider font-semibold
-                        {selectedIndex === index 
-                        ? 'bg-blue-500 text-white' 
-                        : 'bg-neutral-200 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300'}"
-                    >
-                        {item.item_type}
-                    </span>
-                    <span class="text-[10px] text-neutral-400">
-                        {formatTime(item.timestamp)}
-                    </span>
-                    </div>
-                    
-                    <div class="flex w-full gap-2 items-center mt-1">
-                    {#if item.item_type === "Image" && item.thumbnail}
-                        <img 
-                        src={item.thumbnail} 
-                        alt="Thumbnail"
-                        class="h-12 w-12 rounded object-cover border border-neutral-200 dark:border-neutral-700 flex-shrink-0 bg-neutral-100 dark:bg-neutral-800"
-                        />
-                        <span class="text-xs text-neutral-500 italic">Image Bitmap</span>
-                    {:else}
-                        <!-- Display filename for Files, plain text with fallback for others -->
-                        <div class="w-full truncate font-medium text-neutral-900 dark:text-neutral-100 leading-tight" title={item.text}>
+                  <!-- Left: Thumbnail or Spacer -->
+                  {#if item.item_type === "Image" && item.thumbnail}
+                    <img
+                      src={item.thumbnail}
+                      alt="Thumbnail"
+                      class="h-10 w-10 flex-shrink-0 rounded border border-neutral-200 bg-neutral-100 object-cover dark:border-neutral-700 dark:bg-neutral-800"
+                    />
+                  {/if}
+
+                  <!-- Middle: Content -->
+                  <div class="flex min-w-0 flex-1 flex-col justify-center">
+                    {#if item.item_type === "File"}
+                      <div
+                        class="w-full truncate font-medium leading-tight text-neutral-900 dark:text-neutral-100"
+                        title={item.text}
+                      >
                         {getDisplayName(item)}
-                        </div>
+                      </div>
+                    {:else if item.item_type === "Image"}
+                      <span class="text-xs italic text-neutral-500"
+                        >Image Bitmap</span
+                      >
+                    {:else}
+                      <div
+                        class="line-clamp-2 w-full break-all leading-tight text-neutral-600 dark:text-neutral-300"
+                      >
+                        {item.text}
+                      </div>
                     {/if}
-                    </div>
+                  </div>
+
+                  <!-- Right: Metadata -->
+                  <div
+                    class="flex flex-shrink-0 flex-col items-end gap-0.5 self-start pt-1"
+                  >
+                    <span
+                      class="text-[9px] font-semibold uppercase tracking-wider text-neutral-400/70"
+                    >
+                      {item.item_type}
+                    </span>
+                    <span class="text-[10px] tabular-nums text-neutral-400">
+                      {formatTime(item.timestamp)}
+                    </span>
+                  </div>
                 </button>
-                {/each}
+              {/each}
             </div>
-            {/if}
+          {/if}
         </ScrollArea.Viewport>
         <ScrollArea.Scrollbar
-            orientation="vertical"
-            class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none select-none rounded-full border-l border-l-transparent p-px transition-all duration-200 hover:w-3"
+          orientation="vertical"
+          class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none select-none rounded-full border-l border-l-transparent p-px transition-all duration-200 hover:w-3"
         >
-            <ScrollArea.Thumb class="bg-muted-foreground flex-1 rounded-full" />
+          <ScrollArea.Thumb class="bg-muted-foreground flex-1 rounded-full" />
         </ScrollArea.Scrollbar>
         <ScrollArea.Corner />
       </ScrollArea.Root>
     </div>
 
     <!-- Right Preview Pane -->
-    <div class="flex w-2/3 flex-col overflow-hidden bg-white dark:bg-neutral-900">
+    <div
+      class="flex w-2/3 flex-col overflow-hidden bg-white dark:bg-neutral-900"
+    >
       {#if filteredItems[selectedIndex]}
         {@const selectedItem = filteredItems[selectedIndex]}
         <div class="flex h-full flex-col">
-           <!-- Preview Header -->
-           <div class="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/50 flex-shrink-0">
-              <div class="flex items-center gap-2">
-                 <span class="font-medium text-neutral-900 dark:text-neutral-100 text-sm">Preview</span>
-                 <span class="text-xs text-neutral-400">|</span>
-                 <span class="text-xs text-neutral-500">{selectedItem.item_type}</span>
-              </div>
-              <button 
-                class="rounded-md bg-blue-500 px-3 py-1 text-xs font-medium text-white hover:bg-blue-600 transition-colors shadow-sm"
-                onclick={() => handleItemSelect(selectedItem)}
+          <!-- Preview Header -->
+          <div
+            class="flex flex-shrink-0 items-center justify-between border-b border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-900/50"
+          >
+            <div class="flex items-center gap-2">
+              <span
+                class="text-sm font-medium text-neutral-900 dark:text-neutral-100"
+                >Preview</span
               >
-                Paste
-              </button>
-           </div>
-           
-           <!-- Fixed File Path Info (if applicable) -->
-           {#if selectedItem.item_type === "File"}
-              <div class="flex-shrink-0 border-b border-neutral-100 bg-neutral-50/50 p-2 px-4 text-xs dark:border-neutral-800 dark:bg-neutral-900/30">
-                 <div class="font-mono text-neutral-500 break-all select-text cursor-text">
-                    {selectedItem.text}
-                 </div>
-              </div>
-           {/if}
+              <span class="text-xs text-neutral-400">|</span>
+              <span class="text-xs text-neutral-500"
+                >{selectedItem.item_type}</span
+              >
+            </div>
+            <button
+              class="rounded-md bg-blue-500 px-3 py-1 text-xs font-medium text-white shadow-sm transition-colors hover:bg-blue-600"
+              onclick={() => handleItemSelect(selectedItem)}
+            >
+              Paste
+            </button>
+          </div>
 
-           <!-- Preview Content -->
-           <div class="flex-1 overflow-hidden relative">
-              <ScrollArea.Root class="h-full w-full" type="hover">
-                <ScrollArea.Viewport class="h-full w-full p-6">
-                    {#if selectedItem.item_type === "Image" && selectedItem.thumbnail}
-                    <div class="flex min-h-full items-center justify-center bg-[url('/checker-board.svg')] bg-repeat">
-                        <img
-                        src={selectedItem.thumbnail}
-                        class="max-w-full rounded shadow-lg border border-neutral-200 dark:border-neutral-700"
+          <!-- Fixed File Path Info (if applicable) -->
+          {#if selectedItem.item_type === "File"}
+            <div
+              class="flex-shrink-0 border-b border-neutral-100 bg-neutral-50/50 p-2 px-4 text-xs dark:border-neutral-800 dark:bg-neutral-900/30"
+            >
+              <div
+                class="cursor-text select-text break-all font-mono text-neutral-500"
+              >
+                {selectedItem.text}
+              </div>
+            </div>
+          {/if}
+
+          <!-- Preview Content -->
+          <div class="relative flex-1 overflow-hidden">
+            <ScrollArea.Root class="h-full w-full" type="hover">
+              <ScrollArea.Viewport class="h-full w-full p-6">
+                {#if selectedItem.item_type === "Image" && selectedItem.thumbnail}
+                  <div
+                    class="flex min-h-full items-center justify-center bg-[url('/checker-board.svg')] bg-repeat"
+                  >
+                    <img
+                      src={selectedItem.thumbnail}
+                      class="max-w-full rounded border border-neutral-200 shadow-lg dark:border-neutral-700"
+                      alt="Preview"
+                    />
+                  </div>
+                {:else if selectedItem.item_type === "File"}
+                  {#if isImageFile(selectedItem.text)}
+                    <div
+                      class="flex min-h-full items-center justify-center bg-[url('/checker-board.svg')] bg-repeat"
+                    >
+                      <img
+                        src={convertFileSrc(selectedItem.text)}
+                        class="max-h-[80vh] max-w-full rounded border border-neutral-200 shadow-lg dark:border-neutral-700"
                         alt="Preview"
-                        />
+                      />
                     </div>
-                    {:else if selectedItem.item_type === "File"}
-                    {#if isImageFile(selectedItem.text)}
-                        <div class="flex min-h-full items-center justify-center bg-[url('/checker-board.svg')] bg-repeat">
-                            <img
-                            src={convertFileSrc(selectedItem.text)}
-                            class="max-w-full rounded shadow-lg border border-neutral-200 dark:border-neutral-700 max-h-[80vh]"
-                            alt="Preview"
-                            />
-                        </div>
-                    {:else}
-                        <!-- For non-image files, we might want to show icon or details -->
-                        <div class="flex h-full items-center justify-center text-neutral-400 flex-col gap-2">
-                            <div class="i-lucide-file-text text-6xl opacity-20"></div>
-                            <span>File Preview</span>
-                        </div>
-                    {/if}
-                    {:else}
-                    <!-- Text Content -->
-                    <div class="font-mono text-sm text-neutral-800 dark:text-neutral-200 break-words whitespace-pre-wrap leading-relaxed select-text cursor-text">
-                        {selectedItem.text}
+                  {:else}
+                    <!-- For non-image files, we might want to show icon or details -->
+                    <div
+                      class="flex h-full flex-col items-center justify-center gap-2 text-neutral-400"
+                    >
+                      <div class="i-lucide-file-text text-6xl opacity-20"></div>
+                      <span>File Preview</span>
                     </div>
-                    {/if}
-                </ScrollArea.Viewport>
-                <ScrollArea.Scrollbar
-                    orientation="vertical"
-                    class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none select-none rounded-full border-l border-l-transparent p-px transition-all duration-200 hover:w-3"
-                >
-                    <ScrollArea.Thumb class="bg-muted-foreground flex-1 rounded-full" />
-                </ScrollArea.Scrollbar>
-                <ScrollArea.Corner />
-              </ScrollArea.Root>
-           </div>
-           
-           <!-- Footer Info -->
-           <div class="flex justify-between items-center border-t border-neutral-200 px-4 py-2 text-[10px] text-neutral-400 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/50">
-              <span class="font-mono">{selectedItem.id}</span>
-              <span>{selectedItem.text.length} chars</span>
-           </div>
+                  {/if}
+                {:else}
+                  <!-- Text Content -->
+                  <div
+                    class="cursor-text select-text whitespace-pre-wrap break-words font-mono text-sm leading-relaxed text-neutral-800 dark:text-neutral-200"
+                  >
+                    {selectedItem.text}
+                  </div>
+                {/if}
+              </ScrollArea.Viewport>
+              <ScrollArea.Scrollbar
+                orientation="vertical"
+                class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none select-none rounded-full border-l border-l-transparent p-px transition-all duration-200 hover:w-3"
+              >
+                <ScrollArea.Thumb
+                  class="bg-muted-foreground flex-1 rounded-full"
+                />
+              </ScrollArea.Scrollbar>
+              <ScrollArea.Corner />
+            </ScrollArea.Root>
+          </div>
+
+          <!-- Footer Info -->
+          <div
+            class="flex items-center justify-between border-t border-neutral-200 bg-neutral-50 px-4 py-2 text-[10px] text-neutral-400 dark:border-neutral-800 dark:bg-neutral-900/50"
+          >
+            <span class="font-mono">{selectedItem.id}</span>
+            <span>{selectedItem.text.length} chars</span>
+          </div>
         </div>
       {:else}
-        <div class="flex h-full items-center justify-center text-neutral-400 flex-col gap-2">
-           <div class="i-lucide-clipboard text-4xl opacity-20"></div>
-           <span>Select an item to view details</span>
+        <div
+          class="flex h-full flex-col items-center justify-center gap-2 text-neutral-400"
+        >
+          <div class="i-lucide-clipboard text-4xl opacity-20"></div>
+          <span>Select an item to view details</span>
         </div>
       {/if}
     </div>
