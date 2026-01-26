@@ -1,6 +1,11 @@
-use clipboard_rs::{Clipboard, ClipboardContext};
+use base64::{engine::general_purpose, Engine as _};
+use clipboard_rs::{common::RustImage, Clipboard, ClipboardContext};
+use image::{DynamicImage, ImageBuffer, ImageFormat, Rgba};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
+use std::env;
+use std::fs;
+use std::io::Cursor;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -83,39 +88,64 @@ pub fn init(app: &AppHandle) {
                     }
                 }
                 _ => {
-                    // Check for Image presence
-                    // get_image() returns Ok(_) if image exists
+                    // Strategy: Use clipboard-rs high-level get_image() and save to temp file
+                    // This avoids dealing with specific format names "PNG" vs "CF_DIB" and internal struct APIs.
+
                     match ctx.get_image() {
-                        Ok(_) => {
-                            // For now, we just mark it as Image without thumbnail to avoid compilation issues
-                            // We'll use a placeholder text
-                            let placeholder = "Image copied".to_string();
-                            let bytes_hash = format!("IMG:DETECTED:{:?}", SystemTime::now());
+                        Ok(img) => {
+                            // writeln!(file, "get_image() success. Saving to temp...").unwrap();
 
-                            // Problem: without content hash, we might duplicate or miss updates.
-                            // But get_image() might return checkable metadata?
-                            // Assuming for v1 we just accept it if it's new.
-                            // To properly dedup, we'd need to read bytes.
-                            // Let's rely on change being detected if we poll frequently or if 'text' is empty.
+                            // Create a temp file path
+                            let mut temp_path = env::temp_dir();
+                            temp_path.push(format!("clipboard_temp_{}.png", uuid::Uuid::new_v4()));
+                            let temp_path_str = temp_path.to_string_lossy().to_string();
 
-                            // Actually, if I can't read bytes, I can't dedup easily against previous image.
-                            // But if last was TEXT, and now is IMG, we switch.
-                            if !last_content_hash.starts_with("IMG:") {
-                                current_hash = bytes_hash;
-                                new_item = Some(ClipboardItem {
-                                    id: uuid::Uuid::new_v4().to_string(),
-                                    text: placeholder,
-                                    timestamp: now_ts(),
-                                    item_type: "Image".to_string(),
-                                    thumbnail: None,
-                                });
-                            } else {
-                                // Existing image. We assume no change for now as we can't diff.
-                                // Ideally we would retry byte reading later.
-                                current_hash = last_content_hash.clone();
+                            // rust-clippy might complain about to_string_lossy, but it's safe here.
+                            match img.save_to_path(&temp_path_str) {
+                                Ok(_) => {
+                                    // writeln!(file, "save_to_path success: {}", temp_path_str).unwrap();
+
+                                    // Read back
+                                    match fs::read(&temp_path) {
+                                        Ok(bytes) => {
+                                            // writeln!(file, "Read {} bytes", bytes.len()).unwrap();
+
+                                            let base64_img =
+                                                general_purpose::STANDARD.encode(&bytes);
+                                            let thumbnail =
+                                                format!("data:image/png;base64,{}", base64_img);
+                                            let bytes_hash = format!("IMG:{}", thumbnail);
+
+                                            if !last_content_hash.starts_with("IMG:")
+                                                || bytes_hash != last_content_hash
+                                            {
+                                                current_hash = bytes_hash.clone();
+                                                new_item = Some(ClipboardItem {
+                                                    id: uuid::Uuid::new_v4().to_string(),
+                                                    text: "Image copied".to_string(),
+                                                    timestamp: now_ts(),
+                                                    item_type: "Image".to_string(),
+                                                    thumbnail: Some(thumbnail),
+                                                });
+                                            } else {
+                                                current_hash = last_content_hash.clone();
+                                            }
+                                        }
+                                        Err(e) => {
+                                            eprintln!("Failed to read temp file: {}", e);
+                                        }
+                                    }
+                                    // Cleanup
+                                    let _ = fs::remove_file(temp_path);
+                                }
+                                Err(e) => {
+                                    eprintln!("Failed to save clipboard image to temp file: {}", e);
+                                }
                             }
                         }
-                        Err(_) => {
+                        Err(e) => {
+                            // writeln!(file, "get_image() failed: {}", e).unwrap();
+                            // Fallback to check_text
                             check_text(&ctx, &mut current_hash, &mut new_item, &last_content_hash);
                         }
                     }

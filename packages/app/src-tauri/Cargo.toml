@@ -82,7 +82,7 @@ objc2-foundation = { version = "0.3", features = ["NSString", "NSData", "NSObjec
 objc2-app-kit = { version = "0.3", features = ["NSWorkspace", "NSImage", "NSBitmapImageRep", "NSGraphicsContext", "NSOpenPanel", "NSSavePanel", "NSWindow", "NSResponder", "NSApplication", "NSRunningApplication"] }
 
 [target.'cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))'.dependencies]
-clipboard-rs = "0.2"
+clipboard-rs = "0.3"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2"
