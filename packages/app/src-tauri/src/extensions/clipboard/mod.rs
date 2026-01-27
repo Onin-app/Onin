@@ -1,5 +1,7 @@
 pub mod commands;
 pub mod monitor;
+pub mod storage;
+pub mod types;
 
 pub use monitor::init;
 

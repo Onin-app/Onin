@@ -1,3 +1,5 @@
+use crate::extensions::clipboard::storage;
+use crate::extensions::clipboard::types::ClipboardItem;
 use base64::{engine::general_purpose, Engine as _};
 use clipboard_rs::{
     common::RustImage, Clipboard, ClipboardContext, ClipboardHandler, ClipboardWatcher,
@@ -16,28 +18,20 @@ use tauri::{AppHandle, Emitter, Manager};
 
 const MAX_HISTORY_SIZE: usize = 50;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ClipboardItem {
-    pub id: String,
-    pub text: String,
-    pub timestamp: u64,
-    pub item_type: String,
-    pub thumbnail: Option<String>,
-}
-
 #[derive(Clone)]
 pub struct ClipboardHistory {
     items: Arc<Mutex<VecDeque<ClipboardItem>>>,
 }
 
 impl ClipboardHistory {
-    pub fn new() -> Self {
+    pub fn new(app: &AppHandle) -> Self {
+        let items = storage::load_history(app);
         Self {
-            items: Arc::new(Mutex::new(VecDeque::new())),
+            items: Arc::new(Mutex::new(items)),
         }
     }
 
-    pub fn push(&self, item: ClipboardItem) {
+    pub fn push(&self, app: &AppHandle, item: ClipboardItem) {
         let mut items = self.items.lock().unwrap();
 
         if let Some(front) = items.front() {
@@ -54,6 +48,9 @@ impl ClipboardHistory {
         if items.len() > MAX_HISTORY_SIZE {
             items.pop_back();
         }
+
+        // Persist change
+        storage::save_history(app, &items);
     }
 
     pub fn get_all(&self) -> Vec<ClipboardItem> {
@@ -103,6 +100,7 @@ impl ClipboardMonitor {
                                 timestamp: now_ts(),
                                 item_type: "Image".to_string(),
                                 thumbnail: Some(thumbnail),
+                                image_path: None,
                             });
                         } else {
                             *current_hash = self.last_content_hash.clone();
@@ -138,6 +136,7 @@ impl ClipboardHandler for ClipboardMonitor {
                         timestamp: now_ts(),
                         item_type: "File".to_string(),
                         thumbnail: None,
+                        image_path: None,
                     });
                 }
             }
@@ -167,6 +166,7 @@ impl ClipboardHandler for ClipboardMonitor {
                             timestamp: now_ts(),
                             item_type: "Text".to_string(),
                             thumbnail: None,
+                            image_path: None,
                         });
                     }
                 }
@@ -176,7 +176,7 @@ impl ClipboardHandler for ClipboardMonitor {
         if !current_hash.is_empty() {
             if let Some(item) = new_item {
                 self.last_content_hash = current_hash;
-                self.history.push(item);
+                self.history.push(&self.app_handle, item);
                 let _ = self.app_handle.emit("clipboard-update", ());
             } else if current_hash != self.last_content_hash {
                 self.last_content_hash = current_hash;
@@ -186,7 +186,7 @@ impl ClipboardHandler for ClipboardMonitor {
 }
 
 pub fn init(app: &AppHandle) {
-    let history = ClipboardHistory::new();
+    let history = ClipboardHistory::new(app);
     app.manage(history.clone());
 
     let app_for_thread = app.clone();

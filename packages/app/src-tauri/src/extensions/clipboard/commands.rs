@@ -1,4 +1,5 @@
-use crate::extensions::clipboard::monitor::{ClipboardHistory, ClipboardItem};
+use crate::extensions::clipboard::monitor::ClipboardHistory;
+use crate::extensions::clipboard::types::ClipboardItem;
 use base64::{engine::general_purpose, Engine as _};
 use clipboard_rs::{common::RustImage, Clipboard, ClipboardContext};
 use image::load_from_memory;
