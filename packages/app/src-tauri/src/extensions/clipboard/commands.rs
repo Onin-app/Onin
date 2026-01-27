@@ -3,7 +3,7 @@ use crate::extensions::clipboard::types::ClipboardItem;
 use base64::{engine::general_purpose, Engine as _};
 use clipboard_rs::{common::RustImage, Clipboard, ClipboardContext};
 use image::load_from_memory;
-use tauri::{command, State};
+use tauri::{command, Emitter, State};
 
 #[command]
 pub fn get_clipboard_history(state: State<'_, ClipboardHistory>) -> Vec<ClipboardItem> {
@@ -11,7 +11,20 @@ pub fn get_clipboard_history(state: State<'_, ClipboardHistory>) -> Vec<Clipboar
 }
 
 #[command]
-pub fn set_clipboard_item(item: ClipboardItem) -> Result<(), String> {
+pub fn set_clipboard_item(
+    app: tauri::AppHandle,
+    item: ClipboardItem,
+    state: State<'_, ClipboardHistory>,
+) -> Result<(), String> {
+    // 先将记录移到最前面
+    state.move_to_front(&app, &item.id);
+
+    // 设置跳过标志,避免监听器将此次操作记录为新项
+    state.set_skip_next();
+
+    // 触发更新事件,通知前端刷新列表
+    let _ = app.emit("clipboard-update", ());
+
     let ctx = ClipboardContext::new().map_err(|e| e.to_string())?;
 
     match item.item_type.as_str() {

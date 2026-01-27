@@ -21,6 +21,7 @@ const MAX_HISTORY_SIZE: usize = 50;
 #[derive(Clone)]
 pub struct ClipboardHistory {
     items: Arc<Mutex<VecDeque<ClipboardItem>>>,
+    skip_next: Arc<Mutex<bool>>,
 }
 
 impl ClipboardHistory {
@@ -28,6 +29,7 @@ impl ClipboardHistory {
         let items = storage::load_history(app);
         Self {
             items: Arc::new(Mutex::new(items)),
+            skip_next: Arc::new(Mutex::new(false)),
         }
     }
 
@@ -56,6 +58,40 @@ impl ClipboardHistory {
     pub fn get_all(&self) -> Vec<ClipboardItem> {
         let items = self.items.lock().unwrap();
         items.iter().cloned().collect()
+    }
+
+    /// 将指定的项目移到最前面(如果存在)
+    pub fn move_to_front(&self, app: &AppHandle, item_id: &str) -> bool {
+        let mut items = self.items.lock().unwrap();
+
+        // 查找项目的索引
+        if let Some(index) = items.iter().position(|item| item.id == item_id) {
+            // 移除该项目
+            if let Some(item) = items.remove(index) {
+                // 将其添加到最前面
+                items.push_front(item);
+                // 持久化
+                storage::save_history(app, &items);
+                return true;
+            }
+        }
+        false
+    }
+
+    /// 设置跳过下一次剪贴板监听
+    pub fn set_skip_next(&self) {
+        let mut skip = self.skip_next.lock().unwrap();
+        *skip = true;
+    }
+
+    /// 检查并重置跳过标志
+    pub fn should_skip(&self) -> bool {
+        let mut skip = self.skip_next.lock().unwrap();
+        let should_skip = *skip;
+        if should_skip {
+            *skip = false;
+        }
+        should_skip
     }
 }
 
@@ -119,6 +155,11 @@ impl ClipboardMonitor {
 
 impl ClipboardHandler for ClipboardMonitor {
     fn on_clipboard_change(&mut self) {
+        // 检查是否应该跳过这次监听
+        if self.history.should_skip() {
+            return;
+        }
+
         let mut new_item: Option<ClipboardItem> = None;
         let mut current_hash = String::new();
 
