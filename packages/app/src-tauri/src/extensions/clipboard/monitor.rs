@@ -60,6 +60,11 @@ impl ClipboardHistory {
         items.iter().cloned().collect()
     }
 
+    pub fn get(&self, id: &str) -> Option<ClipboardItem> {
+        let items = self.items.lock().unwrap();
+        items.iter().find(|item| item.id == id).cloned()
+    }
+
     /// 将指定的项目移到最前面(如果存在)
     pub fn move_to_front(&self, app: &AppHandle, item_id: &str) -> bool {
         let mut items = self.items.lock().unwrap();

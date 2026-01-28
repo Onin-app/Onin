@@ -78,22 +78,30 @@
   };
 
   const handleItemSelect = async (item: ClipboardItem) => {
-    try {
-      // 1. Set to clipboard
-      await invoke("set_clipboard_item", { item });
-      console.log("[Clipboard] Copied item:", item.id);
+    const startTime = performance.now();
+    console.log(`[Clipboard Timing] START - Selecting item: ${item.id}`);
 
-      // 2. Hide window
+    try {
+      // 1. Paste (Background: set clipboard + simulate paste)
+      // The backend command spawns a thread and returns immediately, so this await is fast.
+      // Optimization: Send ID only to avoid large Base64 transfer.
+      await invoke("paste_clipboard_item", { itemId: item.id });
+
+      const t1 = performance.now();
+      console.log(
+        `[Clipboard Timing] paste_clipboard_item (sent): ${(t1 - startTime).toFixed(2)}ms`,
+      );
+
+      // 2. Hide window immediately
       invoke("close_main_window");
 
-      // 3. Simulate paste
-      setTimeout(async () => {
-        try {
-          await invoke("simulate_paste");
-        } catch (e) {
-          console.error("Failed to paste:", e);
-        }
-      }, 100);
+      const t2 = performance.now();
+      console.log(
+        `[Clipboard Timing] close_main_window (fired): ${(t2 - t1).toFixed(2)}ms`,
+      );
+      console.log(
+        `[Clipboard Timing] TOTAL FRONTEND LATENCY: ${(t2 - startTime).toFixed(2)}ms`,
+      );
     } catch (e) {
       console.error("Failed to select item:", e);
     }

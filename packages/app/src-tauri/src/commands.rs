@@ -140,6 +140,7 @@ pub fn get_invoke_handler(
         // Clipboard Extension
         crate::extensions::clipboard::commands::get_clipboard_history,
         crate::extensions::clipboard::commands::set_clipboard_item,
+        crate::extensions::clipboard::commands::paste_clipboard_item,
     ]
 }
 
