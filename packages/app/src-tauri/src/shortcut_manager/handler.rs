@@ -18,13 +18,28 @@ pub fn handle_global_shortcut(
     let shortcut_str = shortcut.to_string();
     let triggered_shortcut = normalize_shortcut_string(&shortcut_str);
 
+    // Debounce check
+    let state: State<ShortcutState> = app.state();
+    if let Ok(mut last_executed) = state.last_executed.lock() {
+        if let Some(last_time) = last_executed.get(&triggered_shortcut) {
+            if last_time.elapsed().as_millis() < 400 {
+                println!(
+                    "Debouncing shortcut: {} (elapsed: {}ms)",
+                    triggered_shortcut,
+                    last_time.elapsed().as_millis()
+                );
+                return;
+            }
+        }
+        last_executed.insert(triggered_shortcut.clone(), std::time::Instant::now());
+    }
+
     println!(
         "Handling shortcut: {} (normalized: {})",
         shortcut_str, triggered_shortcut
     );
 
     // 获取状态
-    let state: State<ShortcutState> = app.state();
     let shortcuts = match state.shortcuts.lock() {
         Ok(shortcuts) => shortcuts,
         Err(e) => {
@@ -67,13 +82,17 @@ fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::
                     // macOS: 在显示窗口前记录当前应用
                     #[cfg(target_os = "macos")]
                     {
-                        if let Some(bundle_id) = crate::system_commands::get_frontmost_app_bundle_id() {
-                            if let Some(state) = app.try_state::<crate::system_commands::MacOSPreviousApp>() {
+                        if let Some(bundle_id) =
+                            crate::system_commands::get_frontmost_app_bundle_id()
+                        {
+                            if let Some(state) =
+                                app.try_state::<crate::system_commands::MacOSPreviousApp>()
+                            {
                                 *state.0.lock().unwrap() = Some(bundle_id);
                             }
                         }
                     }
-                    
+
                     let _ = window.show();
                     let _ = window.set_focus();
                     let _ = window.emit("window_visibility", &true);
