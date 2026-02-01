@@ -76,7 +76,7 @@ pub fn run() {
         Shortcut::from_str(window_manager::CLOSE_WINDOW_SHORTCUT_STR).unwrap();
 
     // 构建并运行 Tauri 应用
-    state::setup_managed_state(tauri::Builder::default())
+    let app = state::setup_managed_state(tauri::Builder::default())
         // 插件
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -99,6 +99,19 @@ pub fn run() {
         .invoke_handler(commands::get_invoke_handler())
         // 初始化
         .setup(setup::on_app_setup)
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    app.run(|app_handle, event| {
+        #[cfg(target_os = "macos")]
+        match event {
+            tauri::RunEvent::Reopen { .. } => {
+                window_manager::show_main_window(app_handle);
+            }
+            tauri::RunEvent::Resumed => {
+                window_manager::show_main_window(app_handle);
+            }
+            _ => {}
+        }
+    });
 }
