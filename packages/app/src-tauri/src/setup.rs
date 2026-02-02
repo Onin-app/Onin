@@ -170,5 +170,13 @@ fn setup_desktop_features(app: &mut App) -> Result<(), Box<dyn std::error::Error
         eprintln!("[ERROR] Failed to set up window events: {}", e);
     }
 
+    #[cfg(target_os = "macos")]
+    if let Err(e) = app.handle().set_activation_policy(tauri::ActivationPolicy::Regular) {
+        eprintln!("[ERROR] Failed to set activation policy: {}", e);
+    }
+
+    #[cfg(target_os = "macos")]
+    window_manager::setup_activation_observer(&app.handle());
+
     Ok(())
 }

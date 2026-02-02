@@ -56,6 +56,19 @@ pub fn close_main_window(app: tauri::AppHandle, state: State<WindowState>) {
     }
 }
 
+pub fn show_main_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let app_handle_clone = app.clone();
+        tauri::async_runtime::spawn(async move {
+            cancel_hide_task(&app_handle_clone).await;
+        });
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+        let _ = window.emit("window_visibility", &true);
+    }
+}
+
 // ============================================================================
 // 辅助函数
 // ============================================================================
@@ -262,4 +275,65 @@ pub fn setup_window_events(app: &App) -> Result<(), Box<dyn std::error::Error>> 
     });
 
     Ok(())
+}
+
+#[cfg(target_os = "macos")]
+pub fn setup_activation_observer(app: &AppHandle) {
+    macos_activation::setup(app);
+}
+
+#[cfg(target_os = "macos")]
+mod macos_activation {
+    use super::show_main_window;
+    use objc2::rc::Retained;
+    use objc2::{define_class, msg_send, sel, ClassType};
+    use objc2_app_kit::{
+        NSApplicationDidBecomeActiveNotification, NSApplicationDidUnhideNotification,
+    };
+    use objc2_foundation::{NSNotification, NSNotificationCenter};
+    use once_cell::sync::{Lazy, OnceCell};
+    use std::sync::Mutex;
+    use tauri::AppHandle;
+
+    define_class!(
+        #[unsafe(super(objc2::runtime::NSObject))]
+        struct ActivationObserver;
+
+        impl ActivationObserver {
+            #[unsafe(method(handleDidBecomeActive:))]
+            fn handle_did_become_active(&self, _notification: &NSNotification) {
+                if let Some(app) = APP_HANDLE.get() {
+                    show_main_window(app);
+                }
+            }
+        }
+    );
+
+    static APP_HANDLE: OnceCell<AppHandle> = OnceCell::new();
+    static OBSERVER: Lazy<Mutex<Option<Retained<ActivationObserver>>>> =
+        Lazy::new(|| Mutex::new(None));
+
+    pub fn setup(app: &AppHandle) {
+        let _ = APP_HANDLE.set(app.clone());
+        let observer: Retained<ActivationObserver> =
+            unsafe { msg_send![ActivationObserver::class(), new] };
+        let center = NSNotificationCenter::defaultCenter();
+        unsafe {
+            center.addObserver_selector_name_object(
+                &observer,
+                sel!(handleDidBecomeActive:),
+                Some(&NSApplicationDidBecomeActiveNotification),
+                None,
+            );
+            center.addObserver_selector_name_object(
+                &observer,
+                sel!(handleDidBecomeActive:),
+                Some(&NSApplicationDidUnhideNotification),
+                None,
+            );
+        }
+        if let Ok(mut guard) = OBSERVER.lock() {
+            *guard = Some(observer);
+        }
+    }
 }
