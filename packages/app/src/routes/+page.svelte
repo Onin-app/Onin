@@ -41,6 +41,7 @@
   import RefreshProgressBar from "$lib/components/RefreshProgressBar.svelte";
   import PluginIframe from "$lib/components/PluginIframe.svelte";
   import ExtensionResultItem from "$lib/components/ExtensionResultItem.svelte";
+  import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
 
   import "../index.css";
 
@@ -60,6 +61,12 @@
   // Component references
   let searchInputRef: SearchInput;
   let pluginIframeRef = $state<PluginIframe | null>(null);
+
+  // Confirm dialog state
+  let confirmDialogOpen = $state(false);
+  let confirmDialogTitle = $state("");
+  let confirmDialogDescription = $state("");
+  let pendingAction = $state<(() => void) | null>(null);
 
   // AutoAnimate action
   const animate: Action<HTMLElement> = (node) => {
@@ -215,6 +222,21 @@
   };
 
   const handleOpenApp = async (app: LaunchableItem) => {
+    // 检查是否需要确认
+    if (app.requires_confirmation) {
+      confirmDialogTitle = `确认${app.name}`;
+      confirmDialogDescription = `确定要${app.name}吗?此操作无法撤销。`;
+      pendingAction = () => executeApp(app);
+      confirmDialogOpen = true;
+      return;
+    }
+
+    // 不需要确认,直接执行
+    await executeApp(app);
+  };
+
+  // 实际执行应用/命令的函数
+  const executeApp = async (app: LaunchableItem) => {
     // 1. 优先处理 Extension 命令
     if (app.source === "Extension") {
       const extensionInfo = parseExtensionAction(app.action);
@@ -545,3 +567,20 @@
     </div>
   </div>
 </main>
+
+<!-- 确认对话框 -->
+<ConfirmDialog
+  bind:open={confirmDialogOpen}
+  title={confirmDialogTitle}
+  description={confirmDialogDescription}
+  onConfirm={() => {
+    if (pendingAction) {
+      pendingAction();
+      pendingAction = null;
+    }
+  }}
+  onCancel={() => {
+    pendingAction = null;
+  }}
+/>
+

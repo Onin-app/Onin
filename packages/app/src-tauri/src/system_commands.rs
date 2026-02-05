@@ -16,6 +16,7 @@ pub struct SystemCommandInfo {
     pub keywords: &'static [&'static str],
     pub icon: &'static str,
     pub action: fn(AppHandle),
+    pub requires_confirmation: bool,
 }
 
 /// 所有系统命令列表
@@ -28,6 +29,7 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
         keywords: &["shutdown", "关机"],
         icon: "shutdown",
         action: |_| shutdown(),
+        requires_confirmation: true,
     },
     SystemCommandInfo {
         name: "reboot",
@@ -37,6 +39,7 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
         keywords: &["restart", "reboot", "重启"],
         icon: "restart",
         action: |_| reboot(),
+        requires_confirmation: true,
     },
     SystemCommandInfo {
         name: "sleep",
@@ -46,6 +49,7 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
         keywords: &["sleep", "睡眠"],
         icon: "sleep",
         action: |_| sleep(),
+        requires_confirmation: false,
     },
     SystemCommandInfo {
         name: "lock_screen",
@@ -55,6 +59,7 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
         keywords: &["lock", "锁屏"],
         icon: "lock",
         action: |_| lock_screen(),
+        requires_confirmation: false,
     },
     SystemCommandInfo {
         name: "logout",
@@ -64,6 +69,7 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
         keywords: &["logout", "注销"],
         icon: "logout",
         action: |_| logout(),
+        requires_confirmation: true,
     },
     SystemCommandInfo {
         name: "open_app_data_dir",
@@ -73,6 +79,7 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
         keywords: &["数据目录"],
         icon: "folder",
         action: open_app_data_dir,
+        requires_confirmation: false,
     },
     SystemCommandInfo {
         name: "refresh_list",
@@ -82,6 +89,7 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
         keywords: &["refresh", "刷新"],
         icon: "arrowsClockwise",
         action: refresh_list,
+        requires_confirmation: false,
     },
 ];
 

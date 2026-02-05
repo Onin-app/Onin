@@ -72,6 +72,9 @@ pub struct LaunchableItem {
     /// Match conditions for paste content
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub matches: Option<Vec<CommandMatch>>,
+    /// 是否需要二次确认(用于敏感操作如关机、重启等)
+    #[serde(default)]
+    pub requires_confirmation: bool,
 }
 
 /// 命令匹配配置
@@ -139,6 +142,9 @@ pub struct Command {
     pub origin: Option<AppOrigin>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub matches: Option<Vec<CommandMatch>>,
+    /// 是否需要二次确认(用于敏感操作如关机、重启等)
+    #[serde(default)]
+    pub requires_confirmation: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]

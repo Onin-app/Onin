@@ -173,6 +173,7 @@ impl FileCommandManager {
             origin: None,
             source_display: None,
             matches: None,
+            requires_confirmation: false,
         })
     }
     fn delete_commands_json(&self) {
