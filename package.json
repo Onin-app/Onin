@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Onin monorepo - App, SDK and Demo",
+  "license": "GPL-3.0",
   "type": "module",
   "scripts": {
     "dev": "pnpm --filter app tauri:dev",

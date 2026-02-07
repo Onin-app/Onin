@@ -2,6 +2,7 @@
   "name": "sdk",
   "private": false,
   "version": "0.0.2",
+  "license": "GPL-3.0",
   "publishConfig": {
     "name": "onin-sdk"
   },
