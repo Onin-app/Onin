@@ -139,7 +139,9 @@
   --animate-exit-to-left: exit-to-left 0.2s ease;
   --animate-exit-to-right: exit-to-right 0.2s ease;
 
-  --font-sans: "Inter", "sans-serif";
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC",
+    "Noto Sans", "Helvetica Neue", Arial, sans-serif;
   --font-mono: "Source Code Pro", "monospace";
   --font-alt: "Courier", "sans-serif";
   --font-display: "Cal Sans", "sans-serif";
@@ -305,6 +307,7 @@
     @apply text-foreground;
     /* 透明窗口支持 - body 背景透明，让 main 容器自己处理背景 */
     background: transparent;
+    font-family: var(--font-sans);
     font-feature-settings:
       "rlig" 1,
       "calt" 1;

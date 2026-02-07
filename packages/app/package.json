@@ -16,7 +16,7 @@
     "format": "prettier --write \"src/**/*.svelte\"",
     "release": "semantic-release"
   },
-  "license": "MIT",
+  "license": "GPL-3.0",
   "dependencies": {
     "@formkit/auto-animate": "^0.9.0",
     "@tailwindcss/vite": "^4.1.10",

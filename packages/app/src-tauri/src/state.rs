@@ -47,5 +47,6 @@ pub fn setup_managed_state(builder: tauri::Builder<tauri::Wry>) -> tauri::Builde
         // 快捷键管理状态
         .manage(shortcut_manager::ShortcutState {
             shortcuts: Mutex::new(vec![]),
+            last_executed: Mutex::new(std::collections::HashMap::new()),
         })
 }

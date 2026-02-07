@@ -6,13 +6,13 @@ use tauri::{AppHandle, Manager};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SortMode {
     #[serde(rename = "smart")]
-    Smart,      // 智能排序：综合频率和最近使用
+    Smart, // 智能排序：综合频率和最近使用
     #[serde(rename = "frequency")]
-    Frequency,  // 纯频率排序
+    Frequency, // 纯频率排序
     #[serde(rename = "recent")]
-    Recent,     // 最近使用排序
+    Recent, // 最近使用排序
     #[serde(rename = "default")]
-    Default,    // 默认排序（不使用频率）
+    Default, // 默认排序（不使用频率）
 }
 
 impl Default for SortMode {
@@ -26,7 +26,7 @@ pub struct AppConfig {
     /// 自动粘贴时间限制（秒），0 表示不限制
     #[serde(default = "default_auto_paste_time_limit")]
     pub auto_paste_time_limit: u64,
-    
+
     /// 自动清空剪贴板时间限制（秒），0 表示不自动清空
     #[serde(default = "default_auto_clear_time_limit")]
     pub auto_clear_time_limit: u64,
@@ -40,7 +40,7 @@ pub struct AppConfig {
     pub enable_usage_tracking: bool,
 
     /// 插件市场 API 地址（可选）
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default = "default_marketplace_api_url")]
     pub marketplace_api_url: Option<String>,
 }
 
@@ -56,6 +56,10 @@ fn default_enable_usage_tracking() -> bool {
     true // 默认启用
 }
 
+fn default_marketplace_api_url() -> Option<String> {
+    Some("https://onin.baiyapeng.cc".to_string())
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
@@ -63,7 +67,7 @@ impl Default for AppConfig {
             auto_clear_time_limit: default_auto_clear_time_limit(),
             sort_mode: SortMode::default(),
             enable_usage_tracking: default_enable_usage_tracking(),
-            marketplace_api_url: None,
+            marketplace_api_url: default_marketplace_api_url(),
         }
     }
 }
@@ -88,8 +92,8 @@ pub fn load_config(app: &AppHandle) -> Result<AppConfig, String> {
     let content = std::fs::read_to_string(&config_path)
         .map_err(|e| format!("Failed to read config file: {}", e))?;
 
-    let config: AppConfig = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse config: {}", e))?;
+    let config: AppConfig =
+        serde_json::from_str(&content).map_err(|e| format!("Failed to parse config: {}", e))?;
 
     Ok(config)
 }
@@ -108,7 +112,10 @@ pub fn save_config(app: &AppHandle, config: &AppConfig) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn get_app_config(_app: AppHandle, state: tauri::State<'_, AppConfigState>) -> Result<AppConfig, String> {
+pub fn get_app_config(
+    _app: AppHandle,
+    state: tauri::State<'_, AppConfigState>,
+) -> Result<AppConfig, String> {
     let config = state.0.lock().map_err(|e| e.to_string())?;
     Ok(config.clone())
 }

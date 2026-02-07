@@ -39,6 +39,7 @@ pub fn get_initial_extension_commands() -> Vec<Command> {
                     },
                     origin: None,
                     matches: None,
+                    requires_confirmation: false,
                 }
             })
         })

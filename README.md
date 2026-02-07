@@ -13,6 +13,10 @@
   </p>
 </div>
 
+<div align="center">
+  <img src="image.png" alt="Onin Screenshot" width="800" />
+</div>
+
 <br/>
 
 ## Introduction
@@ -20,6 +24,23 @@
 **Onin** is a modern productivity tool designed to keep your hands on the keyboard. Inspired by tools like Raycast and uTools, Onin provides a blazing fast, extensible interface to launch apps, search files, and run commands. Built with **Tauri** and **SvelteKit**, it combines the performance of Rust with the flexibility of modern web technologies.
 
 Onin is more than just a launcher; it's a platform. With a powerful **Plugin SDK**, developers can extend its capabilities to fit any workflow.
+
+## 📥 Download
+
+[**Download the latest version from GitHub Releases**](https://github.com/b-yp/Onin/releases)
+
+### ⚠️ Note for macOS Users
+
+If you encounter the **"Onin is damaged and can't be opened"** error when launching the app:
+
+<img src="damage.png" width="400" alt="Damaged Error" />
+
+This is a common issue with apps not signed by Apple. To fix it, run the following command in your terminal:
+
+```bash
+xattr -cr /Applications/Onin.app
+```
+*(Make sure to move the app to your `Applications` folder first, or adjust the path provided in the command)*
 
 ### ✨ Key Features
 

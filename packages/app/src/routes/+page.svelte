@@ -19,6 +19,7 @@
   import { listen } from "@tauri-apps/api/event";
   import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
   import { goto } from "$app/navigation";
+  import { page } from "$app/state";
 
   // Stores
   import { Theme, type LaunchableItem } from "$lib/type";
@@ -40,6 +41,7 @@
   import RefreshProgressBar from "$lib/components/RefreshProgressBar.svelte";
   import PluginIframe from "$lib/components/PluginIframe.svelte";
   import ExtensionResultItem from "$lib/components/ExtensionResultItem.svelte";
+  import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
 
   import "../index.css";
 
@@ -59,6 +61,12 @@
   // Component references
   let searchInputRef: SearchInput;
   let pluginIframeRef = $state<PluginIframe | null>(null);
+
+  // Confirm dialog state
+  let confirmDialogOpen = $state(false);
+  let confirmDialogTitle = $state("");
+  let confirmDialogDescription = $state("");
+  let pendingAction = $state<(() => void) | null>(null);
 
   // AutoAnimate action
   const animate: Action<HTMLElement> = (node) => {
@@ -113,6 +121,9 @@
 
   // ===== Event Handlers =====
   const handleEsc = () => {
+    // Only handle ESC on main page
+    if (page.route.id !== "/") return;
+
     if (plugin.state.showPluginInline) {
       plugin.closePlugin();
       return;
@@ -194,21 +205,38 @@
   };
 
   // 解析 Extension Action
-  const parseExtensionAction = (action: string | undefined): { extensionId: string, commandCode: string } | null => {
+  const parseExtensionAction = (
+    action: string | undefined,
+  ): { extensionId: string; commandCode: string } | null => {
     if (!action || !action.startsWith("extension:")) return null;
-    
+
     const parts = action.split(":");
     // 格式: extension:id:code
     if (parts.length >= 3) {
       return {
         extensionId: parts[1],
-        commandCode: parts[2]
+        commandCode: parts[2],
       };
     }
     return null;
   };
 
   const handleOpenApp = async (app: LaunchableItem) => {
+    // 检查是否需要确认
+    if (app.requires_confirmation) {
+      confirmDialogTitle = `确认${app.name}`;
+      confirmDialogDescription = `确定要${app.name}吗?此操作无法撤销。`;
+      pendingAction = () => executeApp(app);
+      confirmDialogOpen = true;
+      return;
+    }
+
+    // 不需要确认,直接执行
+    await executeApp(app);
+  };
+
+  // 实际执行应用/命令的函数
+  const executeApp = async (app: LaunchableItem) => {
     // 1. 优先处理 Extension 命令
     if (app.source === "Extension") {
       const extensionInfo = parseExtensionAction(app.action);
@@ -222,6 +250,16 @@
           extensionManager.clearPreview();
           matchedCommands = [];
           goto("/extensions/emoji");
+          return;
+        }
+        // Clipboard Extension
+        if (extensionId === "clipboard") {
+          inputValue = "";
+          clipboard.clearAttachments();
+          extensionPreviewItem = null;
+          extensionManager.clearPreview();
+          matchedCommands = [];
+          goto("/extensions/clipboard");
           return;
         }
         // 其他 Extension 可以在这里扩展...
@@ -298,7 +336,7 @@
     const parts = app.path.split(":");
     if (parts.length >= 2) {
       const extensionId = parts[1];
-      
+
       // 检查是否是 grid 类型的 extension（如 emoji）
       const preview = extensionManager.state.currentPreview;
       if (preview?.view_type === "grid" && extensionId === "emoji") {
@@ -311,7 +349,7 @@
         goto("/extensions/emoji");
         return;
       }
-      
+
       // 使用有效文本（粘贴文本或输入框值）
       const effectiveText = clipboard.state.attachedText || inputValue;
       const result = await extensionManager.execute(extensionId, effectiveText);
@@ -336,8 +374,6 @@
     appListManager.resetToOriginList();
     invoke("close_main_window");
   };
-
-
 
   const handleKeyDown = (e: KeyboardEvent) => {
     appListManager.handleKeyDown(e, displayList, handleOpenApp);
@@ -438,11 +474,7 @@
     <!-- Header: Logo + Search Input + Plugin Menu -->
     <div class="flex items-center gap-2 pb-2">
       <button class="flex-shrink-0 cursor-pointer" onclick={handleToSettings}>
-        <img
-          src="/logo.png"
-          class="h-10 w-10"
-          alt="Onin logo"
-        />
+        <img src="/logo.png" class="h-10 w-10" alt="Onin logo" />
       </button>
 
       <SearchInput
@@ -492,7 +524,6 @@
             plugin.setIframeElement(pluginIframeRef?.getElement() ?? null);
           }}
         />
-
       {:else}
         <!-- App List -->
         <ScrollArea.Root
@@ -536,3 +567,20 @@
     </div>
   </div>
 </main>
+
+<!-- 确认对话框 -->
+<ConfirmDialog
+  bind:open={confirmDialogOpen}
+  title={confirmDialogTitle}
+  description={confirmDialogDescription}
+  onConfirm={() => {
+    if (pendingAction) {
+      pendingAction();
+      pendingAction = null;
+    }
+  }}
+  onCancel={() => {
+    pendingAction = null;
+  }}
+/>
+

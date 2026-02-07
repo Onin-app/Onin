@@ -1,0 +1,362 @@
+<script lang="ts">
+  /**
+   * Clipboard Extension Page
+   */
+  import { onMount, onDestroy } from "svelte";
+  import { goto } from "$app/navigation";
+  import { invoke, convertFileSrc } from "@tauri-apps/api/core";
+  import { listen } from "@tauri-apps/api/event";
+  import { ScrollArea } from "bits-ui";
+  import ExtensionHeader from "$lib/components/ExtensionHeader.svelte";
+
+  type ClipboardItem = {
+    id: string;
+    text: string;
+    timestamp: number;
+    item_type: string; // "Text" | "Image" | "File"
+    thumbnail?: string;
+  };
+
+  let items = $state<ClipboardItem[]>([]);
+  let searchQuery = $state("");
+  let selectedIndex = $state(0);
+  let headerRef: ExtensionHeader;
+  let unlisten: () => void;
+  // let listContainer: HTMLDivElement; // ScrollArea handles refs differently if needed, or we just look up by ID
+
+  // Derived state for filtered items
+  let filteredItems = $derived(
+    items.filter((item) =>
+      item.text.toLowerCase().includes(searchQuery.toLowerCase()),
+    ),
+  );
+
+  async function fetchHistory() {
+    try {
+      items = await invoke<ClipboardItem[]>("get_clipboard_history");
+      selectedIndex = 0; // Reset selection on update
+    } catch (e) {
+      console.error("Failed to fetch history:", e);
+    }
+  }
+
+  const handleBack = () => {
+    goto("/");
+  };
+
+  const handleSearch = (value: string) => {
+    searchQuery = value;
+    selectedIndex = 0;
+  };
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (filteredItems.length === 0) return;
+
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleItemSelect(filteredItems[selectedIndex]);
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      selectedIndex = Math.min(selectedIndex + 1, filteredItems.length - 1);
+      scrollToSelected();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      selectedIndex = Math.max(selectedIndex - 1, 0);
+      scrollToSelected();
+    }
+  };
+
+  const scrollToSelected = () => {
+    // Simple logic to scroll element into view if needed
+    // We need IDs on the elements to find them
+    setTimeout(() => {
+      const el = document.getElementById(`item-${selectedIndex}`);
+      if (el) {
+        el.scrollIntoView({ block: "nearest" });
+      }
+    }, 0);
+  };
+
+  const handleItemSelect = async (item: ClipboardItem) => {
+    const startTime = performance.now();
+    console.log(`[Clipboard Timing] START - Selecting item: ${item.id}`);
+
+    try {
+      // 1. Paste (Background: set clipboard + simulate paste)
+      // The backend command spawns a thread and returns immediately, so this await is fast.
+      // Optimization: Send ID only to avoid large Base64 transfer.
+      await invoke("paste_clipboard_item", { itemId: item.id });
+
+      const t1 = performance.now();
+      console.log(
+        `[Clipboard Timing] paste_clipboard_item (sent): ${(t1 - startTime).toFixed(2)}ms`,
+      );
+
+      // 2. Hide window immediately
+      invoke("close_main_window");
+
+      const t2 = performance.now();
+      console.log(
+        `[Clipboard Timing] close_main_window (fired): ${(t2 - t1).toFixed(2)}ms`,
+      );
+      console.log(
+        `[Clipboard Timing] TOTAL FRONTEND LATENCY: ${(t2 - startTime).toFixed(2)}ms`,
+      );
+    } catch (e) {
+      console.error("Failed to select item:", e);
+    }
+  };
+
+  onMount(async () => {
+    fetchHistory();
+    headerRef?.focus();
+
+    // Listen for updates from backend
+    unlisten = await listen("clipboard-update", () => {
+      fetchHistory();
+    });
+  });
+
+  onDestroy(() => {
+    if (unlisten) unlisten();
+  });
+
+  function formatTime(ts: number) {
+    return new Date(ts).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  function isImageFile(path: string) {
+    const lower = path.trim().toLowerCase();
+    return (
+      lower.endsWith(".png") ||
+      lower.endsWith(".jpg") ||
+      lower.endsWith(".jpeg") ||
+      lower.endsWith(".gif") ||
+      lower.endsWith(".bmp") ||
+      lower.endsWith(".webp") ||
+      lower.endsWith(".ico") ||
+      lower.endsWith(".svg")
+    );
+  }
+
+  function getDisplayName(item: ClipboardItem) {
+    if (item.item_type === "File") {
+      // Split by both / and \ to handle cross-platform paths, though mainly Windows here
+      const parts = item.text.split(/[/\\]/);
+      return parts[parts.length - 1] || item.text;
+    }
+    return item.text.replace(/\n/g, " ");
+  }
+</script>
+
+<div class="flex h-full w-full flex-col overflow-hidden">
+  <ExtensionHeader
+    bind:this={headerRef}
+    placeholder="Search Clipboard History..."
+    bind:value={searchQuery}
+    onInput={handleSearch}
+    onBack={handleBack}
+    onKeyDown={handleKeyDown}
+  />
+
+  <div class="flex flex-1 overflow-hidden">
+    <!-- Left List Pane -->
+    <div
+      class="flex w-1/3 flex-col border-r border-neutral-200 dark:border-neutral-700"
+    >
+      <ScrollArea.Root class="h-full w-full" type="hover">
+        <ScrollArea.Viewport class="h-full w-full p-2">
+          {#if filteredItems.length === 0}
+            <div
+              class="flex h-full items-center justify-center text-sm text-neutral-500"
+            >
+              {#if searchQuery}
+                No matches
+              {:else}
+                Empty
+              {/if}
+            </div>
+          {:else}
+            <div class="flex flex-col gap-1">
+              {#each filteredItems as item, index (item.id)}
+                <button
+                  id="item-{index}"
+                  class="group flex w-full flex-row items-center gap-3 rounded-md border border-transparent px-3 py-2 text-left font-sans text-sm transition-colors
+                    {selectedIndex === index
+                    ? 'bg-neutral-200 dark:bg-neutral-700/50'
+                    : 'hover:bg-neutral-200/50 dark:hover:bg-neutral-800'}"
+                  onclick={() => (selectedIndex = index)}
+                  ondblclick={() => handleItemSelect(item)}
+                >
+                  <!-- Left: Thumbnail or Spacer -->
+                  {#if item.item_type === "Image" && item.thumbnail}
+                    <img
+                      src={item.thumbnail}
+                      alt="Thumbnail"
+                      class="h-10 w-10 flex-shrink-0 rounded border border-neutral-200 bg-neutral-100 object-cover dark:border-neutral-700 dark:bg-neutral-800"
+                    />
+                  {/if}
+
+                  <!-- Middle: Content -->
+                  <div class="flex min-w-0 flex-1 flex-col justify-center">
+                    {#if item.item_type === "File"}
+                      <div
+                        class="w-full truncate font-medium leading-tight text-neutral-900 dark:text-neutral-100"
+                        title={item.text}
+                      >
+                        {getDisplayName(item)}
+                      </div>
+                    {:else if item.item_type === "Image"}
+                      <span class="text-xs italic text-neutral-500"
+                        >Image Bitmap</span
+                      >
+                    {:else}
+                      <div
+                        class="line-clamp-2 w-full break-all leading-tight text-neutral-600 dark:text-neutral-300"
+                      >
+                        {item.text}
+                      </div>
+                    {/if}
+                  </div>
+
+                  <!-- Right: Metadata -->
+                  <div
+                    class="flex flex-shrink-0 flex-col items-end gap-0.5 self-start pt-1"
+                  >
+                    <span
+                      class="text-[9px] font-semibold uppercase tracking-wider text-neutral-400/70"
+                    >
+                      {item.item_type}
+                    </span>
+                    <span class="text-[10px] tabular-nums text-neutral-400">
+                      {formatTime(item.timestamp)}
+                    </span>
+                  </div>
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </ScrollArea.Viewport>
+        <ScrollArea.Scrollbar
+          orientation="vertical"
+          class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none select-none rounded-full border-l border-l-transparent p-px transition-all duration-200 hover:w-3"
+        >
+          <ScrollArea.Thumb class="bg-muted-foreground flex-1 rounded-full" />
+        </ScrollArea.Scrollbar>
+        <ScrollArea.Corner />
+      </ScrollArea.Root>
+    </div>
+
+    <!-- Right Preview Pane -->
+    <div
+      class="flex w-2/3 flex-col overflow-hidden bg-white dark:bg-neutral-900"
+    >
+      {#if filteredItems[selectedIndex]}
+        {@const selectedItem = filteredItems[selectedIndex]}
+        <div class="flex h-full flex-col">
+          <!-- Preview Header -->
+          <div
+            class="flex flex-shrink-0 items-center justify-between border-b border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-900/50"
+          >
+            <div class="flex items-center gap-2">
+              <span
+                class="text-sm font-medium text-neutral-900 dark:text-neutral-100"
+                >Preview</span
+              >
+              <span class="text-xs text-neutral-400">|</span>
+              <span class="text-xs text-neutral-500"
+                >{selectedItem.item_type}</span
+              >
+            </div>
+          </div>
+
+          <!-- Fixed File Path Info (if applicable) -->
+          {#if selectedItem.item_type === "File"}
+            <div
+              class="flex-shrink-0 border-b border-neutral-100 bg-neutral-50/50 p-2 px-4 text-xs dark:border-neutral-800 dark:bg-neutral-900/30"
+            >
+              <div
+                class="cursor-text select-text break-all font-mono text-neutral-500"
+              >
+                {selectedItem.text}
+              </div>
+            </div>
+          {/if}
+
+          <!-- Preview Content -->
+          <div class="relative flex-1 overflow-hidden">
+            <ScrollArea.Root class="h-full w-full" type="hover">
+              <ScrollArea.Viewport class="h-full w-full p-6">
+                {#if selectedItem.item_type === "Image" && selectedItem.thumbnail}
+                  <div
+                    class="flex min-h-full items-center justify-center bg-[url('/checker-board.svg')] bg-repeat"
+                  >
+                    <img
+                      src={selectedItem.thumbnail}
+                      class="max-w-full rounded border border-neutral-200 shadow-lg dark:border-neutral-700"
+                      alt="Preview"
+                    />
+                  </div>
+                {:else if selectedItem.item_type === "File"}
+                  {#if isImageFile(selectedItem.text)}
+                    <div
+                      class="flex min-h-full items-center justify-center bg-[url('/checker-board.svg')] bg-repeat"
+                    >
+                      <img
+                        src={convertFileSrc(selectedItem.text)}
+                        class="max-h-[80vh] max-w-full rounded border border-neutral-200 shadow-lg dark:border-neutral-700"
+                        alt="Preview"
+                      />
+                    </div>
+                  {:else}
+                    <!-- For non-image files, we might want to show icon or details -->
+                    <div
+                      class="flex h-full flex-col items-center justify-center gap-2 text-neutral-400"
+                    >
+                      <div class="i-lucide-file-text text-6xl opacity-20"></div>
+                      <span>File Preview</span>
+                    </div>
+                  {/if}
+                {:else}
+                  <!-- Text Content -->
+                  <div
+                    class="cursor-text select-text whitespace-pre-wrap break-words font-mono text-sm leading-relaxed text-neutral-800 dark:text-neutral-200"
+                  >
+                    {selectedItem.text}
+                  </div>
+                {/if}
+              </ScrollArea.Viewport>
+              <ScrollArea.Scrollbar
+                orientation="vertical"
+                class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none select-none rounded-full border-l border-l-transparent p-px transition-all duration-200 hover:w-3"
+              >
+                <ScrollArea.Thumb
+                  class="bg-muted-foreground flex-1 rounded-full"
+                />
+              </ScrollArea.Scrollbar>
+              <ScrollArea.Corner />
+            </ScrollArea.Root>
+          </div>
+
+          <!-- Footer Info -->
+          <div
+            class="flex items-center justify-between border-t border-neutral-200 bg-neutral-50 px-4 py-2 text-[10px] text-neutral-400 dark:border-neutral-800 dark:bg-neutral-900/50"
+          >
+            <span class="font-mono">{selectedItem.id}</span>
+            <span>{selectedItem.text.length} chars</span>
+          </div>
+        </div>
+      {:else}
+        <div
+          class="flex h-full flex-col items-center justify-center gap-2 text-neutral-400"
+        >
+          <div class="i-lucide-clipboard text-4xl opacity-20"></div>
+          <span>Select an item to view details</span>
+        </div>
+      {/if}
+    </div>
+  </div>
+</div>

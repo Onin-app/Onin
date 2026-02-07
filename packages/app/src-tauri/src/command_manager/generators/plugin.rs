@@ -137,6 +137,7 @@ pub fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
                     action: CommandAction::Plugin(plugin.manifest.id.clone()),
                     origin: None,
                     matches: None,
+                    requires_confirmation: false,
                 });
 
                 // 2. 为每个插件的功能指令创建 Command
@@ -186,6 +187,7 @@ pub fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
                         },
                         origin: None,
                         matches,
+                        requires_confirmation: false,
                     });
                 }
             }
@@ -261,6 +263,7 @@ pub fn get_initial_dynamic_commands(app: &AppHandle) -> Vec<Command> {
                 },
                 origin: None,
                 matches: dc.matches,
+                requires_confirmation: false,
             }
         })
         .collect()

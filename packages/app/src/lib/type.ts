@@ -22,6 +22,7 @@ export interface LaunchableItem {
   origin?: AppOrigin;
   source_display?: string;
   matches?: CommandMatch[];
+  requires_confirmation?: boolean;
 }
 
 export interface CommandKeyword {

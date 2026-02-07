@@ -16,6 +16,7 @@ pub struct SystemCommandInfo {
     pub keywords: &'static [&'static str],
     pub icon: &'static str,
     pub action: fn(AppHandle),
+    pub requires_confirmation: bool,
 }
 
 /// 所有系统命令列表
@@ -28,6 +29,7 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
         keywords: &["shutdown", "关机"],
         icon: "shutdown",
         action: |_| shutdown(),
+        requires_confirmation: true,
     },
     SystemCommandInfo {
         name: "reboot",
@@ -37,6 +39,7 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
         keywords: &["restart", "reboot", "重启"],
         icon: "restart",
         action: |_| reboot(),
+        requires_confirmation: true,
     },
     SystemCommandInfo {
         name: "sleep",
@@ -46,6 +49,7 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
         keywords: &["sleep", "睡眠"],
         icon: "sleep",
         action: |_| sleep(),
+        requires_confirmation: false,
     },
     SystemCommandInfo {
         name: "lock_screen",
@@ -55,6 +59,7 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
         keywords: &["lock", "锁屏"],
         icon: "lock",
         action: |_| lock_screen(),
+        requires_confirmation: false,
     },
     SystemCommandInfo {
         name: "logout",
@@ -64,6 +69,7 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
         keywords: &["logout", "注销"],
         icon: "logout",
         action: |_| logout(),
+        requires_confirmation: true,
     },
     SystemCommandInfo {
         name: "open_app_data_dir",
@@ -73,6 +79,7 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
         keywords: &["数据目录"],
         icon: "folder",
         action: open_app_data_dir,
+        requires_confirmation: false,
     },
     SystemCommandInfo {
         name: "refresh_list",
@@ -82,6 +89,7 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
         keywords: &["refresh", "刷新"],
         icon: "arrowsClockwise",
         action: refresh_list,
+        requires_confirmation: false,
     },
 ];
 
@@ -298,129 +306,142 @@ fn refresh_list(app: AppHandle) {
 // 键盘模拟
 // ============================================================================
 
-/// 模拟 Ctrl+V 粘贴操作
-/// 用于在窗口关闭后将剪贴板内容粘贴到之前活动的应用
-#[tauri::command]
-pub fn simulate_paste() -> Result<(), String> {
+// ============================================================================
+// 键盘模拟
+// ============================================================================
+
+/// 模拟 Ctrl+V / Cmd+V 粘贴操作
+/// 这是一个内部辅助函数，非 Tauri Command
+pub fn simulate_paste_native(app: &AppHandle) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         use std::mem;
         use windows::Win32::UI::Input::KeyboardAndMouse::{
             SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
-            KEYEVENTF_KEYUP, VIRTUAL_KEY, VK_CONTROL, VK_V,
+            KEYEVENTF_KEYUP, VK_CONTROL, VK_V,
         };
 
         unsafe {
             let mut inputs: [INPUT; 4] = mem::zeroed();
 
             // Key down: Ctrl
-            inputs[0] = INPUT {
-                r#type: INPUT_KEYBOARD,
-                Anonymous: INPUT_0 {
-                    ki: KEYBDINPUT {
-                        wVk: VK_CONTROL,
-                        wScan: 0,
-                        dwFlags: KEYBD_EVENT_FLAGS(0),
-                        time: 0,
-                        dwExtraInfo: 0,
-                    },
-                },
-            };
+            inputs[0].r#type = INPUT_KEYBOARD;
+            inputs[0].Anonymous.ki.wVk = VK_CONTROL;
 
             // Key down: V
-            inputs[1] = INPUT {
-                r#type: INPUT_KEYBOARD,
-                Anonymous: INPUT_0 {
-                    ki: KEYBDINPUT {
-                        wVk: VK_V,
-                        wScan: 0,
-                        dwFlags: KEYBD_EVENT_FLAGS(0),
-                        time: 0,
-                        dwExtraInfo: 0,
-                    },
-                },
-            };
+            inputs[1].r#type = INPUT_KEYBOARD;
+            inputs[1].Anonymous.ki.wVk = VK_V;
 
             // Key up: V
-            inputs[2] = INPUT {
-                r#type: INPUT_KEYBOARD,
-                Anonymous: INPUT_0 {
-                    ki: KEYBDINPUT {
-                        wVk: VK_V,
-                        wScan: 0,
-                        dwFlags: KEYEVENTF_KEYUP,
-                        time: 0,
-                        dwExtraInfo: 0,
-                    },
-                },
-            };
+            inputs[2].r#type = INPUT_KEYBOARD;
+            inputs[2].Anonymous.ki.wVk = VK_V;
+            inputs[2].Anonymous.ki.dwFlags = KEYEVENTF_KEYUP;
 
             // Key up: Ctrl
-            inputs[3] = INPUT {
-                r#type: INPUT_KEYBOARD,
-                Anonymous: INPUT_0 {
-                    ki: KEYBDINPUT {
-                        wVk: VK_CONTROL,
-                        wScan: 0,
-                        dwFlags: KEYEVENTF_KEYUP,
-                        time: 0,
-                        dwExtraInfo: 0,
-                    },
-                },
-            };
+            inputs[3].r#type = INPUT_KEYBOARD;
+            inputs[3].Anonymous.ki.wVk = VK_CONTROL;
+            inputs[3].Anonymous.ki.dwFlags = KEYEVENTF_KEYUP;
 
             let sent = SendInput(&inputs, mem::size_of::<INPUT>() as i32);
             if sent != 4 {
                 return Err(format!("SendInput failed: only {} of 4 inputs sent", sent));
             }
         }
-
-        println!("[simulate_paste] Ctrl+V simulated on Windows");
         Ok(())
     }
 
     #[cfg(target_os = "macos")]
     {
-        // macOS: 使用 CGEvent 模拟 Cmd+V
         use std::process::Command;
+        use std::thread;
+        use std::time::Duration;
         
-        // 使用 osascript 来模拟按键
+        println!("[SystemCommand] simulate_paste_native (macOS via osascript) started");
+
+        // 获取记录的前一个应用的 Bundle ID
+        let bundle_id = app.state::<MacOSPreviousApp>()
+            .0.lock().ok()
+            .and_then(|guard| guard.clone());
+        
+        if let Some(bundle_id) = bundle_id {
+            println!("[SystemCommand] Activating previous app: {}", bundle_id);
+            // 激活应用
+            let _ = Command::new("osascript")
+                .args(["-e", &format!(r#"tell application id "{}" to activate"#, bundle_id)])
+                .output();
+            
+            // 给一点时间让窗口激活
+            thread::sleep(Duration::from_millis(100));
+        } else {
+            println!("[SystemCommand] No previous app recorded, waiting generic time");
+            thread::sleep(Duration::from_millis(200));
+        }
+        
+        println!("[SystemCommand] Sending Cmd+V via osascript");
+        // 模拟按键
         let result = Command::new("osascript")
             .args(["-e", "tell application \"System Events\" to keystroke \"v\" using command down"])
             .output();
         
         match result {
+            Ok(output) if output.status.success() => {
+                println!("[SystemCommand] Paste successful");
+                Ok(())
+            },
             Ok(output) => {
-                if output.status.success() {
-                    println!("[simulate_paste] Cmd+V simulated on macOS");
-                    Ok(())
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                eprintln!("[SystemCommand] osascript failed: {}", stderr);
+                if stderr.contains("not allowed") || stderr.contains("not permitted") {
+                    Err("需要辅助功能权限。请前往 系统设置 > 隐私与安全性 > 辅助功能，添加此应用。".to_string())
                 } else {
-                    Err(format!("osascript failed: {:?}", String::from_utf8_lossy(&output.stderr)))
+                    Err(format!("osascript failed: {}", stderr))
                 }
             }
-            Err(e) => Err(format!("Failed to execute osascript: {}", e)),
+            Err(e) => {
+                eprintln!("[SystemCommand] Failed to execute osascript: {}", e);
+                Err(format!("Failed to execute osascript: {}", e))
+            },
         }
     }
 
     #[cfg(target_os = "linux")]
     {
-        // Linux: 使用 xdotool 模拟 Ctrl+V
         use std::process::Command;
-        
+        // xdotool is still the external command way, but reliable on X11
+        // Wayland support would need ydotool or similar but that's out of scope
         let result = Command::new("xdotool")
             .args(["key", "ctrl+v"])
             .output();
         
         match result {
-            Ok(output) => {
-                if output.status.success() {
-                    println!("[simulate_paste] Ctrl+V simulated on Linux");
-                    Ok(())
-                } else {
-                    Err(format!("xdotool failed: {:?}", String::from_utf8_lossy(&output.stderr)))
-                }
-            }
+            Ok(output) if output.status.success() => Ok(()),
+            Ok(output) => Err(format!("xdotool failed: {:?}", String::from_utf8_lossy(&output.stderr))),
             Err(e) => Err(format!("Failed to execute xdotool: {}", e)),
         }
+    }
+}
+
+/// 保留此 Command 以兼容旧代码或直接调用，但内部指向 native 实现
+#[tauri::command]
+pub fn simulate_paste(app: AppHandle) -> Result<(), String> {
+    simulate_paste_native(&app)
+}
+
+// ============================================================================
+// macOS 特定：记录前一个应用
+// ============================================================================
+
+#[cfg(target_os = "macos")]
+pub struct MacOSPreviousApp(pub std::sync::Mutex<Option<String>>);
+
+#[cfg(target_os = "macos")]
+pub fn get_frontmost_app_bundle_id() -> Option<String> {
+    use objc2_app_kit::NSWorkspace;
+    
+    unsafe {
+        let workspace = NSWorkspace::sharedWorkspace();
+        workspace.frontmostApplication()
+            .and_then(|app| app.bundleIdentifier())
+            .map(|id| id.to_string())
     }
 }

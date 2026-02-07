@@ -33,6 +33,7 @@ pub async fn get_initial_app_commands() -> Vec<Command> {
                         action: CommandAction::App(path),
                         origin: app_info.origin,
                         matches: None,
+                        requires_confirmation: false,
                     }
                 })
             })

@@ -101,6 +101,7 @@ pub async fn get_all_launchable_items(
                 origin: cmd.origin,
                 source_display,
                 matches: cmd.matches,
+                requires_confirmation: cmd.requires_confirmation,
             })
         })
         .collect();

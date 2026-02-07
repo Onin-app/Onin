@@ -18,6 +18,7 @@ pub fn get_initial_system_commands() -> Vec<Command> {
             action: CommandAction::System(cmd_info.name.to_string()),
             origin: None,
             matches: None,
+            requires_confirmation: cmd_info.requires_confirmation,
         })
         .collect()
 }

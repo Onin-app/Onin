@@ -48,6 +48,7 @@ pub fn get_extension_commands() -> Vec<Command> {
                 action: CommandAction::System(format!("extension:{}:{}", manifest.id, cmd.code)),
                 origin: None,
                 matches: None, // Extension 使用自己的匹配逻辑
+                requires_confirmation: false,
             })
         })
         .collect()
