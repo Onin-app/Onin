@@ -1,0 +1,268 @@
+[
+    {
+        "id": "openai",
+        "name": "OpenAI",
+        "baseUrl": "https://api.openai.com/v1",
+        "description": "The standard OpenAI API.",
+        "models": [
+            {
+                "id": "gpt-4o",
+                "name": "GPT-4o"
+            },
+            {
+                "id": "gpt-4o-mini",
+                "name": "GPT-4o Mini"
+            },
+            {
+                "id": "gpt-4-turbo",
+                "name": "GPT-4 Turbo"
+            },
+            {
+                "id": "gpt-4",
+                "name": "GPT-4"
+            },
+            {
+                "id": "gpt-3.5-turbo",
+                "name": "GPT-3.5 Turbo"
+            },
+            {
+                "id": "o1",
+                "name": "o1"
+            },
+            {
+                "id": "o1-mini",
+                "name": "o1-mini"
+            }
+        ],
+        "docsUrl": "https://platform.openai.com/docs/models"
+    },
+    {
+        "id": "anthropic",
+        "name": "Anthropic",
+        "baseUrl": "https://api.anthropic.com/v1",
+        "description": "Claude models from Anthropic.",
+        "models": [
+            {
+                "id": "claude-3-5-sonnet-20241022",
+                "name": "Claude 3.5 Sonnet"
+            },
+            {
+                "id": "claude-3-5-haiku-20241022",
+                "name": "Claude 3.5 Haiku"
+            },
+            {
+                "id": "claude-3-opus-20240229",
+                "name": "Claude 3 Opus"
+            },
+            {
+                "id": "claude-3-sonnet-20240229",
+                "name": "Claude 3 Sonnet"
+            },
+            {
+                "id": "claude-3-haiku-20240307",
+                "name": "Claude 3 Haiku"
+            }
+        ],
+        "docsUrl": "https://docs.anthropic.com/en/docs/models-overview"
+    },
+    {
+        "id": "deepseek",
+        "name": "DeepSeek",
+        "baseUrl": "https://api.deepseek.com",
+        "description": "DeepSeek generic API.",
+        "models": [
+            {
+                "id": "deepseek-chat",
+                "name": "DeepSeek V3"
+            },
+            {
+                "id": "deepseek-reasoner",
+                "name": "DeepSeek R1"
+            },
+            {
+                "id": "deepseek-coder",
+                "name": "DeepSeek Coder"
+            }
+        ],
+        "docsUrl": "https://platform.deepseek.com"
+    },
+    {
+        "id": "google",
+        "name": "Google AI",
+        "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "description": "Gemini models via OpenAI-compatible API.",
+        "models": [
+            {
+                "id": "gemini-2.0-flash-exp",
+                "name": "Gemini 2.0 Flash (Experimental)"
+            },
+            {
+                "id": "gemini-1.5-pro",
+                "name": "Gemini 1.5 Pro"
+            },
+            {
+                "id": "gemini-1.5-flash",
+                "name": "Gemini 1.5 Flash"
+            },
+            {
+                "id": "gemini-1.5-flash-8b",
+                "name": "Gemini 1.5 Flash-8B"
+            }
+        ],
+        "docsUrl": "https://ai.google.dev/gemini-api/docs/openai"
+    },
+    {
+        "id": "xai",
+        "name": "xAI",
+        "baseUrl": "https://api.x.ai/v1",
+        "description": "Grok models from xAI.",
+        "models": [
+            {
+                "id": "grok-beta",
+                "name": "Grok Beta"
+            },
+            {
+                "id": "grok-vision-beta",
+                "name": "Grok Vision Beta"
+            }
+        ],
+        "docsUrl": "https://docs.x.ai/docs"
+    },
+    {
+        "id": "mistral",
+        "name": "Mistral AI",
+        "baseUrl": "https://api.mistral.ai/v1",
+        "description": "Mistral models.",
+        "models": [
+            {
+                "id": "mistral-large-latest",
+                "name": "Mistral Large"
+            },
+            {
+                "id": "mistral-small-latest",
+                "name": "Mistral Small"
+            },
+            {
+                "id": "codestral-latest",
+                "name": "Codestral"
+            },
+            {
+                "id": "open-mistral-nemo",
+                "name": "Mistral Nemo"
+            }
+        ],
+        "docsUrl": "https://docs.mistral.ai/"
+    },
+    {
+        "id": "groq",
+        "name": "Groq",
+        "baseUrl": "https://api.groq.com/openai/v1",
+        "description": "Fast inference with Groq.",
+        "models": [
+            {
+                "id": "llama-3.3-70b-versatile",
+                "name": "Llama 3.3 70B"
+            },
+            {
+                "id": "llama-3.1-70b-versatile",
+                "name": "Llama 3.1 70B"
+            },
+            {
+                "id": "llama-3.1-8b-instant",
+                "name": "Llama 3.1 8B"
+            },
+            {
+                "id": "mixtral-8x7b-32768",
+                "name": "Mixtral 8x7B"
+            },
+            {
+                "id": "gemma2-9b-it",
+                "name": "Gemma 2 9B"
+            }
+        ],
+        "docsUrl": "https://console.groq.com/docs/models"
+    },
+    {
+        "id": "together",
+        "name": "Together AI",
+        "baseUrl": "https://api.together.xyz/v1",
+        "description": "Open-source models via Together AI.",
+        "models": [
+            {
+                "id": "meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo",
+                "name": "Llama 3.1 405B Instruct"
+            },
+            {
+                "id": "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
+                "name": "Llama 3.1 70B Instruct"
+            },
+            {
+                "id": "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+                "name": "Llama 3.1 8B Instruct"
+            },
+            {
+                "id": "Qwen/Qwen2.5-72B-Instruct-Turbo",
+                "name": "Qwen 2.5 72B"
+            },
+            {
+                "id": "deepseek-ai/DeepSeek-V2.5",
+                "name": "DeepSeek V2.5"
+            }
+        ],
+        "docsUrl": "https://docs.together.ai/docs/inference-models"
+    },
+    {
+        "id": "openrouter",
+        "name": "OpenRouter",
+        "baseUrl": "https://openrouter.ai/api/v1",
+        "description": "Unified API for multiple LLM providers.",
+        "models": [
+            {
+                "id": "anthropic/claude-3.5-sonnet",
+                "name": "Claude 3.5 Sonnet"
+            },
+            {
+                "id": "openai/gpt-4o",
+                "name": "GPT-4o"
+            },
+            {
+                "id": "google/gemini-2.0-flash-exp:free",
+                "name": "Gemini 2.0 Flash (Free)"
+            },
+            {
+                "id": "meta-llama/llama-3.3-70b-instruct",
+                "name": "Llama 3.3 70B"
+            },
+            {
+                "id": "deepseek/deepseek-chat",
+                "name": "DeepSeek V3"
+            }
+        ],
+        "docsUrl": "https://openrouter.ai/docs"
+    },
+    {
+        "id": "ollama",
+        "name": "Ollama (Local)",
+        "baseUrl": "http://localhost:11434/v1",
+        "description": "Run LLMs locally with Ollama.",
+        "models": [],
+        "fetchModels": true,
+        "docsUrl": "https://ollama.com/"
+    },
+    {
+        "id": "lmstudio",
+        "name": "LM Studio (Local)",
+        "baseUrl": "http://localhost:1234/v1",
+        "description": "Local LLM server with LM Studio.",
+        "models": [],
+        "fetchModels": true,
+        "docsUrl": "https://lmstudio.ai/"
+    },
+    {
+        "id": "custom",
+        "name": "Custom Endpoint",
+        "baseUrl": "http://localhost:8000/v1",
+        "description": "Custom OpenAI-compatible endpoint.",
+        "models": []
+    }
+]

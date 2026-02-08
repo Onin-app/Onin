@@ -141,6 +141,11 @@ pub fn get_invoke_handler(
         crate::extensions::clipboard::commands::get_clipboard_history,
         crate::extensions::clipboard::commands::set_clipboard_item,
         crate::extensions::clipboard::commands::paste_clipboard_item,
+        // AI Manager
+        crate::ai_manager::commands::get_ai_config,
+        crate::ai_manager::commands::update_ai_config,
+        crate::ai_manager::commands::plugin_ai_ask,
+        crate::ai_manager::commands::plugin_ai_stream,
     ]
 }
 

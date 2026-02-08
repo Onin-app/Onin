@@ -5,6 +5,7 @@ use tauri_plugin_global_shortcut::{Shortcut, ShortcutState};
 use tracing_subscriber;
 use tracing_subscriber::fmt::format::FmtSpan;
 
+pub mod ai_manager;
 mod app_config;
 mod command_manager;
 mod commands;
