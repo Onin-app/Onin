@@ -25,6 +25,7 @@ export interface AIProvider {
   id: string;
   provider_type: string;
   name: string;
+  display_name?: string | null;
   base_url: string;
   default_model: string | null;
 }

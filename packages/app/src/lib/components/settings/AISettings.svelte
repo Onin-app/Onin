@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
+  import { openUrl } from "@tauri-apps/plugin-opener";
   import { Button, Combobox, ScrollArea } from "bits-ui";
   import { toast } from "svelte-sonner";
   import {
@@ -25,6 +26,7 @@
     id: string;
     provider_type: string;
     name: string;
+    display_name?: string | null;
     base_url: string;
     api_key: string | null;
     default_model: string | null;
@@ -37,6 +39,7 @@
     baseUrl: string;
     models: { id: string; name: string }[];
     docsUrl?: string;
+    apiKeyUrl?: string;
   }
 
   let config = $state<AIConfig>({ active_provider_id: null, providers: [] });
@@ -48,6 +51,7 @@
     id: string;
     provider_type: string;
     name: string;
+    display_name: string | null;
     base_url: string;
     api_key: string | null;
     default_model: string | null;
@@ -55,6 +59,7 @@
     id: "",
     provider_type: "",
     name: "",
+    display_name: null,
     base_url: "",
     api_key: null,
     default_model: null,
@@ -113,6 +118,7 @@
       id: "",
       provider_type: "",
       name: "",
+      display_name: null,
       base_url: "",
       api_key: null,
       default_model: null,
@@ -211,6 +217,7 @@
       id: providerId,
       provider_type: editForm.provider_type,
       name: remote?.name || editForm.name,
+      display_name: editForm.display_name || null,
       base_url: editForm.base_url,
       api_key: editForm.api_key || null,
       default_model: editForm.default_model || null,
@@ -351,7 +358,7 @@
                       <h3
                         class="font-semibold text-neutral-900 dark:text-neutral-100"
                       >
-                        {provider.name}
+                        {provider.display_name || provider.name}
                       </h3>
                       {#if config.active_provider_id === provider.id}
                         <span
@@ -364,6 +371,10 @@
                     <div
                       class="mt-1 flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400"
                     >
+                      {#if provider.display_name}
+                        <span>{provider.name}</span>
+                        <span>•</span>
+                      {/if}
                       {#if provider.default_model}
                         <span>{provider.default_model}</span>
                         <span>•</span>
@@ -411,7 +422,7 @@
               class="border-b border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-800/50"
             >
               <h3 class="font-semibold text-neutral-900 dark:text-neutral-100">
-                {editingIndex === -1 ? "Add New Provider" : "Edit Provider"}
+                {editingIndex === -1 ? "添加新 Provider" : "编辑 Provider"}
               </h3>
             </div>
 
@@ -421,7 +432,7 @@
                 <label
                   class="mb-1.5 block text-sm font-medium text-neutral-700 dark:text-neutral-300"
                 >
-                  Provider
+                  服务提供商
                 </label>
                 <Combobox.Root
                   type="single"
@@ -491,12 +502,32 @@
                 </Combobox.Root>
               </div>
 
+              <!-- Display Name (Optional) -->
+              <div>
+                <label
+                  for="display-name-input"
+                  class="mb-1.5 block text-sm font-medium text-neutral-700 dark:text-neutral-300"
+                >
+                  显示名称 (可选)
+                </label>
+                <input
+                  id="display-name-input"
+                  type="text"
+                  bind:value={editForm.display_name}
+                  placeholder="为这个配置起个名字,方便识别,如「工作账号」"
+                  class="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:focus:border-neutral-100"
+                />
+                <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                  不填写则显示默认的 Provider 名称
+                </p>
+              </div>
+
               <!-- Base URL -->
               <div>
                 <label
                   class="mb-1.5 block text-sm font-medium text-neutral-700 dark:text-neutral-300"
                 >
-                  Base URL
+                  API 地址
                 </label>
                 <input
                   type="text"
@@ -511,7 +542,7 @@
                 <label
                   class="mb-1.5 block text-sm font-medium text-neutral-700 dark:text-neutral-300"
                 >
-                  API Key
+                  API 密钥
                 </label>
                 <input
                   type="password"
@@ -519,6 +550,22 @@
                   placeholder="sk-..."
                   class="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:focus:border-neutral-100"
                 />
+                {#if selectedRemoteProvider?.apiKeyUrl}
+                  <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                    需要 API 密钥?
+                    <button
+                      type="button"
+                      class="text-blue-600 hover:underline dark:text-blue-400"
+                      onclick={() => {
+                        if (selectedRemoteProvider?.apiKeyUrl) {
+                          openUrl(selectedRemoteProvider.apiKeyUrl);
+                        }
+                      }}
+                    >
+                      点击这里申请
+                    </button>
+                  </p>
+                {/if}
               </div>
 
               <!-- Model Selector -->
@@ -526,7 +573,7 @@
                 <label
                   class="mb-1.5 block text-sm font-medium text-neutral-700 dark:text-neutral-300"
                 >
-                  Default Model
+                  默认模型
                 </label>
                 {#if modelOptions.length > 0}
                   <Combobox.Root
