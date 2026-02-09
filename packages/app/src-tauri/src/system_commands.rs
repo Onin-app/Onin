@@ -288,7 +288,8 @@ fn logout() {
     });
 }
 
-fn open_app_data_dir(app: AppHandle) {
+#[tauri::command]
+pub fn open_app_data_dir(app: AppHandle) {
     if let Ok(path) = app.path().app_data_dir() {
         if let Err(e) = opener::open(&path) {
             eprintln!("Failed to open app data dir: {}", e);
