@@ -147,6 +147,9 @@ pub fn get_invoke_handler(
         crate::ai_manager::commands::update_ai_config,
         crate::ai_manager::commands::plugin_ai_ask,
         crate::ai_manager::commands::plugin_ai_stream,
+        crate::ai_manager::commands::validate_ai_provider,
+        crate::ai_manager::commands::list_ai_models,
+        crate::ai_manager::commands::get_ai_capabilities,
     ]
 }
 

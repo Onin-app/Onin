@@ -104,10 +104,25 @@ impl AIManager {
         self.config.read().await.clone()
     }
 
-    pub async fn ask(&self, request: ChatRequest) -> Result<String, Box<dyn Error + Send + Sync>> {
-
+    pub async fn ask(&self, mut request: ChatRequest) -> Result<String, Box<dyn Error + Send + Sync>> {
+        let config = self.config.read().await;
         let provider_lock = self.active_provider.read().await;
+        
         if let Some(provider) = provider_lock.as_ref() {
+            // If no model specified, use the default model from config
+            if request.model.is_none() {
+                if let Some(provider_id) = &config.active_provider_id {
+                    if let Some(provider_config) = config.providers.iter().find(|p| &p.id == provider_id) {
+                        request.model = provider_config.default_model.clone();
+                    }
+                }
+            }
+            
+            // If still no model, return error
+            if request.model.is_none() {
+                return Err("No model specified and no default model configured".into());
+            }
+            
             provider.ask(request).await
         } else {
             Err("No active AI provider configured".into())
@@ -116,17 +131,44 @@ impl AIManager {
     
     pub async fn stream(
         &self,
-        request: ChatRequest,
+        mut request: ChatRequest,
     ) -> Result<BoxStream<'static, Result<String, Box<dyn Error + Send + Sync>>>, Box<dyn Error + Send + Sync>> {
+        let config = self.config.read().await;
         let provider_lock = self.active_provider.read().await;
+        
         if let Some(provider) = provider_lock.as_ref() {
-            // We need to clone the provider reference to move it into the future if needed, 
-            // but here we are calling an async method on the provider trait object.
-            // Traits objects should be safe to call if Sync.
+            // If no model specified, use the default model from config
+            if request.model.is_none() {
+                if let Some(provider_id) = &config.active_provider_id {
+                    if let Some(provider_config) = config.providers.iter().find(|p| &p.id == provider_id) {
+                        request.model = provider_config.default_model.clone();
+                    }
+                }
+            }
+            
+            // If still no model, return error
+            if request.model.is_none() {
+                return Err("No model specified and no default model configured".into());
+            }
+            
             provider.stream(request).await
         } else {
             Err("No active AI provider configured".into())
         }
+    }
+
+    pub async fn list_models(&self) -> Result<Vec<self::provider::ModelInfo>, Box<dyn Error + Send + Sync>> {
+        let provider_lock = self.active_provider.read().await;
+        if let Some(provider) = provider_lock.as_ref() {
+            provider.list_models().await
+        } else {
+            Err("No active AI provider configured".into())
+        }
+    }
+    
+    pub async fn get_capabilities(&self) -> Option<self::provider::ProviderCapabilities> {
+        let provider_lock = self.active_provider.read().await;
+        provider_lock.as_ref().map(|p| p.capabilities())
     }
 }
 

@@ -92,6 +92,12 @@
         ),
   );
 
+  interface ValidationResult {
+    valid: boolean;
+    message?: string;
+    models_count?: number;
+  }
+
   onMount(async () => {
     try {
       config = await invoke("get_ai_config");
@@ -132,11 +138,65 @@
     return `${templateId}_${timestamp}_${random}`;
   }
 
+  async function testConnection() {
+    if (!editForm.provider_type || !editForm.base_url) {
+      toast.error("Provider and Base URL are required to test connection");
+      return;
+    }
+
+    const toastId = toast.loading("Testing connection...");
+    try {
+      const validation = await invoke<ValidationResult>("validate_ai_provider", {
+        base_url: editForm.base_url,
+        api_key: editForm.api_key,
+      });
+
+      if (validation.valid) {
+        toast.success(`Connection successful! Found ${validation.models_count} models.`, { id: toastId });
+        
+        // If successful, we can optionally fetch models to populate the list? 
+        // For now, let's just show success.
+      } else {
+        toast.error(`Connection failed: ${validation.message}`, { id: toastId });
+      }
+    } catch (e) {
+      toast.error(`Error testing connection: ${e}`, { id: toastId });
+    }
+  }
+
   async function save() {
     // Validation
     if (!editForm.provider_type || !editForm.base_url) {
       toast.error("Provider and Base URL are required");
       return;
+    }
+    
+    // Auto-validate before save? Or allow save even if invalid?
+    // Let's do a quick validation check but allow save if user insists or just warn.
+    // For now, let's just save, but maybe we should trigger validation?
+    // Given the request "API Key 验证", let's enable it.
+    
+    const toastId = toast.loading("Validating and saving...");
+    
+    try {
+       const validation = await invoke<ValidationResult>("validate_ai_provider", {
+        base_url: editForm.base_url,
+        api_key: editForm.api_key,
+      });
+      
+      if (!validation.valid) {
+        toast.error(`Validation failed: ${validation.message}`, { id: toastId });
+        // Optional: return here to prevent saving invalid config? 
+        // User might want to save anyway. Let's just warn for now.
+        // Actually, returning is safer.
+        return;
+      }
+      
+      toast.success("Validation successful", { id: toastId });
+    } catch(e) {
+       // If validation errors out (network issue?), maybe warn?
+       console.error(e);
+       toast.warning("Could not validate connection, saving anyway...", { id: toastId });
     }
 
     const remote = providers.find((p) => p.id === editForm.provider_type);
@@ -546,14 +606,20 @@
                 {/if}
               </div>
 
-              <!-- Actions -->
-              <div class="flex justify-end gap-2 pt-2">
-                <Button.Root
-                  class="inline-flex h-9 items-center justify-center rounded-lg border border-neutral-200 bg-white px-4 text-sm font-medium text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
-                  onclick={cancelEdit}
-                >
-                  Cancel
-                </Button.Root>
+                <!-- Actions -->
+                <div class="flex justify-end gap-2 pt-2">
+                  <Button.Root
+                    class="inline-flex h-9 items-center justify-center rounded-lg border border-neutral-200 bg-white px-4 text-sm font-medium text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+                    onclick={testConnection}
+                  >
+                    Test Connection
+                  </Button.Root>
+                  <Button.Root
+                    class="inline-flex h-9 items-center justify-center rounded-lg border border-neutral-200 bg-white px-4 text-sm font-medium text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+                    onclick={cancelEdit}
+                  >
+                    Cancel
+                  </Button.Root>
                 <Button.Root
                   class="inline-flex h-9 items-center justify-center rounded-lg bg-neutral-900 px-4 text-sm font-semibold text-neutral-50 shadow-sm transition-colors hover:bg-neutral-900/90 focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:outline-hidden dark:bg-neutral-50 dark:text-neutral-900 dark:hover:bg-neutral-50/90"
                   onclick={save}

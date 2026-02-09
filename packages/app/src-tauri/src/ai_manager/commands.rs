@@ -58,3 +58,27 @@ pub async fn plugin_ai_stream(
 
     Ok(())
 }
+
+#[command]
+pub async fn validate_ai_provider(
+    base_url: String,
+    api_key: Option<String>,
+) -> Result<crate::ai_manager::provider::ValidationResult, String> {
+    use crate::ai_manager::provider::AIProvider;
+    let provider = crate::ai_manager::providers::openai_compatible::OpenAICompatibleProvider::new(base_url, api_key);
+    provider.validate().await.map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn list_ai_models(
+    ai_manager: State<'_, Arc<AIManager>>,
+) -> Result<Vec<crate::ai_manager::provider::ModelInfo>, String> {
+    ai_manager.list_models().await.map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn get_ai_capabilities(
+    ai_manager: State<'_, Arc<AIManager>>,
+) -> Result<Option<crate::ai_manager::provider::ProviderCapabilities>, String> {
+    Ok(ai_manager.get_capabilities().await)
+}
