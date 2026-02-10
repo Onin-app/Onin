@@ -13,6 +13,7 @@
     Trash,
     PencilSimple,
   } from "phosphor-svelte";
+  import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
 
   // Mock data import - in production this would be a fetch call
   import remoteProviders from "$lib/mocks/ai-providers.json";
@@ -64,6 +65,10 @@
     api_key: null,
     default_model: null,
   });
+
+  // Delete confirmation dialog state
+  let deleteDialogOpen = $state(false);
+  let pendingDeleteIndex = $state<number | null>(null);
 
   // Search states for comboboxes
   let providerSearch = $state("");
@@ -152,18 +157,26 @@
 
     const toastId = toast.loading("Testing connection...");
     try {
-      const validation = await invoke<ValidationResult>("validate_ai_provider", {
-        base_url: editForm.base_url,
-        api_key: editForm.api_key,
-      });
+      const validation = await invoke<ValidationResult>(
+        "validate_ai_provider",
+        {
+          base_url: editForm.base_url,
+          api_key: editForm.api_key,
+        },
+      );
 
       if (validation.valid) {
-        toast.success(`Connection successful! Found ${validation.models_count} models.`, { id: toastId });
-        
-        // If successful, we can optionally fetch models to populate the list? 
+        toast.success(
+          `Connection successful! Found ${validation.models_count} models.`,
+          { id: toastId },
+        );
+
+        // If successful, we can optionally fetch models to populate the list?
         // For now, let's just show success.
       } else {
-        toast.error(`Connection failed: ${validation.message}`, { id: toastId });
+        toast.error(`Connection failed: ${validation.message}`, {
+          id: toastId,
+        });
       }
     } catch (e) {
       toast.error(`Error testing connection: ${e}`, { id: toastId });
@@ -176,33 +189,40 @@
       toast.error("Provider and Base URL are required");
       return;
     }
-    
+
     // Auto-validate before save? Or allow save even if invalid?
     // Let's do a quick validation check but allow save if user insists or just warn.
     // For now, let's just save, but maybe we should trigger validation?
     // Given the request "API Key 验证", let's enable it.
-    
+
     const toastId = toast.loading("Validating and saving...");
-    
+
     try {
-       const validation = await invoke<ValidationResult>("validate_ai_provider", {
-        base_url: editForm.base_url,
-        api_key: editForm.api_key,
-      });
-      
+      const validation = await invoke<ValidationResult>(
+        "validate_ai_provider",
+        {
+          base_url: editForm.base_url,
+          api_key: editForm.api_key,
+        },
+      );
+
       if (!validation.valid) {
-        toast.error(`Validation failed: ${validation.message}`, { id: toastId });
-        // Optional: return here to prevent saving invalid config? 
+        toast.error(`Validation failed: ${validation.message}`, {
+          id: toastId,
+        });
+        // Optional: return here to prevent saving invalid config?
         // User might want to save anyway. Let's just warn for now.
         // Actually, returning is safer.
         return;
       }
-      
+
       toast.success("Validation successful", { id: toastId });
-    } catch(e) {
-       // If validation errors out (network issue?), maybe warn?
-       console.error(e);
-       toast.warning("Could not validate connection, saving anyway...", { id: toastId });
+    } catch (e) {
+      // If validation errors out (network issue?), maybe warn?
+      console.error(e);
+      toast.warning("Could not validate connection, saving anyway...", {
+        id: toastId,
+      });
     }
 
     const remote = providers.find((p) => p.id === editForm.provider_type);
@@ -246,15 +266,22 @@
   async function deleteProvider(index: number) {
     const provider = config.providers[index];
 
-    // Warn if deleting active provider
+    // Warn if deleting active provider - show dialog instead of system confirm
     if (provider.id === config.active_provider_id) {
-      if (
-        !confirm(
-          "This is your active provider. Are you sure you want to delete it?",
-        )
-      ) {
-        return;
-      }
+      pendingDeleteIndex = index;
+      deleteDialogOpen = true;
+      return;
+    }
+
+    // Direct delete for non-active providers
+    await performDelete(index);
+  }
+
+  async function performDelete(index: number) {
+    const provider = config.providers[index];
+
+    // Clear active provider if deleting the active one
+    if (provider.id === config.active_provider_id) {
       config.active_provider_id = null;
     }
 
@@ -267,6 +294,19 @@
       console.error(e);
       toast.error("Error deleting provider");
     }
+  }
+
+  function handleDeleteConfirm() {
+    if (pendingDeleteIndex !== null) {
+      performDelete(pendingDeleteIndex);
+      pendingDeleteIndex = null;
+    }
+    deleteDialogOpen = false; // Close dialog after action
+  }
+
+  function handleDeleteCancel() {
+    pendingDeleteIndex = null;
+    deleteDialogOpen = false; // Close dialog
   }
 
   async function setActive(providerId: string) {
@@ -551,7 +591,9 @@
                   class="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:focus:border-neutral-100"
                 />
                 {#if selectedRemoteProvider?.apiKeyUrl}
-                  <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                  <p
+                    class="mt-1 text-xs text-neutral-500 dark:text-neutral-400"
+                  >
                     需要 API 密钥?
                     <button
                       type="button"
@@ -653,20 +695,20 @@
                 {/if}
               </div>
 
-                <!-- Actions -->
-                <div class="flex justify-end gap-2 pt-2">
-                  <Button.Root
-                    class="inline-flex h-9 items-center justify-center rounded-lg border border-neutral-200 bg-white px-4 text-sm font-medium text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
-                    onclick={testConnection}
-                  >
-                    Test Connection
-                  </Button.Root>
-                  <Button.Root
-                    class="inline-flex h-9 items-center justify-center rounded-lg border border-neutral-200 bg-white px-4 text-sm font-medium text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
-                    onclick={cancelEdit}
-                  >
-                    Cancel
-                  </Button.Root>
+              <!-- Actions -->
+              <div class="flex justify-end gap-2 pt-2">
+                <Button.Root
+                  class="inline-flex h-9 items-center justify-center rounded-lg border border-neutral-200 bg-white px-4 text-sm font-medium text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+                  onclick={testConnection}
+                >
+                  Test Connection
+                </Button.Root>
+                <Button.Root
+                  class="inline-flex h-9 items-center justify-center rounded-lg border border-neutral-200 bg-white px-4 text-sm font-medium text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+                  onclick={cancelEdit}
+                >
+                  Cancel
+                </Button.Root>
                 <Button.Root
                   class="inline-flex h-9 items-center justify-center rounded-lg bg-neutral-900 px-4 text-sm font-semibold text-neutral-50 shadow-sm transition-colors hover:bg-neutral-900/90 focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:outline-hidden dark:bg-neutral-50 dark:text-neutral-900 dark:hover:bg-neutral-50/90"
                   onclick={save}
@@ -688,3 +730,12 @@
   </ScrollArea.Scrollbar>
   <ScrollArea.Corner />
 </ScrollArea.Root>
+
+<!-- Delete Confirmation Dialog -->
+<ConfirmDialog
+  bind:open={deleteDialogOpen}
+  title="删除活跃 Provider"
+  description="这是当前正在使用的 Provider，删除后需要重新选择一个 Provider 才能使用 AI 功能。确定要删除吗？"
+  onConfirm={handleDeleteConfirm}
+  onCancel={handleDeleteCancel}
+/>
