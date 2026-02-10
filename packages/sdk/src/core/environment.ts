@@ -10,6 +10,7 @@
 export enum RuntimeEnvironment {
   Headless = 'headless',  /** Headless Deno environment */
   Webview = 'webview',    /** Webview environment with UI */
+  Iframe = 'iframe',      /** Iframe environment (plugin in iframe) */
   Unknown = 'unknown',
 }
 
@@ -18,6 +19,7 @@ export enum RuntimeEnvironment {
  * 
  * Determines the current code's runtime environment by checking global objects and runtime characteristics.
  * - If `window.__TAURI_INTERNALS__` object exists, it's considered a Webview environment
+ * - If running in an iframe (window.self !== window.top), it's considered an Iframe environment
  * - If `Deno.core` exists, it's considered a Headless environment (including plugin runtime)
  * - Otherwise, it's considered an unknown environment.
  * 
@@ -27,6 +29,11 @@ export function getEnvironment(): RuntimeEnvironment {
   // @ts-ignore
   if (typeof window !== 'undefined' && window.__TAURI_INTERNALS__) {
     return RuntimeEnvironment.Webview;
+  }
+
+  // Check if running in an iframe (plugin mode)
+  if (typeof window !== 'undefined' && window.self !== window.top) {
+    return RuntimeEnvironment.Iframe;
   }
 
   // @ts-ignore

@@ -10,6 +10,36 @@ import {
 /** Cache for the imported invoke function */
 let invokeFn: ((cmd: string, args?: any) => Promise<any>) | null = null;
 
+/** Message ID counter for postMessage calls */
+let messageIdCounter = 0;
+
+/** Pending postMessage calls waiting for response */
+const pendingCalls = new Map<string, { resolve: (value: any) => void; reject: (error: Error) => void }>();
+
+/**
+ * Setup postMessage response listener (only once)
+ */
+let postMessageListenerSetup = false;
+function setupPostMessageListener() {
+  if (postMessageListenerSetup) return;
+  postMessageListenerSetup = true;
+
+  window.addEventListener('message', (event) => {
+    const data = event.data;
+    if (!data || typeof data !== 'object') return;
+    if (!data.messageId || !pendingCalls.has(data.messageId)) return;
+
+    const pending = pendingCalls.get(data.messageId)!;
+    pendingCalls.delete(data.messageId);
+
+    if (data.error) {
+      pending.reject(new Error(data.error));
+    } else {
+      pending.resolve(data.result);
+    }
+  });
+}
+
 /**
  * Asynchronously loads and caches the invoke function
  * @returns The invoke function for the current environment
@@ -25,6 +55,33 @@ async function loadInvoke() {
   if (environment === RuntimeEnvironment.Webview) {
     const { invoke } = await import('@tauri-apps/api/core');
     invokeFn = invoke;
+  } else if (environment === RuntimeEnvironment.Iframe) {
+    // Iframe environment: use postMessage to communicate with parent window
+    setupPostMessageListener();
+
+    invokeFn = async <T>(method: string, args: any): Promise<T> => {
+      return new Promise((resolve, reject) => {
+        const messageId = `invoke_${++messageIdCounter}_${Date.now()}`;
+
+        pendingCalls.set(messageId, { resolve, reject });
+
+        // Send invoke request to parent window
+        window.parent.postMessage({
+          type: 'plugin-tauri-call',
+          messageId,
+          command: 'invoke',
+          args: [method, args],
+        }, '*');
+
+        // Timeout after 30 seconds
+        setTimeout(() => {
+          if (pendingCalls.has(messageId)) {
+            pendingCalls.delete(messageId);
+            reject(new Error(`Invoke timeout for method: ${method}`));
+          }
+        }, 30000);
+      });
+    };
   } else if (environment === RuntimeEnvironment.Headless) {
     // Headless environment invoke implementation defined directly here
     invokeFn = async <T>(method: string, arg: any): Promise<T> => {
@@ -114,6 +171,46 @@ async function loadListen() {
   if (environment === RuntimeEnvironment.Webview) {
     const { listen } = await import('@tauri-apps/api/event');
     listenFn = listen;
+  } else if (environment === RuntimeEnvironment.Iframe) {
+    // Iframe environment: use postMessage to listen for events from parent window
+    // Store event handlers
+    const eventHandlers = new Map<string, Set<EventCallback<any>>>();
+
+    // Setup listener for events from parent
+    window.addEventListener('message', (event) => {
+      const data = event.data;
+      if (!data || typeof data !== 'object') return;
+
+      // Handle stream events (for AI streaming)
+      if (data.type === 'plugin-event' && data.eventName) {
+        const handlers = eventHandlers.get(data.eventName);
+        if (handlers) {
+          handlers.forEach(handler => {
+            handler({ payload: data.payload } as any);
+          });
+        }
+      }
+    });
+
+    listenFn = (
+      event: EventName,
+      handler: EventCallback<any>,
+    ): Promise<UnlistenFn> => {
+      const eventName = event.toString();
+
+      if (!eventHandlers.has(eventName)) {
+        eventHandlers.set(eventName, new Set());
+      }
+      eventHandlers.get(eventName)!.add(handler);
+
+      // Return unlisten function
+      return Promise.resolve(() => {
+        const handlers = eventHandlers.get(eventName);
+        if (handlers) {
+          handlers.delete(handler);
+        }
+      });
+    };
   } else if (environment === RuntimeEnvironment.Headless) {
     // Headless environment simulates "listening" to specific events by mounting global variables
     listenFn = (
@@ -124,13 +221,13 @@ async function loadListen() {
         // This is special handling logic for registerCommandHandler
         (globalThis as any).__ONIN_COMMAND_HANDLER__ = handler;
         // Headless mode has no concept of unlisten, return an empty function
-        return Promise.resolve(() => {});
+        return Promise.resolve(() => { });
       }
 
       console.warn(
         `Event listening for '${event.toString()}' is not supported in headless mode.`,
       );
-      return Promise.resolve(() => {}); // Return an empty unlisten function
+      return Promise.resolve(() => { }); // Return an empty unlisten function
     };
   } else {
     throw new Error('Unsupported runtime environment for listen');
