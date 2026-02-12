@@ -177,15 +177,17 @@ pub async fn execute_command(
             }
             CommandAction::Extension {
                 extension_id,
-                command_code,
+                command_code: _command_code,
             } => {
-                // Extension 命令由前端处理（导航到独立页面）
-                // 后端只需记录日志
                 tracing::info!(
-                    "Extension command triggered: {}:{}",
-                    extension_id,
-                    command_code
+                    "Extension command triggered: {}",
+                    extension_id
                 );
+                
+                let result = crate::extension::execute_extension_command(extension_id, "");
+                if let Some(error) = result.error {
+                     eprintln!("Extension command failed: {}", error);
+                }
             }
         }
     } else {

@@ -45,7 +45,10 @@ pub fn get_extension_commands() -> Vec<Command> {
                     .collect(),
                 icon: manifest.icon.to_string(),
                 source: ItemSource::Command,
-                action: CommandAction::System(format!("extension:{}:{}", manifest.id, cmd.code)),
+                action: CommandAction::Extension {
+                    extension_id: manifest.id.to_string(),
+                    command_code: cmd.code.to_string(),
+                },
                 origin: None,
                 matches: None, // Extension 使用自己的匹配逻辑
                 requires_confirmation: false,
