@@ -30,6 +30,7 @@ pub fn get_all_extensions() -> Vec<&'static dyn Extension> {
         &extensions::calculator::CALCULATOR_EXTENSION,
         &extensions::emoji::EMOJI_EXTENSION,
         &extensions::clipboard::CLIPBOARD_EXTENSION,
+        &extensions::translator::TRANSLATOR_EXTENSION,
     ]
 }
 

@@ -120,6 +120,8 @@
   });
 
   // ===== Event Handlers =====
+
+
   const handleEsc = () => {
     // Only handle ESC on main page
     if (page.route.id !== "/") return;
@@ -262,7 +264,22 @@
           goto("/extensions/clipboard");
           return;
         }
-        // 其他 Extension 可以在这里扩展...
+        // Translator Extension
+        if (extensionId === "translator") {
+          const effectiveText = clipboard.state.attachedText || inputValue;
+          await extensionManager.execute(extensionId, effectiveText);
+
+          inputValue = "";
+          clipboard.clearAttachments();
+          extensionPreviewItem = null;
+          extensionManager.clearPreview();
+          matchedCommands = [];
+          appListManager.resetToOriginList();
+          // We likely want to close the main window as the translator opens in a new window
+          // The backend execute handler for translator opens a new window.
+          invoke("close_main_window");
+          return;
+        }
       }
     }
 
@@ -476,6 +493,7 @@
       <button class="flex-shrink-0 cursor-pointer" onclick={handleToSettings}>
         <img src="/logo.png" class="h-10 w-10" alt="Onin logo" />
       </button>
+
 
       <SearchInput
         bind:this={searchInputRef}

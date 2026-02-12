@@ -8,7 +8,10 @@ use crate::{
     shortcut_manager, system_commands, tray_manager, unified_launch_manager, usage_tracker,
     window_manager,
 };
-use tauri::Manager;
+use tauri::{
+    webview::WebviewBuilder, AppHandle, Emitter, Listener, Manager, WebviewUrl,
+    WebviewWindowBuilder, WindowBuilder,
+};
 
 /// 生成包含所有 Tauri 命令的 invoke handler
 pub fn get_invoke_handler(
@@ -138,6 +141,9 @@ pub fn get_invoke_handler(
         extension::api::get_emoji_data,
         // Keyboard simulation
         system_commands::simulate_paste,
+        // Google Translate Demo
+        // Translator Extension
+        crate::extensions::translator::commands::open_translator_window,
         // Clipboard Extension
         crate::extensions::clipboard::commands::get_clipboard_history,
         crate::extensions::clipboard::commands::set_clipboard_item,

@@ -12,6 +12,7 @@
     CurrencyDollar,
     CalendarBlank,
     Smiley,
+    Translate,
   } from "phosphor-svelte";
 
   interface PhosphorIconProps {
@@ -37,6 +38,7 @@
     currencyDollar: CurrencyDollar,
     calendar: CalendarBlank,
     smiley: Smiley,
+    translate: Translate,
   };
 
   const IconComponent = $derived(iconMap[icon] || Power);
