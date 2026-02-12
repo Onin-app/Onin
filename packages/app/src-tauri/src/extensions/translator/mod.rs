@@ -25,19 +25,18 @@ pub fn get_invoke_handler(
 pub static TRANSLATOR_MANIFEST: ExtensionManifest = crate::extension::types::ExtensionManifest {
     id: "translator",
     name: "翻译",
-    description: "多引擎聚合翻译 (Google, DeepL)",
+    description: "多引擎聚合翻译",
     icon: "translate", 
     commands: &[ExtensionCommand {
         code: "open",
         name: "打开翻译器",
-        description: "打开包含 Google 和 DeepL 的翻译窗口",
+        description: "打开翻译窗口",
         keywords: &[
             "translate",
             "translator",
             "fy",
+            "fanyi",
             "翻译",
-            "google",
-            "deepl",
         ],
         matches: None,
     }],

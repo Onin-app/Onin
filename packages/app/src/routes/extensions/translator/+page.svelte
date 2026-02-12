@@ -6,6 +6,19 @@
 
   let engine = $state("google");
 
+  const engines = [
+    { id: "google", label: "Google" },
+    { id: "deepl", label: "DeepL" },
+    { id: "bing", label: "Bing" },
+    { id: "baidu", label: "百度" },
+    { id: "sougou", label: "搜狗" },
+    { id: "tencent", label: "腾讯" },
+    { id: "caiyun", label: "彩云" },
+    { id: "youdao", label: "有道" },
+    { id: "papago", label: "Papago" },
+    { id: "yandex", label: "Yandex" },
+  ];
+
   const switchEngine = async (newEngine: string) => {
     if (engine === newEngine) return;
     engine = newEngine;
@@ -16,22 +29,18 @@
 <div
   class="flex h-full w-full items-center justify-center border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900"
 >
-  <Tabs.Root value={engine} onValueChange={(val) => switchEngine(val)} class="w-[400px]">
+  <Tabs.Root value={engine} onValueChange={(val) => switchEngine(val)} class="w-full">
     <Tabs.List
-      class="grid w-full grid-cols-2 rounded-lg bg-gray-200 p-1 text-sm font-medium text-gray-500 hover:bg-gray-200/80 dark:bg-gray-800 dark:text-gray-400"
+      class="flex w-full gap-1 overflow-x-auto rounded-lg bg-gray-200 p-1 text-xs font-medium text-gray-500 hover:bg-gray-200/80 dark:bg-gray-800 dark:text-gray-400"
     >
-      <Tabs.Trigger
-        value="google"
-        class="flex items-center justify-center rounded-md py-1.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm dark:data-[state=active]:bg-gray-950 dark:data-[state=active]:text-gray-50"
-      >
-        Google Translate
-      </Tabs.Trigger>
-      <Tabs.Trigger
-        value="deepl"
-        class="flex items-center justify-center rounded-md py-1.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm dark:data-[state=active]:bg-gray-950 dark:data-[state=active]:text-gray-50"
-      >
-        DeepL
-      </Tabs.Trigger>
+      {#each engines as e}
+        <Tabs.Trigger
+          value={e.id}
+          class="flex flex-shrink-0 items-center justify-center rounded-md px-3 py-1 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm dark:data-[state=active]:bg-gray-950 dark:data-[state=active]:text-gray-50"
+        >
+          {e.label}
+        </Tabs.Trigger>
+      {/each}
     </Tabs.List>
   </Tabs.Root>
 </div>
