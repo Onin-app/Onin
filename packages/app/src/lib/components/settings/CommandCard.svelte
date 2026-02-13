@@ -11,6 +11,8 @@
   // Props 接口
   interface Props {
     command: Command;
+    /** 显示模式：function 只显示别名，match 只显示匹配规则，all 全部显示 */
+    mode?: "function" | "match" | "all";
     onExecute: (commandName: string) => void;
     onToggleKeyword: (commandName: string, keywordName: string) => void;
     onAddKeyword: (commandName: string, keyword: string) => void;
@@ -19,6 +21,7 @@
 
   let {
     command,
+    mode = "all",
     onExecute,
     onToggleKeyword,
     onAddKeyword,
@@ -43,8 +46,8 @@
     </p>
   {/if}
 
-  <!-- 匹配规则显示区域 -->
-  {#if command.matches && command.matches.length > 0}
+  <!-- 匹配规则显示区域（function 模式下隐藏） -->
+  {#if mode !== "function" && command.matches && command.matches.length > 0}
     <div class="flex flex-col gap-1.5">
       {#each command.matches as match}
         <div class="flex flex-wrap items-center gap-1.5 text-xs">
@@ -179,7 +182,8 @@
     </div>
   {/if}
 
-  <!-- 关键词列表 -->
+  <!-- 关键词列表（match 模式下隐藏） -->
+  {#if mode !== "match"}
   <div class="flex flex-wrap gap-1.5">
     {#each command.keywords as keyword}
       <div
@@ -272,4 +276,5 @@
       />
     </div>
   </div>
+  {/if}
 </div>

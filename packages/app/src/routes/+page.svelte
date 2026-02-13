@@ -101,8 +101,14 @@
       (app) => !app.action || !matchedActions.has(app.action),
     );
 
+    // 去重：当 Extension 预览已存在时，从匹配命令中过滤掉 Extension 来源的命令
+    // Extension 已通过预览条目展示（如 "翻译: hello"），无需在匹配命令中重复
+    const deduplicatedMatchedCommands = extensionPreviewItem
+      ? matchedCommands.filter((cmd) => cmd.source !== "Extension")
+      : matchedCommands;
+
     // Extension 预览 -> 精确/模糊匹配(appList) -> 插件通配符匹配(matchedCommands)
-    return [...result, ...filteredAppList, ...matchedCommands];
+    return [...result, ...filteredAppList, ...deduplicatedMatchedCommands];
   });
 
   // ===== Effects =====

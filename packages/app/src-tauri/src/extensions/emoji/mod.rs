@@ -9,8 +9,8 @@ pub mod data;
 
 use crate::extension::registry::Extension;
 use crate::extension::types::{
-    EmojiGridData, EmojiGroup, EmojiItem, ExtensionCommand, ExtensionManifest, ExtensionMatch,
-    ExtensionPreview, ExtensionResult, PreviewViewType,
+    EmojiGridData, EmojiGroup, EmojiItem, ExtensionCommand, ExtensionManifest, ExtensionPreview,
+    ExtensionResult, PreviewViewType,
 };
 
 // ============================================================================
@@ -28,7 +28,7 @@ pub static EMOJI_MANIFEST: ExtensionManifest = ExtensionManifest {
         name: "搜索 Emoji",
         description: "浏览和搜索 Emoji 表情",
         keywords: &["emoji", "表情", "😀", "smiley", "emoticon"],
-        matches: None, // 移除正则匹配，使用关键字匹配
+        matches: None, // 不参与匹配指令，仅通过关键词触发
     }],
 };
 
@@ -47,15 +47,12 @@ impl Extension for EmojiExtension {
         &EMOJI_MANIFEST
     }
 
-    fn matches(&self, _input: &str) -> bool {
-        // Emoji 现在作为命令出现在列表中，不再需要 preview 匹配
-        // Preview 只用于 calculator 这类需要即时显示结果的 extension
-        false
-    }
+    // 不覆盖 custom_matches()，使用默认行为
+    // Emoji 作为命令出现在列表中，不需要输入预览匹配
 
-    fn execute(&self, input: &str) -> ExtensionResult {
-        // 对于 emoji 扩展，execute 返回选中的 emoji
-        // 这里返回空结果，实际选择逻辑在前端处理
+    fn execute(&self, _input: &str) -> ExtensionResult {
+        // 对于 emoji 扩展，execute 返回空结果
+        // 实际选择逻辑在前端处理
         ExtensionResult {
             success: true,
             value: None,
@@ -68,11 +65,6 @@ impl Extension for EmojiExtension {
 
     fn preview(&self, input: &str) -> Option<ExtensionPreview> {
         let trimmed = input.trim().to_lowercase();
-
-        // 检查是否匹配 emoji 关键字
-        if !self.matches(input) {
-            return None;
-        }
 
         // 提取搜索关键词（emoji 后面的部分）
         let search_query = if trimmed.starts_with("emoji ") {

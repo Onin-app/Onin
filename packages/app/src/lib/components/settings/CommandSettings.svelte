@@ -215,6 +215,14 @@
   let matchCommands = $derived(
     selectedPluginCommands.filter((cmd) => isMatchCommand(cmd)),
   );
+
+  // 当前分类下有匹配指令的 Extension 命令
+  let categoryMatchCommands = $derived(
+    filteredCommands.filter((cmd) => isMatchCommand(cmd)),
+  );
+
+  // 当前分类下的所有命令（功能指令标签页展示全部，匹配指令标签页只展示有 matches 的）
+  let categoryFunctionCommands = $derived(filteredCommands);
 </script>
 
 <main class="flex h-full w-full gap-6">
@@ -259,6 +267,7 @@
                 {#each functionCommands as command}
                   <CommandCard
                     {command}
+                    mode="function"
                     onExecute={executeCommand}
                     onToggleKeyword={toggleKeywordDisabled}
                     onAddKeyword={addKeyword}
@@ -273,10 +282,11 @@
                   </div>
                 {/if}
               {:else}
-                <!-- 内置指令列表 -->
-                {#each filteredCommands as command}
+                <!-- 内置指令列表（排除有匹配指令的，它们显示在匹配指令标签页） -->
+                {#each categoryFunctionCommands as command}
                   <CommandCard
                     {command}
+                    mode="function"
                     onExecute={executeCommand}
                     onToggleKeyword={toggleKeywordDisabled}
                     onAddKeyword={addKeyword}
@@ -305,6 +315,7 @@
                 {#each matchCommands as command}
                   <CommandCard
                     {command}
+                    mode="match"
                     onExecute={executeCommand}
                     onToggleKeyword={toggleKeywordDisabled}
                     onAddKeyword={addKeyword}
@@ -319,11 +330,24 @@
                   </div>
                 {/if}
               {:else}
-                <div
-                  class="flex h-full flex-col items-center justify-center text-neutral-400"
-                >
-                  <p>请选择一个插件</p>
-                </div>
+                <!-- 内置分类的匹配指令 -->
+                {#each categoryMatchCommands as command}
+                  <CommandCard
+                    {command}
+                    mode="match"
+                    onExecute={executeCommand}
+                    onToggleKeyword={toggleKeywordDisabled}
+                    onAddKeyword={addKeyword}
+                    onRemoveKeyword={removeKeyword}
+                  />
+                {/each}
+                {#if categoryMatchCommands.length === 0}
+                  <div
+                    class="flex h-full flex-col items-center justify-center text-neutral-400"
+                  >
+                    <p>暂无匹配指令</p>
+                  </div>
+                {/if}
               {/if}
             </div>
           </ScrollArea.Viewport>
