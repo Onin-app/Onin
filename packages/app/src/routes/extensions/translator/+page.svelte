@@ -4,19 +4,12 @@
   import { Tabs } from "bits-ui";
   import "../../../index.css";
 
-  let engine = $state("google");
+  let engine = $state("sougou");
 
   const engines = [
-    { id: "google", label: "Google" },
-    { id: "deepl", label: "DeepL" },
-    { id: "bing", label: "Bing" },
-    { id: "baidu", label: "百度" },
     { id: "sougou", label: "搜狗" },
-    { id: "tencent", label: "腾讯" },
-    { id: "caiyun", label: "彩云" },
-    { id: "youdao", label: "有道" },
-    { id: "papago", label: "Papago" },
-    { id: "yandex", label: "Yandex" },
+    { id: "google", label: "Google" },
+    { id: "baidu", label: "百度" },
   ];
 
   const switchEngine = async (newEngine: string) => {
