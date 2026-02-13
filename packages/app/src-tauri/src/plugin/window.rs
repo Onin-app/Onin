@@ -1,7 +1,7 @@
 //! # 插件窗口管理模块
 //!
 //! 负责插件窗口的创建、显示、隐藏、销毁，包括：
-//! - 窗口基本控制（最小化、最大化、关闭等）
+//! - 窗口基本控制（关闭、聚焦）
 //! - 窗口状态持久化
 //! - ESC 快捷键管理
 //! - 窗口切换防抖
@@ -30,67 +30,11 @@ pub fn plugin_close_window(app: tauri::AppHandle, label: String) -> Result<(), S
     }
 }
 
-/// 最小化插件窗口
-#[tauri::command]
-pub fn plugin_minimize_window(app: tauri::AppHandle, label: String) -> Result<(), String> {
-    if let Some(window) = app.get_webview_window(&label) {
-        window.minimize().map_err(|e| e.to_string())?;
-        // 触发窗口隐藏事件
-        trigger_window_visibility_event(&window, false);
-        Ok(())
-    } else {
-        Err(format!("窗口未找到: {}", label))
-    }
-}
-
-/// 最大化插件窗口
-#[tauri::command]
-pub fn plugin_maximize_window(app: tauri::AppHandle, label: String) -> Result<(), String> {
-    if let Some(window) = app.get_webview_window(&label) {
-        window.maximize().map_err(|e| e.to_string())
-    } else {
-        Err(format!("窗口未找到: {}", label))
-    }
-}
-
-/// 取消最大化插件窗口
-#[tauri::command]
-pub fn plugin_unmaximize_window(app: tauri::AppHandle, label: String) -> Result<(), String> {
-    if let Some(window) = app.get_webview_window(&label) {
-        window.unmaximize().map_err(|e| e.to_string())
-    } else {
-        Err(format!("窗口未找到: {}", label))
-    }
-}
-
-/// 检查插件窗口是否最大化
-#[tauri::command]
-pub fn plugin_is_maximized(app: tauri::AppHandle, label: String) -> Result<bool, String> {
-    if let Some(window) = app.get_webview_window(&label) {
-        window.is_maximized().map_err(|e| e.to_string())
-    } else {
-        Err(format!("窗口未找到: {}", label))
-    }
-}
-
 /// 显示插件窗口
 #[tauri::command]
 pub fn plugin_show_window(app: tauri::AppHandle, label: String) -> Result<(), String> {
     if let Some(window) = app.get_webview_window(&label) {
         window.show().map_err(|e| e.to_string())?;
-        // 触发窗口显示事件
-        trigger_window_visibility_event(&window, true);
-        Ok(())
-    } else {
-        Err(format!("窗口未找到: {}", label))
-    }
-}
-
-/// 取消最小化插件窗口（恢复窗口）
-#[tauri::command]
-pub fn plugin_unminimize_window(app: tauri::AppHandle, label: String) -> Result<(), String> {
-    if let Some(window) = app.get_webview_window(&label) {
-        window.unminimize().map_err(|e| e.to_string())?;
         // 触发窗口显示事件
         trigger_window_visibility_event(&window, true);
         Ok(())
@@ -107,12 +51,6 @@ pub fn plugin_set_focus(app: tauri::AppHandle, label: String) -> Result<(), Stri
     } else {
         Err(format!("窗口未找到: {}", label))
     }
-}
-
-/// 开始拖拽窗口
-#[tauri::command]
-pub fn plugin_start_dragging(window: tauri::WebviewWindow) -> Result<(), String> {
-    window.start_dragging().map_err(|e| e.to_string())
 }
 
 // ============================================================================
@@ -253,40 +191,53 @@ pub async fn create_or_show_plugin_window(
         return Ok(());
     }
 
-    // 构建窗口 URL
-    // 开发模式：使用 localhost:1420
-    // 生产模式：使用 tauri://localhost
-    #[cfg(debug_assertions)]
-    let plugin_url = format!(
-        "http://localhost:1420/plugin-window?plugin_id={}",
-        plugin.manifest.id
-    );
-    
-    #[cfg(not(debug_assertions))]
-    let plugin_url = format!(
-        "tauri://localhost/plugin-window?plugin_id={}",
-        plugin.manifest.id
-    );
+    // 构建窗口 URL - 直接指向插件 Entry
+    let plugin_url = if plugin.manifest.dev_mode && plugin.manifest.dev_server.is_some() {
+        // 开发模式：使用开发服务器
+        let mut url = reqwest::Url::parse(plugin.manifest.dev_server.as_ref().unwrap())
+            .map_err(|e| format!("无效的开发服务器 URL: {}", e))?;
+            
+        // 添加必要的查询参数
+        {
+            let mut pairs = url.query_pairs_mut();
+            pairs.append_pair("plugin_id", &plugin.manifest.id);
+            pairs.append_pair("mode", "window");
+        }
+        
+        println!("[plugin/window] 开发模式: 从 {} 加载", url);
+        url.to_string()
+    } else {
+
+
+        // 注意：这里需要确保插件服务器已经启动并且可以被访问
+        // 如果我们使用的是自定义协议或者 asset server，URL 格式可能不同
+        // 目前假设插件服务器运行在某个端口，或者通过 tauri 协议访问
+
+        // TODO: 这里需要根据实际的插件服务器逻辑来构建 URL
+        // 暂时回退到使用 load_plugin_url 类似的逻辑，或者复用之前的 plugin server port
+        
+        let port = match app.try_state::<crate::plugin::PluginServerPort>() {
+            Some(state) => state.0.lock().unwrap().unwrap_or(0),
+            None => 0,
+        };
+        
+        if port == 0 {
+             return Err("插件服务器未启动".to_string());
+        }
+
+        format!(
+            "http://127.0.0.1:{}/plugin/{}/{}?mode=window&plugin_id={}",
+            port,
+            plugin.dir_name,
+            plugin.manifest.entry,
+            plugin.manifest.id
+        )
+    };
     
     println!(
         "[plugin/window] 从 {} 加载插件窗口",
         plugin_url
     );
-
-    // 开发模式日志
-    if plugin.manifest.dev_mode {
-        if let Some(dev_server) = &plugin.manifest.dev_server {
-            println!(
-                "[plugin/window] 插件 {} 处于开发模式，将从 {} 加载",
-                plugin.manifest.id, dev_server
-            );
-        } else {
-            eprintln!(
-                "[plugin/window] 警告: 插件 {} 设置了 devMode=true 但未指定 devServer",
-                plugin.manifest.id
-            );
-        }
-    }
 
     // 加载保存的窗口状态
     let window_states = load_plugin_window_states(&app);
@@ -300,7 +251,8 @@ pub async fn create_or_show_plugin_window(
     )
     .title(plugin.manifest.name.clone())
     .resizable(true)
-    .decorations(false) // 所有平台都隐藏系统装饰
+    .decorations(true) // 启用原生装饰
+    .devtools(true) // 启用开发者工具
     .transparent(false); // 确保窗口不透明
     
     // 应用保存的窗口位置和大小

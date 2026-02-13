@@ -60,10 +60,7 @@ pub use state::{
 };
 
 // 桥接功能重导出
-pub use bridge::{
-    fix_asset_paths, inject_tauri_bridge, inline_resources, PLUGIN_WINDOW_CONTROLS_SCRIPT,
-    PLUGIN_WINDOW_TOPBAR_TEMPLATE,
-};
+pub use bridge::{fix_asset_paths, inject_tauri_bridge, inline_resources};
 
 // 协议处理重导出
 pub use protocol::handle_plugin_protocol;
@@ -84,9 +81,7 @@ pub use settings::{
 
 // 窗口命令
 pub use window::{
-    open_plugin_in_window, plugin_close_window, plugin_is_maximized, plugin_maximize_window,
-    plugin_minimize_window, plugin_set_focus, plugin_show_window, plugin_start_dragging,
-    plugin_unmaximize_window, plugin_unminimize_window,
+    open_plugin_in_window, plugin_close_window, plugin_set_focus, plugin_show_window,
 };
 
 // 执行器命令

@@ -81,7 +81,7 @@ async fn try_start_server(
 async fn serve_plugin_file(
     State(state): State<Arc<PluginServerState>>,
     Path((plugin_id, file_path)): Path<(String, String)>,
-    Query(params): Query<HashMap<String, String>>,
+    Query(_params): Query<HashMap<String, String>>,
 ) -> Response {
     let file_path = if file_path.is_empty() {
         "index.html".to_string()
@@ -114,8 +114,7 @@ async fn serve_plugin_file(
 
     // 处理 HTML 文件
     let final_content = if extension == Some("html") {
-        let mode = params.get("mode").map(|s| s.as_str()).unwrap_or("inline");
-        process_html_content(content, &plugin_id, mode)
+        process_html_content(content, &plugin_id)
     } else {
         content
     };
@@ -163,15 +162,11 @@ fn get_content_type(extension: Option<&str>) -> &'static str {
 // HTML 处理
 // ============================================================================
 
-/// 处理 HTML 内容：修复路径并注入 Tauri 桥接或运行时信息
-fn process_html_content(content: Vec<u8>, plugin_id: &str, mode: &str) -> Vec<u8> {
+/// 处理 HTML 内容：修复路径并注入 Tauri 桥接
+fn process_html_content(content: Vec<u8>, plugin_id: &str) -> Vec<u8> {
     if let Ok(html) = String::from_utf8(content.clone()) {
         let fixed_html = fix_asset_paths(&html);
-        if mode == "window" {
-            inject_window_runtime(&fixed_html, plugin_id).into_bytes()
-        } else {
-            inject_tauri_bridge(&fixed_html, plugin_id).into_bytes()
-        }
+        inject_tauri_bridge(&fixed_html, plugin_id).into_bytes()
     } else {
         content
     }
@@ -182,32 +177,6 @@ fn process_html_content(content: Vec<u8>, plugin_id: &str, mode: &str) -> Vec<u8
 /// Vite 构建的插件使用绝对路径（如 /assets/...），需要转换为相对路径
 fn fix_asset_paths(html: &str) -> String {
     html.replace("=\"/", "=\"./").replace("='/", "='./")
-}
-
-/// 注入窗口模式运行时信息
-fn inject_window_runtime(html: &str, plugin_id: &str) -> String {
-    let script = format!(
-        r#"
-<script>
-window.__PLUGIN_ID__ = '{}';
-window.__ONIN_RUNTIME__ = {{
-  mode: 'window',
-  pluginId: '{}',
-  version: '0.1.0',
-  mainWindowLabel: 'main'
-}};
-</script>
-"#,
-        plugin_id, plugin_id
-    );
-
-    if html.contains("<head>") {
-        html.replace("<head>", &format!("<head>{}", script))
-    } else if html.contains("<html>") {
-        html.replace("<html>", &format!("<html><head>{}</head>", script))
-    } else {
-        format!("{}{}", script, html)
-    }
 }
 
 // ============================================================================

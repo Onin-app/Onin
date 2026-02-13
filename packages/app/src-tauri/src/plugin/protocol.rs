@@ -8,7 +8,6 @@
 use tauri::http::{Request, Response};
 use tauri::Manager;
 
-use super::bridge::{PLUGIN_WINDOW_CONTROLS_SCRIPT, PLUGIN_WINDOW_TOPBAR_TEMPLATE};
 use super::types::PluginStore;
 
 // ============================================================================
@@ -138,18 +137,13 @@ window.__ONIN_RUNTIME__ = {{
                     plugin.manifest.id, plugin.manifest.id, plugin.manifest.version
                 );
 
-                let topbar_html = format!(
-                    "{}{}\n<script>\n{}\n</script>",
-                    plugin_id_script, PLUGIN_WINDOW_TOPBAR_TEMPLATE, PLUGIN_WINDOW_CONTROLS_SCRIPT
-                );
-
                 // 在 </head> 之前或 <body> 之后注入
                 if let Some(head_pos) = modified_html.find("</head>") {
-                    modified_html.insert_str(head_pos, &topbar_html);
+                    modified_html.insert_str(head_pos, &plugin_id_script);
                 } else if let Some(body_pos) = modified_html.find("<body") {
                     if let Some(body_end) = modified_html[body_pos..].find('>') {
                         let insert_pos = body_pos + body_end + 1;
-                        modified_html.insert_str(insert_pos, &topbar_html);
+                        modified_html.insert_str(insert_pos, &plugin_id_script);
                     }
                 }
             }

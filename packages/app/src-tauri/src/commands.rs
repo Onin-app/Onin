@@ -51,14 +51,8 @@ pub fn get_invoke_handler(
         // Plugin window
         plugin::window::open_plugin_in_window,
         plugin::window::plugin_close_window,
-        plugin::window::plugin_minimize_window,
-        plugin::window::plugin_maximize_window,
-        plugin::window::plugin_unmaximize_window,
-        plugin::window::plugin_unminimize_window,
-        plugin::window::plugin_is_maximized,
         plugin::window::plugin_show_window,
         plugin::window::plugin_set_focus,
-        plugin::window::plugin_start_dragging,
         // Plugin executor
         plugin::executor::execute_plugin_entry,
         // Plugin settings
