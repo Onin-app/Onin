@@ -7,7 +7,7 @@
   "devMode": true,
   "devServer": "http://localhost:5174",
   "type": "webview",
-  "display_mode": "window",
+  "display_mode": "inline",
   "icon": "icon.svg",
   "commands": [
     {

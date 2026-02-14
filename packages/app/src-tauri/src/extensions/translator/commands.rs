@@ -45,7 +45,7 @@ pub async fn open_window(app: &tauri::AppHandle, text: Option<String>) -> Result
     
     // Helper to append query (simplified)
     // Google: ?text=...
-    let google_url = if let Some(t) = &text {
+    let google_url = if let Some(_) = &text {
         format!("https://translate.google.com/?sl=auto&tl=zh-CN&text={}", encoded)
     } else {
         "https://translate.google.com/".to_string()
@@ -66,7 +66,7 @@ pub async fn open_window(app: &tauri::AppHandle, text: Option<String>) -> Result
 
     // Baidu: #zh/en/text (or auto/zh)
     // https://fanyi.baidu.com/#auto/zh/text
-    let baidu_url = if let Some(t) = &text {
+    let baidu_url = if let Some(_) = &text {
         format!("https://fanyi.baidu.com/#auto/zh/{}", encoded)
     } else {
         "https://fanyi.baidu.com".to_string()
@@ -87,7 +87,7 @@ pub async fn open_window(app: &tauri::AppHandle, text: Option<String>) -> Result
 
     // Sougou: ?text=... (need to verify)
     // https://fanyi.sogou.com/text?keyword=...
-    let sougou_url = if let Some(t) = &text {
+    let sougou_url = if let Some(_) = &text {
         format!("https://fanyi.sogou.com/text?keyword={}", encoded)
     } else {
         "https://fanyi.sogou.com/".to_string()

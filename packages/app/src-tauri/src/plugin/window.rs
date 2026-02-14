@@ -253,8 +253,8 @@ pub async fn create_or_show_plugin_window(
         return Ok(());
     }
 
-    // 构建窗口 URL 和相关配置
-    let (plugin_url, initialization_script) = if plugin.manifest.dev_mode && plugin.manifest.dev_server.is_some() {
+    // 构建窗口 URL
+    let plugin_url = if plugin.manifest.dev_mode && plugin.manifest.dev_server.is_some() {
         let dev_server = plugin.manifest.dev_server.as_ref().unwrap();
         // 如果 devServer 已经有 query params，使用 & 连接
         let separator = if dev_server.contains('?') { '&' } else { '?' };
@@ -266,7 +266,7 @@ pub async fn create_or_show_plugin_window(
             "[plugin/window] 从 {} 加载插件窗口 (Dev Mode)",
             url
         );
-        (url, String::new())
+        url
     } else {
         // 获取插件服务器端口 (仅在非 Dev Mode 或 Dev Mode 无 Server 时需要)
         let port = {
@@ -289,7 +289,7 @@ pub async fn create_or_show_plugin_window(
             "[plugin/window] 从 {} 加载插件窗口 (Native Mode)",
             url
         );
-        (url, String::new())
+        url
     };
 
     // 注入运行时信息

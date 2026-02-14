@@ -58,7 +58,7 @@ fn create_shortcut_handler(
         // ESC 快捷键处理
         if shortcut == &close_window_shortcut {
             if let Some(window) = app.get_webview_window("main") {
-                let _ = window.emit("esc_key_pressed", ());
+                let _ = window.emit("escape_pressed", ());
             }
         }
     }
@@ -96,6 +96,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         // 自定义协议
         .register_uri_scheme_protocol("plugin", plugin::handle_plugin_protocol)
+        // 命令
         // 命令
         .invoke_handler(commands::get_invoke_handler())
         // 初始化

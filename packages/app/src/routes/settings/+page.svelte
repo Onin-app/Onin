@@ -82,7 +82,7 @@
   onDestroy(() => {
     // On destroy, reset the handler if it's still ours
     if (get(escapeHandler) === handleEsc) {
-      escapeHandler.set(() => {});
+      escapeHandler.set(null);
     }
   });
 

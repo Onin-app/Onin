@@ -47,12 +47,22 @@ pub const CLOSE_WINDOW_SHORTCUT_STR: &str = "escape";
 /// 隐藏主窗口命令
 #[tauri::command]
 pub fn close_main_window(app: tauri::AppHandle, state: State<WindowState>) {
+    // Try get_webview_window first
     if let Some(window) = app.get_webview_window("main") {
         state
             .hiding_initiated_by_command
             .store(true, Ordering::Relaxed);
         window.hide().ok();
         window.emit("window_visibility", &false).unwrap_or_default();
+    } else if let Some(window) = app.get_window("main") {
+        // Fallback to get_window
+         state
+            .hiding_initiated_by_command
+            .store(true, Ordering::Relaxed);
+        window.hide().ok();
+        window.emit("window_visibility", &false).unwrap_or_default();
+    } else {
+        eprintln!("[window_manager] Main window not found for closing");
     }
 }
 
@@ -193,14 +203,22 @@ fn handle_window_focused(app_handle: &AppHandle, shortcut: Shortcut) {
         cancel_hide_task(&app_handle_clone).await;
     });
 
-    // 注册 ESC 快捷键
-    println!("Window focused, registering Esc shortcut.");
-    app_handle
-        .global_shortcut()
-        .register(shortcut)
-        .unwrap_or_else(|err| {
-            eprintln!("[ERROR] Failed to register Esc shortcut: {}", err);
-        });
+    // 注册 ESC 快捷键 (Async to avoid deadlock if triggered by shortcut handler)
+    let app_handle_reg = app_handle.clone();
+    tauri::async_runtime::spawn(async move {
+        println!("Window focused, registering Esc shortcut (async).");
+        // Optional: tiny delay to ensure lock release
+        // sleep(Duration::from_millis(10)).await;
+        app_handle_reg
+            .global_shortcut()
+            .register(shortcut)
+            .unwrap_or_else(|err| {
+                // Ignore "already registered" error to reduce noise, or keep logging
+                if !err.to_string().contains("already registered") {
+                     eprintln!("[ERROR] Failed to register Esc shortcut: {}", err);
+                }
+            });
+    });
 }
 
 /// 处理窗口失去焦点
@@ -212,13 +230,19 @@ fn handle_window_blur(
     let window_state: State<WindowState> = app_handle.state();
     let lock_state: State<WindowCloseLockState> = app_handle.state();
 
-    // 注销 ESC 快捷键
-    app_handle
-        .global_shortcut()
-        .unregister(shortcut)
-        .unwrap_or_else(|err| {
-            eprintln!("[ERROR] Failed to unregister Esc shortcut: {}", err);
-        });
+    // 注销 ESC 快捷键 (Async to avoid deadlock)
+    let app_handle_unreg = app_handle.clone();
+    tauri::async_runtime::spawn(async move {
+         app_handle_unreg
+            .global_shortcut()
+            .unregister(shortcut)
+            .unwrap_or_else(|err| {
+                 // Ignore "not registered" error
+                  if !err.to_string().contains("not registered") {
+                      eprintln!("[ERROR] Failed to unregister Esc shortcut: {}", err);
+                  }
+            });
+    });
 
     // 如果窗口被锁定，跳过隐藏
     if lock_state.0.load(Ordering::Relaxed) > 0 {

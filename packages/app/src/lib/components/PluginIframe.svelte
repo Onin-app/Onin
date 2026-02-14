@@ -1,10 +1,15 @@
 <script lang="ts">
   /**
-   * PluginIframe Component
+   * PluginInlineView Component
+   * (Formerly PluginIframe)
    *
-   * 插件 iframe 容器组件
-   * 负责加载和管理插件的 iframe，并处理生命周期事件
+   * 插件内联视图组件 - Native Webview 版本
+   * 使用 div 占位符，并通过 Tauri 2 API 控制原生 Child Webview 的位置和大小
    */
+  import { onMount, onDestroy } from "svelte";
+  import { invoke } from "@tauri-apps/api/core";
+  import { listen, type UnlistenFn } from "@tauri-apps/api/event"; // [Fix] Import UnlistenFn
+
   interface Props {
     url: string;
     pluginId?: string;
@@ -13,14 +18,17 @@
 
   let { url, pluginId = "", onLoad }: Props = $props();
 
-  let iframeElement = $state<HTMLIFrameElement | null>(null);
+  let containerElement = $state<HTMLDivElement | null>(null);
+  let resizeObserver: ResizeObserver | null = null;
+  let isMounted = false;
+  let unlistenLoaded: UnlistenFn | null = null; // [Fix] Declare at top level
 
   /**
-   * 计算带有 mode 和 plugin_id 参数的 iframe URL
-   * 这样 SDK 可以在初始化时立即从 URL 获取运行模式信息
+   * 计算带有 mode 和 plugin_id 参数的 URL
    */
-  const iframeSrc = $derived.by(() => {
+  const targetUrl = $derived.by(() => {
     try {
+      if (!url) return "";
       const urlObj = new URL(url);
       urlObj.searchParams.set("mode", "inline");
       if (pluginId) {
@@ -28,24 +36,182 @@
       }
       return urlObj.toString();
     } catch {
-      // 如果 URL 解析失败，添加查询参数的简单方式
+      if (typeof url !== 'string') return "";
       const separator = url.includes("?") ? "&" : "?";
       const params = `mode=inline${pluginId ? `&plugin_id=${encodeURIComponent(pluginId)}` : ""}`;
       return `${url}${separator}${params}`;
     }
   });
 
-  // 暴露 iframe 元素给父组件
-  export function getElement(): HTMLIFrameElement | null {
-    return iframeElement;
+  // 暴露元素给父组件 (保持接口兼容，虽然不再是 iframe)
+  // 父组件可能用它来获取焦点等，对于 div 也可以
+  export function getElement(): HTMLDivElement | null {
+    return containerElement;
   }
 
   /**
-   * 发送运行时初始化信息给插件
+   * 获取物理像素矩形
    */
-  function sendRuntimeInit() {
-    if (!iframeElement?.contentWindow) return;
+  function getPhysicalRect(element: HTMLElement) {
+    const rect = element.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    return {
+      x: rect.x * dpr,
+      y: rect.y * dpr,
+      width: rect.width * dpr,
+      height: rect.height * dpr,
+    };
+  }
 
+  /**
+   * 更新 Webview 位置和大小
+   */
+  async function updateBounds() {
+    if (!containerElement || !isMounted) return;
+    const rect = getPhysicalRect(containerElement);
+    try {
+      await invoke("update_inline_plugin_bounds", { rect });
+    } catch (error) {
+      console.error("[PluginInlineView] Failed to update bounds:", error);
+    }
+  }
+
+  /**
+   * 显示 Webview
+   */
+   async function showWebview() {
+     if (!containerElement) {
+         console.error("[PluginInlineView] Container element not found");
+         return;
+     }
+
+     // Revert to strict logic
+     const rect = getPhysicalRect(containerElement);
+     
+     // Access targetUrl safely
+     let safeUrl = "";
+     try {
+         safeUrl = targetUrl;
+     } catch (e) {
+         console.error(`Failed to read targetUrl: ${e}`);
+         throw e;
+     }
+ 
+     try {
+       await invoke("show_inline_plugin", { url: safeUrl, rect });
+       
+       // 发送运行时初始化数据
+       // 必须在 show_inline_plugin 之后发送，确保 webview 已经存在
+       sendRuntimeInit();
+
+       // [Fix] onLoad 应该等待 backend 的 on_page_load 事件，而不是立即触发
+       // onLoad?.();
+     } catch (error) {
+       console.error("[PluginInlineView] Failed to show webview:", error);
+     }
+   }
+
+  /**
+   * 发送生命周期事件给插件
+   */
+  export async function sendLifecycleEvent(
+    event: "show" | "hide" | "focus" | "blur",
+  ) {
+    try {
+        // 使用后端命令发送消息到 Native Webview
+        await invoke("send_inline_plugin_message", {
+            message: {
+                type: "plugin-lifecycle-event",
+                event,
+            }
+        });
+        console.log("[PluginInlineView] Sent lifecycle event:", event);
+    } catch (err) {
+        console.error("[PluginInlineView] Failed to send lifecycle event:", err);
+    }
+  }
+
+  // 监听 URL 变化
+  $effect(() => {
+      if (isMounted && targetUrl) {
+          showWebview();
+      }
+  });
+
+  let rectCheckLoop: number | null = null;
+  let lastRectJson = "";
+
+  onMount(() => {
+    isMounted = true;
+    
+    // 监听 Native Webview 加载完成事件
+    listen("plugin-inline-loaded", () => {
+        console.log("[PluginInlineView] Native webview loaded");
+        onLoad?.();
+        // Also send init again just in case? No, showWebview sent it.
+        // But if load happened, maybe context cleared?
+        // Yes, on load, JS context is reset. So we MUST send init AFTER load.
+        sendRuntimeInit(); 
+    }).then(u => unlistenLoaded = u);
+
+    // 初始化显示
+    // 使用 requestAnimationFrame 确保布局已完成
+    requestAnimationFrame(() => {
+         try {
+             showWebview().catch(e => {
+                 console.error(`showWebview promise rejected: ${e}`);
+             });
+             
+             // 初始化后发送 runtime-init (虽然 native bridge 可能会自己处理?)
+             // 我们的 bridge script 检查了 native window 模式，跳过了 iframe 桥接 logic。
+             // 所以我们需要通过 send_inline_plugin_message 发送 init data
+             // Moved to showWebview to ensure it sends on every load
+             // sendRuntimeInit();
+         } catch (e) {
+             console.error(`Error in RAF callback: ${e}`);
+         }
+    });
+
+    // 监听大小变化
+    if (containerElement) {
+
+      resizeObserver = new ResizeObserver(() => {
+        updateBounds();
+      });
+      resizeObserver.observe(containerElement);
+    }
+    
+    // 轮询检查位置变化 (ResizeObserver 无法检测仅仅位置改变的情况)
+    const checkLoop = () => {
+        if (!isMounted) return;
+        updateBoundsIfChanged();
+        rectCheckLoop = requestAnimationFrame(checkLoop);
+    };
+    rectCheckLoop = requestAnimationFrame(checkLoop);
+  });
+
+  onDestroy(() => {
+    isMounted = false;
+    resizeObserver?.disconnect();
+    if (rectCheckLoop) cancelAnimationFrame(rectCheckLoop);
+    
+    if (unlistenLoaded) unlistenLoaded();
+    
+    // 销毁 Webview (双重保险)
+    invoke("close_inline_plugin").catch(console.error);
+  });
+  
+  async function updateBoundsIfChanged() {
+      if (!containerElement) return;
+      const rect = getPhysicalRect(containerElement);
+      const rectJson = JSON.stringify(rect);
+      if (rectJson !== lastRectJson) {
+          lastRectJson = rectJson;
+          updateBounds();
+      }
+  }
+
+  function sendRuntimeInit() {
     const runtimeInit = {
       type: "plugin-runtime-init",
       runtime: {
@@ -55,47 +221,14 @@
         mainWindowLabel: "main",
       },
     };
-
-    iframeElement.contentWindow.postMessage(runtimeInit, "*");
-    console.log("[PluginIframe] Sent runtime init:", runtimeInit.runtime);
+    invoke("send_inline_plugin_message", { message: runtimeInit }).catch(console.error);
   }
 
-  /**
-   * 发送生命周期事件给插件
-   */
-  export function sendLifecycleEvent(
-    event: "show" | "hide" | "focus" | "blur",
-  ) {
-    if (iframeElement?.contentWindow) {
-      iframeElement.contentWindow.postMessage(
-        {
-          type: "plugin-lifecycle-event",
-          event,
-        },
-        "*",
-      );
-      console.log("[PluginIframe] Sent lifecycle event:", event);
-    }
-  }
-
-  /**
-   * 处理 iframe 加载完成
-   */
-  function handleLoad() {
-    // 发送运行时初始化
-    sendRuntimeInit();
-    // 发送初始 show 事件
-    sendLifecycleEvent("show");
-    // 通知父组件
-    onLoad?.();
-  }
 </script>
 
-<iframe
-  bind:this={iframeElement}
-  src={iframeSrc}
-  class="h-full w-full border-0"
-  title="Plugin"
-  allow="clipboard-read; clipboard-write"
-  onload={handleLoad}
-></iframe>
+<div
+  bind:this={containerElement}
+  class="h-full w-full bg-transparent relative"
+   role="none"
+>
+</div>

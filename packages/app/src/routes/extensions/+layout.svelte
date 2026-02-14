@@ -38,7 +38,7 @@
   onDestroy(() => {
     unsubscribeTheme?.();
     if (get(escapeHandler) === handleEsc) {
-      escapeHandler.set(() => {});
+      escapeHandler.set(null);
     }
   });
 

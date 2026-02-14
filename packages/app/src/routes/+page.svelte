@@ -129,13 +129,19 @@
 
 
   const handleEsc = () => {
+    console.log("handleEsc triggered, route:", page.route.id);
     // Only handle ESC on main page
-    if (page.route.id !== "/") return;
+    if (page.route.id !== "/") {
+        console.log("Not on main page, ignoring ESC");
+        return;
+    }
 
     if (plugin.state.showPluginInline) {
+      console.log("Closing inline plugin");
       plugin.closePlugin();
       return;
     }
+    console.log("Clearing input/closing main window");
     inputValue = "";
     clipboard.clearAttachments();
     matchedCommands = [];
@@ -415,9 +421,9 @@
     console.log("Main page component has mounted");
     escapeHandler.set(handleEsc);
 
-    // 设置插件消息处理
-    window.addEventListener("message", plugin.handlePluginMessage);
-
+    // 设置插件消息处理 (已废弃，使用 Native Bridge)
+    // window.addEventListener("message", plugin.handlePluginMessage);
+    
     // 加载配置
     await appListManager.loadConfig();
 
@@ -456,6 +462,12 @@
       },
     );
 
+    // 监听后端发来的 ESC 事件 (当焦点在插件窗口或全局快捷键捕获时)
+    const unlistenEsc = await listen("escape_pressed", () => {
+      console.log("Received escape_pressed event from backend");
+      handleEsc();
+    });
+
     // 设置 composables 的事件监听
     const unlistenPlugin = await plugin.setupListeners();
     const unlistenAppList = await appListManager.setupListeners();
@@ -464,6 +476,7 @@
       unlistenWindowShow();
       unlistenClearClipboard();
       unlistenFocus();
+      unlistenEsc();
       unlistenPlugin();
       unlistenAppList();
     };
@@ -473,14 +486,14 @@
     unsubscribeTheme?.();
 
     if (get(escapeHandler) === handleEsc) {
-      escapeHandler.set(() => {});
+      escapeHandler.set(null);
     }
 
     if (unlisten) {
       unlisten();
     }
 
-    window.removeEventListener("message", plugin.handlePluginMessage);
+    // window.removeEventListener("message", plugin.handlePluginMessage);
   });
 </script>
 

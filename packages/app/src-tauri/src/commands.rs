@@ -59,6 +59,12 @@ pub fn get_invoke_handler(
         plugin::window::plugin_show_window,
         plugin::window::plugin_set_focus,
         plugin::window::plugin_start_dragging,
+        // Plugin Inline
+        plugin::inline::show_inline_plugin,
+        plugin::inline::update_inline_plugin_bounds,
+        plugin::inline::hide_inline_plugin,
+        plugin::inline::close_inline_plugin,
+        plugin::inline::send_inline_plugin_message,
         // Plugin executor
         plugin::executor::execute_plugin_entry,
         // Plugin settings

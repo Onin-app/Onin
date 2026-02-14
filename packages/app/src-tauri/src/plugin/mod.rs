@@ -24,6 +24,7 @@
 
 pub mod bridge;
 pub mod executor;
+pub mod inline;
 pub mod installer;
 pub mod loader;
 pub mod protocol;
@@ -87,6 +88,12 @@ pub use window::{
     open_plugin_in_window, plugin_close_window, plugin_is_maximized, plugin_maximize_window,
     plugin_minimize_window, plugin_set_focus, plugin_show_window, plugin_start_dragging,
     plugin_unmaximize_window, plugin_unminimize_window,
+};
+
+// 内联插件命令
+pub use inline::{
+    close_inline_plugin, hide_inline_plugin, send_inline_plugin_message, show_inline_plugin,
+    update_inline_plugin_bounds, InlinePluginState,
 };
 
 // 执行器命令

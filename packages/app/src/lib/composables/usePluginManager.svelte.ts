@@ -12,7 +12,6 @@ export interface PluginState {
   currentPluginUrl: string;
   currentPluginId: string;
   currentPluginAutoDetach: boolean;
-  iframeElement: HTMLIFrameElement | null;
 }
 
 export interface PluginManagerReturn {
@@ -22,11 +21,11 @@ export interface PluginManagerReturn {
   closePlugin: () => void;
   detachPlugin: () => Promise<void>;
   toggleAutoDetach: (checked: boolean) => Promise<void>;
-  handlePluginMessage: (event: MessageEvent) => Promise<void>;
+  handlePluginMessage: (event: MessageEvent) => Promise<void>; // Keep for compatibility if needed, but likely unused
   sendLifecycleEvent: (event: "show" | "hide" | "focus" | "blur") => void;
   // Lifecycle
   setupListeners: () => Promise<UnlistenFn>;
-  setIframeElement: (element: HTMLIFrameElement | null) => void;
+  setIframeElement: (element: HTMLElement | null) => void; // Deprecated, keep empty for compatibility
 }
 
 /**
@@ -41,7 +40,6 @@ export function usePluginManager(): PluginManagerReturn {
     currentPluginUrl: "",
     currentPluginId: "",
     currentPluginAutoDetach: false,
-    iframeElement: null,
   });
 
   // ===== Methods =====
@@ -57,7 +55,9 @@ export function usePluginManager(): PluginManagerReturn {
     state.currentPluginUrl = "";
     state.currentPluginId = "";
     state.currentPluginAutoDetach = false;
-    state.iframeElement = null;
+
+    // Create side effect to close (destroy) webview
+    invoke("close_inline_plugin").catch(console.error);
   };
 
   /**
@@ -114,56 +114,34 @@ export function usePluginManager(): PluginManagerReturn {
   };
 
   /**
-   * 处理来自插件 iframe 的消息
+   * 处理来自插件的消息
+   * (Native Webview 模式下不再需要代理 invoke，但保留空函数以防调用)
    */
   const handlePluginMessage = async (event: MessageEvent) => {
-    if (event.data?.type !== "plugin-tauri-call") return;
-
-    const { messageId, command, args } = event.data;
-    const iframe = state.iframeElement;
-    if (!iframe?.contentWindow) return;
-
-    try {
-      let result;
-      if (command === "invoke") {
-        result = await invoke(args[0], args[1] || {});
-      } else if (command === "emit") {
-        result = null;
-      }
-
-      iframe.contentWindow.postMessage({ messageId, result }, "*");
-    } catch (error) {
-      iframe.contentWindow.postMessage(
-        {
-          messageId,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "*",
-      );
-    }
+    // No-op for native webview
   };
 
   /**
    * 发送生命周期事件给插件
    */
   const sendLifecycleEvent = (event: "show" | "hide" | "focus" | "blur") => {
-    if (state.iframeElement?.contentWindow) {
-      state.iframeElement.contentWindow.postMessage(
-        {
-          type: "plugin-lifecycle-event",
-          event,
-        },
-        "*",
-      );
-      console.log("[PluginManager] Sent lifecycle event:", event);
-    }
+    invoke("send_inline_plugin_message", {
+      message: {
+        type: "plugin-lifecycle-event",
+        event,
+      },
+    }).catch((err) => {
+      // Ignore error if webview is not ready or closed
+      // console.error("Failed to send lifecycle event:", err);
+    });
+    console.log("[PluginManager] Sent lifecycle event:", event);
   };
 
   /**
-   * 设置 iframe 元素引用
+   * 设置 iframe 元素引用 (Deprecated)
    */
-  const setIframeElement = (element: HTMLIFrameElement | null) => {
-    state.iframeElement = element;
+  const setIframeElement = (element: any) => {
+    // No-op
   };
 
   /**
