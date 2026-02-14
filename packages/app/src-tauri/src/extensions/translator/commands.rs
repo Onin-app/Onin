@@ -33,7 +33,7 @@ pub async fn open_window(app: &tauri::AppHandle, text: Option<String>) -> Result
     // This loads the local Svelte route: /extensions/translator
     let _ui_webview = window
         .add_child(
-            WebviewBuilder::new("translator-ui", WebviewUrl::App("extensions/translator".into()))
+            WebviewBuilder::new("translator-ui", WebviewUrl::App("/extensions/translator".into()))
                 .auto_resize(),
             LogicalPosition::new(0.0, 0.0),
             LogicalSize::new(1000.0, 50.0),
