@@ -25,7 +25,7 @@ export interface PluginManagerReturn {
   sendLifecycleEvent: (event: "show" | "hide" | "focus" | "blur") => void;
   // Lifecycle
   setupListeners: () => Promise<UnlistenFn>;
-  setIframeElement: (element: HTMLElement | null) => void; // Deprecated, keep empty for compatibility
+
 }
 
 /**
@@ -137,12 +137,7 @@ export function usePluginManager(): PluginManagerReturn {
     console.log("[PluginManager] Sent lifecycle event:", event);
   };
 
-  /**
-   * 设置 iframe 元素引用 (Deprecated)
-   */
-  const setIframeElement = (element: any) => {
-    // No-op
-  };
+
 
   /**
    * 设置事件监听器
@@ -202,6 +197,5 @@ export function usePluginManager(): PluginManagerReturn {
     handlePluginMessage,
     sendLifecycleEvent,
     setupListeners,
-    setIframeElement,
   };
 }

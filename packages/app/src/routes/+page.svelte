@@ -39,7 +39,7 @@
   import AppListItem from "$lib/components/AppListItem.svelte";
   import PluginMenu from "$lib/components/PluginMenu.svelte";
   import RefreshProgressBar from "$lib/components/RefreshProgressBar.svelte";
-  import PluginIframe from "$lib/components/PluginIframe.svelte";
+  import PluginInlineView from "$lib/components/PluginInlineView.svelte";
   import ExtensionResultItem from "$lib/components/ExtensionResultItem.svelte";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
 
@@ -60,7 +60,7 @@
 
   // Component references
   let searchInputRef: SearchInput;
-  let pluginIframeRef = $state<PluginIframe | null>(null);
+  let pluginInlineViewRef = $state<PluginInlineView | null>(null);
 
   // Confirm dialog state
   let confirmDialogOpen = $state(false);
@@ -127,13 +127,12 @@
 
   // ===== Event Handlers =====
 
-
   const handleEsc = () => {
     console.log("handleEsc triggered, route:", page.route.id);
     // Only handle ESC on main page
     if (page.route.id !== "/") {
-        console.log("Not on main page, ignoring ESC");
-        return;
+      console.log("Not on main page, ignoring ESC");
+      return;
     }
 
     if (plugin.state.showPluginInline) {
@@ -423,7 +422,7 @@
 
     // 设置插件消息处理 (已废弃，使用 Native Bridge)
     // window.addEventListener("message", plugin.handlePluginMessage);
-    
+
     // 加载配置
     await appListManager.loadConfig();
 
@@ -513,7 +512,6 @@
         <img src="/logo.png" class="h-10 w-10" alt="Onin logo" />
       </button>
 
-
       <SearchInput
         bind:this={searchInputRef}
         bind:value={inputValue}
@@ -552,13 +550,13 @@
       <RefreshProgressBar isRefreshing={appListManager.state.isRefreshing} />
 
       {#if plugin.state.showPluginInline}
-        <!-- Plugin Iframe -->
-        <PluginIframe
-          bind:this={pluginIframeRef}
+        <!-- Plugin Inline View -->
+        <PluginInlineView
+          bind:this={pluginInlineViewRef}
           url={plugin.state.currentPluginUrl}
           pluginId={plugin.state.currentPluginId}
           onLoad={() => {
-            plugin.setIframeElement(pluginIframeRef?.getElement() ?? null);
+            // No-op for now, logic potentially moved to component or manager
           }}
         />
       {:else}
@@ -593,7 +591,7 @@
           </ScrollArea.Viewport>
           <ScrollArea.Scrollbar
             orientation="vertical"
-            class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none select-none rounded-full border-l border-l-transparent p-px transition-all duration-200 hover:w-3"
+            class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none rounded-full border-l border-l-transparent p-px transition-all duration-200 select-none hover:w-3"
           >
             <ScrollArea.Thumb class="bg-muted-foreground flex-1 rounded-full" />
           </ScrollArea.Scrollbar>
@@ -620,4 +618,3 @@
     pendingAction = null;
   }}
 />
-
