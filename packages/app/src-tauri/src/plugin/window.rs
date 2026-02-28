@@ -137,12 +137,17 @@ pub fn open_plugin_in_window(
     }
     .ok_or_else(|| format!("插件未找到: {}", plugin_id))?;
 
-    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let plugin_dir = data_dir.join("plugins").join(&plugin.dir_name);
-    let entry_path = plugin_dir.join(&plugin.manifest.entry);
+    // 仅在非 dev_mode（无 dev_server）时校验本地入口文件是否存在
+    // dev_mode 插件直接从 dev_server 加载，不需要本地文件
+    let is_dev_mode = plugin.manifest.dev_mode && plugin.manifest.dev_server.is_some();
+    if !is_dev_mode {
+        let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+        let plugin_dir = data_dir.join("plugins").join(&plugin.dir_name);
+        let entry_path = plugin_dir.join(&plugin.manifest.entry);
 
-    if !entry_path.is_file() {
-        return Err(format!("插件入口文件未找到: {:?}", entry_path));
+        if !entry_path.is_file() {
+            return Err(format!("插件入口文件未找到: {:?}", entry_path));
+        }
     }
 
     // 强制在窗口模式中打开

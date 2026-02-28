@@ -25,7 +25,6 @@ export interface PluginManagerReturn {
   sendLifecycleEvent: (event: "show" | "hide" | "focus" | "blur") => void;
   // Lifecycle
   setupListeners: () => Promise<UnlistenFn>;
-
 }
 
 /**
@@ -62,15 +61,29 @@ export function usePluginManager(): PluginManagerReturn {
 
   /**
    * 分离插件到独立窗口
+   *
+   * 必须顺序执行：先关闭 inline webview，再创建独立窗口。
+   * 若并发操作，两者同时调用 Win32 窗口管理器会产生死锁导致应用卡死。
    */
   const detachPlugin = async () => {
     if (!state.currentPluginId) return;
 
+    // 保存 pluginId，因为 closePlugin() 会清空 state.currentPluginId
+    const pluginId = state.currentPluginId;
+
     try {
-      await invoke("open_plugin_in_window", {
-        pluginId: state.currentPluginId,
-      });
-      closePlugin();
+      // 步骤 1：先发送 hide 生命周期事件，并更新 UI 状态
+      sendLifecycleEvent("hide");
+      state.showPluginInline = false;
+      state.currentPluginUrl = "";
+      state.currentPluginId = "";
+      state.currentPluginAutoDetach = false;
+
+      // 步骤 2：await 销毁 inline webview，确保完全关闭后再创建新窗口
+      await invoke("close_inline_plugin");
+
+      // 步骤 3：打开独立窗口（inline webview 已销毁，无死锁风险）
+      await invoke("open_plugin_in_window", { pluginId });
     } catch (error) {
       console.error("Failed to detach plugin:", error);
     }
@@ -136,8 +149,6 @@ export function usePluginManager(): PluginManagerReturn {
     });
     console.log("[PluginManager] Sent lifecycle event:", event);
   };
-
-
 
   /**
    * 设置事件监听器
