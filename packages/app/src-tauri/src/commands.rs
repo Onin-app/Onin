@@ -59,6 +59,8 @@ pub fn get_invoke_handler(
         plugin::window::plugin_show_window,
         plugin::window::plugin_set_focus,
         plugin::window::plugin_start_dragging,
+        plugin::window::return_to_inline_from_window,
+        plugin::window::plugin_toggle_window_pin,
         // Plugin Inline
         plugin::inline::show_inline_plugin,
         plugin::inline::update_inline_plugin_bounds,

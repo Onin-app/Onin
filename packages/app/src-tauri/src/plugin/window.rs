@@ -16,6 +16,10 @@ use super::types::{
     PluginWindowCreating, PluginWindowToggleDebounce, WindowBounds,
 };
 
+/// 编译期嵌入的 FAB 悬浮菜单脚本（CSS + HTML + JS）
+/// 源文件：src-tauri/templates/plugin-window-fab.js
+const PLUGIN_WINDOW_FAB_SCRIPT: &str = include_str!("../../templates/plugin-window-fab.js");
+
 // ============================================================================
 // 窗口基本控制命令
 // ============================================================================
@@ -150,6 +154,65 @@ pub fn open_plugin_in_window(
     });
 
     Ok(())
+}
+
+// ============================================================================
+// 窗口相关操作（例如：回到内联模式等）
+// ============================================================================
+
+/// 从窗口模式恢复到内联模式
+#[tauri::command]
+pub fn return_to_inline_from_window(
+    app: tauri::AppHandle,
+    store: State<'_, PluginStore>,
+    plugin_id: String,
+) -> Result<(), String> {
+    // 1. 获取插件信息
+    let plugin = {
+        let store_lock = store.0.lock().unwrap();
+        find_plugin_by_id(&store_lock, &plugin_id).cloned()
+    }
+    .ok_or_else(|| format!("插件未找到: {}", plugin_id))?;
+
+    // 2. 构建插件 URL
+    let plugin_url = if plugin.manifest.dev_mode && plugin.manifest.dev_server.is_some() {
+        plugin.manifest.dev_server.as_ref().unwrap().clone()
+    } else {
+        let port = {
+            let port_state = app.state::<super::types::PluginServerPort>();
+            let guard = port_state.0.lock().unwrap();
+            *guard
+        }
+        .ok_or_else(|| "插件服务器未启动".to_string())?;
+
+        let entry = plugin.manifest.entry.trim_start_matches('/');
+        format!(
+            "http://127.0.0.1:{}/plugin/{}/{}",
+            port, plugin.dir_name, entry
+        )
+    };
+
+    // 3. 关闭弹出的大窗口
+    let window_label = format!("plugin_{}", plugin.manifest.id.replace('.', "_"));
+    let _ = plugin_close_window(app.clone(), window_label);
+
+    // 4. 通知主窗口显示内联插件
+    super::executor::show_plugin_inline(&app, &plugin, plugin_url)
+}
+
+/// 切换插件窗口置顶状态
+#[tauri::command]
+pub fn plugin_toggle_window_pin(
+    app: tauri::AppHandle,
+    plugin_id: String,
+    pin: bool,
+) -> Result<(), String> {
+    let window_label = format!("plugin_{}", plugin_id.replace('.', "_"));
+    if let Some(window) = app.get_webview_window(&window_label) {
+        window.set_always_on_top(pin).map_err(|e| e.to_string())
+    } else {
+        Err(format!("窗口未找到: {}", window_label))
+    }
 }
 
 // ============================================================================
@@ -292,22 +355,23 @@ pub async fn create_or_show_plugin_window(
         url
     };
 
-    // 注入运行时信息
+    // 注入运行时信息及 FAB 悬浮菜单
+    // FAB 脚本从外部模板文件编译期嵌入，详见 templates/plugin-window-fab.js
     let runtime_script = format!(
         r#"
         window.__ONIN_RUNTIME__ = {{
             mode: "window",
-            pluginId: "{}",
-            version: "{}",
-            mainWindowLabel: "main",
-            theme: "light" // TODO: 获取当前主题
+            pluginId: "{id}",
+            version: "{ver}",
+            mainWindowLabel: "main"
         }};
-        window.__PLUGIN_ID__ = "{}";
+        window.__PLUGIN_ID__ = "{id}";
         console.log("[Tauri Native] Runtime injected:", window.__ONIN_RUNTIME__);
+        {fab}
         "#,
-        plugin.manifest.id,
-        plugin.manifest.version,
-        plugin.manifest.id
+        id  = plugin.manifest.id,
+        ver = plugin.manifest.version,
+        fab = PLUGIN_WINDOW_FAB_SCRIPT,
     );
 
     // 加载保存的窗口状态

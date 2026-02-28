@@ -209,7 +209,7 @@ fn execute_html_plugin(
 }
 
 /// 在主窗口内联显示插件
-fn show_plugin_inline(
+pub fn show_plugin_inline(
     app: &tauri::AppHandle,
     plugin: &super::types::LoadedPlugin,
     plugin_url: String,
