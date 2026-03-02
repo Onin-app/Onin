@@ -19,7 +19,10 @@
     "tauri": "cd packages/app && pnpm tauri",
     "tauri:dev": "pnpm --filter app tauri:dev",
     "tauri:build": "pnpm --filter app tauri:build",
-    "release": "pnpm --filter app release"
+    "release": "pnpm --filter app release",
+    "docs:dev": "pnpm --filter onin-docs dev",
+    "docs:build": "pnpm --filter onin-docs build",
+    "docs:preview": "pnpm --filter onin-docs preview"
   },
   "devDependencies": {
     "prettier": "^3.6.2",

@@ -17,4 +17,8 @@ packages/*/dist
 packages/*/build
 packages/*/.svelte-kit
 
+# VitePress
+packages/docs/.vitepress/cache
+packages/docs/.vitepress/dist
+
 .agent/*
