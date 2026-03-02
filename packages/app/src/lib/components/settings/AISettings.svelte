@@ -146,7 +146,7 @@
   function startEdit(index: number) {
     editingIndex = index;
     const provider = config.providers[index];
-    editForm = { ...provider };
+    editForm = { ...provider, display_name: provider.display_name ?? null };
   }
 
   function cancelEdit() {
@@ -509,6 +509,7 @@
                 <!-- Provider Selector -->
                 <div>
                   <label
+                    for="provider-type"
                     class="mb-1.5 block text-sm font-medium text-neutral-700 dark:text-neutral-300"
                   >
                     服务提供商
@@ -529,6 +530,7 @@
                   >
                     <div class="relative w-full">
                       <Combobox.Input
+                        id="provider-type"
                         oninput={(e) =>
                           (providerSearch = e.currentTarget.value)}
                         class="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm font-medium text-neutral-900 placeholder:text-neutral-500 focus:ring-2 focus:ring-neutral-950 focus:ring-offset-2 focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-offset-neutral-950 dark:placeholder:text-neutral-400 dark:focus:ring-neutral-300"
@@ -607,11 +609,13 @@
                 <!-- Base URL -->
                 <div>
                   <label
+                    for="api-url-input"
                     class="mb-1.5 block text-sm font-medium text-neutral-700 dark:text-neutral-300"
                   >
                     API 地址
                   </label>
                   <input
+                    id="api-url-input"
                     type="text"
                     bind:value={editForm.base_url}
                     placeholder="https://..."
@@ -622,11 +626,13 @@
                 <!-- API Key -->
                 <div>
                   <label
+                    for="api-key-input"
                     class="mb-1.5 block text-sm font-medium text-neutral-700 dark:text-neutral-300"
                   >
                     API 密钥
                   </label>
                   <input
+                    id="api-key-input"
                     type="password"
                     bind:value={editForm.api_key}
                     placeholder="sk-..."
@@ -655,6 +661,7 @@
                 <!-- Model Selector -->
                 <div>
                   <label
+                    for="default-model-input"
                     class="mb-1.5 block text-sm font-medium text-neutral-700 dark:text-neutral-300"
                   >
                     默认模型
@@ -678,6 +685,7 @@
                     >
                       <div class="relative w-full">
                         <Combobox.Input
+                          id="default-model-input"
                           oninput={(e) => (modelSearch = e.currentTarget.value)}
                           class="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm font-medium text-neutral-900 placeholder:text-neutral-500 focus:ring-2 focus:ring-neutral-950 focus:ring-offset-2 focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-offset-neutral-950 dark:placeholder:text-neutral-400 dark:focus:ring-neutral-300"
                           placeholder="Select a model"
@@ -730,6 +738,7 @@
                     </Combobox.Root>
                   {:else}
                     <input
+                      id="default-model-input"
                       class="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:focus:border-neutral-100"
                       bind:value={editForm.default_model}
                       placeholder="e.g. gpt-4o"

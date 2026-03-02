@@ -231,6 +231,7 @@
         {#if !keyword.is_default}
           <button
             class="-mr-0.5 ml-1 rounded-full p-0.5 text-neutral-400 opacity-0 transition-all group-hover/chip:opacity-100 hover:bg-neutral-200 hover:text-red-500 dark:text-neutral-500 dark:hover:bg-neutral-700"
+            aria-label="删除关键词"
             onclick={(e) => {
               e.stopPropagation();
               onRemoveKeyword(command.name, keyword.name);
