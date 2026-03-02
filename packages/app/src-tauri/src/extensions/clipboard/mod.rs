@@ -24,7 +24,7 @@ pub static CLIPBOARD_MANIFEST: ExtensionManifest = ExtensionManifest {
         name: "Clipboard History",
         description: "Search and paste from clipboard history",
         keywords: &["clipboard", "history", "paste", "cp", "jiantieban"],
-        matches: None,
+        matches: None, // 不参与匹配指令，仅通过关键词触发
     }],
 };
 
@@ -41,30 +41,10 @@ impl Extension for ClipboardExtension {
         &CLIPBOARD_MANIFEST
     }
 
-    fn matches(&self, _input: &str) -> bool {
-        // Appears in command list via keywords
-        false
-    }
+    // 不覆盖 custom_matches()，使用默认行为
+    // Clipboard 作为命令出现在列表中，不需要匹配指令
 
     fn execute(&self, _input: &str) -> ExtensionResult {
-        // Just opens the window logic (handled by frontend usually calling execute_extension wrapper)
-        // But actually the frontend `ExtensionResultItem` likely invokes `execute_extension`
-        // which calls this.
-        // For simple window opening, we might return a specialized result or rely on the fact
-        // that the launcher handles the navigation if we set it up right.
-
-        // However, `ExtensionResult` is mostly for inline results.
-        // If we look at `extensions/api.rs`, `execute_extension` returns `ExtensionResult`.
-
-        // The frontend `ExtensionResultItem.svelte` handles the result.
-        // If `result_type` is `Conversion`, it might show UI.
-        // But for Emoji/Clipboard which are full pages, the Launcher likely treats them as "Apps".
-
-        // Actually, looking at `Emoji` implementation:
-        // `execute` returns `success: true, value: None`.
-        // The **Frontend** launcher likely navigates to `/extensions/[id]` when an extension is selected?
-        // Let's check `UnifiedLaunchManager` or just assume standard behavior.
-
         ExtensionResult {
             success: true,
             value: None,

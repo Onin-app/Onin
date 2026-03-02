@@ -23,6 +23,7 @@ pub fn setup_managed_state(builder: tauri::Builder<tauri::Wry>) -> tauri::Builde
         .manage(plugin::PluginWindowToggleDebounce(Mutex::new(
             std::collections::HashMap::new(),
         )))
+        .manage(plugin::InlinePluginState::default())
         // Plugin API 相关状态
         .manage(plugin_api::command::CommandExecutionStore(
             Default::default(),

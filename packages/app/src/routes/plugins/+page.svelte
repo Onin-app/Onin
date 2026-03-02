@@ -73,7 +73,7 @@
 
   onDestroy(() => {
     if (get(escapeHandler) === handleEsc) {
-      escapeHandler.set(() => {});
+      escapeHandler.set(null);
     }
     if (unlisten) {
       unlisten();

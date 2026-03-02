@@ -8,7 +8,10 @@ use crate::{
     shortcut_manager, system_commands, tray_manager, unified_launch_manager, usage_tracker,
     window_manager,
 };
-use tauri::Manager;
+use tauri::{
+    webview::WebviewBuilder, AppHandle, Emitter, Listener, Manager, WebviewUrl,
+    WebviewWindowBuilder, WindowBuilder,
+};
 
 /// 生成包含所有 Tauri 命令的 invoke handler
 pub fn get_invoke_handler(
@@ -40,6 +43,7 @@ pub fn get_invoke_handler(
         // System commands
         system_commands::execute_command,
         system_commands::get_basic_commands,
+        system_commands::open_app_data_dir,
         // Plugin loader
         plugin::loader::load_plugins,
         plugin::loader::get_loaded_plugins,
@@ -55,6 +59,14 @@ pub fn get_invoke_handler(
         plugin::window::plugin_show_window,
         plugin::window::plugin_set_focus,
         plugin::window::plugin_start_dragging,
+        plugin::window::return_to_inline_from_window,
+        plugin::window::plugin_toggle_window_pin,
+        // Plugin Inline
+        plugin::inline::show_inline_plugin,
+        plugin::inline::update_inline_plugin_bounds,
+        plugin::inline::hide_inline_plugin,
+        plugin::inline::close_inline_plugin,
+        plugin::inline::send_inline_plugin_message,
         // Plugin executor
         plugin::executor::execute_plugin_entry,
         // Plugin settings
@@ -137,10 +149,21 @@ pub fn get_invoke_handler(
         extension::api::get_emoji_data,
         // Keyboard simulation
         system_commands::simulate_paste,
+        // Google Translate Demo
+        // Translator Extension
+        crate::extensions::translator::commands::open_translator_window,
         // Clipboard Extension
         crate::extensions::clipboard::commands::get_clipboard_history,
         crate::extensions::clipboard::commands::set_clipboard_item,
         crate::extensions::clipboard::commands::paste_clipboard_item,
+        // AI Manager
+        crate::ai_manager::commands::get_ai_config,
+        crate::ai_manager::commands::update_ai_config,
+        crate::ai_manager::commands::plugin_ai_ask,
+        crate::ai_manager::commands::plugin_ai_stream,
+        crate::ai_manager::commands::validate_ai_provider,
+        crate::ai_manager::commands::list_ai_models,
+        crate::ai_manager::commands::get_ai_capabilities,
     ]
 }
 

@@ -7,6 +7,7 @@
   "devMode": true,
   "devServer": "http://localhost:5174",
   "type": "webview",
+  "display_mode": "inline",
   "icon": "icon.svg",
   "commands": [
     {
@@ -106,6 +107,61 @@
           "name": "图片",
           "description": "处理剪贴板中的图片",
           "min": 1
+        }
+      ]
+    },
+    {
+      "code": "demo-ai-ask",
+      "name": "Demo AI Ask",
+      "description": "演示 AI 问答功能",
+      "keywords": [
+        {
+          "name": "ai",
+          "type": "prefix"
+        },
+        {
+          "name": "ask",
+          "type": "prefix"
+        }
+      ],
+      "matches": [
+        {
+          "type": "text",
+          "name": "问题",
+          "description": "输入要问 AI 的问题",
+          "min": 1,
+          "max": 500
+        }
+      ]
+    },
+    {
+      "code": "demo-ai-vision",
+      "name": "Demo AI Vision",
+      "description": "演示 AI 图片识别功能",
+      "keywords": [
+        {
+          "name": "vision",
+          "type": "prefix"
+        },
+        {
+          "name": "识图",
+          "type": "prefix"
+        }
+      ],
+      "matches": [
+        {
+          "type": "image",
+          "name": "图片",
+          "description": "要识别的图片",
+          "min": 1,
+          "max": 5
+        },
+        {
+          "type": "text",
+          "name": "问题",
+          "description": "关于图片的问题(可选)",
+          "min": 0,
+          "max": 200
         }
       ]
     }

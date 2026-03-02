@@ -28,25 +28,31 @@ pub fn on_app_setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     // 2. 加载并应用应用配置
     load_app_config(app);
 
-    // 3. 启动平台特定服务 (仅 Windows)
+    // 3. 加载并初始化 AI 配置
+    load_ai_config(app);
+
+    // 4. 启动平台特定服务 (仅 Windows)
     #[cfg(target_os = "windows")]
     plugin_api::clipboard::start_clipboard_monitor(app.handle().clone());
 
     // Initialize Clipboard Extension (Native)
     crate::extensions::clipboard::init(app.handle());
 
-    // 4. 初始化调度器状态
+    // Initialize Translator Extension
+    crate::extensions::translator::init(app.handle());
+
+    // 5. 初始化调度器状态
     init_scheduler_state(app);
 
-    // 5. 注册文件命令管理器
+    // 6. 注册文件命令管理器
     app.manage(file_command_manager::FileCommandManager::new(
         app.handle().clone(),
     ));
 
-    // 6. 启动异步初始化任务
+    // 7. 启动异步初始化任务
     spawn_async_init_tasks(app.handle().clone());
 
-    // 7. 桌面平台特定设置
+    // 8. 桌面平台特定设置
     #[cfg(desktop)]
     setup_desktop_features(app)?;
 
@@ -70,6 +76,30 @@ fn load_app_config(app: &App) {
     if let Ok(mut current_config) = config_state.0.lock() {
         *current_config = config;
     };
+}
+
+/// 加载并初始化 AI 配置
+fn load_ai_config(app: &App) {
+    // 创建 AIManager 并加载配置
+    let ai_manager = std::sync::Arc::new(crate::ai_manager::AIManager::new(app.handle().clone()));
+    
+    // 异步加载配置
+    let ai_manager_clone = ai_manager.clone();
+    tauri::async_runtime::spawn(async move {
+        match ai_manager_clone.load_config().await {
+            Ok(config) => {
+                if let Err(e) = ai_manager_clone.update_config(config).await {
+                    eprintln!("[ERROR] Failed to apply AI config: {}", e);
+                }
+            }
+            Err(e) => {
+                eprintln!("[ERROR] Failed to load AI config: {}", e);
+            }
+        }
+    });
+    
+    // 注册到 managed state
+    app.manage(ai_manager);
 }
 
 /// 初始化调度器状态

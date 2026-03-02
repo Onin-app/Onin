@@ -28,17 +28,28 @@
   // It will live for the entire duration of the app, avoiding setup/teardown during page navigation.
   onMount(() => {
     const listenersPromise = (async () => {
-      const unlisten = await listen("esc_key_pressed", () => {
-        console.log("Layout: esc_key_pressed received. Delegating to logic.");
+      // Restore Listener:
+      // Listen to "escape_pressed" (standardized event)
+      // BUT only handle it if we are NOT on the main page.
+      // The main page (+page.svelte) has its own listener.
+      const unlisten = await listen("escape_pressed", () => {
+        console.log("Layout: escape_pressed received. Route:", page.route.id);
 
         // Check if we are on the main page
         if (page.route.id === "/") {
-          // Get the current handler function from the store and execute it.
-          const handler = get(escapeHandler);
-          handler();
+            // Do NOTHING. Let +page.svelte handle it.
+            console.log("Layout: On main page, ignoring ESC to avoid double-handling.");
         } else {
-          // If not on main page, default behavior is to go back
-          window.history.back();
+          // If not on main page, check if there is a registered handler
+          const handler = get(escapeHandler);
+          if (handler && typeof handler === 'function') {
+             console.log("Layout: Executing registered escape handler.");
+             handler();
+          } else {
+             // Fallback
+             console.log("Layout: No handler, going back.");
+             window.history.back();
+          }
         }
       });
 

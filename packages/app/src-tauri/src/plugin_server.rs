@@ -194,6 +194,14 @@ const TAURI_BRIDGE_SCRIPT: &str = r#"
   window.__PLUGIN_ID__ = pluginIdFromUrl || pluginIdFromInjection;
   globalThis.__PLUGIN_ID__ = window.__PLUGIN_ID__;
   
+  // Check if running in native window (not iframe)
+  if (window.self === window.top) {
+    console.log('[Tauri Bridge] Running in native window mode');
+    // In native window mode, we rely on Tauri's native API injection (window.__TAURI_INTERNALS__)
+    // which is enabled by the capabilities configuration for localhost/127.0.0.1
+    return;
+  }
+
   const createProxy = (command) => {
     return (...args) => {
       return new Promise((resolve, reject) => {

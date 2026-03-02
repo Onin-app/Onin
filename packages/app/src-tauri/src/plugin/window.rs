@@ -16,6 +16,10 @@ use super::types::{
     PluginWindowCreating, PluginWindowToggleDebounce, WindowBounds,
 };
 
+/// 编译期嵌入的 FAB 悬浮菜单脚本（CSS + HTML + JS）
+/// 源文件：src-tauri/templates/plugin-window-fab.js
+const PLUGIN_WINDOW_FAB_SCRIPT: &str = include_str!("../../templates/plugin-window-fab.js");
+
 // ============================================================================
 // 窗口基本控制命令
 // ============================================================================
@@ -133,12 +137,17 @@ pub fn open_plugin_in_window(
     }
     .ok_or_else(|| format!("插件未找到: {}", plugin_id))?;
 
-    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let plugin_dir = data_dir.join("plugins").join(&plugin.dir_name);
-    let entry_path = plugin_dir.join(&plugin.manifest.entry);
+    // 仅在非 dev_mode（无 dev_server）时校验本地入口文件是否存在
+    // dev_mode 插件直接从 dev_server 加载，不需要本地文件
+    let is_dev_mode = plugin.manifest.dev_mode && plugin.manifest.dev_server.is_some();
+    if !is_dev_mode {
+        let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+        let plugin_dir = data_dir.join("plugins").join(&plugin.dir_name);
+        let entry_path = plugin_dir.join(&plugin.manifest.entry);
 
-    if !entry_path.is_file() {
-        return Err(format!("插件入口文件未找到: {:?}", entry_path));
+        if !entry_path.is_file() {
+            return Err(format!("插件入口文件未找到: {:?}", entry_path));
+        }
     }
 
     // 强制在窗口模式中打开
@@ -150,6 +159,65 @@ pub fn open_plugin_in_window(
     });
 
     Ok(())
+}
+
+// ============================================================================
+// 窗口相关操作（例如：回到内联模式等）
+// ============================================================================
+
+/// 从窗口模式恢复到内联模式
+#[tauri::command]
+pub fn return_to_inline_from_window(
+    app: tauri::AppHandle,
+    store: State<'_, PluginStore>,
+    plugin_id: String,
+) -> Result<(), String> {
+    // 1. 获取插件信息
+    let plugin = {
+        let store_lock = store.0.lock().unwrap();
+        find_plugin_by_id(&store_lock, &plugin_id).cloned()
+    }
+    .ok_or_else(|| format!("插件未找到: {}", plugin_id))?;
+
+    // 2. 构建插件 URL
+    let plugin_url = if plugin.manifest.dev_mode && plugin.manifest.dev_server.is_some() {
+        plugin.manifest.dev_server.as_ref().unwrap().clone()
+    } else {
+        let port = {
+            let port_state = app.state::<super::types::PluginServerPort>();
+            let guard = port_state.0.lock().unwrap();
+            *guard
+        }
+        .ok_or_else(|| "插件服务器未启动".to_string())?;
+
+        let entry = plugin.manifest.entry.trim_start_matches('/');
+        format!(
+            "http://127.0.0.1:{}/plugin/{}/{}",
+            port, plugin.dir_name, entry
+        )
+    };
+
+    // 3. 关闭弹出的大窗口
+    let window_label = format!("plugin_{}", plugin.manifest.id.replace('.', "_"));
+    let _ = plugin_close_window(app.clone(), window_label);
+
+    // 4. 通知主窗口显示内联插件
+    super::executor::show_plugin_inline(&app, &plugin, plugin_url)
+}
+
+/// 切换插件窗口置顶状态
+#[tauri::command]
+pub fn plugin_toggle_window_pin(
+    app: tauri::AppHandle,
+    plugin_id: String,
+    pin: bool,
+) -> Result<(), String> {
+    let window_label = format!("plugin_{}", plugin_id.replace('.', "_"));
+    if let Some(window) = app.get_webview_window(&window_label) {
+        window.set_always_on_top(pin).map_err(|e| e.to_string())
+    } else {
+        Err(format!("窗口未找到: {}", window_label))
+    }
 }
 
 // ============================================================================
@@ -254,39 +322,62 @@ pub async fn create_or_show_plugin_window(
     }
 
     // 构建窗口 URL
-    // 开发模式：使用 localhost:1420
-    // 生产模式：使用 tauri://localhost
-    #[cfg(debug_assertions)]
-    let plugin_url = format!(
-        "http://localhost:1420/plugin-window?plugin_id={}",
-        plugin.manifest.id
-    );
-    
-    #[cfg(not(debug_assertions))]
-    let plugin_url = format!(
-        "tauri://localhost/plugin-window?plugin_id={}",
-        plugin.manifest.id
-    );
-    
-    println!(
-        "[plugin/window] 从 {} 加载插件窗口",
-        plugin_url
-    );
-
-    // 开发模式日志
-    if plugin.manifest.dev_mode {
-        if let Some(dev_server) = &plugin.manifest.dev_server {
-            println!(
-                "[plugin/window] 插件 {} 处于开发模式，将从 {} 加载",
-                plugin.manifest.id, dev_server
-            );
-        } else {
-            eprintln!(
-                "[plugin/window] 警告: 插件 {} 设置了 devMode=true 但未指定 devServer",
-                plugin.manifest.id
-            );
+    let plugin_url = if plugin.manifest.dev_mode && plugin.manifest.dev_server.is_some() {
+        let dev_server = plugin.manifest.dev_server.as_ref().unwrap();
+        // 如果 devServer 已经有 query params，使用 & 连接
+        let separator = if dev_server.contains('?') { '&' } else { '?' };
+        let url = format!(
+            "{}{}mode=window&plugin_id={}",
+            dev_server, separator, plugin.manifest.id
+        );
+        println!(
+            "[plugin/window] 从 {} 加载插件窗口 (Dev Mode)",
+            url
+        );
+        url
+    } else {
+        // 获取插件服务器端口 (仅在非 Dev Mode 或 Dev Mode 无 Server 时需要)
+        let port = {
+            let port_state = app.state::<super::types::PluginServerPort>();
+            let guard = port_state.0.lock().unwrap();
+            *guard
         }
-    }
+        .ok_or_else(|| "插件服务器未启动".to_string())?;
+
+        // 直接加载插件文件，绕过 plugin-window 包装页
+        let entry = plugin.manifest.entry.trim_start_matches('/');
+        let url = format!(
+            "http://127.0.0.1:{}/plugin/{}/{}?mode=window&plugin_id={}",
+            port,
+            plugin.dir_name, // Use dir_name to match actual directory on disk (e.g. with @market suffix)
+            entry,
+            plugin.manifest.id
+        );
+        println!(
+            "[plugin/window] 从 {} 加载插件窗口 (Native Mode)",
+            url
+        );
+        url
+    };
+
+    // 注入运行时信息及 FAB 悬浮菜单
+    // FAB 脚本从外部模板文件编译期嵌入，详见 templates/plugin-window-fab.js
+    let runtime_script = format!(
+        r#"
+        window.__ONIN_RUNTIME__ = {{
+            mode: "window",
+            pluginId: "{id}",
+            version: "{ver}",
+            mainWindowLabel: "main"
+        }};
+        window.__PLUGIN_ID__ = "{id}";
+        console.log("[Tauri Native] Runtime injected:", window.__ONIN_RUNTIME__);
+        {fab}
+        "#,
+        id  = plugin.manifest.id,
+        ver = plugin.manifest.version,
+        fab = PLUGIN_WINDOW_FAB_SCRIPT,
+    );
 
     // 加载保存的窗口状态
     let window_states = load_plugin_window_states(&app);
@@ -296,12 +387,13 @@ pub async fn create_or_show_plugin_window(
     let mut builder = WebviewWindowBuilder::new(
         &app,
         window_label.clone(),
-        tauri::WebviewUrl::External(plugin_url.parse().unwrap()),
+        tauri::WebviewUrl::External(plugin_url.parse().map_err(|e: url::ParseError| e.to_string())?),
     )
     .title(plugin.manifest.name.clone())
     .resizable(true)
-    .decorations(false) // 所有平台都隐藏系统装饰
-    .transparent(false); // 确保窗口不透明
+    .decorations(true) // 使用系统原生装饰
+    .transparent(false) // 确保窗口不透明
+    .initialization_script(&runtime_script);
     
     // 应用保存的窗口位置和大小
     if let Some(ref bounds) = saved_bounds {

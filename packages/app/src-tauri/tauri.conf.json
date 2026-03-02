@@ -30,7 +30,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' plugin: asset: https://asset.localhost 'unsafe-inline' 'unsafe-eval'; script-src 'self' plugin: asset: https://asset.localhost 'unsafe-inline' 'unsafe-eval'; style-src 'self' plugin: asset: https://asset.localhost 'unsafe-inline'; img-src 'self' plugin: asset: https://asset.localhost data: http: https:; font-src 'self' plugin: asset: https://asset.localhost; connect-src 'self' plugin: asset: https://asset.localhost http: https:; frame-src 'self' plugin: asset: https://asset.localhost;",
+      "csp": "default-src 'self' plugin: asset: https://asset.localhost https: 'unsafe-inline' 'unsafe-eval'; script-src 'self' plugin: asset: https://asset.localhost https: 'unsafe-inline' 'unsafe-eval'; style-src 'self' plugin: asset: https://asset.localhost https: 'unsafe-inline'; img-src 'self' plugin: asset: https://asset.localhost data: http: https:; font-src 'self' plugin: asset: https://asset.localhost https:; connect-src 'self' plugin: asset: https://asset.localhost http: https:; frame-src 'self' plugin: asset: https://asset.localhost https:;",
       "dangerousDisableAssetCspModification": true,
       "assetProtocol": {
         "enable": true,

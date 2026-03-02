@@ -11,11 +11,11 @@ pub mod types;
 
 pub use registry::{find_matching_extensions, get_all_extensions, get_extension_by_id, Extension};
 pub use types::{
-    ExtensionCommand, ExtensionManifest, ExtensionMatch, ExtensionPreview, ExtensionResult,
-    ExtensionResultType,
+    ExtensionCommand, ExtensionManifest, ExtensionPreview, ExtensionResult, ExtensionResultType,
+    StaticCommandMatch,
 };
 
-use crate::shared_types::{Command, CommandAction, CommandKeyword, ItemSource};
+use crate::shared_types::{Command, CommandAction, CommandKeyword, CommandMatch, ItemSource};
 
 // ============================================================================
 // Extension 命令生成
@@ -29,26 +29,47 @@ pub fn get_extension_commands() -> Vec<Command> {
         .iter()
         .flat_map(|ext| {
             let manifest = ext.manifest();
-            manifest.commands.iter().map(move |cmd| Command {
-                name: format!("extension:{}:{}", manifest.id, cmd.code),
-                title: cmd.name.to_string(),
-                description: Some(cmd.description.to_string()),
-                english_name: cmd.code.to_string(),
-                keywords: cmd
-                    .keywords
-                    .iter()
-                    .map(|k| CommandKeyword {
-                        name: k.to_string(),
-                        disabled: None,
-                        is_default: None,
-                    })
-                    .collect(),
-                icon: manifest.icon.to_string(),
-                source: ItemSource::Command,
-                action: CommandAction::System(format!("extension:{}:{}", manifest.id, cmd.code)),
-                origin: None,
-                matches: None, // Extension 使用自己的匹配逻辑
-                requires_confirmation: false,
+            manifest.commands.iter().map(move |cmd| {
+                // 将 StaticCommandMatch 转换为运行时的 CommandMatch
+                let matches: Option<Vec<CommandMatch>> = cmd.matches.map(|static_matches| {
+                    static_matches
+                        .iter()
+                        .map(|m| CommandMatch {
+                            match_type: m.match_type.to_string(),
+                            name: m.name.to_string(),
+                            description: m.description.to_string(),
+                            regexp: m.regexp.map(|r| r.to_string()),
+                            min: m.min,
+                            max: m.max,
+                            extensions: vec![],
+                        })
+                        .collect()
+                });
+
+                Command {
+                    name: format!("extension:{}:{}", manifest.id, cmd.code),
+                    title: cmd.name.to_string(),
+                    description: Some(cmd.description.to_string()),
+                    english_name: cmd.code.to_string(),
+                    keywords: cmd
+                        .keywords
+                        .iter()
+                        .map(|k| CommandKeyword {
+                            name: k.to_string(),
+                            disabled: None,
+                            is_default: None,
+                        })
+                        .collect(),
+                    icon: manifest.icon.to_string(),
+                    source: ItemSource::Extension,
+                    action: CommandAction::Extension {
+                        extension_id: manifest.id.to_string(),
+                        command_code: cmd.code.to_string(),
+                    },
+                    origin: None,
+                    matches,
+                    requires_confirmation: false,
+                }
             })
         })
         .collect()
@@ -56,7 +77,7 @@ pub fn get_extension_commands() -> Vec<Command> {
 
 /// 尝试获取输入的实时预览
 ///
-/// 如果输入匹配任何 Extension，返回预览结果
+/// 如果输入匹配任何 Extension（通过 custom_matches），返回预览结果
 pub fn get_preview_for_input(input: &str) -> Option<ExtensionPreview> {
     if input.is_empty() {
         return None;

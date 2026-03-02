@@ -10,12 +10,14 @@
     TerminalWindow,
     Keyboard,
     PlugsConnected,
+    Sparkle,
   } from "phosphor-svelte";
 
   import GeneralSettings from "$lib/components/settings/GeneralSettings.svelte";
   import FileCommandSettings from "$lib/components/settings/FileCommandSettings.svelte";
   import CommandSettings from "$lib/components/settings/CommandSettings.svelte";
   import ShortcutSettings from "$lib/components/settings/ShortcutSettings.svelte";
+  import AISettings from "$lib/components/settings/AISettings.svelte";
   import { escapeHandler } from "$lib/stores/escapeHandler";
 
   interface SettingItem {
@@ -25,7 +27,8 @@
       | typeof GeneralSettings
       | typeof FileCommandSettings
       | typeof CommandSettings
-      | typeof ShortcutSettings;
+      | typeof ShortcutSettings
+      | typeof AISettings;
     icon: any;
   }
 
@@ -54,6 +57,12 @@
       component: ShortcutSettings,
       icon: Keyboard,
     },
+    {
+      name: "AI 能力",
+      id: "ai",
+      component: AISettings,
+      icon: Sparkle,
+    },
   ];
 
   let activeSetting = $state<SettingItem>(settings[0]);
@@ -73,7 +82,7 @@
   onDestroy(() => {
     // On destroy, reset the handler if it's still ours
     if (get(escapeHandler) === handleEsc) {
-      escapeHandler.set(() => {});
+      escapeHandler.set(null);
     }
   });
 

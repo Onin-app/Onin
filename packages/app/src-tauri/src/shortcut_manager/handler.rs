@@ -70,8 +70,12 @@ pub fn handle_global_shortcut(
 }
 
 /// 执行快捷键动作
+/// 执行快捷键动作
 fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::Shortcut) {
     if app_shortcut.command_name == "toggle_window" {
+        // Helper to handle toggle logic to avoid code duplication across window types
+        // Using a macro or just duplicating blocks since types differ slightly in Rust strictness
+        // Block for WebviewWindow
         if let Some(window) = app.get_webview_window("main") {
             match window.is_visible() {
                 Ok(true) => {
@@ -79,7 +83,7 @@ fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::
                     let _ = window.emit("window_visibility", &false);
                 }
                 Ok(false) => {
-                    // macOS: 在显示窗口前记录当前应用
+                    // macOS logic
                     #[cfg(target_os = "macos")]
                     {
                         if let Some(bundle_id) =
@@ -97,10 +101,37 @@ fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::
                     let _ = window.set_focus();
                     let _ = window.emit("window_visibility", &true);
                 }
-                Err(e) => {
-                    eprintln!("Error checking window visibility: {}", e);
-                }
+                Err(e) => eprintln!("Error checking window visibility: {}", e),
             }
+        } else if let Some(window) = app.get_window("main") {
+            // Fallback block for Window
+            match window.is_visible() {
+                Ok(true) => {
+                    let _ = window.hide();
+                    let _ = window.emit("window_visibility", &false);
+                }
+                Ok(false) => {
+                    // macOS logic (same)
+                    #[cfg(target_os = "macos")]
+                    {
+                        if let Some(bundle_id) =
+                            crate::system_commands::get_frontmost_app_bundle_id()
+                        {
+                            if let Some(state) =
+                                app.try_state::<crate::system_commands::MacOSPreviousApp>()
+                            {
+                                *state.0.lock().unwrap() = Some(bundle_id);
+                            }
+                        }
+                    }
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                    let _ = window.emit("window_visibility", &true);
+                }
+                Err(e) => eprintln!("Error checking window visibility (fallback): {}", e),
+            }
+        } else {
+            eprintln!("Main window not found for toggle_window");
         }
     } else if app_shortcut.command_name == "detach_window" {
         println!("Executing detach window command");
@@ -108,12 +139,20 @@ fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::
             if let Err(e) = window.emit("detach_window_shortcut", ()) {
                 eprintln!("Error emitting detach window command: {}", e);
             }
+        } else if let Some(window) = app.get_window("main") {
+            if let Err(e) = window.emit("detach_window_shortcut", ()) {
+                eprintln!("Error emitting detach window command (fallback): {}", e);
+            }
         }
     } else {
         println!("Executing command: {}", app_shortcut.command_name);
         if let Some(window) = app.get_webview_window("main") {
             if let Err(e) = window.emit("execute_command_by_name", &app_shortcut.command_name) {
                 eprintln!("Error emitting command: {}", e);
+            }
+        } else if let Some(window) = app.get_window("main") {
+            if let Err(e) = window.emit("execute_command_by_name", &app_shortcut.command_name) {
+                eprintln!("Error emitting command (fallback): {}", e);
             }
         }
     }
@@ -154,6 +193,22 @@ fn handle_special_keys(app: &AppHandle, triggered_shortcut: &str) {
         //     let _ = window.emit("window_visibility", &false);
         // }
         println!("ESC detected in backend. Delegating to frontend.");
+        if let Some(window) = app.get_webview_window("main") {
+            println!("Found main window, emitting escape_pressed");
+            if let Err(e) = window.emit("escape_pressed", ()) {
+                eprintln!("Error emitting escape_pressed event: {}", e);
+            }
+        } else {
+            eprintln!("Main window not found when handling ESC. Available windows:");
+            for (label, _) in app.webview_windows() {
+                eprintln!(" - {}", label);
+            }
+            // Try get_window as fallback (though in v2 it might be same)
+            if let Some(w) = app.get_window("main") {
+                eprintln!("Found 'main' via get_window! Emitting...");
+                let _ = w.emit("escape_pressed", ());
+            }
+        }
     } else {
         println!("No matching shortcut found for: {}", triggered_shortcut);
     }

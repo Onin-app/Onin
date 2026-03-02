@@ -12,8 +12,7 @@
   import { Theme } from "$lib/type";
   import { theme, getTheme } from "$lib/utils/theme";
   import { escapeHandler } from "$lib/stores/escapeHandler";
-
-  import "../../index.css";
+  import { page } from "$app/state";
 
   let currentTheme = $state<Theme>(Theme.DARK);
 
@@ -39,14 +38,20 @@
   onDestroy(() => {
     unsubscribeTheme?.();
     if (get(escapeHandler) === handleEsc) {
-      escapeHandler.set(() => {});
+      escapeHandler.set(null);
     }
   });
+
+  const isTranslator = $derived(page.route.id?.includes("translator"));
 </script>
 
-<main
-  class="h-[100vh] w-full overflow-hidden rounded-xl bg-neutral-100 p-4 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100"
-  data-tauri-drag-region
->
+{#if isTranslator}
   <slot />
-</main>
+{:else}
+  <main
+    class="h-[100vh] w-full overflow-hidden rounded-xl bg-neutral-100 p-4 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100"
+    data-tauri-drag-region
+  >
+    <slot />
+  </main>
+{/if}

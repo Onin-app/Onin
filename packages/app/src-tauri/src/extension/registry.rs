@@ -14,8 +14,17 @@ pub trait Extension: Send + Sync {
     /// 获取扩展清单
     fn manifest(&self) -> &'static ExtensionManifest;
 
-    /// 检查输入是否匹配此扩展
-    fn matches(&self, input: &str) -> bool;
+    /// 自定义匹配逻辑（可选覆盖）
+    ///
+    /// - 返回 `None`：使用声明式 `CommandMatch` 配置（默认行为）
+    /// - 返回 `Some(true)`：自定义判断为匹配
+    /// - 返回 `Some(false)`：自定义判断为不匹配
+    ///
+    /// Calculator 等需要复杂语义分析的 Extension 应覆盖此方法。
+    /// Translator 等使用标准匹配规则的 Extension 无需覆盖。
+    fn custom_matches(&self, _input: &str) -> Option<bool> {
+        None
+    }
 
     /// 执行扩展命令
     fn execute(&self, input: &str) -> ExtensionResult;
@@ -30,6 +39,7 @@ pub fn get_all_extensions() -> Vec<&'static dyn Extension> {
         &extensions::calculator::CALCULATOR_EXTENSION,
         &extensions::emoji::EMOJI_EXTENSION,
         &extensions::clipboard::CLIPBOARD_EXTENSION,
+        &extensions::translator::TRANSLATOR_EXTENSION,
     ]
 }
 
@@ -41,9 +51,12 @@ pub fn get_extension_by_id(id: &str) -> Option<&'static dyn Extension> {
 }
 
 /// 查找匹配输入的所有扩展
+///
+/// 优先使用 Extension 的 `custom_matches` 钩子，
+/// 如果未覆盖（返回 None），则不在此处匹配（由前端的 matchCommand.ts 处理）
 pub fn find_matching_extensions(input: &str) -> Vec<&'static dyn Extension> {
     get_all_extensions()
         .into_iter()
-        .filter(|ext| ext.matches(input))
+        .filter(|ext| ext.custom_matches(input).unwrap_or(false))
         .collect()
 }

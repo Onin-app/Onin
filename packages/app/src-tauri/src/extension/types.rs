@@ -40,19 +40,29 @@ pub struct ExtensionCommand {
     pub description: &'static str,
     /// 触发关键词
     pub keywords: &'static [&'static str],
-    /// 匹配规则（可选）
-    pub matches: Option<ExtensionMatch>,
+    /// 匹配规则（可选），使用统一的 StaticCommandMatch 格式
+    pub matches: Option<&'static [StaticCommandMatch]>,
 }
 
-/// Extension 匹配规则
+/// 编译时静态的匹配规则
+///
+/// 与 `CommandMatch`（shared_types.rs）语义一致，但使用 `&'static str`
+/// 以便在 Extension 的 `static` 声明中使用。
+/// 在 `generators/extension.rs` 中会转换为运行时的 `CommandMatch`。
 #[derive(Debug, Clone)]
-pub struct ExtensionMatch {
-    /// 正则表达式模式
-    pub pattern: &'static str,
-    /// 最小输入长度
-    pub min_length: Option<usize>,
-    /// 最大输入长度
-    pub max_length: Option<usize>,
+pub struct StaticCommandMatch {
+    /// 匹配类型: "text" | "image" | "file" | "folder"
+    pub match_type: &'static str,
+    /// 匹配规则名称
+    pub name: &'static str,
+    /// 匹配规则描述
+    pub description: &'static str,
+    /// 正则表达式（仅 type="text" 时使用）
+    pub regexp: Option<&'static str>,
+    /// 最小数量（text: 字符数, file/image/folder: 文件数量）
+    pub min: Option<u32>,
+    /// 最大数量
+    pub max: Option<u32>,
 }
 
 // ============================================================================

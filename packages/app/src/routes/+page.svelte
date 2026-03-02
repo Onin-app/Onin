@@ -39,7 +39,7 @@
   import AppListItem from "$lib/components/AppListItem.svelte";
   import PluginMenu from "$lib/components/PluginMenu.svelte";
   import RefreshProgressBar from "$lib/components/RefreshProgressBar.svelte";
-  import PluginIframe from "$lib/components/PluginIframe.svelte";
+  import PluginInlineView from "$lib/components/PluginInlineView.svelte";
   import ExtensionResultItem from "$lib/components/ExtensionResultItem.svelte";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
 
@@ -60,7 +60,7 @@
 
   // Component references
   let searchInputRef: SearchInput;
-  let pluginIframeRef = $state<PluginIframe | null>(null);
+  let pluginInlineViewRef = $state<PluginInlineView | null>(null);
 
   // Confirm dialog state
   let confirmDialogOpen = $state(false);
@@ -101,8 +101,14 @@
       (app) => !app.action || !matchedActions.has(app.action),
     );
 
+    // 去重：当 Extension 预览已存在时，从匹配命令中过滤掉 Extension 来源的命令
+    // Extension 已通过预览条目展示（如 "翻译: hello"），无需在匹配命令中重复
+    const deduplicatedMatchedCommands = extensionPreviewItem
+      ? matchedCommands.filter((cmd) => cmd.source !== "Extension")
+      : matchedCommands;
+
     // Extension 预览 -> 精确/模糊匹配(appList) -> 插件通配符匹配(matchedCommands)
-    return [...result, ...filteredAppList, ...matchedCommands];
+    return [...result, ...filteredAppList, ...deduplicatedMatchedCommands];
   });
 
   // ===== Effects =====
@@ -120,14 +126,21 @@
   });
 
   // ===== Event Handlers =====
+
   const handleEsc = () => {
+    console.log("handleEsc triggered, route:", page.route.id);
     // Only handle ESC on main page
-    if (page.route.id !== "/") return;
+    if (page.route.id !== "/") {
+      console.log("Not on main page, ignoring ESC");
+      return;
+    }
 
     if (plugin.state.showPluginInline) {
+      console.log("Closing inline plugin");
       plugin.closePlugin();
       return;
     }
+    console.log("Clearing input/closing main window");
     inputValue = "";
     clipboard.clearAttachments();
     matchedCommands = [];
@@ -262,7 +275,22 @@
           goto("/extensions/clipboard");
           return;
         }
-        // 其他 Extension 可以在这里扩展...
+        // Translator Extension
+        if (extensionId === "translator") {
+          const effectiveText = clipboard.state.attachedText || inputValue;
+          await extensionManager.execute(extensionId, effectiveText);
+
+          inputValue = "";
+          clipboard.clearAttachments();
+          extensionPreviewItem = null;
+          extensionManager.clearPreview();
+          matchedCommands = [];
+          appListManager.resetToOriginList();
+          // We likely want to close the main window as the translator opens in a new window
+          // The backend execute handler for translator opens a new window.
+          invoke("close_main_window");
+          return;
+        }
       }
     }
 
@@ -392,8 +420,8 @@
     console.log("Main page component has mounted");
     escapeHandler.set(handleEsc);
 
-    // 设置插件消息处理
-    window.addEventListener("message", plugin.handlePluginMessage);
+    // 设置插件消息处理 (已废弃，使用 Native Bridge)
+    // window.addEventListener("message", plugin.handlePluginMessage);
 
     // 加载配置
     await appListManager.loadConfig();
@@ -433,6 +461,12 @@
       },
     );
 
+    // 监听后端发来的 ESC 事件 (当焦点在插件窗口或全局快捷键捕获时)
+    const unlistenEsc = await listen("escape_pressed", () => {
+      console.log("Received escape_pressed event from backend");
+      handleEsc();
+    });
+
     // 设置 composables 的事件监听
     const unlistenPlugin = await plugin.setupListeners();
     const unlistenAppList = await appListManager.setupListeners();
@@ -441,6 +475,7 @@
       unlistenWindowShow();
       unlistenClearClipboard();
       unlistenFocus();
+      unlistenEsc();
       unlistenPlugin();
       unlistenAppList();
     };
@@ -450,14 +485,14 @@
     unsubscribeTheme?.();
 
     if (get(escapeHandler) === handleEsc) {
-      escapeHandler.set(() => {});
+      escapeHandler.set(null);
     }
 
     if (unlisten) {
       unlisten();
     }
 
-    window.removeEventListener("message", plugin.handlePluginMessage);
+    // window.removeEventListener("message", plugin.handlePluginMessage);
   });
 </script>
 
@@ -515,13 +550,13 @@
       <RefreshProgressBar isRefreshing={appListManager.state.isRefreshing} />
 
       {#if plugin.state.showPluginInline}
-        <!-- Plugin Iframe -->
-        <PluginIframe
-          bind:this={pluginIframeRef}
+        <!-- Plugin Inline View -->
+        <PluginInlineView
+          bind:this={pluginInlineViewRef}
           url={plugin.state.currentPluginUrl}
           pluginId={plugin.state.currentPluginId}
           onLoad={() => {
-            plugin.setIframeElement(pluginIframeRef?.getElement() ?? null);
+            // No-op for now, logic potentially moved to component or manager
           }}
         />
       {:else}
@@ -556,7 +591,7 @@
           </ScrollArea.Viewport>
           <ScrollArea.Scrollbar
             orientation="vertical"
-            class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none select-none rounded-full border-l border-l-transparent p-px transition-all duration-200 hover:w-3"
+            class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none rounded-full border-l border-l-transparent p-px transition-all duration-200 select-none hover:w-3"
           >
             <ScrollArea.Thumb class="bg-muted-foreground flex-1 rounded-full" />
           </ScrollArea.Scrollbar>
@@ -583,4 +618,3 @@
     pendingAction = null;
   }}
 />
-

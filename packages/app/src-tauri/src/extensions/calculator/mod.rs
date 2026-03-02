@@ -8,8 +8,8 @@ mod units;
 
 use crate::extension::registry::Extension;
 use crate::extension::types::{
-    ExtensionCommand, ExtensionManifest, ExtensionMatch, ExtensionPreview, ExtensionResult,
-    PreviewViewType,
+    ExtensionCommand, ExtensionManifest, ExtensionPreview, ExtensionResult, PreviewViewType,
+    StaticCommandMatch,
 };
 use regex::Regex;
 use std::sync::LazyLock;
@@ -31,12 +31,9 @@ pub static CALCULATOR_MANIFEST: ExtensionManifest = ExtensionManifest {
         keywords: &[
             "calc", "计算", "=", "convert", "转换", "date", "日期", "currency", "货币",
         ],
-        matches: Some(ExtensionMatch {
-            // 匹配数学表达式、单位转换、日期偏移或货币转换
-            pattern: r"^[\d\+\-\*\/\(\)\s\.\^%a-zA-Z$¥€£₩]+$",
-            min_length: Some(1),
-            max_length: None,
-        }),
+        // Calculator 使用 custom_matches() 进行复杂语义分析，
+        // 此处不需要声明式匹配规则
+        matches: None,
     }],
 };
 
@@ -98,13 +95,14 @@ impl Extension for CalculatorExtension {
         &CALCULATOR_MANIFEST
     }
 
-    fn matches(&self, input: &str) -> bool {
+    /// Calculator 使用自定义匹配逻辑（算式/货币/日期/单位的语义分析）
+    fn custom_matches(&self, input: &str) -> Option<bool> {
         let trimmed = input.trim();
         if trimmed.is_empty() {
-            return false;
+            return Some(false);
         }
 
-        !matches!(detect_input_type(trimmed), InputType::Unknown)
+        Some(!matches!(detect_input_type(trimmed), InputType::Unknown))
     }
 
     fn execute(&self, input: &str) -> ExtensionResult {
