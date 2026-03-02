@@ -4,6 +4,7 @@ export default defineConfig({
   title: 'Onin',
   description: '专为开发者和高效用户打造的键盘启动器',
   lang: 'zh-CN',
+  base: '/Onin/',
 
   themeConfig: {
     logo: '/logo.png',
