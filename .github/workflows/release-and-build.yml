@@ -4,7 +4,22 @@ on:
   push:
     branches:
       - master
+    paths:
+      - 'packages/app/**'
+      - 'packages/sdk/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/release-and-build.yml'
   workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   release:
@@ -13,6 +28,7 @@ jobs:
       released: ${{ steps.release.outputs.released }}
       version: ${{ steps.release.outputs.version }}
       tag: ${{ steps.release.outputs.tag }}
+      app_changed: ${{ steps.filter.outputs.app }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,8 +47,16 @@ jobs:
           node-version: 20
           cache: 'pnpm'
 
+      - name: Detect changed paths
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            app:
+              - 'packages/app/**'
+
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Run checks
         run: |
@@ -87,7 +111,12 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
+
+      - name: Bump SDK version
+        run: |
+          cd packages/sdk
+          npm version ${{ needs.release.outputs.version }} --no-git-tag-version
 
       - name: Build SDK
         run: pnpm build:sdk
@@ -95,14 +124,13 @@ jobs:
       - name: Publish SDK to npm
         run: |
           cd packages/sdk
-          npm version ${{ needs.release.outputs.version }} --no-git-tag-version
           npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   build-tauri:
     needs: release
-    if: always()
+    if: needs.release.outputs.released == 'true' && needs.release.outputs.app_changed == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -144,7 +172,7 @@ jobs:
           workspaces: './packages/app/src-tauri -> target'
 
       - name: Install frontend dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
