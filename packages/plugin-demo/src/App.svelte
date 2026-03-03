@@ -16,7 +16,7 @@
     settings,
     scheduler,
     ai,
-  } from 'sdk';
+  } from 'onin-sdk';
 
   // 当前选中的测试模块
   let currentModule = $state('lifecycle');

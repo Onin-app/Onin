@@ -135,7 +135,7 @@ importers:
       '@tauri-apps/api':
         specifier: ^2.8.0
         version: 2.8.0
-      sdk:
+      onin-sdk:
         specifier: workspace:*
         version: link:../sdk
     devDependencies:
