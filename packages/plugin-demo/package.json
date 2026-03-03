@@ -12,7 +12,7 @@
     "check": "svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
-    "sdk": "workspace:*",
+    "onin-sdk": "workspace:*",
     "@tauri-apps/api": "^2.8.0"
   },
   "devDependencies": {
