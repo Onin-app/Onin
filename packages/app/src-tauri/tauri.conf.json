@@ -24,6 +24,7 @@
         "focus": true,
         "hiddenTitle": true,
         "maximizable": false,
+        "resizable": true,
         "skipTaskbar": true,
         "transparent": true,
         "shadow": false

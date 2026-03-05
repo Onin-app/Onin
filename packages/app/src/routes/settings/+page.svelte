@@ -91,8 +91,9 @@
   };
 </script>
 
+<div class="h-screen w-full bg-transparent p-1">
 <main
-  class="flex h-screen w-full overflow-hidden rounded-xl bg-neutral-50 text-neutral-900 selection:bg-neutral-200 dark:bg-neutral-900 dark:text-neutral-100 dark:selection:bg-neutral-700"
+  class="flex h-full w-full overflow-hidden rounded-xl bg-neutral-50 text-neutral-900 selection:bg-neutral-200 dark:bg-neutral-900 dark:text-neutral-100 dark:selection:bg-neutral-700"
   data-tauri-drag-region
 >
   <aside
@@ -142,3 +143,4 @@
     </div>
   </div>
 </main>
+</div>
