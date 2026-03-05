@@ -69,7 +69,7 @@ fn wrap_code(js_code: &str, plugin_id: Option<&str>) -> String {
 fn wrap_es_module(js_code: &str, plugin_id: Option<&str>) -> String {
     // 将 ES 模块代码转换为 data URL
     let code_with_id = if let Some(id) = plugin_id {
-        format!("globalThis.__PLUGIN_ID__ = '{}';\\n{}", id, js_code)
+        format!("globalThis.__PLUGIN_ID__ = '{}';\n{}", id, js_code)
     } else {
         js_code.to_string()
     };
@@ -92,7 +92,7 @@ fn wrap_es_module(js_code: &str, plugin_id: Option<&str>) -> String {
 /// 包装 IIFE 代码
 fn wrap_iife(js_code: &str, plugin_id: Option<&str>) -> String {
     if let Some(id) = plugin_id {
-        format!("globalThis.__PLUGIN_ID__ = '{}';\\n{}", id, js_code)
+        format!("globalThis.__PLUGIN_ID__ = '{}';\n{}", id, js_code)
     } else {
         js_code.to_string()
     }
@@ -102,7 +102,7 @@ fn wrap_iife(js_code: &str, plugin_id: Option<&str>) -> String {
 fn wrap_async_iife(js_code: &str, plugin_id: Option<&str>) -> String {
     if let Some(id) = plugin_id {
         format!(
-            "(async () => {{\n  globalThis.__PLUGIN_ID__ = '{}';\\n{}\n}})().catch(err => console.error('Plugin error:', err));",
+            "(async () => {{\n  globalThis.__PLUGIN_ID__ = '{}';\n{}\n}})().catch(err => console.error('Plugin error:', err));",
             id, js_code
         )
     } else {
