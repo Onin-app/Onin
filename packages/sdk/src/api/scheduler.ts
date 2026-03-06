@@ -253,6 +253,65 @@ async function list(): Promise<ScheduleTask[]> {
 }
 
 /**
+ * 指定具体时间戳执行单次任务
+ *
+ * @param id - 任务唯一标识
+ * @param timestamp - 执行时间的时间戳 (毫秒)
+ * @param callback - 任务执行回调
+ *
+ * @example
+ * ```typescript
+ * // 在指定的未来的某个时刻执行
+ * const futureTime = Date.now() + 60 * 1000;
+ * await scheduler.at('one-time-event', futureTime, async () => {
+ *   console.log('Time is up!');
+ * });
+ * ```
+ */
+async function at(
+  id: string,
+  timestamp: number,
+  callback: TaskCallback,
+): Promise<void> {
+  // 保存回调
+  taskCallbacks.set(id, callback);
+
+  try {
+    await invoke('schedule_once', {
+      pluginId: getPluginId(),
+      options: { id, execute_at: timestamp },
+    });
+  } catch (error) {
+    taskCallbacks.delete(id);
+    throw error;
+  }
+}
+
+/**
+ * 延迟执行单次任务
+ *
+ * @param id - 任务唯一标识
+ * @param delayMs - 延迟时间 (毫秒)
+ * @param callback - 任务执行回调
+ *
+ * @example
+ * ```typescript
+ * // 25分钟后执行 (如番茄钟)
+ * await scheduler.timeout('pomodoro-end', 25 * 60 * 1000, async () => {
+ *   console.log('Pomodoro finished!');
+ * });
+ * ```
+ */
+async function timeout(
+  id: string,
+  delayMs: number,
+  callback: TaskCallback,
+): Promise<void> {
+  const timestamp = Date.now() + delayMs;
+  return at(id, timestamp, callback);
+}
+
+/**
  * Scheduler API 命名空间
  */
 export const scheduler = {
@@ -260,6 +319,8 @@ export const scheduler = {
   daily,
   hourly,
   weekly,
+  at,
+  timeout,
   cancel,
   list,
 };
