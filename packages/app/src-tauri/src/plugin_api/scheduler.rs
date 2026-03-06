@@ -250,6 +250,7 @@ pub async fn schedule_task(
     state: State<'_, SchedulerState>,
 ) -> Result<(), String> {
     use crate::plugin::PluginStore;
+    use crate::plugin::types::find_plugin_by_id;
 
     // 验证 cron 表达式
     validate_cron(&options.cron)?;
@@ -259,7 +260,7 @@ pub async fn schedule_task(
         let plugin_store = app_handle.state::<PluginStore>();
         let store_lock = plugin_store.0.lock().unwrap();
 
-        if let Some(plugin) = store_lock.get(&plugin_id) {
+        if let Some(plugin) = find_plugin_by_id(&store_lock, &plugin_id) {
             // 检查插件是否启用
             if !plugin.enabled {
                 return Err(format!("Plugin {} is disabled", plugin_id));
