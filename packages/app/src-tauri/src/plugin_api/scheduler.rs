@@ -65,7 +65,8 @@ impl SchedulerState {
                     let app_handle_clone = app_handle.clone();
 
                     // 创建 Job
-                    match Job::new_async(task.cron.as_str(), move |_uuid, _l| {
+                    let six_field_cron = to_six_field_cron(&task.cron);
+                    match Job::new_async(six_field_cron.as_str(), move |_uuid, _l| {
                         let app_handle = app_handle_clone.clone();
                         let plugin_id = plugin_id.clone();
                         let task_id = task_id.clone();
@@ -241,6 +242,18 @@ fn validate_cron(cron: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// 将5字段 cron（分 时 日 月 周）转换为 tokio_cron_scheduler 所需的6字段格式（秒 分 时 日 月 周）
+fn to_six_field_cron(cron: &str) -> String {
+    let parts: Vec<&str> = cron.split_whitespace().collect();
+    if parts.len() == 5 {
+        // 5字段：补充秒字段 0 在最前面
+        format!("0 {}", cron)
+    } else {
+        // 已经是6字段或其他格式，直接返回
+        cron.to_string()
+    }
+}
+
 /// 注册定时任务
 #[tauri::command]
 pub async fn schedule_task(
@@ -313,8 +326,9 @@ pub async fn schedule_task(
     // 在闭包之前克隆 app_handle
     let app_handle_for_job = app_handle.clone();
 
-    // 创建 Job
-    let job = Job::new_async(options.cron.as_str(), move |_uuid, _l| {
+    // 创建 Job（将5字段 cron 转换为 tokio_cron_scheduler 所需的6字段格式）
+    let six_field_cron = to_six_field_cron(&options.cron);
+    let job = Job::new_async(six_field_cron.as_str(), move |_uuid, _l| {
         let app_handle = app_handle_for_job.clone();
         let plugin_id = plugin_id_clone.clone();
         let task_id = task_id.clone();
