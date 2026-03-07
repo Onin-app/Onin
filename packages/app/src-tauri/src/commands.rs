@@ -123,6 +123,7 @@ pub fn get_invoke_handler(
         plugin_api::clipboard::commands::get_clipboard_content,
         // Plugin API: scheduler
         plugin_api::scheduler::schedule_task,
+        plugin_api::scheduler::schedule_once,
         plugin_api::scheduler::cancel_task,
         plugin_api::scheduler::list_tasks,
         // Command manager

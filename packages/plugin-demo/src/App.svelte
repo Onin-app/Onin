@@ -73,7 +73,7 @@
     { id: 'http', name: 'HTTP', icon: '🌐', count: 6 },
     { id: 'dialog', name: 'Dialog', icon: '💬', count: 8 },
     { id: 'settings', name: 'Settings', icon: '⚙️', count: 3 },
-    { id: 'scheduler', name: 'Scheduler', icon: '⏰', count: 6 },
+    { id: 'scheduler', name: 'Scheduler', icon: '⏰', count: 8 },
     { id: 'ai', name: 'AI', icon: '🤖', count: 10 },
   ];
 
@@ -872,6 +872,31 @@
       >
         <span class="api-name">list</span>
         <span class="api-desc">列出任务</span>
+      </button>
+      <button
+        class="test-btn"
+        onclick={() =>
+          runTest('scheduler.timeout', () =>
+            scheduler.timeout('test-timeout', 5000, () =>
+              log('✅ 5秒 Timeout 任务执行完成', 'success'),
+            ),
+          )}
+      >
+        <span class="api-name">timeout</span>
+        <span class="api-desc">5秒后执行</span>
+      </button>
+      <button
+        class="test-btn"
+        onclick={() =>
+          runTest('scheduler.at', () => {
+            const time = Date.now() + 10000;
+            return scheduler.at('test-at', time, () =>
+              log('✅ 10秒 At 任务执行完成', 'success'),
+            );
+          })}
+      >
+        <span class="api-name">at</span>
+        <span class="api-desc">10秒后执行</span>
       </button>
       <button
         class="test-btn"

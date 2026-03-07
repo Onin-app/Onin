@@ -17,10 +17,10 @@ permissions:
   pages: write
   id-token: write
 
-# 同一时间只允许一个部署，跳过排队中的任务，但不取消正在进行的
+# 同一时间只允许一个部署，有新任务进来时取消正在运行的旧任务，确保始终以最新提交为准
 concurrency:
   group: pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:

@@ -58,6 +58,7 @@ pub struct PluginCommandManifest {
     /// 命令描述
     pub description: String,
     /// 触发关键词列表
+    #[serde(default)]
     pub keywords: Vec<PluginCommandKeyword>,
     /// 匹配规则列表
     #[serde(default)]

@@ -48,10 +48,12 @@
 {#if isTranslator}
   <slot />
 {:else}
-  <main
-    class="h-[100vh] w-full overflow-hidden rounded-xl bg-neutral-100 p-4 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100"
-    data-tauri-drag-region
-  >
+  <div class="h-[100vh] w-full bg-transparent p-1">
+    <main
+      class="h-full w-full overflow-hidden rounded-xl bg-neutral-100 p-3 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100"
+      data-tauri-drag-region
+    >
     <slot />
-  </main>
+    </main>
+  </div>
 {/if}

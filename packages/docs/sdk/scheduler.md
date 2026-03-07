@@ -81,6 +81,39 @@ await scheduler.weekly('report', 1, '09:00', () => generateReport());
 await scheduler.cancel('morning');
 ```
 
+### `scheduler.at(id, timestamp, callback)`
+
+在指定时间戳（毫秒）执行**一次性任务**，执行后自动清理。
+
+```typescript
+// 在明天早上 9:00 执行
+const tomorrow9am = new Date();
+tomorrow9am.setDate(tomorrow9am.getDate() + 1);
+tomorrow9am.setHours(9, 0, 0, 0);
+
+await scheduler.at('send-report', tomorrow9am.getTime(), async () => {
+  await sendReport();
+});
+```
+
+### `scheduler.timeout(id, delayMs, callback)`
+
+延迟指定毫秒后执行**一次性任务**，是 `at(id, Date.now() + delayMs, callback)` 的快捷方式。
+
+```typescript
+// 25 分钟后提醒（如番茄钟）
+await scheduler.timeout('pomodoro-end', 25 * 60 * 1000, async () => {
+  await notification.show({ title: '番茄钟结束', body: '休息一下！' });
+});
+```
+
+::: warning 一次性任务的注意事项
+
+- `at()` / `timeout()` 的任务执行后会**自动删除**，无需手动 cancel
+- 应用重启后，**已过期**的一次性任务会被**自动丢弃**，不会补偿触发
+- 应用重启后，**未过期**的一次性任务会按剩余时间继续等待执行
+  :::
+
 ### `scheduler.list()`
 
 获取当前插件的所有定时任务列表。
@@ -89,3 +122,14 @@ await scheduler.cancel('morning');
 const tasks = await scheduler.list();
 console.log('已注册任务:', tasks);
 ```
+
+## 重启恢复
+
+Scheduler 任务持久化到本地存储，应用重启后会**自动恢复**：
+
+- **cron 任务**：按原计划继续执行
+- **一次性任务（at/timeout）**：剩余时间继续倒计时；若已过期则自动丢弃
+
+::: warning 回调需要重新注册
+任务回调保存在内存中，应用重启后会丢失。插件应在初始化时重新调用 `schedule()` / `at()` 等方法注册回调，后端会识别同名任务已存在并拒绝重复注册（或直接覆盖）。
+:::

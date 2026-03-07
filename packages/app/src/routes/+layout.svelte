@@ -9,6 +9,7 @@
   import { page } from "$app/state";
   import { setupPluginConsoleListener } from "$lib/plugin-console";
   import { Toaster } from "svelte-sonner";
+  import WindowResizer from "$lib/components/WindowResizer.svelte";
 
   // Setup plugin console listener to forward plugin console output to webview devtools
   setupPluginConsoleListener();
@@ -90,4 +91,5 @@
 
 {@render children()}
 
+<WindowResizer />
 <Toaster richColors position="top-center" />
