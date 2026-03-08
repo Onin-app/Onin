@@ -6,7 +6,6 @@
  */
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import type { LaunchableItem, CommandUsageStats, AppConfig } from "$lib/type";
 import { fuzzyMatch } from "$lib/utils/fuzzyMatch";
 import { sortByUsage } from "$lib/utils/sortByUsage";
@@ -132,7 +131,6 @@ export function useAppList(): AppListManagerReturn {
       if (app.action) {
         await invoke("execute_command", {
           name: app.action,
-          window: await WebviewWindow.getCurrent(),
           args: Object.keys(args).length > 0 ? args : null,
         });
 
@@ -149,7 +147,6 @@ export function useAppList(): AppListManagerReturn {
       } else if (app.source === "FileCommand") {
         await invoke("open_app", {
           path: app.path,
-          window: await WebviewWindow.getCurrent(),
         });
       }
 

@@ -67,22 +67,24 @@ pub fn get_current_plugin_id<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Re
         return Ok(id);
     }
 
-    // 2. 尝试从当前获取焦点的 webview label 解析
+    // 2. 优先从内联插件状态获取（避免被其他插件窗口焦点污染上下文）
+    if let Some(inline_state) = tauri::Manager::try_state::<crate::plugin::InlinePluginState>(app) {
+        if inline_state.is_visible.load(std::sync::atomic::Ordering::Relaxed) {
+            if let Ok(id_lock) = inline_state.current_plugin_id.lock() {
+                if let Some(id) = id_lock.as_ref() {
+                    return Ok(id.to_string());
+                }
+            }
+        }
+    }
+
+    // 3. 尝试从当前获取焦点的插件窗口 label 解析
     // 注意：显式使用 tauri::Manager 特性的方法
     for window in tauri::Manager::webview_windows(app).values() {
         let label = window.label();
         if label.starts_with("plugin_") && window.is_focused().unwrap_or(false) {
             let plugin_id = label.strip_prefix("plugin_").unwrap().replace('_', ".");
             return Ok(plugin_id);
-        }
-    }
-
-    // 3. 尝试从内联插件状态获取
-    if let Some(inline_state) = tauri::Manager::try_state::<crate::plugin::InlinePluginState>(app) {
-        if let Ok(id_lock) = inline_state.current_plugin_id.lock() {
-            if let Some(id) = id_lock.as_ref() {
-                return Ok(id.to_string());
-            }
         }
     }
 
