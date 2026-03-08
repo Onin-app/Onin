@@ -101,6 +101,8 @@ pub fn get_invoke_handler(
         plugin_api::storage::plugin_storage_keys,
         plugin_api::storage::plugin_storage_set_items,
         plugin_api::storage::plugin_storage_get_items,
+        plugin_api::storage::plugin_storage_get_all,
+        plugin_api::storage::plugin_storage_set_all,
         // Plugin API: filesystem
         plugin_api::fs::plugin_fs_read_file,
         plugin_api::fs::plugin_fs_write_file,

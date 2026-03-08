@@ -100,6 +100,8 @@ pub async fn dispatch(
         "plugin_storage_keys" => storage::handle_storage_keys(app_handle).await,
         "plugin_storage_set_items" => storage::handle_storage_set_items(app_handle, arg).await,
         "plugin_storage_get_items" => storage::handle_storage_get_items(app_handle, arg).await,
+        "plugin_storage_get_all" => storage::handle_storage_get_all(app_handle).await,
+        "plugin_storage_set_all" => storage::handle_storage_set_all(app_handle, arg).await,
 
         // 文件系统 API
         "plugin_fs_read_file" => fs::handle_read_file(app_handle, arg).await,

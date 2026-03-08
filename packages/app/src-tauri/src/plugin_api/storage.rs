@@ -221,3 +221,48 @@ pub async fn plugin_storage_get_items(
     );
     Ok(result)
 }
+
+#[tauri::command]
+pub async fn plugin_storage_get_all(
+    app: AppHandle,
+) -> Result<HashMap<String, serde_json::Value>, StorageError> {
+    let plugin_id = get_current_plugin_id(&app)?;
+    let store_path = get_plugin_store_path(&plugin_id);
+    let store = StoreBuilder::new(&app, store_path).build()?;
+
+    store.reload()?;
+    let mut result = HashMap::new();
+    for (key, value) in store.entries() {
+        result.insert(key.clone(), value.clone());
+    }
+
+    println!(
+        "[Storage] Got all {} items for plugin '{}'",
+        result.len(),
+        plugin_id
+    );
+    Ok(result)
+}
+
+#[tauri::command]
+pub async fn plugin_storage_set_all(
+    app: AppHandle,
+    data: HashMap<String, serde_json::Value>,
+) -> Result<(), StorageError> {
+    let plugin_id = get_current_plugin_id(&app)?;
+    let store_path = get_plugin_store_path(&plugin_id);
+    let store = StoreBuilder::new(&app, store_path).build()?;
+
+    store.clear();
+    let data_len = data.len();
+    for (key, value) in data {
+        store.set(key, value);
+    }
+    store.save()?;
+
+    println!(
+        "[Storage] Replaced with {} items for plugin '{}'",
+        data_len, plugin_id
+    );
+    Ok(())
+}
