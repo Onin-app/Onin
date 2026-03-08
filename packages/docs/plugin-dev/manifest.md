@@ -39,8 +39,11 @@
 
 | 字段           | 类型                     | 默认值     | 说明                            |
 | -------------- | ------------------------ | ---------- | ------------------------------- |
-| `display_mode` | `"inline"` \| `"window"` | `"inline"` | 插件默认显示方式                |
-| `auto_detach`  | `boolean`                | `false`    | UI 插件是否始终在独立窗口中打开 |
+| `display_mode` | `"inline"` \| `"window"` | `"inline"` | 插件默认显示方式                                                                       |
+| `auto_detach`  | `boolean`                | `false`    | UI 插件是否始终在独立窗口中打开                                                       |
+| `terminate_on_bg` | `boolean`             | `false`    | 应用隐藏到后台时是否立即结束插件运行。对于节省资源的工具类插件建议开启 |
+| `run_at_startup` | `boolean`              | `false`    | 是否随 Onin 主程序启动自动加载并运行插件                                              |
+| `lifecycle`    | `string`                 | `"lifecycle.js"` | 视图插件的初始化脚本路径。即便 UI 未打开，该脚本也会被执行（需 `run_at_startup` 支持） |
 
 ## 开发模式
 

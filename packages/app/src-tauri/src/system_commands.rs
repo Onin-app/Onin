@@ -106,7 +106,6 @@ pub async fn get_basic_commands(app: AppHandle) -> Vec<Command> {
 pub async fn execute_command(
     name: String,
     app: AppHandle,
-    window: tauri::WebviewWindow,
     args: Option<serde_json::Value>,
 ) {
     // 记录使用情况
@@ -129,7 +128,7 @@ pub async fn execute_command(
                 }
             }
             CommandAction::App(path) => {
-                if let Err(e) = installed_apps::open_app(path.clone(), window) {
+                if let Err(e) = installed_apps::open_app(path.clone(), app.clone()) {
                     eprintln!("Failed to open app {}: {}", path, e);
                 }
             }

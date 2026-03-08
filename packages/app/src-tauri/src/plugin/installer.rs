@@ -72,8 +72,9 @@ pub fn import_plugin(
     );
 
     // 安全检查：验证插件 ID 格式
-    if manifest.id.contains("..") || manifest.id.contains("/") || manifest.id.contains("\\") {
-        return Err("插件 ID 无效: 包含非法字符".to_string());
+    let id_regex = regex::Regex::new(r"^[a-z0-9][a-z0-9.-]*[a-z0-9]$").unwrap();
+    if !id_regex.is_match(&manifest.id) || manifest.id.contains("..") {
+        return Err("插件 ID 无效: 格式错误或包含非法字符".to_string());
     }
 
     // 检查插件是否已存在
@@ -122,14 +123,27 @@ pub fn import_plugin(
 
     // 6. 加载插件到 store
     let plugin_states = load_plugin_states(&app);
-    let (enabled, auto_detach) = if let Some(state) = plugin_states.get(&manifest.id) {
-        (state.enabled, state.auto_detach)
+    let (enabled, auto_detach, terminate_on_bg, run_at_startup) =
+        if let Some(state) = plugin_states.get(&manifest.id) {
+            (
+                state.enabled,
+                state.auto_detach,
+                state.terminate_on_bg,
+                state.run_at_startup,
+            )
     } else {
-        (true, manifest.auto_detach)
+        (
+            true,
+            manifest.auto_detach,
+            manifest.terminate_on_bg,
+            manifest.run_at_startup,
+        )
     };
 
     let mut manifest_with_state = manifest.clone();
     manifest_with_state.auto_detach = auto_detach;
+    manifest_with_state.terminate_on_bg = terminate_on_bg;
+    manifest_with_state.run_at_startup = run_at_startup;
 
     let loaded_plugin = LoadedPlugin {
         manifest: manifest_with_state,
@@ -366,13 +380,19 @@ pub async fn download_and_install_plugin(
 
     // 6. 加载到 store
     let plugin_states = load_plugin_states(&app);
-    let auto_detach = plugin_states
+    let (auto_detach, terminate_on_bg, run_at_startup) = plugin_states
         .get(&manifest.id)
-        .map(|s| s.auto_detach)
-        .unwrap_or(manifest.auto_detach);
+        .map(|s| (s.auto_detach, s.terminate_on_bg, s.run_at_startup))
+        .unwrap_or((
+            manifest.auto_detach,
+            manifest.terminate_on_bg,
+            manifest.run_at_startup,
+        ));
 
     let mut manifest_with_state = manifest.clone();
     manifest_with_state.auto_detach = auto_detach;
+    manifest_with_state.terminate_on_bg = terminate_on_bg;
+    manifest_with_state.run_at_startup = run_at_startup;
 
     let loaded_plugin = LoadedPlugin {
         manifest: manifest_with_state,

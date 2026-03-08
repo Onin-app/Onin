@@ -158,6 +158,20 @@ async fn merge_commands(app: &AppHandle, saved_commands: Vec<Command>) -> Vec<Co
         }
     }
 
+    // 合并动态命令
+    let current_dynamic_commands = generators::get_initial_dynamic_commands(app);
+    for dynamic_command in current_dynamic_commands {
+        let existing_command = saved_commands
+            .iter()
+            .find(|c| c.source == ItemSource::Plugin && c.name == dynamic_command.name);
+
+        if let Some(existing) = existing_command {
+            final_plugins.push(existing.clone());
+        } else {
+            final_plugins.push(dynamic_command);
+        }
+    }
+
     let mut final_commands = final_system_commands;
     final_commands.extend(other_commands);
     final_commands.extend(final_plugins);

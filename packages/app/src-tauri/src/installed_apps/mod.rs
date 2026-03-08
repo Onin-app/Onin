@@ -10,7 +10,7 @@ pub mod macos_icon;
 mod windows;
 
 use crate::shared_types::AppOrigin;
-use tauri::command;
+use tauri::{command, AppHandle, Manager};
 
 #[derive(serde::Serialize, Clone, Debug)]
 pub struct AppInfo {
@@ -59,7 +59,7 @@ pub async fn fetch_installed_apps() -> Result<Vec<AppInfo>, String> {
 }
 
 #[command]
-pub fn open_app(path: String, window: tauri::WebviewWindow) -> Result<(), String> {
+pub fn open_app(path: String, app: AppHandle) -> Result<(), String> {
     println!("Opening app: {path}");
 
     #[cfg(target_os = "windows")]
@@ -77,7 +77,11 @@ pub fn open_app(path: String, window: tauri::WebviewWindow) -> Result<(), String
         linux::open_app(&path)?;
     }
 
-    window.hide().map_err(|e| e.to_string())?;
+    if let Some(main) = app.get_webview_window("main") {
+        main.hide().map_err(|e| e.to_string())?;
+    } else if let Some(main) = app.get_window("main") {
+        main.hide().map_err(|e| e.to_string())?;
+    }
 
     Ok(())
 }

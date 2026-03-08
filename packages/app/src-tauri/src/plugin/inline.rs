@@ -17,14 +17,25 @@ use tauri::State; // Ensure State is imported
 
 pub struct InlinePluginState {
     pub is_visible: AtomicBool,
+    pub current_plugin_id: std::sync::Mutex<Option<String>>,
 }
 
 impl Default for InlinePluginState {
     fn default() -> Self {
         Self {
             is_visible: AtomicBool::new(false),
+            current_plugin_id: std::sync::Mutex::new(None),
         }
     }
+}
+
+fn resolve_host_window<R: Runtime>(app: &AppHandle<R>) -> Result<tauri::Window<R>, String> {
+    app.get_window("main")
+        .or_else(|| app.windows().values().next().cloned())
+        .ok_or_else(|| {
+            let labels = app.windows().keys().cloned().collect::<Vec<_>>().join(", ");
+            format!("Main window not found, available windows: [{}]", labels)
+        })
 }
 
 #[tauri::command]
@@ -32,18 +43,30 @@ pub async fn show_inline_plugin<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, InlinePluginState>,
     url: String,
+    plugin_id: String,
     rect: Rect,
 ) -> Result<(), String> {
     state.is_visible.store(true, Ordering::Relaxed);
+    {
+        let mut id_lock = state.current_plugin_id.lock().unwrap();
+        *id_lock = Some(plugin_id);
+    }
     
-    let window = app.get_window("main").ok_or("Main window not found")?;
+    let window = resolve_host_window(&app)?;
 
     // Check if webview exists
     if let Some(webview) = window.get_webview("plugin-inline") {
-        // Update URL if different
-        if webview.url().unwrap().to_string() != url {
-            // webview.load_url(&url).map_err(|e| e.to_string())?;
-            // Use eval to navigate as load_url might be missing or renamed
+        // Update URL if different (Normalized comparison)
+        let current_url_str = webview.url().unwrap().to_string();
+        let is_different = if let (Ok(u1), Ok(u2)) = (Url::parse(&current_url_str), Url::parse(&url)) {
+            // Compare normalized URLs (ignores trailing slashes, etc.)
+            u1.as_str().trim_end_matches('/') != u2.as_str().trim_end_matches('/')
+        } else {
+            current_url_str != url
+        };
+
+        if is_different {
+            println!("[plugin/inline] URL changed from {} to {}, reloading", current_url_str, url);
             webview
                 .eval(&format!("window.location.replace('{}')", url))
                 .map_err(|e| e.to_string())?;
@@ -130,7 +153,7 @@ pub fn update_inline_plugin_bounds<R: Runtime>(
     }
 
     // println!("[plugin/inline] Updating bounds: {:?}", rect);
-    let window = app.get_window("main").ok_or("Main window not found")?;
+    let window = resolve_host_window(&app)?;
     if let Some(webview) = window.get_webview("plugin-inline") {
         webview
             .set_bounds(tauri::Rect {
@@ -148,8 +171,12 @@ pub fn hide_inline_plugin<R: Runtime>(
     state: State<'_, InlinePluginState>,
 ) -> Result<(), String> {
     state.is_visible.store(false, Ordering::Relaxed);
+    {
+        let mut id_lock = state.current_plugin_id.lock().map_err(|e| e.to_string())?;
+        *id_lock = None;
+    }
 
-    let window = app.get_window("main").ok_or("Main window not found")?;
+    let window = resolve_host_window(&app)?;
     if let Some(webview) = window.get_webview("plugin-inline") {
         webview.hide().map_err(|e| e.to_string())?;
         // Enforce 0x0
@@ -167,8 +194,12 @@ pub fn close_inline_plugin<R: Runtime>(
     state: State<'_, InlinePluginState>,
 ) -> Result<(), String> {
     state.is_visible.store(false, Ordering::Relaxed);
+    {
+        let mut id_lock = state.current_plugin_id.lock().map_err(|e| e.to_string())?;
+        *id_lock = None;
+    }
 
-    let window = app.get_window("main").ok_or("Main window not found")?;
+    let window = resolve_host_window(&app)?;
     
     if let Some(webview) = window.get_webview("plugin-inline") {
         // Revert to close() (destroy) mechanism.
@@ -197,4 +228,13 @@ pub fn send_inline_plugin_message<R: Runtime>(
             .map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+#[tauri::command]
+pub fn open_inline_plugin_devtools<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+    if let Some(webview) = app.get_webview("plugin-inline") {
+        webview.open_devtools();
+        Ok(())
+    } else {
+        Err("插件视图未找到".to_string())
+    }
 }

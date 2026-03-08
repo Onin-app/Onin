@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Component, Path, PathBuf};
 use tauri::{AppHandle, Manager};
 use tokio::fs;
 
@@ -80,8 +80,7 @@ fn get_plugin_fs_root(app: &AppHandle, plugin_id: &str) -> Result<PathBuf, FileS
         .app_data_dir()
         .map_err(|e| FileSystemError::from(format!("Failed to get app data dir: {}", e)))?;
 
-    let plugin_dir = app_data_dir.join("plugin_data").join(plugin_id);
-    Ok(plugin_dir)
+    Ok(app_data_dir.join("plugin_data").join(plugin_id))
 }
 
 // 解析相对路径到绝对路径，确保在插件目录内
@@ -91,18 +90,46 @@ fn resolve_plugin_path(
     relative_path: &str,
 ) -> Result<PathBuf, FileSystemError> {
     let plugin_root = get_plugin_fs_root(app, plugin_id)?;
-    let resolved_path = plugin_root.join(relative_path);
 
     // 确保插件根目录存在
     if !plugin_root.exists() {
         std::fs::create_dir_all(&plugin_root).map_err(|e| {
             FileSystemError::from(format!("Failed to create plugin directory: {}", e))
         })?;
+    } else {
+        let meta = std::fs::symlink_metadata(&plugin_root)?;
+        if meta.file_type().is_symlink() {
+            return Err(FileSystemError::from("Plugin root must not be a symlink"));
+        }
     }
 
-    // 安全检查：确保路径在插件目录内
-    if !resolved_path.starts_with(&plugin_root) {
-        return Err(FileSystemError::from("Path is outside plugin directory"));
+    let relative = Path::new(relative_path);
+    if relative.is_absolute() {
+        return Err(FileSystemError::from("Absolute paths are not allowed"));
+    }
+
+    let mut resolved_path = plugin_root.clone();
+    for component in relative.components() {
+        match component {
+            Component::Prefix(_) | Component::RootDir => {
+                return Err(FileSystemError::from("Absolute paths are not allowed"));
+            }
+            Component::CurDir => {}
+            Component::ParentDir => {
+                return Err(FileSystemError::from("Parent path traversal is not allowed"));
+            }
+            Component::Normal(part) => {
+                resolved_path.push(part);
+                if resolved_path.exists() {
+                    let meta = std::fs::symlink_metadata(&resolved_path)?;
+                    if meta.file_type().is_symlink() {
+                        return Err(FileSystemError::from(
+                            "Symlink paths are not allowed in plugin filesystem",
+                        ));
+                    }
+                }
+            }
+        }
     }
 
     Ok(resolved_path)

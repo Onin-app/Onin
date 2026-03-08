@@ -154,8 +154,29 @@ fn spawn_async_init_tasks(app_handle: tauri::AppHandle) {
 
         // 2. 加载插件
         let plugin_store = app_handle.state::<plugin::PluginStore>();
-        if let Err(e) = plugin::load_plugins(app_handle.clone(), plugin_store) {
+        if let Err(e) = plugin::load_plugins(app_handle.clone(), plugin_store.clone()) {
             eprintln!("[ERROR] Failed to load plugins on startup: {}", e);
+        }
+
+        // 2.1 启动设置为跟随主程序启动的插件
+        let plugins_to_start = {
+            let store_lock = plugin_store.0.lock().unwrap();
+            store_lock
+                .values()
+                .filter(|p| p.enabled && p.manifest.run_at_startup)
+                .map(|p| p.manifest.id.clone())
+                .collect::<Vec<_>>()
+        };
+
+        for plugin_id in plugins_to_start {
+            println!("[INFO] 正在启动设置为跟随启动的插件: {}", plugin_id);
+            if let Err(e) = plugin::executor::execute_plugin_entry(
+                app_handle.clone(),
+                plugin_store.clone(),
+                plugin_id.clone(),
+            ) {
+                eprintln!("[ERROR] 插件 {} 启动失败: {}", plugin_id, e);
+            }
         }
 
         // 3. 初始化命令管理器

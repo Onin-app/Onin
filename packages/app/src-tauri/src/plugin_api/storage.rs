@@ -3,24 +3,8 @@ use std::collections::HashMap;
 use tauri::AppHandle;
 use tauri_plugin_store::{Error, StoreBuilder};
 
-// 线程本地存储用于保存当前插件ID
-thread_local! {
-    static CURRENT_PLUGIN_ID: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
-}
+// Plugin ID retrieval now handled by crate::plugin::context
 
-// 设置当前插件ID（在插件调用开始时调用）
-pub fn set_current_plugin_id(plugin_id: String) {
-    CURRENT_PLUGIN_ID.with(|id| {
-        *id.borrow_mut() = Some(plugin_id);
-    });
-}
-
-// 清除当前插件ID（在插件调用结束时调用）
-pub fn clear_current_plugin_id() {
-    CURRENT_PLUGIN_ID.with(|id| {
-        *id.borrow_mut() = None;
-    });
-}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StorageError {
@@ -61,12 +45,9 @@ fn get_plugin_store_path(plugin_id: &str) -> String {
 }
 
 // 获取当前执行插件的 ID
-pub fn get_current_plugin_id(_app: &AppHandle) -> Result<String, StorageError> {
-    CURRENT_PLUGIN_ID.with(|id| {
-        id.borrow().clone().ok_or_else(|| {
-            StorageError::from("No plugin context found. Storage API must be called from within a plugin execution context.")
-        })
-    })
+pub fn get_current_plugin_id<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<String, StorageError> {
+    crate::plugin::context::get_current_plugin_id(app, None)
+        .map_err(|e| StorageError::from(e))
 }
 
 #[tauri::command]
@@ -198,4 +179,49 @@ pub async fn plugin_storage_get_items(
         plugin_id
     );
     Ok(result)
+}
+
+#[tauri::command]
+pub async fn plugin_storage_get_all(
+    app: AppHandle,
+) -> Result<HashMap<String, serde_json::Value>, StorageError> {
+    let plugin_id = get_current_plugin_id(&app)?;
+    let store_path = get_plugin_store_path(&plugin_id);
+    let store = StoreBuilder::new(&app, store_path).build()?;
+
+    store.reload()?;
+    let mut result = HashMap::new();
+    for (key, value) in store.entries() {
+        result.insert(key.clone(), value.clone());
+    }
+
+    println!(
+        "[Storage] Got all {} items for plugin '{}'",
+        result.len(),
+        plugin_id
+    );
+    Ok(result)
+}
+
+#[tauri::command]
+pub async fn plugin_storage_set_all(
+    app: AppHandle,
+    data: HashMap<String, serde_json::Value>,
+) -> Result<(), StorageError> {
+    let plugin_id = get_current_plugin_id(&app)?;
+    let store_path = get_plugin_store_path(&plugin_id);
+    let store = StoreBuilder::new(&app, store_path).build()?;
+
+    store.clear();
+    let data_len = data.len();
+    for (key, value) in data {
+        store.set(key, value);
+    }
+    store.save()?;
+
+    println!(
+        "[Storage] Replaced with {} items for plugin '{}'",
+        data_len, plugin_id
+    );
+    Ok(())
 }

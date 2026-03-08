@@ -23,6 +23,7 @@
 //! - `bridge`: API 桥接
 
 pub mod bridge;
+pub mod context;
 pub mod executor;
 pub mod inline;
 pub mod installer;

@@ -101,6 +101,52 @@
       "</div>" +
       "</div>" +
       '<div class="onin-fab-divider"></div>' +
+      // 自动分离
+      '<button class="onin-fab-item" id="onin-btn-auto-detach">' +
+      '<span class="onin-icon-text">' +
+      '<svg fill="currentColor" viewBox="0 0 256 256"><path d="M224,128a96,96,0,1,1-96-96A96,96,0,0,1,224,128Z" opacity="0.2"></path><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm45.66-93.66a8,8,0,0,1,0,11.32l-32,32a8,8,0,0,1-11.32-11.32L148.69,136H88a8,8,0,0,1,0-16h60.69l-18.35-18.34a8,8,0,0,1,11.32-11.32Z"></path></svg>' +
+      "自动分离为独立窗口" +
+      "</span>" +
+      '<div id="onin-auto-detach-switch" style="width:34px;height:20px;border-radius:10px;background:rgba(255,255,255,0.15);position:relative;transition:0.25s;flex-shrink:0;">' +
+      '<div id="onin-auto-detach-thumb" style="width:16px;height:16px;border-radius:50%;background:white;position:absolute;top:2px;left:2px;transition:0.25s;"></div>' +
+      "</div>" +
+      "</button>" +
+      // 后台停止
+      '<button class="onin-fab-item" id="onin-btn-terminate-bg">' +
+      '<span class="onin-icon-text">' +
+      '<svg fill="currentColor" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm40-88a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h64A8,8,0,0,1,168,128Z"></path></svg>' +
+      "退出到后台立即结束" +
+      "</span>" +
+      '<div id="onin-terminate-bg-switch" style="width:34px;height:20px;border-radius:10px;background:rgba(255,255,255,0.15);position:relative;transition:0.25s;flex-shrink:0;">' +
+      '<div id="onin-terminate-bg-thumb" style="width:16px;height:16px;border-radius:50%;background:white;position:absolute;top:2px;left:2px;transition:0.25s;"></div>' +
+      "</div>" +
+      "</button>" +
+      // 随主程序启动
+      '<button class="onin-fab-item" id="onin-btn-run-startup">' +
+      '<span class="onin-icon-text">' +
+      '<svg fill="currentColor" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm37.66-93.66-48,48a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,156.69l42.34-42.35a8,8,0,0,1,11.32,11.32Z"></path></svg>' +
+      "跟随主程序同时启动" +
+      "</span>" +
+      '<div id="onin-run-startup-switch" style="width:34px;height:20px;border-radius:10px;background:rgba(255,255,255,0.15);position:relative;transition:0.25s;flex-shrink:0;">' +
+      '<div id="onin-run-startup-thumb" style="width:16px;height:16px;border-radius:50%;background:white;position:absolute;top:2px;left:2px;transition:0.25s;"></div>' +
+      "</div>" +
+      "</button>" +
+      '<div class="onin-fab-divider"></div>' +
+      // 开发者工具
+      '<button class="onin-fab-item" id="onin-btn-devtools">' +
+      '<span class="onin-icon-text">' +
+      '<svg fill="currentColor" viewBox="0 0 256 256"><path d="M160,128a32,32,0,1,1-32-32A32,32,0,0,1,160,128Z" opacity="0.2"></path><path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,160H40V56H216V200ZM176,128a32,32,0,1,0-32,32A32,32,0,0,0,176,128Z"></path></svg>' +
+      "开发者工具" +
+      "</span>" +
+      "</button>" +
+      // 卸载
+      '<button class="onin-fab-item" id="onin-btn-uninstall" style="color: #ff453a;">' +
+      '<span class="onin-icon-text">' +
+      '<svg fill="currentColor" viewBox="0 0 256 256"><path d="M216,48H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM192,208H64V64H192ZM80,24a8,8,0,0,1,8-8h80a8,8,0,0,1,8,8v16H80Z"></path></svg>' +
+      "卸载插件" +
+      "</span>" +
+      "</button>" +
+      '<div class="onin-fab-divider"></div>' +
       '<button class="onin-fab-item" id="onin-btn-inline">' +
       '<span class="onin-icon-text">' +
       '<svg fill="currentColor" viewBox="0 0 256 256">' +
@@ -139,6 +185,13 @@
     var isDragging = false;
     var startY = 0;
     var initialBottom = 24;
+
+    // 插件设置状态
+    var settings = {
+      auto_detach: false,
+      terminate_on_bg: false,
+      run_at_startup: false
+    };
 
     // 恢复上次拖拽位置（加 clamp 防止旧值超出当前窗口范围）
     var storedBottom = localStorage.getItem(KEY_FAB_Y);
@@ -180,6 +233,50 @@
         localStorage.removeItem(KEY_PINNED);
         pinSwitch.style.background = "rgba(255,255,255,0.15)";
         pinThumb.style.left = "2px";
+      });
+    }
+
+    // 初始化获取插件详细设置
+    invoke("get_plugin_with_schema", { pluginId: pluginId }).then(function (plugin) {
+      if (plugin) {
+        settings.auto_detach = !!plugin.auto_detach;
+        settings.terminate_on_bg = !!plugin.terminate_on_bg;
+        settings.run_at_startup = !!plugin.run_at_startup;
+
+        updateSwitchUI("auto-detach", settings.auto_detach);
+        updateSwitchUI("terminate-bg", settings.terminate_on_bg);
+        updateSwitchUI("run-startup", settings.run_at_startup);
+      }
+    }).catch(console.error);
+
+    function updateSwitchUI(id, enabled) {
+      var sw = document.getElementById("onin-" + id + "-switch");
+      var thumb = document.getElementById("onin-" + id + "-thumb");
+      if (sw && thumb) {
+        sw.style.background = enabled ? "#0F8BFF" : "rgba(255,255,255,0.15)";
+        thumb.style.left = enabled ? "16px" : "2px";
+      }
+    }
+
+    function toggleSetting(key, elementId) {
+      var next = !settings[key];
+      var commandMap = {
+        auto_detach: "toggle_plugin_auto_detach",
+        terminate_on_bg: "toggle_plugin_terminate_on_bg",
+        run_at_startup: "toggle_plugin_run_at_startup"
+      };
+
+      // 乐观更新
+      updateSwitchUI(elementId, next);
+
+      var args = { pluginId: pluginId };
+      args[key] = next;
+
+      invoke(commandMap[key], args).then(function () {
+        settings[key] = next;
+      }).catch(function (err) {
+        console.error("[FAB] Toggle failed:", err);
+        updateSwitchUI(elementId, settings[key]); // 回滚
       });
     }
 
@@ -317,5 +414,37 @@
         if (currentZoom > 0.3) currentZoom -= 0.1;
         applyZoom(Math.round(currentZoom * 10) / 10);
       });
+
+    // ── 4. 插件项事件 ──────────────────────────────────────────────
+    document.getElementById("onin-btn-auto-detach").addEventListener("click", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      toggleSetting("auto_detach", "auto-detach");
+    });
+
+    document.getElementById("onin-btn-terminate-bg").addEventListener("click", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      toggleSetting("terminate_on_bg", "terminate-bg");
+    });
+
+    document.getElementById("onin-btn-run-startup").addEventListener("click", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      toggleSetting("run_at_startup", "run-startup");
+    });
+
+    document.getElementById("onin-btn-devtools").addEventListener("click", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      invoke("plugin_open_devtools").catch(console.error);
+    });
+
+    document.getElementById("onin-btn-uninstall").addEventListener("click", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      if (confirm("确定要卸载此插件吗？此操作无法撤销。")) {
+        invoke("uninstall_plugin", { pluginId: pluginId }).then(function () {
+          // 卸载后关闭窗口
+          invoke("plugin_close_window", { label: "plugin_" + pluginId.replace(/\./g, "_") });
+        }).catch(console.error);
+      }
+    });
+
   });
 })();

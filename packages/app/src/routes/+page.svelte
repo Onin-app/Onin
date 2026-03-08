@@ -17,7 +17,7 @@
   import { ScrollArea } from "bits-ui";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
-  import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+  import { getCurrentWindow } from "@tauri-apps/api/window";
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
 
@@ -452,7 +452,7 @@
     });
 
     // 监听窗口焦点事件并转发给插件
-    const currentWindow = getCurrentWebviewWindow();
+    const currentWindow = getCurrentWindow();
     const unlistenFocus = await currentWindow.onFocusChanged(
       ({ payload: focused }) => {
         if (plugin.state.showPluginInline) {
@@ -503,105 +503,115 @@
   >
     <div
       class="flex h-full w-full flex-col"
-    role="listbox"
-    tabindex="0"
-    onkeydown={handleKeyDown}
-  >
-    <!-- Header: Logo + Search Input + Plugin Menu -->
-    <div class="flex items-center gap-2 pb-2">
-      <button class="flex-shrink-0 cursor-pointer" onclick={handleToSettings}>
-        <img src="/logo.png" class="h-10 w-10" alt="Onin logo" />
-      </button>
+      role="listbox"
+      tabindex="0"
+      onkeydown={handleKeyDown}
+    >
+      <!-- Header: Logo + Search Input + Plugin Menu -->
+      <div class="flex items-center gap-2 pb-2">
+        <button class="flex-shrink-0 cursor-pointer" onclick={handleToSettings}>
+          <img src="/logo.png" class="h-10 w-10" alt="Onin logo" />
+        </button>
 
-      <SearchInput
-        bind:this={searchInputRef}
-        bind:value={inputValue}
-        attachedText={clipboard.state.attachedText}
-        attachedFiles={clipboard.state.attachedFiles}
-        showAllFiles={clipboard.state.showAllFiles}
-        onInput={handleInput}
-        onPaste={handlePaste}
-        onDrop={handleDrop}
-        onDragOver={clipboard.handleDragOver}
-        onRemoveFile={handleRemoveFile}
-        onRemoveText={() => {
-          clipboard.clearAttachments();
-          updateMatchedCommands();
-        }}
-        onEditText={handleEditText}
-        onToggleShowAllFiles={clipboard.toggleShowAllFiles}
-        onBackspace={handleBackspace}
-      />
+        <SearchInput
+          bind:this={searchInputRef}
+          bind:value={inputValue}
+          attachedText={clipboard.state.attachedText}
+          attachedFiles={clipboard.state.attachedFiles}
+          showAllFiles={clipboard.state.showAllFiles}
+          onInput={handleInput}
+          onPaste={handlePaste}
+          onDrop={handleDrop}
+          onDragOver={clipboard.handleDragOver}
+          onRemoveFile={handleRemoveFile}
+          onRemoveText={() => {
+            clipboard.clearAttachments();
+            updateMatchedCommands();
+          }}
+          onEditText={handleEditText}
+          onToggleShowAllFiles={clipboard.toggleShowAllFiles}
+          onBackspace={handleBackspace}
+        />
 
-      <div class="flex-shrink-0">
+        <div class="flex-shrink-0">
+          {#if plugin.state.showPluginInline}
+            <PluginMenu
+              bind:autoDetach={plugin.state.currentPluginAutoDetach}
+              bind:terminateOnBg={plugin.state.currentPluginTerminateOnBg}
+              bind:runAtStartup={plugin.state.currentPluginRunAtStartup}
+              detachShortcut={$detachWindowShortcut}
+              onDetach={plugin.detachPlugin}
+              onClose={plugin.closePlugin}
+              onToggleAutoDetach={plugin.toggleAutoDetach}
+              onToggleTerminateOnBg={plugin.toggleTerminateOnBg}
+              onToggleRunAtStartup={plugin.toggleRunAtStartup}
+              onOpenDevTools={plugin.openDevTools}
+              onUninstall={plugin.uninstallPlugin}
+            />
+          {/if}
+        </div>
+      </div>
+
+      <!-- Content Area -->
+      <div class="relative flex-1 overflow-hidden">
+        <RefreshProgressBar isRefreshing={appListManager.state.isRefreshing} />
+
         {#if plugin.state.showPluginInline}
-          <PluginMenu
-            bind:autoDetach={plugin.state.currentPluginAutoDetach}
-            detachShortcut={$detachWindowShortcut}
-            onDetach={plugin.detachPlugin}
-            onClose={plugin.closePlugin}
-            onToggleAutoDetach={plugin.toggleAutoDetach}
+          <!-- Plugin Inline View -->
+          <PluginInlineView
+            bind:this={pluginInlineViewRef}
+            url={plugin.state.currentPluginUrl}
+            pluginId={plugin.state.currentPluginId}
+            onLoad={() => {
+              // No-op for now, logic potentially moved to component or manager
+            }}
           />
+        {:else}
+          <!-- App List -->
+          <ScrollArea.Root
+            class="h-full w-full rounded-[10px] border px-2 py-2"
+            type="hover"
+          >
+            <ScrollArea.Viewport class="h-full w-full overflow-x-hidden">
+              <div class="app-list overflow-hidden">
+                <div use:animate>
+                  {#each displayList as app, index ((app.action || "") + app.path + app.name + index)}
+                    {#if app.path.startsWith("extension:")}
+                      <!-- Extension 预览项（如计算器结果） -->
+                      <ExtensionResultItem
+                        title={app.name}
+                        description={app.description || ""}
+                        icon={app.icon}
+                        isSelected={appListManager.state.selectedIndex ===
+                          index}
+                        onClick={() => handleOpenApp(app)}
+                      />
+                    {:else}
+                      <AppListItem
+                        {app}
+                        isSelected={appListManager.state.selectedIndex ===
+                          index}
+                        onClick={() => handleOpenApp(app)}
+                      />
+                    {/if}
+                  {/each}
+                </div>
+              </div>
+            </ScrollArea.Viewport>
+            <ScrollArea.Scrollbar
+              orientation="vertical"
+              class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none rounded-full border-l border-l-transparent p-px transition-all duration-200 select-none hover:w-3"
+            >
+              <ScrollArea.Thumb
+                class="bg-muted-foreground flex-1 rounded-full"
+              />
+            </ScrollArea.Scrollbar>
+
+            <ScrollArea.Corner />
+          </ScrollArea.Root>
         {/if}
       </div>
     </div>
-
-    <!-- Content Area -->
-    <div class="relative flex-1 overflow-hidden">
-      <RefreshProgressBar isRefreshing={appListManager.state.isRefreshing} />
-
-      {#if plugin.state.showPluginInline}
-        <!-- Plugin Inline View -->
-        <PluginInlineView
-          bind:this={pluginInlineViewRef}
-          url={plugin.state.currentPluginUrl}
-          pluginId={plugin.state.currentPluginId}
-          onLoad={() => {
-            // No-op for now, logic potentially moved to component or manager
-          }}
-        />
-      {:else}
-        <!-- App List -->
-        <ScrollArea.Root
-          class="h-full w-full rounded-[10px] border px-2 py-2"
-          type="hover"
-        >
-          <ScrollArea.Viewport class="h-full w-full overflow-x-hidden">
-            <div class="app-list overflow-hidden">
-              <div use:animate>
-                {#each displayList as app, index ((app.action || '') + app.path + app.name + index)}
-                  {#if app.path.startsWith("extension:")}
-                    <!-- Extension 预览项（如计算器结果） -->
-                    <ExtensionResultItem
-                      title={app.name}
-                      description={app.description || ""}
-                      icon={app.icon}
-                      isSelected={appListManager.state.selectedIndex === index}
-                      onClick={() => handleOpenApp(app)}
-                    />
-                  {:else}
-                    <AppListItem
-                      {app}
-                      isSelected={appListManager.state.selectedIndex === index}
-                      onClick={() => handleOpenApp(app)}
-                    />
-                  {/if}
-                {/each}
-              </div>
-            </div>
-          </ScrollArea.Viewport>
-          <ScrollArea.Scrollbar
-            orientation="vertical"
-            class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none rounded-full border-l border-l-transparent p-px transition-all duration-200 select-none hover:w-3"
-          >
-            <ScrollArea.Thumb class="bg-muted-foreground flex-1 rounded-full" />
-          </ScrollArea.Scrollbar>
-
-          <ScrollArea.Corner />
-        </ScrollArea.Root>
-      {/if}
-    </div>
-  </div>
   </main>
 </div>
 

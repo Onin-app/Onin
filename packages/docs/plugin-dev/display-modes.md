@@ -4,7 +4,7 @@ Onin 插件支持两种显示方式，通过 `manifest.json` 中的 `display_mod
 
 ## Inline 模式（默认）
 
-插件在 Onin 主窗口的内容区域内嵌展示，通过 iframe 加载你的 HTML 入口文件。
+插件在 Onin 主窗口的内容区域内嵌展示，通过原生的 Webview 加载你的 HTML 入口文件。
 
 ```json
 {

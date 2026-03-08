@@ -97,7 +97,11 @@
     }
 
     try {
-      await invoke("show_inline_plugin", { url: safeUrl, rect });
+      await invoke("show_inline_plugin", {
+        url: safeUrl,
+        pluginId: pluginId,
+        rect,
+      });
 
       // 发送运行时初始化数据
       // 必须在 show_inline_plugin 之后发送，确保 webview 已经存在
@@ -195,8 +199,8 @@
 
     if (unlistenLoaded) unlistenLoaded();
 
-    // 销毁 Webview (双重保险)
-    invoke("close_inline_plugin").catch(console.error);
+    // 组件卸载时仅隐藏，避免误销毁后台保活的插件实例
+    invoke("hide_inline_plugin").catch(console.error);
   });
 
   async function updateBoundsIfChanged() {

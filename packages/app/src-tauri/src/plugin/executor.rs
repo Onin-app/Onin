@@ -214,17 +214,18 @@ pub fn show_plugin_inline(
     plugin: &super::types::LoadedPlugin,
     plugin_url: String,
 ) -> Result<(), String> {
-    let main_window = app
+    // 尝试恢复主窗口可见性；失败不应阻塞插件打开流程。
+    if let Some(main_window) = app
         .get_webview_window("main")
-        .ok_or_else(|| "主窗口未找到".to_string())?;
-
-    // 显示主窗口（如果隐藏）
-    if let Ok(false) = main_window.is_visible() {
-        if let Err(e) = main_window.show() {
-            eprintln!("[plugin/executor] 警告: 显示主窗口失败: {}", e);
-        }
-        if let Err(e) = main_window.set_focus() {
-            eprintln!("[plugin/executor] 警告: 聚焦主窗口失败: {}", e);
+        .or_else(|| app.webview_windows().values().next().cloned())
+    {
+        if let Ok(false) = main_window.is_visible() {
+            if let Err(e) = main_window.show() {
+                eprintln!("[plugin/executor] 警告: 显示主窗口失败: {}", e);
+            }
+            if let Err(e) = main_window.set_focus() {
+                eprintln!("[plugin/executor] 警告: 聚焦主窗口失败: {}", e);
+            }
         }
     }
 
@@ -241,7 +242,7 @@ pub fn show_plugin_inline(
         plugin_url,
     };
 
-    main_window
+    app
         .emit("show_plugin_inline", payload)
         .map_err(|e| format!("发送 show_plugin_inline 事件失败: {}", e))?;
 

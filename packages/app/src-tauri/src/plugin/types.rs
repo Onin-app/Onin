@@ -242,6 +242,12 @@ pub struct PluginManifest {
     /// 如果为 true，HTML 插件将始终在独立窗口中打开
     #[serde(default)]
     pub auto_detach: bool,
+    /// 退出到后台立即结束运行
+    #[serde(default)]
+    pub terminate_on_bg: bool,
+    /// 跟随主程序同时启动运行
+    #[serde(default)]
+    pub run_at_startup: bool,
     /// 生命周期文件路径（可选）
     /// 对于视图插件（HTML 入口），此文件将在加载时执行
     /// 用于注册生命周期钩子、设置和命令
@@ -401,6 +407,12 @@ pub struct PluginState {
     /// 是否自动分离到独立窗口
     #[serde(default)]
     pub auto_detach: bool,
+    /// 退出到后台立即结束运行
+    #[serde(default)]
+    pub terminate_on_bg: bool,
+    /// 跟随主程序同时启动运行
+    #[serde(default)]
+    pub run_at_startup: bool,
 }
 
 /// 插件状态集合

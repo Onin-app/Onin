@@ -326,6 +326,8 @@ pub fn collect_plugin_states(
                 PluginState {
                     enabled: plugin.enabled,
                     auto_detach: plugin.manifest.auto_detach,
+                    terminate_on_bg: plugin.manifest.terminate_on_bg,
+                    run_at_startup: plugin.manifest.run_at_startup,
                 },
             );
         }

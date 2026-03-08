@@ -35,14 +35,11 @@ pub async fn op_invoke(
         )
     };
 
-    // 设置当前插件ID到线程本地存储
-    crate::plugin_api::storage::set_current_plugin_id(plugin_id.clone());
+    // 设置当前插件ID到线程本地存储 (使用 RAII Guard 确保即使 panic 也能清理)
+    let _guard = crate::plugin::context::PluginContextGuard::new(plugin_id.clone());
 
     // 调用处理器分发
     let result = handlers::dispatch(&method, app_handle, plugin_id, arg).await;
-
-    // 清除当前插件ID
-    crate::plugin_api::storage::clear_current_plugin_id();
 
     result
 }

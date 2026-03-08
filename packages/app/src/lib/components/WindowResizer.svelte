@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+  import { getCurrentWindow } from "@tauri-apps/api/window";
 
   let isWindows = $state(false);
 
@@ -12,7 +12,7 @@
 
   const handleResize = (direction: string) => {
     if ((window as any).__TAURI_INTERNALS__) {
-      getCurrentWebviewWindow().startResizeDragging(direction as any);
+      getCurrentWindow().startResizeDragging(direction as any);
     }
   };
 </script>

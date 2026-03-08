@@ -133,6 +133,76 @@ pub fn toggle_plugin_auto_detach(
     }
 }
 
+/// 切换插件退出到后台立即结束运行设置
+#[tauri::command]
+pub fn toggle_plugin_terminate_on_bg(
+    app: tauri::AppHandle,
+    store: State<'_, PluginStore>,
+    plugin_id: String,
+    terminate_on_bg: bool,
+) -> Result<(), String> {
+    let mut store_lock = store.0.lock().unwrap();
+
+    if let Some(plugin) = find_plugin_by_id_mut(&mut store_lock, &plugin_id) {
+        plugin.manifest.terminate_on_bg = terminate_on_bg;
+        println!(
+            "[plugin/settings] 插件 {} 的 terminate_on_bg 已设为 {}",
+            plugin_id, terminate_on_bg
+        );
+
+        // 收集所有插件的状态
+        let states = collect_plugin_states(&store_lock);
+
+        // 释放锁后再保存状态
+        drop(store_lock);
+
+        // 持久化保存状态
+        if let Err(e) = save_plugin_states(&app, &states) {
+            eprintln!("[plugin/settings] 保存插件状态失败: {}", e);
+            return Err(format!("保存插件状态失败: {}", e));
+        }
+
+        Ok(())
+    } else {
+        Err(format!("插件未找到: {}", plugin_id))
+    }
+}
+
+/// 切换插件跟随主程序同时启动运行设置
+#[tauri::command]
+pub fn toggle_plugin_run_at_startup(
+    app: tauri::AppHandle,
+    store: State<'_, PluginStore>,
+    plugin_id: String,
+    run_at_startup: bool,
+) -> Result<(), String> {
+    let mut store_lock = store.0.lock().unwrap();
+
+    if let Some(plugin) = find_plugin_by_id_mut(&mut store_lock, &plugin_id) {
+        plugin.manifest.run_at_startup = run_at_startup;
+        println!(
+            "[plugin/settings] 插件 {} 的 run_at_startup 已设为 {}",
+            plugin_id, run_at_startup
+        );
+
+        // 收集所有插件的状态
+        let states = collect_plugin_states(&store_lock);
+
+        // 释放锁后再保存状态
+        drop(store_lock);
+
+        // 持久化保存状态
+        if let Err(e) = save_plugin_states(&app, &states) {
+            eprintln!("[plugin/settings] 保存插件状态失败: {}", e);
+            return Err(format!("保存插件状态失败: {}", e));
+        }
+
+        Ok(())
+    } else {
+        Err(format!("插件未找到: {}", plugin_id))
+    }
+}
+
 // ============================================================================
 // Tauri 命令 - 设置模式管理
 // ============================================================================

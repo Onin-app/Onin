@@ -103,3 +103,27 @@ pub async fn handle_storage_get_items(
         Err(e) => super::err_fmt("Storage", e),
     }
 }
+
+/// 获取所有存储项
+pub async fn handle_storage_get_all(app_handle: AppHandle) -> InvokeResult {
+    match plugin_api::storage::plugin_storage_get_all(app_handle).await {
+        Ok(items) => super::ok_value(serde_json::json!(items)),
+        Err(e) => super::err_fmt("Storage", e),
+    }
+}
+
+/// 设置所有存储项
+pub async fn handle_storage_set_all(app_handle: AppHandle, arg: serde_json::Value) -> InvokeResult {
+    let data = match arg.get("data") {
+        Some(data_value) => match data_value.as_object() {
+            Some(obj) => obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+            None => return super::err("data must be an object"),
+        },
+        None => return super::err("data is required"),
+    };
+
+    match plugin_api::storage::plugin_storage_set_all(app_handle, data).await {
+        Ok(_) => super::ok_null(),
+        Err(e) => super::err_fmt("Storage", e),
+    }
+}
