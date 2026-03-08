@@ -17,12 +17,14 @@ use tauri::State; // Ensure State is imported
 
 pub struct InlinePluginState {
     pub is_visible: AtomicBool,
+    pub current_plugin_id: std::sync::Mutex<Option<String>>,
 }
 
 impl Default for InlinePluginState {
     fn default() -> Self {
         Self {
             is_visible: AtomicBool::new(false),
+            current_plugin_id: std::sync::Mutex::new(None),
         }
     }
 }
@@ -32,18 +34,30 @@ pub async fn show_inline_plugin<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, InlinePluginState>,
     url: String,
+    plugin_id: String,
     rect: Rect,
 ) -> Result<(), String> {
     state.is_visible.store(true, Ordering::Relaxed);
+    {
+        let mut id_lock = state.current_plugin_id.lock().unwrap();
+        *id_lock = Some(plugin_id);
+    }
     
     let window = app.get_window("main").ok_or("Main window not found")?;
 
     // Check if webview exists
     if let Some(webview) = window.get_webview("plugin-inline") {
-        // Update URL if different
-        if webview.url().unwrap().to_string() != url {
-            // webview.load_url(&url).map_err(|e| e.to_string())?;
-            // Use eval to navigate as load_url might be missing or renamed
+        // Update URL if different (Normalized comparison)
+        let current_url_str = webview.url().unwrap().to_string();
+        let is_different = if let (Ok(u1), Ok(u2)) = (Url::parse(&current_url_str), Url::parse(&url)) {
+            // Compare normalized URLs (ignores trailing slashes, etc.)
+            u1.as_str().trim_end_matches('/') != u2.as_str().trim_end_matches('/')
+        } else {
+            current_url_str != url
+        };
+
+        if is_different {
+            println!("[plugin/inline] URL changed from {} to {}, reloading", current_url_str, url);
             webview
                 .eval(&format!("window.location.replace('{}')", url))
                 .map_err(|e| e.to_string())?;

@@ -61,12 +61,32 @@ fn get_plugin_store_path(plugin_id: &str) -> String {
 }
 
 // 获取当前执行插件的 ID
-pub fn get_current_plugin_id(_app: &AppHandle) -> Result<String, StorageError> {
-    CURRENT_PLUGIN_ID.with(|id| {
-        id.borrow().clone().ok_or_else(|| {
-            StorageError::from("No plugin context found. Storage API must be called from within a plugin execution context.")
-        })
-    })
+pub fn get_current_plugin_id<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<String, StorageError> {
+    // 1. 尝试从线程局部变量获取（适用于通过 executor 执行的 JS 插件）
+    if let Some(id) = CURRENT_PLUGIN_ID.with(|id| id.borrow().clone()) {
+        return Ok(id);
+    }
+
+    // 2. 尝试从当前获取焦点的 webview label 解析
+    // 注意：显式使用 tauri::Manager 特性的方法
+    for window in tauri::Manager::webview_windows(app).values() {
+        let label = window.label();
+        if label.starts_with("plugin_") && window.is_focused().unwrap_or(false) {
+            let plugin_id = label.strip_prefix("plugin_").unwrap().replace('_', ".");
+            return Ok(plugin_id);
+        }
+    }
+
+    // 3. 尝试从内联插件状态获取
+    if let Some(inline_state) = tauri::Manager::try_state::<crate::plugin::InlinePluginState>(app) {
+        if let Ok(id_lock) = inline_state.current_plugin_id.lock() {
+            if let Some(id) = id_lock.as_ref() {
+                return Ok(id.to_string());
+            }
+        }
+    }
+
+    Err(StorageError::from("No plugin context found. Storage API must be called from within a plugin execution context."))
 }
 
 #[tauri::command]

@@ -97,7 +97,11 @@
     }
 
     try {
-      await invoke("show_inline_plugin", { url: safeUrl, rect });
+      await invoke("show_inline_plugin", {
+        url: safeUrl,
+        pluginId: pluginId,
+        rect,
+      });
 
       // 发送运行时初始化数据
       // 必须在 show_inline_plugin 之后发送，确保 webview 已经存在
