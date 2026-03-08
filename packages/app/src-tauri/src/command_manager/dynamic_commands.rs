@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, Webview};
 
 /// 动态命令存储结构
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
@@ -95,11 +95,12 @@ fn get_current_timestamp() -> u64 {
 #[tauri::command]
 pub async fn register_dynamic_command(
     app: AppHandle,
+    window: Webview,
     command: CommandDefinition,
 ) -> Result<(), String> {
     // 从 webview 获取 plugin_id（通过 URL 参数或窗口标签）
     // 这里我们从窗口标签解析 plugin_id
-    let plugin_id = get_plugin_id_from_context(&app)?;
+    let plugin_id = crate::plugin::context::get_current_plugin_id(&app, Some(&window))?;
 
     let mut store = load_dynamic_commands(&app);
 
@@ -164,9 +165,10 @@ pub async fn register_dynamic_command(
 #[tauri::command]
 pub async fn remove_dynamic_command(
     app: AppHandle,
+    window: Webview,
     command_code: String,
 ) -> Result<(), String> {
-    let plugin_id = get_plugin_id_from_context(&app)?;
+    let plugin_id = crate::plugin::context::get_current_plugin_id(&app, Some(&window))?;
 
     let mut store = load_dynamic_commands(&app);
 
@@ -207,32 +209,8 @@ pub fn get_all_dynamic_commands(app: &AppHandle) -> Vec<DynamicCommand> {
         .collect()
 }
 
-/// 从上下文获取 plugin_id
-/// 
-/// 尝试从活跃的插件窗口获取 plugin_id
-fn get_plugin_id_from_context(app: &AppHandle) -> Result<String, String> {
-    // 尝试从活跃插件窗口状态获取
-    if let Some(active_window) = app.try_state::<crate::plugin::ActivePluginWindow>() {
-        let active = active_window.0.lock().unwrap();
-        if let Some(plugin_id) = active.as_ref() {
-            return Ok(plugin_id.clone());
-        }
-    }
+// get_plugin_id_from_context has been moved to crate::plugin::context::get_current_plugin_id
 
-    // 尝试从所有打开的插件窗口中查找
-    for (label, _) in app.webview_windows() {
-        if label.starts_with("plugin_") {
-            // plugin_com_example_plugin -> com.example.plugin
-            let plugin_id = label
-                .strip_prefix("plugin_")
-                .unwrap()
-                .replace('_', ".");
-            return Ok(plugin_id);
-        }
-    }
-
-    Err("Could not determine plugin ID from context".to_string())
-}
 
 #[cfg(test)]
 mod tests {

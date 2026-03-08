@@ -205,7 +205,7 @@ pub fn return_to_inline_from_window(
     };
 
     // 3. 关闭弹出的大窗口
-    let window_label = format!("plugin_{}", plugin.manifest.id.replace('.', "_"));
+    let window_label = crate::plugin::context::make_label_from_plugin_id(&plugin.manifest.id);
     let _ = plugin_close_window(app.clone(), window_label);
 
     // 4. 通知主窗口显示内联插件
@@ -219,7 +219,7 @@ pub fn plugin_toggle_window_pin(
     plugin_id: String,
     pin: bool,
 ) -> Result<(), String> {
-    let window_label = format!("plugin_{}", plugin_id.replace('.', "_"));
+    let window_label = crate::plugin::context::make_label_from_plugin_id(&plugin_id);
     if let Some(window) = app.get_webview_window(&window_label) {
         window.set_always_on_top(pin).map_err(|e| e.to_string())
     } else {
@@ -261,7 +261,7 @@ pub async fn create_or_show_plugin_window(
     app: tauri::AppHandle,
     plugin: &LoadedPlugin,
 ) -> Result<(), String> {
-    let window_label = format!("plugin_{}", plugin.manifest.id.replace('.', "_"));
+    let window_label = crate::plugin::context::make_label_from_plugin_id(&plugin.manifest.id);
 
     // 防抖检查：防止短时间内重复触发
     const DEBOUNCE_MS: u64 = 100; // 100ms 防抖时间

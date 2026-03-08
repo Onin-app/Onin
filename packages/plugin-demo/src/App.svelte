@@ -289,7 +289,7 @@
         onclick={() =>
           runTest('command.register', () =>
             command.register({
-              code: 'test-cmd-' + Date.now(),
+              code: 'test-cmd',
               name: '测试命令',
               description: '由 SDK Test 动态注册',
               keywords: [{ name: 'test' }],

@@ -72,8 +72,9 @@ pub fn import_plugin(
     );
 
     // 安全检查：验证插件 ID 格式
-    if manifest.id.contains("..") || manifest.id.contains("/") || manifest.id.contains("\\") {
-        return Err("插件 ID 无效: 包含非法字符".to_string());
+    let id_regex = regex::Regex::new(r"^[a-z0-9][a-z0-9.-]*[a-z0-9]$").unwrap();
+    if !id_regex.is_match(&manifest.id) || manifest.id.contains("..") {
+        return Err("插件 ID 无效: 格式错误或包含非法字符".to_string());
     }
 
     // 检查插件是否已存在
