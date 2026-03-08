@@ -58,6 +58,7 @@ pub fn get_invoke_handler(
         plugin::window::plugin_is_maximized,
         plugin::window::plugin_show_window,
         plugin::window::plugin_set_focus,
+        plugin::window::plugin_open_devtools,
         plugin::window::plugin_start_dragging,
         plugin::window::return_to_inline_from_window,
         plugin::window::plugin_toggle_window_pin,
@@ -67,11 +68,14 @@ pub fn get_invoke_handler(
         plugin::inline::hide_inline_plugin,
         plugin::inline::close_inline_plugin,
         plugin::inline::send_inline_plugin_message,
+        plugin::inline::open_inline_plugin_devtools,
         // Plugin executor
         plugin::executor::execute_plugin_entry,
         // Plugin settings
         plugin::settings::toggle_plugin,
         plugin::settings::toggle_plugin_auto_detach,
+        plugin::settings::toggle_plugin_terminate_on_bg,
+        plugin::settings::toggle_plugin_run_at_startup,
         plugin::settings::register_plugin_settings_schema,
         plugin::settings::get_plugin_settings,
         plugin::settings::save_plugin_settings,

@@ -29,6 +29,15 @@ impl Default for InlinePluginState {
     }
 }
 
+fn resolve_host_window<R: Runtime>(app: &AppHandle<R>) -> Result<tauri::Window<R>, String> {
+    app.get_window("main")
+        .or_else(|| app.windows().values().next().cloned())
+        .ok_or_else(|| {
+            let labels = app.windows().keys().cloned().collect::<Vec<_>>().join(", ");
+            format!("Main window not found, available windows: [{}]", labels)
+        })
+}
+
 #[tauri::command]
 pub async fn show_inline_plugin<R: Runtime>(
     app: AppHandle<R>,
@@ -43,7 +52,7 @@ pub async fn show_inline_plugin<R: Runtime>(
         *id_lock = Some(plugin_id);
     }
     
-    let window = app.get_window("main").ok_or("Main window not found")?;
+    let window = resolve_host_window(&app)?;
 
     // Check if webview exists
     if let Some(webview) = window.get_webview("plugin-inline") {
@@ -144,7 +153,7 @@ pub fn update_inline_plugin_bounds<R: Runtime>(
     }
 
     // println!("[plugin/inline] Updating bounds: {:?}", rect);
-    let window = app.get_window("main").ok_or("Main window not found")?;
+    let window = resolve_host_window(&app)?;
     if let Some(webview) = window.get_webview("plugin-inline") {
         webview
             .set_bounds(tauri::Rect {
@@ -162,8 +171,12 @@ pub fn hide_inline_plugin<R: Runtime>(
     state: State<'_, InlinePluginState>,
 ) -> Result<(), String> {
     state.is_visible.store(false, Ordering::Relaxed);
+    {
+        let mut id_lock = state.current_plugin_id.lock().map_err(|e| e.to_string())?;
+        *id_lock = None;
+    }
 
-    let window = app.get_window("main").ok_or("Main window not found")?;
+    let window = resolve_host_window(&app)?;
     if let Some(webview) = window.get_webview("plugin-inline") {
         webview.hide().map_err(|e| e.to_string())?;
         // Enforce 0x0
@@ -181,8 +194,12 @@ pub fn close_inline_plugin<R: Runtime>(
     state: State<'_, InlinePluginState>,
 ) -> Result<(), String> {
     state.is_visible.store(false, Ordering::Relaxed);
+    {
+        let mut id_lock = state.current_plugin_id.lock().map_err(|e| e.to_string())?;
+        *id_lock = None;
+    }
 
-    let window = app.get_window("main").ok_or("Main window not found")?;
+    let window = resolve_host_window(&app)?;
     
     if let Some(webview) = window.get_webview("plugin-inline") {
         // Revert to close() (destroy) mechanism.
@@ -211,4 +228,13 @@ pub fn send_inline_plugin_message<R: Runtime>(
             .map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+#[tauri::command]
+pub fn open_inline_plugin_devtools<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+    if let Some(webview) = app.get_webview("plugin-inline") {
+        webview.open_devtools();
+        Ok(())
+    } else {
+        Err("插件视图未找到".to_string())
+    }
 }

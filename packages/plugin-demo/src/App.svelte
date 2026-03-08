@@ -78,8 +78,23 @@
   ];
 
   // 生命周期 demo
-  lifecycle.onLoad(() => {
-    log('✓ 插件已加载 (onLoad 触发)', 'success');
+  lifecycle.onLoad(async () => {
+    const startedAt = new Date().toLocaleString();
+    const startupMessage = `plugin-demo 已触发 onLoad（${startedAt}）`;
+
+    console.log(`[plugin-demo/startup] ${startupMessage}`);
+    log(`✓ ${startupMessage}`, 'success');
+
+    // 用系统通知辅助验证“跟随主程序启动”是否生效
+    try {
+      await notification.show({
+        title: 'Plugin Demo 已启动',
+        body: startupMessage,
+      });
+      log('✓ 已发送启动通知，可用于验证 run_at_startup', 'success');
+    } catch (err: any) {
+      log(`✗ 启动通知发送失败: ${err?.message || err}`, 'error');
+    }
   });
 </script>
 

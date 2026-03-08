@@ -15,6 +15,9 @@
     enabled: boolean;
     install_source: "local" | "marketplace";
     readme?: string;
+    auto_detach?: boolean;
+    terminate_on_bg?: boolean;
+    run_at_startup?: boolean;
     // 市场插件可能有的额外字段
     stars?: number;
     downloads?: number;
@@ -63,7 +66,9 @@
   }
 
   // 生成插件 icon 的 URL
-  async function getPluginIconUrl(plugin: PluginDetail): Promise<string | undefined> {
+  async function getPluginIconUrl(
+    plugin: PluginDetail,
+  ): Promise<string | undefined> {
     if (!plugin.icon) {
       return undefined;
     }
@@ -104,8 +109,11 @@
         try {
           const { fetchPluginDetail } = await import("$lib/api/marketplace");
           const marketDetail = await fetchPluginDetail(result.id);
-          console.log("[InstalledPluginDetail] Loaded market detail:", marketDetail);
-          
+          console.log(
+            "[InstalledPluginDetail] Loaded market detail:",
+            marketDetail,
+          );
+
           // 合并数据：优先使用市场数据
           detail = {
             ...result,
@@ -116,7 +124,10 @@
             version: marketDetail.version || result.version,
           };
         } catch (marketError) {
-          console.error("Failed to load market detail, using local data:", marketError);
+          console.error(
+            "Failed to load market detail, using local data:",
+            marketError,
+          );
           // 如果市场接口失败，继续使用本地数据
         }
       }
@@ -136,13 +147,13 @@
   });
 </script>
 
-<Dialog.Root {open} onOpenChange={onOpenChange}>
+<Dialog.Root {open} {onOpenChange}>
   <Dialog.Portal>
     <Dialog.Overlay
-      class="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+      class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50"
     />
     <Dialog.Content
-      class="fixed top-[50%] left-[50%] z-50 max-h-[80vh] w-full max-w-2xl translate-x-[-50%] translate-y-[-50%] overflow-auto rounded-lg bg-white p-6 shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] dark:bg-neutral-900"
+      class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] fixed top-[50%] left-[50%] z-50 max-h-[80vh] w-full max-w-2xl translate-x-[-50%] translate-y-[-50%] overflow-auto rounded-lg bg-white p-6 shadow-xl dark:bg-neutral-900"
     >
       <Dialog.Close
         class="absolute top-4 right-4 rounded p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800"

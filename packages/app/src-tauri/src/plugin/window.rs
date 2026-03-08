@@ -113,11 +113,18 @@ pub fn plugin_set_focus(app: tauri::AppHandle, label: String) -> Result<(), Stri
     }
 }
 
-/// 开始拖拽窗口
+#[tauri::command]
+pub fn plugin_open_devtools(window: tauri::WebviewWindow) -> Result<(), String> {
+    window.open_devtools();
+    Ok(())
+}
+
 #[tauri::command]
 pub fn plugin_start_dragging(window: tauri::WebviewWindow) -> Result<(), String> {
     window.start_dragging().map_err(|e| e.to_string())
 }
+
+/// 开始拖拽窗口
 
 // ============================================================================
 // 窗口创建和管理

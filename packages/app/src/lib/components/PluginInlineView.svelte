@@ -199,8 +199,8 @@
 
     if (unlistenLoaded) unlistenLoaded();
 
-    // 销毁 Webview (双重保险)
-    invoke("close_inline_plugin").catch(console.error);
+    // 组件卸载时仅隐藏，避免误销毁后台保活的插件实例
+    invoke("hide_inline_plugin").catch(console.error);
   });
 
   async function updateBoundsIfChanged() {

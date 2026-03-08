@@ -76,3 +76,18 @@ lifecycle.onUnload(async () => {
 | 插件卸载清理  | `lifecycle.onUnload`            |
 | 窗口显示/隐藏 | `pluginWindow.onShow / onHide`  |
 | 窗口焦点变化  | `pluginWindow.onFocus / onBlur` |
+
+## 后台生命周期脚本 (lifecycle.js)
+
+对于 UI 插件，如果你希望在不打开界面的情况下执行后台逻辑（如定时同步数据、监听系统消息），可以结合 `manifest.json` 中的 `run_at_startup: true` 使用。
+
+Onin 会在启动时自动加载 `lifecycle` 指定的文件（默认为 `lifecycle.js`），并由于该文件通常会导入 SDK 并注册 `onLoad`，你的初始化逻辑将在后台自动运行。
+
+**manifest.json 示例：**
+
+```json
+{
+  "run_at_startup": true,
+  "lifecycle": "dist/lifecycle.js"
+}
+```

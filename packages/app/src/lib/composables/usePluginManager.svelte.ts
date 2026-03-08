@@ -12,6 +12,8 @@ export interface PluginState {
   currentPluginUrl: string;
   currentPluginId: string;
   currentPluginAutoDetach: boolean;
+  currentPluginTerminateOnBg: boolean;
+  currentPluginRunAtStartup: boolean;
 }
 
 export interface PluginManagerReturn {
@@ -22,6 +24,10 @@ export interface PluginManagerReturn {
   detachPlugin: () => Promise<void>;
   toggleAutoDetach: (checked: boolean) => Promise<void>;
   handlePluginMessage: (event: MessageEvent) => Promise<void>; // Keep for compatibility if needed, but likely unused
+  toggleTerminateOnBg: (checked: boolean) => Promise<void>;
+  toggleRunAtStartup: (checked: boolean) => Promise<void>;
+  openDevTools: () => Promise<void>;
+  uninstallPlugin: () => Promise<void>;
   sendLifecycleEvent: (event: "show" | "hide" | "focus" | "blur") => void;
   // Lifecycle
   setupListeners: () => Promise<UnlistenFn>;
@@ -39,6 +45,8 @@ export function usePluginManager(): PluginManagerReturn {
     currentPluginUrl: "",
     currentPluginId: "",
     currentPluginAutoDetach: false,
+    currentPluginTerminateOnBg: false,
+    currentPluginRunAtStartup: false,
   });
 
   // ===== Methods =====
@@ -50,13 +58,20 @@ export function usePluginManager(): PluginManagerReturn {
     // 发送隐藏事件给插件
     sendLifecycleEvent("hide");
 
+    // 缓存当前配置，避免清理 state 后丢失判断依据
+    const shouldTerminate = state.currentPluginTerminateOnBg;
+
     state.showPluginInline = false;
     state.currentPluginUrl = "";
     state.currentPluginId = "";
     state.currentPluginAutoDetach = false;
+    state.currentPluginTerminateOnBg = false;
+    state.currentPluginRunAtStartup = false;
 
-    // Create side effect to close (destroy) webview
-    invoke("close_inline_plugin").catch(console.error);
+    // 未勾选 terminate_on_bg 时，仅隐藏并保活；勾选时才销毁
+    invoke(shouldTerminate ? "close_inline_plugin" : "hide_inline_plugin").catch(
+      console.error,
+    );
   };
 
   /**
@@ -78,6 +93,8 @@ export function usePluginManager(): PluginManagerReturn {
       state.currentPluginUrl = "";
       state.currentPluginId = "";
       state.currentPluginAutoDetach = false;
+      state.currentPluginTerminateOnBg = false;
+      state.currentPluginRunAtStartup = false;
 
       // 步骤 2：await 销毁 inline webview，确保完全关闭后再创建新窗口
       await invoke("close_inline_plugin");
@@ -151,6 +168,80 @@ export function usePluginManager(): PluginManagerReturn {
   };
 
   /**
+   * 切换退出到后台立即结束设置
+   */
+  const toggleTerminateOnBg = async (checked: boolean) => {
+    if (!state.currentPluginId) return;
+    const previousState = state.currentPluginTerminateOnBg;
+    try {
+      state.currentPluginTerminateOnBg = checked;
+      await invoke("toggle_plugin_terminate_on_bg", {
+        pluginId: state.currentPluginId,
+        terminateOnBg: checked,
+      });
+      await invoke("show_notification", {
+        options: {
+          title: checked ? "已启用后台自动停止" : "已禁用后台自动停止",
+          body: `插件在${checked ? "退出到后台后将立即停止" : "退出到后台后将继续运行"}`,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to toggle terminate on bg:", error);
+      state.currentPluginTerminateOnBg = previousState;
+    }
+  };
+
+  /**
+   * 切换随主程序启动设置
+   */
+  const toggleRunAtStartup = async (checked: boolean) => {
+    if (!state.currentPluginId) return;
+    const previousState = state.currentPluginRunAtStartup;
+    try {
+      state.currentPluginRunAtStartup = checked;
+      await invoke("toggle_plugin_run_at_startup", {
+        pluginId: state.currentPluginId,
+        runAtStartup: checked,
+      });
+      await invoke("show_notification", {
+        options: {
+          title: checked ? "已启用随主程序初始化" : "已禁用随主程序初始化",
+          body: `插件将${checked ? "随主程序启动时自动运行" : "不再随主程序启动"}`,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to toggle run at startup:", error);
+      state.currentPluginRunAtStartup = previousState;
+    }
+  };
+
+  /**
+   * 打开开发者工具
+   */
+  const openDevTools = async () => {
+    try {
+      await invoke("open_inline_plugin_devtools");
+    } catch (error) {
+      console.error("Failed to open devtools:", error);
+    }
+  };
+
+  /**
+   * 卸载当前插件
+   */
+  const uninstallPlugin = async () => {
+    if (!state.currentPluginId) return;
+    try {
+      const pluginId = state.currentPluginId;
+      await invoke("uninstall_plugin", { pluginId });
+      closePlugin();
+      // Should also notify usePluginList to refresh, but it should listen to event
+    } catch (error) {
+      console.error("Failed to uninstall plugin:", error);
+    }
+  };
+
+  /**
    * 设置事件监听器
    * 返回清理函数
    */
@@ -176,15 +267,37 @@ export function usePluginManager(): PluginManagerReturn {
           pluginId: event.payload.plugin_id,
         });
         state.currentPluginAutoDetach = plugin?.auto_detach ?? false;
+        state.currentPluginTerminateOnBg = plugin?.terminate_on_bg ?? false;
+        state.currentPluginRunAtStartup = plugin?.run_at_startup ?? false;
         console.log(
-          `Plugin ${event.payload.plugin_id} auto_detach state:`,
-          state.currentPluginAutoDetach,
+          `Plugin ${event.payload.plugin_id} auto_detach: ${state.currentPluginAutoDetach}, terminate_on_bg: ${state.currentPluginTerminateOnBg}, run_at_startup: ${state.currentPluginRunAtStartup}`,
         );
       } catch (error) {
-        console.error("Failed to get plugin auto_detach state:", error);
+        console.error("Failed to get plugin settings:", error);
         state.currentPluginAutoDetach = false;
+        state.currentPluginTerminateOnBg = false;
+        state.currentPluginRunAtStartup = false;
       }
     });
+
+    // 监听窗口可见性事件
+    const unlistenVisibility = await listen<boolean>(
+      "window_visibility",
+      (event) => {
+        const isVisible = event.payload;
+        if (
+          !isVisible &&
+          state.showPluginInline &&
+          state.currentPluginTerminateOnBg
+        ) {
+          console.log(
+            "[PluginManager] Terminating plugin on background hide:",
+            state.currentPluginId,
+          );
+          closePlugin();
+        }
+      },
+    );
 
     // 监听分离窗口快捷键事件
     const unlistenDetachWindow = await listen("detach_window_shortcut", () => {
@@ -195,6 +308,7 @@ export function usePluginManager(): PluginManagerReturn {
     return () => {
       unlistenPluginInline();
       unlistenDetachWindow();
+      unlistenVisibility();
     };
   };
 
@@ -205,6 +319,10 @@ export function usePluginManager(): PluginManagerReturn {
     closePlugin,
     detachPlugin,
     toggleAutoDetach,
+    toggleTerminateOnBg,
+    toggleRunAtStartup,
+    openDevTools,
+    uninstallPlugin,
     handlePluginMessage,
     sendLifecycleEvent,
     setupListeners,

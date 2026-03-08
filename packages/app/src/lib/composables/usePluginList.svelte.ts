@@ -19,6 +19,9 @@ export interface PluginManifest {
     downloads?: number;
     stars?: number;
     enabled?: boolean;
+    auto_detach?: boolean;
+    terminate_on_bg?: boolean;
+    run_at_startup?: boolean;
     settings?: PluginSettingsSchema;
     dir_name?: string;
     install_source?: "local" | "marketplace";
@@ -37,6 +40,9 @@ export interface PluginListReturn {
     refreshPlugins: () => Promise<void>;
     importPlugin: () => Promise<void>;
     togglePlugin: (pluginId: string, enabled: boolean) => Promise<void>;
+    toggleAutoDetach: (pluginId: string, autoDetach: boolean) => Promise<void>;
+    toggleTerminateOnBg: (pluginId: string, terminateOnBg: boolean) => Promise<void>;
+    toggleRunAtStartup: (pluginId: string, runAtStartup: boolean) => Promise<void>;
     uninstallPlugin: (pluginId: string) => Promise<void>;
     executePlugin: (pluginId: string) => Promise<void>;
     handleImageError: (pluginId: string) => void;
@@ -206,6 +212,42 @@ export function usePluginList(): PluginListReturn {
         }
     };
 
+    const toggleAutoDetach = async (pluginId: string, autoDetach: boolean) => {
+        try {
+            await invoke("toggle_plugin_auto_detach", { pluginId, autoDetach });
+            state.plugins = state.plugins.map((p) => {
+                const pId = p.dir_name || p.id;
+                return pId === pluginId ? { ...p, auto_detach: autoDetach } : p;
+            });
+        } catch (error) {
+            console.error("Failed to toggle auto detach:", error);
+        }
+    };
+
+    const toggleTerminateOnBg = async (pluginId: string, terminateOnBg: boolean) => {
+        try {
+            await invoke("toggle_plugin_terminate_on_bg", { pluginId, terminateOnBg });
+            state.plugins = state.plugins.map((p) => {
+                const pId = p.dir_name || p.id;
+                return pId === pluginId ? { ...p, terminate_on_bg: terminateOnBg } : p;
+            });
+        } catch (error) {
+            console.error("Failed to toggle terminate on bg:", error);
+        }
+    };
+
+    const toggleRunAtStartup = async (pluginId: string, runAtStartup: boolean) => {
+        try {
+            await invoke("toggle_plugin_run_at_startup", { pluginId, runAtStartup });
+            state.plugins = state.plugins.map((p) => {
+                const pId = p.dir_name || p.id;
+                return pId === pluginId ? { ...p, run_at_startup: runAtStartup } : p;
+            });
+        } catch (error) {
+            console.error("Failed to toggle run at startup:", error);
+        }
+    };
+
     const uninstallPlugin = async (pluginId: string) => {
         const plugin = state.plugins.find((p) => p.id === pluginId);
         const pluginName = plugin?.name || pluginId;
@@ -331,6 +373,9 @@ export function usePluginList(): PluginListReturn {
         refreshPlugins,
         importPlugin,
         togglePlugin,
+        toggleAutoDetach,
+        toggleTerminateOnBg,
+        toggleRunAtStartup,
         uninstallPlugin,
         executePlugin,
         handleImageError,

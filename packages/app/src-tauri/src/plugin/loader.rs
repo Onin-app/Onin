@@ -78,15 +78,28 @@ pub fn load_plugins_internal(
         // 解析目录名，提取插件 ID 和安装来源
         let (_parsed_id, install_source) = parse_plugin_dir_name(&dir_name);
 
-        // 从持久化状态中获取启用状态和 auto_detach，如果没有则使用默认值
-        let (enabled, auto_detach) = if let Some(state) = plugin_states.get(&manifest.id) {
-            (state.enabled, state.auto_detach)
+        // 从持久化状态中恢复插件运行相关状态
+        let (enabled, auto_detach, terminate_on_bg, run_at_startup) =
+            if let Some(state) = plugin_states.get(&manifest.id) {
+                (
+                    state.enabled,
+                    state.auto_detach,
+                    state.terminate_on_bg,
+                    state.run_at_startup,
+                )
         } else {
-            (true, manifest.auto_detach)
+            (
+                true,
+                manifest.auto_detach,
+                manifest.terminate_on_bg,
+                manifest.run_at_startup,
+            )
         };
 
         let mut manifest_with_state = manifest.clone();
         manifest_with_state.auto_detach = auto_detach;
+        manifest_with_state.terminate_on_bg = terminate_on_bg;
+        manifest_with_state.run_at_startup = run_at_startup;
 
         // 自动执行生命周期文件进行初始化
         // Headless 插件：执行 index.js (entry)

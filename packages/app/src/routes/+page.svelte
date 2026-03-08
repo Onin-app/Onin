@@ -17,7 +17,7 @@
   import { ScrollArea } from "bits-ui";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
-  import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+  import { getCurrentWindow } from "@tauri-apps/api/window";
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
 
@@ -452,7 +452,7 @@
     });
 
     // 监听窗口焦点事件并转发给插件
-    const currentWindow = getCurrentWebviewWindow();
+    const currentWindow = getCurrentWindow();
     const unlistenFocus = await currentWindow.onFocusChanged(
       ({ payload: focused }) => {
         if (plugin.state.showPluginInline) {
@@ -537,10 +537,16 @@
           {#if plugin.state.showPluginInline}
             <PluginMenu
               bind:autoDetach={plugin.state.currentPluginAutoDetach}
+              bind:terminateOnBg={plugin.state.currentPluginTerminateOnBg}
+              bind:runAtStartup={plugin.state.currentPluginRunAtStartup}
               detachShortcut={$detachWindowShortcut}
               onDetach={plugin.detachPlugin}
               onClose={plugin.closePlugin}
               onToggleAutoDetach={plugin.toggleAutoDetach}
+              onToggleTerminateOnBg={plugin.toggleTerminateOnBg}
+              onToggleRunAtStartup={plugin.toggleRunAtStartup}
+              onOpenDevTools={plugin.openDevTools}
+              onUninstall={plugin.uninstallPlugin}
             />
           {/if}
         </div>
