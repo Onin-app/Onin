@@ -419,6 +419,40 @@
       <button
         class="test-btn"
         onclick={() =>
+          runTest('notification.isPermissionGranted', () =>
+            notification.isPermissionGranted(),
+          )}
+      >
+        <span class="api-name">isPermissionGranted</span>
+        <span class="api-desc">检查通知权限</span>
+      </button>
+      <button
+        class="test-btn"
+        onclick={() =>
+          runTest('notification.requestPermission', () =>
+            notification.requestPermission(),
+          )}
+      >
+        <span class="api-name">requestPermission</span>
+        <span class="api-desc">申请通知权限</span>
+      </button>
+      <button
+        class="test-btn"
+        onclick={() =>
+          runTest('notification.show (Sound)', () =>
+            notification.show({
+              title: 'Sound Test',
+              body: '这是一条带声音的通知',
+              sound: 'default',
+            }),
+          )}
+      >
+        <span class="api-name">show (Sound)</span>
+        <span class="api-desc">带声音显示</span>
+      </button>
+      <button
+        class="test-btn"
+        onclick={() =>
           runTest('notification.show', () =>
             notification.show({
               title: 'SDK Test',

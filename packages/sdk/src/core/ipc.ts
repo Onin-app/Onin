@@ -141,7 +141,7 @@ async function loadInvoke() {
  * @since 0.1.0
  * @group Core
  */
-export async function invoke<T>(method: string, arg: any): Promise<T> {
+export async function invoke<T>(method: string, arg?: any): Promise<T> {
   const fn = await loadInvoke();
   if (!fn) {
     throw new Error('Invoke function not loaded');

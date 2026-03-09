@@ -88,6 +88,8 @@ pub async fn dispatch(
     match method {
         // 通知 API
         "show_notification" => notification::handle_show_notification(app_handle, arg).await,
+        "is_permission_granted" => notification::handle_is_permission_granted(app_handle, arg).await,
+        "request_permission" => notification::handle_request_permission(app_handle, arg).await,
 
         // HTTP 请求 API
         "plugin_request" => request::handle_plugin_request(app_handle, arg).await,

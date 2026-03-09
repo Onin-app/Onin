@@ -3,6 +3,7 @@
 ## API 文档
 
 - [API.md](API.md) - 主应用 API 说明
+- [NOTIFICATION_STRATEGY.md](NOTIFICATION_STRATEGY.md) - 通知策略（macOS dev/build 差异）
 
 ## 插件系统
 

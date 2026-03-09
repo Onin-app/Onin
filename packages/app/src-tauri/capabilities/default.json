@@ -18,6 +18,9 @@
     "autostart:allow-disable",
     "autostart:allow-is-enabled",
     "notification:allow-show",
+    "notification:allow-is-permission-granted",
+    "notification:allow-request-permission",
+    "notification:allow-permission-state",
     "core:webview:allow-internal-toggle-devtools",
     "core:webview:allow-create-webview-window",
     "os:default"

@@ -17,7 +17,11 @@
     "core:window:allow-is-maximized",
     "core:window:allow-set-focus",
     "core:window:allow-set-title",
-    "core:window:allow-start-dragging"
+    "core:window:allow-start-dragging",
+    "notification:allow-show",
+    "notification:allow-is-permission-granted",
+    "notification:allow-request-permission",
+    "notification:allow-permission-state"
   ],
   "remote": {
     "urls": ["http://localhost:*", "http://127.0.0.1:*"]

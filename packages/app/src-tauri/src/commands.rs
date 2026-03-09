@@ -88,6 +88,8 @@ pub fn get_invoke_handler(
         plugin::installer::download_and_install_plugin,
         // Plugin API: notification
         plugin_api::notification::show_notification,
+        plugin_api::notification::is_permission_granted,
+        plugin_api::notification::request_permission,
         // Plugin API: command
         plugin_api::command::execute_plugin_command,
         plugin_api::command::plugin_command_result,
