@@ -20,7 +20,6 @@ use tower_http::cors::CorsLayer;
 /// Plugin HTTP server state
 pub struct PluginServerState {
     pub plugins_dir: std::path::PathBuf,
-    pub port: u16,
 }
 
 /// 启动端口范围
@@ -48,7 +47,7 @@ async fn try_start_server(
     plugins_dir: std::path::PathBuf,
     port: u16,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let state = Arc::new(PluginServerState { plugins_dir, port });
+    let state = Arc::new(PluginServerState { plugins_dir });
 
     let cors = CorsLayer::new()
         .allow_origin("http://localhost:1420".parse::<header::HeaderValue>().unwrap())
