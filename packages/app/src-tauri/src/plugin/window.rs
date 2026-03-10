@@ -208,7 +208,13 @@ pub fn return_to_inline_from_window(
     let window_label = crate::plugin::context::make_label_from_plugin_id(&plugin.manifest.id);
     let _ = plugin_close_window(app.clone(), window_label);
 
-    // 4. 通知主窗口显示内联插件
+    // 4. 确保主窗口重新显示并获得焦点，否则用户会感觉“没有切回来”
+    if let Some(main_window) = app.get_webview_window("main") {
+        let _ = main_window.show();
+        let _ = main_window.set_focus();
+    }
+
+    // 5. 通知主窗口显示内联插件
     super::executor::show_plugin_inline(&app, &plugin, plugin_url)
 }
 
