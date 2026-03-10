@@ -33,16 +33,16 @@
  * ```
  */
 
-import { PostMessageAdapter } from '../core/adapters/postmessage';
+import { LifecycleMessageAdapter } from '../core/adapters/lifecycle-message';
 import type { EventCallback } from '../core/adapters/base';
 
-// 使用统一的 PostMessage 适配器
-let adapter: PostMessageAdapter | null = null;
+// 使用统一的生命周期消息适配器
+let adapter: LifecycleMessageAdapter | null = null;
 
-function getAdapter(): PostMessageAdapter {
+function getAdapter(): LifecycleMessageAdapter {
   if (!adapter) {
-    console.log('[pluginWindow] Creating PostMessageAdapter');
-    adapter = new PostMessageAdapter();
+    console.log('[pluginWindow] Creating LifecycleMessageAdapter');
+    adapter = new LifecycleMessageAdapter();
   }
   return adapter;
 }

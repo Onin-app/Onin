@@ -147,7 +147,7 @@ export function usePluginManager(): PluginManagerReturn {
    * 发送生命周期事件给插件
    */
   const sendLifecycleEvent = (event: "show" | "hide" | "focus" | "blur") => {
-    invoke("send_inline_plugin_message", {
+    invoke("post_inline_plugin_message", {
       message: {
         type: "plugin-lifecycle-event",
         event,

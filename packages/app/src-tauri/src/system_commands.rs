@@ -423,7 +423,7 @@ pub fn simulate_paste_native(app: &AppHandle) -> Result<(), String> {
     }
 }
 
-/// 保留此 Command 以兼容旧代码或直接调用，但内部指向 native 实现
+/// 对外暴露粘贴命令，内部复用 native 粘贴实现
 #[tauri::command]
 pub fn simulate_paste(app: AppHandle) -> Result<(), String> {
     simulate_paste_native(&app)

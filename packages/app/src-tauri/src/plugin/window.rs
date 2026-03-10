@@ -119,12 +119,6 @@ pub fn plugin_open_devtools(window: tauri::WebviewWindow) -> Result<(), String> 
     Ok(())
 }
 
-#[tauri::command]
-pub fn plugin_start_dragging(window: tauri::WebviewWindow) -> Result<(), String> {
-    window.start_dragging().map_err(|e| e.to_string())
-}
-
-/// 开始拖拽窗口
 
 // ============================================================================
 // 窗口创建和管理

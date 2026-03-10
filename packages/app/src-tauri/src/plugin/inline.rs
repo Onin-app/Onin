@@ -215,7 +215,7 @@ pub fn close_inline_plugin<R: Runtime>(
 }
 
 #[tauri::command]
-pub fn send_inline_plugin_message<R: Runtime>(
+pub fn post_inline_plugin_message<R: Runtime>(
     app: AppHandle<R>,
     message: serde_json::Value,
 ) -> Result<(), String> {
