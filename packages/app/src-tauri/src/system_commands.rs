@@ -442,12 +442,10 @@ pub struct MacOSPreviousApp(pub std::sync::Mutex<Option<String>>);
 pub fn get_frontmost_app_bundle_id() -> Option<String> {
     use objc2_app_kit::NSWorkspace;
     
-    unsafe {
-        let workspace = NSWorkspace::sharedWorkspace();
-        workspace.frontmostApplication()
-            .and_then(|app| app.bundleIdentifier())
-            .map(|id| id.to_string())
-    }
+    let workspace = NSWorkspace::sharedWorkspace();
+    workspace.frontmostApplication()
+        .and_then(|app| app.bundleIdentifier())
+        .map(|id| id.to_string())
 }
 
 

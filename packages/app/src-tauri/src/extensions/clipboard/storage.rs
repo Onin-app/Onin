@@ -4,8 +4,6 @@ use std::collections::VecDeque;
 use std::fs;
 use tauri::{AppHandle, Manager};
 
-const MAX_HISTORY_SIZE: usize = 50;
-
 fn get_storage_dir(app: &AppHandle) -> std::path::PathBuf {
     let app_data_dir = app.path().app_data_dir().unwrap();
     app_data_dir.join("extensions").join("clipboard")

@@ -21,8 +21,6 @@ pub static CLIPBOARD_MANIFEST: ExtensionManifest = ExtensionManifest {
     icon: "clipboard",
     commands: &[ExtensionCommand {
         code: "history",
-        name: "Clipboard History",
-        description: "Search and paste from clipboard history",
         keywords: &["clipboard", "history", "paste", "cp", "jiantieban"],
         matches: None, // 不参与匹配指令，仅通过关键词触发
     }],

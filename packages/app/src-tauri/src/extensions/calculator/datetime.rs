@@ -23,10 +23,6 @@ static OFFSET_PATTERN: LazyLock<Regex> =
 static OFFSET_UNIT_PATTERN: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(\d+)([dwmy])").unwrap());
 
-/// 匹配日期格式: YYYY-MM-DD
-static DATE_PATTERN: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^(\d{4}-\d{2}-\d{2})$").unwrap());
-
 /// 匹配日期+偏移: 2026-12-25 -3d, 2026-12-25 +1w
 static DATE_OFFSET_PATTERN: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^(\d{4}-\d{2}-\d{2})\s*([+-])(\d+[dwmy])+$").unwrap());

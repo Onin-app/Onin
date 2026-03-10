@@ -51,11 +51,6 @@ const GLOBAL_SETUP_CODE: &str = r#"
     };
 "#;
 
-/// 创建 JS 运行时（无插件ID）
-pub fn create_runtime(app_handle: &AppHandle) -> Result<JsRuntime, String> {
-    create_runtime_with_plugin_id(app_handle, "")
-}
-
 /// 创建带有插件ID的 JS 运行时
 ///
 /// # 参数
