@@ -57,7 +57,7 @@ export type CommandAction =
   | { System: string }
   | { App: string }
   | { File: string }
-  | { Plugin: string }
+  | { PluginEntry: { plugin_id: string } }
   | { PluginCommand: { plugin_id: string; command_code: string } }
   | { Extension: { extension_id: string; command_code: string } };
 
@@ -103,3 +103,4 @@ export interface AppConfig {
   enable_usage_tracking: boolean;
   marketplace_api_url?: string;
 }
+

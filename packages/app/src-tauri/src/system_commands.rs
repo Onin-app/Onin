@@ -118,6 +118,7 @@ pub async fn execute_command(
 
     let commands = command_manager::load_commands(&app).await;
     if let Some(command) = commands.iter().find(|cmd| cmd.name == name) {
+        #[allow(deprecated)]
         match &command.action {
             CommandAction::System(sys_cmd_name) => {
                 if let Some(cmd_info) = SYSTEM_COMMANDS.iter().find(|&cmd| cmd.name == sys_cmd_name)
@@ -137,15 +138,14 @@ pub async fn execute_command(
                     eprintln!("Failed to open file {}: {}", path, e);
                 }
             }
-            CommandAction::Plugin(plugin_id) => {
+            CommandAction::PluginEntry { plugin_id } => {
                 let plugin_store = app.state::<crate::plugin::PluginStore>();
                 if let Err(e) =
                     crate::plugin::execute_plugin_entry(app.clone(), plugin_store, plugin_id.clone())
                 {
                     eprintln!("Failed to execute plugin {}: {}", plugin_id, e);
                 }
-            }
-            CommandAction::PluginCommand {
+            }            CommandAction::PluginCommand {
                 plugin_id,
                 command_code,
             } => {
@@ -447,3 +447,13 @@ pub fn get_frontmost_app_bundle_id() -> Option<String> {
             .map(|id| id.to_string())
     }
 }
+
+
+
+
+
+
+
+
+
+

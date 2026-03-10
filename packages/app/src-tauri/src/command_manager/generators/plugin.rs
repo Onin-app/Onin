@@ -121,7 +121,6 @@ pub fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
                     get_plugin_icon_base64(app, &plugin.dir_name, &plugin.manifest.icon);
 
                 // 1. 为插件本身创建一个 Command（用于打开插件）
-                #[allow(deprecated)]
                 commands.push(Command {
                     name: format!("plugin_{}", safe_plugin_id),
                     title: plugin.manifest.name.clone(),
@@ -134,7 +133,9 @@ pub fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
                     }],
                     icon: icon_base64.clone(),
                     source: ItemSource::Plugin,
-                    action: CommandAction::Plugin(plugin.manifest.id.clone()),
+                    action: CommandAction::PluginEntry {
+                        plugin_id: plugin.manifest.id.clone(),
+                    },
                     origin: None,
                     matches: None,
                     requires_confirmation: false,
