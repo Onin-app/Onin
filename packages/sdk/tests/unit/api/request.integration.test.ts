@@ -491,8 +491,11 @@ describe('Request API Integration', () => {
     expect(mockParseHttpError).toHaveBeenCalledWith(timeoutError, {
       url: 'https://api.example.com/slow',
       method: 'GET',
-      timeout: 10000,
-      headers: undefined
+      options: {
+        timeout: 10000,
+        url: 'https://api.example.com/slow',
+        method: 'GET'
+      }
     });
   });
 });

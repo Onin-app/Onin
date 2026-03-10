@@ -301,8 +301,7 @@ describe('Request API', () => {
       expect(mockParseHttpError).toHaveBeenCalledWith(networkError, {
         url: 'https://api.example.com/data',
         method: 'GET',
-        timeout: undefined,
-        headers: undefined
+        options
       });
     });
 
