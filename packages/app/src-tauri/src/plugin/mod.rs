@@ -22,13 +22,11 @@
 //! - `protocol`: 协议处理
 //! - `bridge`: API 桥接
 
-pub mod bridge;
 pub mod context;
 pub mod executor;
 pub mod inline;
 pub mod installer;
 pub mod loader;
-pub mod protocol;
 pub mod settings;
 pub mod state;
 pub mod types;
@@ -61,11 +59,7 @@ pub use state::{
     save_plugin_window_state,
 };
 
-// 桥接功能重导出
-pub use bridge::{PLUGIN_WINDOW_CONTROLS_SCRIPT, PLUGIN_WINDOW_TOPBAR_TEMPLATE};
 
-// 协议处理重导出
-pub use protocol::handle_plugin_protocol;
 
 // ============================================================================
 // Tauri 命令重导出

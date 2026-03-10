@@ -94,8 +94,6 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_opener::init())
-        // 自定义协议
-        .register_uri_scheme_protocol("plugin", plugin::handle_plugin_protocol)
         // 命令
         // 命令
         .invoke_handler(commands::get_invoke_handler())
