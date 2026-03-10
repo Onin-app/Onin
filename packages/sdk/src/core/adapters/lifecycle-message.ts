@@ -1,7 +1,7 @@
 /**
- * 统一 PostMessage 适配器
+ * 生命周期消息适配器
  *
- * 插件窗口生命周期由宿主通过 postMessage 转发到页面。
+ * 插件窗口生命周期由宿主通过消息转发到页面。
  * - Inline 模式：消息由主应用内联容器转发
  * - Window 模式：消息由独立插件窗口转发
  *
@@ -23,7 +23,7 @@ interface RuntimeInfo {
 }
 
 /**
- * 统一 PostMessage 适配器
+ * 生命周期消息适配器
  */
 export class LifecycleMessageAdapter extends BaseAdapter {
   private messageHandler: ((event: MessageEvent) => void) | null = null;
@@ -52,7 +52,7 @@ export class LifecycleMessageAdapter extends BaseAdapter {
     // 尝试从 URL 参数获取模式信息作为 fallback
     this.trySetRuntimeFromUrl();
 
-    // 监听来自父窗口的消息
+    // 监听来自宿主窗口的消息
     this.messageHandler = (event: MessageEvent) => {
       if (event.data && typeof event.data === 'object' && event.data.type) {
         console.log(
@@ -198,3 +198,4 @@ export class LifecycleMessageAdapter extends BaseAdapter {
     console.log('[LifecycleMessageAdapter] Destroyed');
   }
 }
+

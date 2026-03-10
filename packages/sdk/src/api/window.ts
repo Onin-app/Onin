@@ -2,7 +2,7 @@
  * 窗口管理 API
  *
  * 提供窗口事件监听 API，支持 inline（内嵌 native webview）和 window（独立窗口）两种模式。
- * 使用统一的 PostMessage 适配器，从父窗口接收事件。
+ * 使用生命周期消息适配器，从宿主窗口接收事件。
  *
  * @module api/window
  * @example
@@ -147,3 +147,4 @@ export const pluginWindow = {
     }
   },
 };
+
