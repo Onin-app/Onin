@@ -420,8 +420,6 @@
     console.log("Main page component has mounted");
     escapeHandler.set(handleEsc);
 
-    // 设置插件消息处理 (已废弃，使用 Native Bridge)
-    // window.addEventListener("message", plugin.handlePluginMessage);
 
     // 加载配置
     await appListManager.loadConfig();
@@ -492,7 +490,6 @@
       unlisten();
     }
 
-    // window.removeEventListener("message", plugin.handlePluginMessage);
   });
 </script>
 

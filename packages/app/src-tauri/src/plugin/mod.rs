@@ -62,8 +62,7 @@ pub use state::{
 };
 
 // 桥接功能重导出
-// 桥接功能重导出
-pub use bridge::{fix_asset_paths, PLUGIN_WINDOW_CONTROLS_SCRIPT, PLUGIN_WINDOW_TOPBAR_TEMPLATE};
+pub use bridge::{PLUGIN_WINDOW_CONTROLS_SCRIPT, PLUGIN_WINDOW_TOPBAR_TEMPLATE};
 
 // 协议处理重导出
 pub use protocol::handle_plugin_protocol;

@@ -23,7 +23,6 @@ export interface PluginManagerReturn {
   closePlugin: () => void;
   detachPlugin: () => Promise<void>;
   toggleAutoDetach: (checked: boolean) => Promise<void>;
-  handlePluginMessage: (event: MessageEvent) => Promise<void>; // Keep for compatibility if needed, but likely unused
   toggleTerminateOnBg: (checked: boolean) => Promise<void>;
   toggleRunAtStartup: (checked: boolean) => Promise<void>;
   openDevTools: () => Promise<void>;
@@ -143,13 +142,6 @@ export function usePluginManager(): PluginManagerReturn {
     }
   };
 
-  /**
-   * 处理来自插件的消息
-   * (Native Webview 模式下不再需要代理 invoke，但保留空函数以防调用)
-   */
-  const handlePluginMessage = async (event: MessageEvent) => {
-    // No-op for native webview
-  };
 
   /**
    * 发送生命周期事件给插件
@@ -323,7 +315,6 @@ export function usePluginManager(): PluginManagerReturn {
     toggleRunAtStartup,
     openDevTools,
     uninstallPlugin,
-    handlePluginMessage,
     sendLifecycleEvent,
     setupListeners,
   };
