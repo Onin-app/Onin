@@ -9,8 +9,8 @@ pub mod data;
 
 use crate::extension::registry::Extension;
 use crate::extension::types::{
-    EmojiGridData, EmojiGroup, EmojiItem, ExtensionCommand, ExtensionManifest, ExtensionPreview,
-    ExtensionResult, PreviewViewType,
+    EmojiGridData, ExtensionCommand, ExtensionManifest, ExtensionPreview, ExtensionResult,
+    PreviewViewType,
 };
 
 // ============================================================================

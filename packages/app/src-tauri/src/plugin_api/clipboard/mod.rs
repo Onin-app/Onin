@@ -15,12 +15,8 @@ mod types;
 
 // 重新导出公共接口
 pub use commands::{
-    get_clipboard_content, plugin_clipboard_clear, plugin_clipboard_get_metadata,
-    plugin_clipboard_read_image, plugin_clipboard_read_text, plugin_clipboard_write_image,
-    plugin_clipboard_write_text,
+    plugin_clipboard_clear, plugin_clipboard_get_metadata, plugin_clipboard_read_image,
+    plugin_clipboard_read_text, plugin_clipboard_write_image, plugin_clipboard_write_text,
 };
 pub use monitor::start_clipboard_monitor;
-pub use types::{
-    ClipboardContent, ClipboardContentType, ClipboardError, ClipboardFile, ClipboardMetadata,
-    WriteImageOptions, WriteTextOptions,
-};
+pub use types::{WriteImageOptions, WriteTextOptions};

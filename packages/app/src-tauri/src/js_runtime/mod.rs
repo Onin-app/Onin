@@ -25,5 +25,6 @@ pub use global::{
     clear_all_plugin_runtimes, clear_plugin_runtime, get_plugin_runtime_manager,
     init_plugin_runtime_manager,
 };
-pub use manager::PluginRuntimeManager;
-pub use runtime::{create_runtime, create_runtime_with_plugin_id};
+
+#[cfg(test)]
+mod tests;

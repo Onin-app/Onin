@@ -201,8 +201,10 @@ pub async fn execute_command(
 /// 跨平台系统命令配置
 struct PlatformCommand<'a> {
     log_message: &'static str,
+    #[allow(dead_code)]
     windows: Option<(&'static str, &'a [&'a str])>,
     macos: Option<(&'static str, &'a [&'a str])>,
+    #[allow(dead_code)]
     linux: Option<(&'static str, &'a [&'a str])>,
 }
 

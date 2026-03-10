@@ -5,7 +5,7 @@
 
 use objc2::rc::Retained;
 use objc2::MainThreadMarker;
-use objc2_app_kit::{NSApplication, NSModalResponseOK, NSOpenPanel};
+use objc2_app_kit::{NSModalResponseOK, NSOpenPanel};
 use objc2_foundation::NSURL;
 
 /// 打开一个可以同时选择文件和文件夹的对话框

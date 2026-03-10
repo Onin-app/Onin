@@ -8,9 +8,9 @@ use tauri::AppHandle;
 use super::ops::console::op_console_log;
 use super::ops::invoke::op_invoke;
 
-/// 定义 Deno 扩展
-///
-/// 注册所有可用的 ops 并设置初始状态
+// 定义 Deno 扩展
+//
+// 注册所有可用的 ops 并设置初始状态
 deno_core::extension!(
     onin_plugin_api,
     ops = [op_invoke, op_console_log],

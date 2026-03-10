@@ -8,10 +8,6 @@ use crate::{
     shortcut_manager, system_commands, tray_manager, unified_launch_manager, usage_tracker,
     window_manager,
 };
-use tauri::{
-    webview::WebviewBuilder, AppHandle, Emitter, Listener, Manager, WebviewUrl,
-    WebviewWindowBuilder, WindowBuilder,
-};
 
 /// 生成包含所有 Tauri 命令的 invoke handler
 pub fn get_invoke_handler(

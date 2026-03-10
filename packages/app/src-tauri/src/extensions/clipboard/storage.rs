@@ -2,7 +2,6 @@ use crate::extensions::clipboard::types::ClipboardItem;
 use base64::{engine::general_purpose, Engine as _};
 use std::collections::VecDeque;
 use std::fs;
-use std::io::Write;
 use tauri::{AppHandle, Manager};
 
 const MAX_HISTORY_SIZE: usize = 50;

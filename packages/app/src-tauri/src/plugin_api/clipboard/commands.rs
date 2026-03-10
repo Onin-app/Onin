@@ -109,7 +109,7 @@ pub async fn plugin_clipboard_get_metadata(
 
     let mut content_type = ClipboardContentType::Empty;
     let mut text: Option<String> = None;
-    let mut files: Option<Vec<ClipboardFile>> = None;
+    let files: Option<Vec<ClipboardFile>> = None;
 
     // 先尝试读取文件路径（Windows/Linux）
     #[cfg(any(target_os = "windows", target_os = "linux"))]

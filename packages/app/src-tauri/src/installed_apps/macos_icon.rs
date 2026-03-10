@@ -4,9 +4,7 @@
 use base64::{engine::general_purpose, Engine as _};
 use objc2::msg_send;
 use objc2::AllocAnyThread;
-use objc2_app_kit::{
-    NSBitmapImageFileType, NSBitmapImageRep, NSGraphicsContext, NSImage, NSWorkspace,
-};
+use objc2_app_kit::{NSBitmapImageFileType, NSBitmapImageRep, NSGraphicsContext, NSWorkspace};
 use objc2_foundation::{NSDictionary, NSString};
 use tracing::{error, info, warn};
 

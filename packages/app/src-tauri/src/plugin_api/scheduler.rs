@@ -68,7 +68,6 @@ impl SchedulerState {
                     let app_handle_clone = app_handle.clone();
 
                     // 创建 Job
-                    let is_one_shot = task.execute_at.is_some();
                     let job_result = if let Some(execute_at) = task.execute_at {
                         let now = std::time::SystemTime::now()
                             .duration_since(std::time::UNIX_EPOCH)

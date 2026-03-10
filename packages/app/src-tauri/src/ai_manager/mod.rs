@@ -1,8 +1,7 @@
-use self::config::{AIConfig, ProviderConfig};
+use self::config::AIConfig;
 use self::provider::{AIProvider, ChatRequest};
 use self::providers::openai_compatible::OpenAICompatibleProvider;
 
-use std::collections::HashMap;
 use std::error::Error;
 use std::path::PathBuf;
 use std::sync::Arc;

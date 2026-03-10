@@ -10,6 +10,7 @@ use super::timestamp::{
 };
 
 /// 启动剪贴板监控
+#[allow(dead_code)]
 pub fn start_clipboard_monitor(app: AppHandle) {
     let mut started = CLIPBOARD_MONITOR_STARTED.lock().unwrap();
     if *started {
@@ -42,6 +43,7 @@ pub fn start_clipboard_monitor(app: AppHandle) {
         }
 
         impl ClipboardManager {
+            #[allow(dead_code)]
             pub fn new() -> Self {
                 let ctx = ClipboardContext::new().unwrap();
                 ClipboardManager { ctx }
@@ -70,6 +72,7 @@ pub fn start_clipboard_monitor(app: AppHandle) {
 }
 
 /// 自动清空检查线程
+#[allow(dead_code)]
 fn start_auto_clear_thread() {
     use super::timestamp::get_clipboard_timestamp;
     use crate::app_config::AppConfigState;

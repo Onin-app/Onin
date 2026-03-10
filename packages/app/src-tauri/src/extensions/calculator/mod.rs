@@ -9,7 +9,6 @@ mod units;
 use crate::extension::registry::Extension;
 use crate::extension::types::{
     ExtensionCommand, ExtensionManifest, ExtensionPreview, ExtensionResult, PreviewViewType,
-    StaticCommandMatch,
 };
 use regex::Regex;
 use std::sync::LazyLock;

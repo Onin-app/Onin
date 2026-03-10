@@ -10,10 +10,7 @@ pub mod registry;
 pub mod types;
 
 pub use registry::{find_matching_extensions, get_all_extensions, get_extension_by_id, Extension};
-pub use types::{
-    ExtensionCommand, ExtensionManifest, ExtensionPreview, ExtensionResult, ExtensionResultType,
-    StaticCommandMatch,
-};
+pub use types::{ExtensionPreview, ExtensionResult};
 
 use crate::shared_types::{Command, CommandAction, CommandKeyword, CommandMatch, ItemSource};
 

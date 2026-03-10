@@ -3,7 +3,7 @@
 use crate::command_manager;
 use crate::shared_types::Shortcut as AppShortcut;
 use std::str::FromStr;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, State};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 
 use super::state::ShortcutState;

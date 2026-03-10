@@ -5,15 +5,11 @@ use clipboard_rs::{
     common::RustImage, Clipboard, ClipboardContext, ClipboardHandler, ClipboardWatcher,
     ClipboardWatcherContext,
 };
-use image::{DynamicImage, ImageBuffer, ImageFormat, Rgba};
-use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::env;
 use std::fs;
-use std::io::Cursor;
 use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager};
 
 const MAX_HISTORY_SIZE: usize = 50;
