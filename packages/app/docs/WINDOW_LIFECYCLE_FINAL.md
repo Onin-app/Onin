@@ -127,12 +127,12 @@ async function executeWindowShowCallbacks(): Promise<void> {
 
 使用浏览器原生 API，完美支持。
 
-### 2. iframe 模式（display_mode: "inline"）
+### 2. 旧 iframe 模式（display_mode: "inline"，已由 native inline webview 替代）
 
-使用 `postMessage` 通信：
+这是历史实现，使用 `postMessage` 通信：
 
 ```typescript
-// 父窗口发送消息
+// 父窗口向 iframe 发送消息
 iframe.contentWindow.postMessage(
   {
     type: "plugin-lifecycle-event",
@@ -165,7 +165,7 @@ window.addEventListener("message", (event) => {
 
 ```
 [Lifecycle] Starting window events initialization
-[Lifecycle] Environment check - isInIframe: false
+[Lifecycle] Environment check - inline webview mode
 [Lifecycle] Initializing window events for standalone window mode
 [Lifecycle] Using native visibilitychange API
 [Lifecycle] ✅ Native browser event listeners registered
