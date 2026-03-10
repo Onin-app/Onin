@@ -1,7 +1,7 @@
 /**
  * 窗口管理 API
  *
- * 提供窗口事件监听 API，支持 inline（iframe）和 window（独立窗口）两种模式。
+ * 提供窗口事件监听 API，支持 inline（内嵌 native webview）和 window（独立窗口）两种模式。
  * 使用统一的 PostMessage 适配器，从父窗口接收事件。
  *
  * @module api/window
@@ -51,7 +51,7 @@ function getAdapter(): PostMessageAdapter {
  * 注册窗口显示回调
  *
  * 当窗口从隐藏状态变为可见时触发。
- * - inline 模式：iframe 变为可见时触发
+ * - inline 模式：内嵌 webview 变为可见时触发
  * - window 模式：独立窗口显示或从最小化恢复时触发
  *
  * @param callback - 窗口显示时执行的回调函数
@@ -64,7 +64,7 @@ function onShow(callback: EventCallback): void {
  * 注册窗口隐藏回调
  *
  * 当窗口从可见状态变为隐藏时触发。
- * - inline 模式：iframe 被隐藏时触发
+ * - inline 模式：内嵌 webview 被隐藏时触发
  * - window 模式：独立窗口被最小化或隐藏时触发
  *
  * @param callback - 窗口隐藏时执行的回调函数

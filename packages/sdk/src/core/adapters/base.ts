@@ -1,7 +1,7 @@
 /**
  * 窗口适配器基础接口
  *
- * 定义了处理窗口事件的统一接口，具体实现由 InlineAdapter 和 WindowAdapter 提供。
+ * 定义了处理窗口事件的统一接口，具体实现由不同运行模式的适配器提供。
  *
  * @module core/adapters/base
  */
@@ -12,8 +12,8 @@ export type EventCallback = () => void | Promise<void>;
  * 窗口适配器接口
  *
  * 定义了窗口事件监听的统一 API，不同运行模式有不同的实现：
- * - InlineAdapter: 使用 postMessage 和 visibilitychange
- * - WindowAdapter: 使用 Tauri 事件系统
+ * - Inline lifecycle adapter: 通过宿主转发生命周期事件
+ * - Window lifecycle adapter: 使用 Tauri 事件系统
  */
 export interface WindowAdapter {
   /**

@@ -2,7 +2,7 @@
  * 插件运行时环境模块
  *
  * 提供统一的运行时环境检测，通过主应用注入的 __ONIN_RUNTIME__ 对象
- * 来判断插件的运行模式，而不是使用不可靠的 iframe 检测方法。
+ * 来判断插件的运行模式，并在开发环境下从 URL 参数回退推断。
  *
  * @module core/runtime
  */
@@ -16,7 +16,7 @@ export type PluginMode = 'inline' | 'window';
  * 运行时环境信息接口
  */
 export interface OninRuntime {
-  /** 插件运行模式：inline（iframe 内联）或 window（独立窗口） */
+  /** 插件运行模式：inline（内嵌 native webview）或 window（独立窗口） */
   mode: PluginMode;
   /** 插件 ID */
   pluginId: string;
@@ -37,22 +37,10 @@ declare global {
 let cachedRuntime: OninRuntime | null = null;
 
 /**
- * 检测是否在 iframe 中运行
- */
-function isInIframe(): boolean {
-  try {
-    return typeof window !== 'undefined' && window.self !== window.top;
-  } catch (e) {
-    // 跨域 iframe 会抛出异常，说明确实在 iframe 中
-    return true;
-  }
-}
-
-/**
  * 获取运行时环境信息
  *
  * 优先从 window.__ONIN_RUNTIME__ 读取主应用注入的信息，
- * 如果不存在则根据环境自动检测。
+ * 如果不存在则根据 URL 参数进行开发模式回退。
  */
 export function getRuntime(): OninRuntime {
   // 返回缓存的运行时信息
@@ -70,9 +58,12 @@ export function getRuntime(): OninRuntime {
     return cachedRuntime;
   }
 
-  // 开发模式 fallback - 根据环境自动检测
-  const inIframe = isInIframe();
-  const mode: PluginMode = inIframe ? 'inline' : 'window';
+  // 开发模式 fallback - 从 URL 参数推断运行模式
+  const modeParam =
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location?.search).get('mode')
+      : null;
+  const mode: PluginMode = modeParam === 'inline' ? 'inline' : 'window';
 
   // 尝试从 URL 或其他来源获取 pluginId
   const pluginId =
@@ -82,7 +73,7 @@ export function getRuntime(): OninRuntime {
     'dev-plugin';
 
   console.log(
-    `[SDK Runtime] No runtime injected, auto-detected mode: ${mode}, inIframe: ${inIframe}`,
+    `[SDK Runtime] No runtime injected, fallback mode from URL: ${mode}`,
   );
 
   cachedRuntime = {
@@ -123,7 +114,7 @@ export const runtime = {
 };
 
 /**
- * 是否为内联模式（iframe）
+ * 是否为内联模式（native child webview）
  */
 export function isInlineMode(): boolean {
   return getRuntime().mode === 'inline';

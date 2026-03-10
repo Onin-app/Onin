@@ -182,75 +182,21 @@ fn fix_asset_paths(html: &str) -> String {
 // Tauri 桥接注入
 // ============================================================================
 
-/// Tauri API 桥接脚本模板
+/// Runtime initialization script template
 const TAURI_BRIDGE_SCRIPT: &str = r#"
 <script>
 (function() {
   const pluginIdFromInjection = '__PLUGIN_ID__';
   const urlParams = new URLSearchParams(window.location.search);
   const pluginIdFromUrl = urlParams.get('plugin_id');
-  
+
   window.__PLUGIN_ID__ = pluginIdFromUrl || pluginIdFromInjection;
   globalThis.__PLUGIN_ID__ = window.__PLUGIN_ID__;
-  
-  // Check if running in native window (not iframe)
-  if (window.self === window.top) {
-    console.log('[Tauri Bridge] Running in native window mode');
-    // In native window mode, we rely on Tauri's native API injection (window.__TAURI_INTERNALS__)
-    // which is enabled by the capabilities configuration for localhost/127.0.0.1
-    return;
-  }
-
-  const createProxy = (command) => {
-    return (...args) => {
-      return new Promise((resolve, reject) => {
-        const messageId = 'tauri_' + Math.random().toString(36).substring(7) + '_' + Date.now();
-        
-        const handleResponse = (event) => {
-          if (event.data && event.data.messageId === messageId) {
-            window.removeEventListener('message', handleResponse);
-            if (event.data.error) {
-              reject(new Error(event.data.error));
-            } else {
-              resolve(event.data.result);
-            }
-          }
-        };
-        
-        window.addEventListener('message', handleResponse);
-        
-        window.parent.postMessage({
-          type: 'plugin-tauri-call',
-          messageId,
-          command,
-          args
-        }, '*');
-        
-        setTimeout(() => {
-          window.removeEventListener('message', handleResponse);
-          reject(new Error('Tauri call timeout'));
-        }, 30000);
-      });
-    };
-  };
-  
-  const invokeProxy = createProxy('invoke');
-  
-  window.__TAURI__ = {
-    core: { invoke: invokeProxy },
-    event: {
-      emit: createProxy('emit'),
-      listen: createProxy('listen')
-    },
-    invoke: invokeProxy
-  };
-  
-  window.__TAURI_INVOKE__ = invokeProxy;
 })();
 </script>
 "#;
 
-/// 注入 Tauri API 桥接脚本到 HTML
+/// 注入运行时初始化脚本到 HTML
 fn inject_tauri_bridge(html: &str, plugin_id: &str) -> String {
     let bridge_script = TAURI_BRIDGE_SCRIPT.replace("__PLUGIN_ID__", plugin_id);
 

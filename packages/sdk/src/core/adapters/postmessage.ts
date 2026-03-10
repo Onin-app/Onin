@@ -1,9 +1,9 @@
 /**
  * 统一 PostMessage 适配器
  *
- * 所有插件都在 iframe 中运行，父窗口通过 postMessage 发送事件。
- * - Inline 模式：父窗口是主应用窗口
- * - Window 模式：父窗口是独立的插件窗口
+ * 插件窗口生命周期由宿主通过 postMessage 转发到页面。
+ * - Inline 模式：消息由主应用内联容器转发
+ * - Window 模式：消息由独立插件窗口转发
  *
  * 消息格式：
  * - plugin-runtime-init: { type, runtime: { mode, pluginId, ... } }
@@ -48,7 +48,6 @@ export class PostMessageAdapter extends BaseAdapter {
    */
   private initializeNow(): void {
     console.log('[PostMessageAdapter] Initializing...');
-    console.log('[PostMessageAdapter] In iframe:', window.self !== window.top);
 
     // 尝试从 URL 参数获取模式信息作为 fallback
     this.trySetRuntimeFromUrl();
