@@ -1,6 +1,6 @@
 //! # 计算引擎
 //!
-//! 使用 meval crate 进行数学表达式解析和求值
+//! 使用 evalexpr crate 进行数学表达式解析和求值
 
 use crate::extension::types::ExtensionResult;
 
@@ -21,8 +21,8 @@ pub fn evaluate(input: &str) -> ExtensionResult {
     // 预处理表达式
     let processed = preprocess_expression(expr);
 
-    // 使用 meval 计算
-    match meval::eval_str(&processed) {
+    // 使用 evalexpr 计算
+    match evalexpr::eval_number(&processed) {
         Ok(result) => {
             // 格式化结果
             let formatted = format_result(result);
@@ -37,10 +37,10 @@ pub fn evaluate(input: &str) -> ExtensionResult {
 
 /// 预处理表达式
 ///
-/// 将用户输入转换为 meval 可识别的格式
+/// 将用户输入转换为 evalexpr 可识别的格式
 /// 支持百分比语法：
-/// - `a + b%` → `a * (1 + b / 100)`
-/// - `a - b%` → `a * (1 - b / 100)`
+/// - `a + b%` → `a * (1 + b / 100.0)`
+/// - `a - b%` → `a * (1 - b / 100.0)`
 fn preprocess_expression(expr: &str) -> String {
     let mut result = expr.to_string();
 
@@ -48,8 +48,11 @@ fn preprocess_expression(expr: &str) -> String {
     result = result.replace(' ', "");
 
     // 处理百分比语法：a+b% 或 a-b%
-    // 匹配模式：数字 + 或 - 数字%
     result = preprocess_percentage(&result);
+
+    // 将整数字面量提升为浮点，避免 evalexpr 的整数除法
+    // 例如：7/2 → 7.0/2.0，100*(1+20/100) → 100.0*(1.0+20.0/100.0)
+    result = promote_integers_to_float(&result);
 
     result
 }
@@ -97,6 +100,57 @@ fn preprocess_percentage(expr: &str) -> String {
     result
 }
 
+/// 将表达式中所有整数字面量提升为浮点数
+///
+/// 避免 evalexpr 在遇到整数操作数时执行整数除法
+/// 例如：`7/2` → `7.0/2.0`，`100*(1+20/100)` → `100.0*(1.0+20.0/100.0)`
+fn promote_integers_to_float(expr: &str) -> String {
+    let chars: Vec<char> = expr.chars().collect();
+    let mut result = String::with_capacity(expr.len() + 16);
+    let mut i = 0;
+
+    while i < chars.len() {
+        let c = chars[i];
+
+        // 识别负号：后跟数字，且前面是运算符或左括号（或是开头）
+        let is_unary_minus = c == '-'
+            && i + 1 < chars.len()
+            && chars[i + 1].is_ascii_digit()
+            && (i == 0 || matches!(chars[i - 1], '+' | '-' | '*' | '/' | '^' | '(' | ','));
+
+        if c.is_ascii_digit() || is_unary_minus {
+            // 可选负号
+            if is_unary_minus {
+                result.push('-');
+                i += 1;
+            }
+            // 收集连续数字
+            while i < chars.len() && chars[i].is_ascii_digit() {
+                result.push(chars[i]);
+                i += 1;
+            }
+            // 检查后面是否已有小数点
+            if i < chars.len() && chars[i] == '.' {
+                // 已是浮点，原样保留小数部分
+                result.push('.');
+                i += 1;
+                while i < chars.len() && chars[i].is_ascii_digit() {
+                    result.push(chars[i]);
+                    i += 1;
+                }
+            } else {
+                // 纯整数，追加 .0
+                result.push_str(".0");
+            }
+        } else {
+            result.push(c);
+            i += 1;
+        }
+    }
+
+    result
+}
+
 /// 格式化计算结果
 ///
 /// - 整数结果不显示小数点
@@ -107,9 +161,9 @@ fn format_result(value: f64) -> String {
         return format!("{}", value as i64);
     }
 
-    // 检查是否接近整数（处理浮点精度问题）
+    // 检查是否接近整数（处理浮点精度问题，阈值 5e-10 覆盖末位精度误差）
     let rounded = value.round();
-    if (value - rounded).abs() < 1e-10 && rounded.abs() < 1e15 {
+    if (value - rounded).abs() <= 5e-10 && rounded.abs() < 1e15 {
         return format!("{}", rounded as i64);
     }
 
