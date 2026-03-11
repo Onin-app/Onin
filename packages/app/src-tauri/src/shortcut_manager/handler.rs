@@ -5,6 +5,8 @@ use super::utils::normalize_shortcut_string;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_global_shortcut::{Shortcut, ShortcutState as GlobalShortcutPluginState};
 
+const SHORTCUT_DEBOUNCE_MS: u128 = 400;
+
 /// 处理全局快捷键事件
 pub fn handle_global_shortcut(
     app: &AppHandle,
@@ -17,22 +19,7 @@ pub fn handle_global_shortcut(
 
     let shortcut_str = shortcut.to_string();
     let triggered_shortcut = normalize_shortcut_string(&shortcut_str);
-
-    // Debounce check
     let state: State<ShortcutState> = app.state();
-    if let Ok(mut last_executed) = state.last_executed.lock() {
-        if let Some(last_time) = last_executed.get(&triggered_shortcut) {
-            if last_time.elapsed().as_millis() < 400 {
-                println!(
-                    "Debouncing shortcut: {} (elapsed: {}ms)",
-                    triggered_shortcut,
-                    last_time.elapsed().as_millis()
-                );
-                return;
-            }
-        }
-        last_executed.insert(triggered_shortcut.clone(), std::time::Instant::now());
-    }
 
     println!(
         "Handling shortcut: {} (normalized: {})",
@@ -59,6 +46,12 @@ pub fn handle_global_shortcut(
     });
 
     if let Some(app_shortcut) = matching_shortcut {
+        if app_shortcut.command_name != "toggle_window"
+            && should_debounce_shortcut(&state, &triggered_shortcut)
+        {
+            return;
+        }
+
         println!(
             "Found matching shortcut: {} -> {}",
             app_shortcut.shortcut, app_shortcut.command_name
@@ -67,6 +60,27 @@ pub fn handle_global_shortcut(
     } else {
         handle_special_keys(app, &triggered_shortcut);
     }
+}
+
+fn should_debounce_shortcut(state: &State<ShortcutState>, triggered_shortcut: &str) -> bool {
+    if let Ok(mut last_executed) = state.last_executed.lock() {
+        if let Some(last_time) = last_executed.get(triggered_shortcut) {
+            let elapsed = last_time.elapsed().as_millis();
+            if elapsed < SHORTCUT_DEBOUNCE_MS {
+                println!(
+                    "Debouncing shortcut: {} (elapsed: {}ms)",
+                    triggered_shortcut, elapsed
+                );
+                return true;
+            }
+        }
+        last_executed.insert(
+            triggered_shortcut.to_string(),
+            std::time::Instant::now(),
+        );
+    }
+
+    false
 }
 
 /// 执行快捷键动作
