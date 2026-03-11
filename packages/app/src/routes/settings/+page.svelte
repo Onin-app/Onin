@@ -108,6 +108,7 @@
     </div>
     <nav class="flex flex-1 flex-col gap-1">
       {#each settings as setting}
+        {@const Icon = setting.icon}
         <Button.Root
           class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors {activeSetting.id ===
           setting.id
@@ -115,7 +116,7 @@
             : 'text-neutral-600 hover:bg-neutral-200/50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white'}"
           onclick={() => handleClickSetting(setting)}
         >
-          <svelte:component this={setting.icon} size={18} />
+          <Icon size={18} />
           {setting.name}
         </Button.Root>
       {/each}

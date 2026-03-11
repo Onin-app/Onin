@@ -18,8 +18,8 @@
 
   let searchQuery = $state("");
   let emojiData = $state<EmojiGridData | null>(null);
-  let headerRef: ExtensionHeader;
-  let gridRef: EmojiGridView;
+  let headerRef = $state<ExtensionHeader>(null!);
+  let gridRef = $state<EmojiGridView>(null!);
 
   // 从 URL 参数获取初始搜索值
   const initialQuery = $derived($page.url.searchParams.get("q") || "");
