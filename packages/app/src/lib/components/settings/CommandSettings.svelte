@@ -163,8 +163,6 @@
       .forEach((cmd) => {
         if (isPluginEntryAction(cmd.action)) {
           map.set(cmd.action.PluginEntry.plugin_id, cmd.title);
-        } else if (isPluginAction(cmd.action)) {
-          map.set(cmd.action.Plugin, cmd.title);
         }
       });
     return map;
