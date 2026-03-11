@@ -93,11 +93,15 @@ fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::
         if let Some(window) = app.get_webview_window("main") {
             match window.is_visible() {
                 Ok(true) => {
+                    // macOS：隐藏前先把焦点归还给上一个应用
+                    #[cfg(target_os = "macos")]
+                    crate::system_commands::activate_previous_app(app);
+
                     let _ = window.hide();
                     let _ = window.emit("window_visibility", &false);
                 }
                 Ok(false) => {
-                    // macOS logic
+                    // macOS logic：记录当前前台应用，以便下次隐藏时归还焦点
                     #[cfg(target_os = "macos")]
                     {
                         if let Some(bundle_id) =
@@ -121,11 +125,15 @@ fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::
             // Fallback block for Window
             match window.is_visible() {
                 Ok(true) => {
+                    // macOS：隐藏前先把焦点归还给上一个应用
+                    #[cfg(target_os = "macos")]
+                    crate::system_commands::activate_previous_app(app);
+
                     let _ = window.hide();
                     let _ = window.emit("window_visibility", &false);
                 }
                 Ok(false) => {
-                    // macOS logic (same)
+                    // macOS logic (same)：记录当前前台应用
                     #[cfg(target_os = "macos")]
                     {
                         if let Some(bundle_id) =

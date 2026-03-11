@@ -309,7 +309,21 @@ pub async fn create_or_show_plugin_window(
         if !is_focused {
             // 窗口无焦点（可能最小化、隐藏或在后台），恢复并聚焦
             println!("[plugin/window] 显示并聚焦窗口 {}", window_label);
-            
+
+            // macOS：记录当前前台应用，以便隐藏时归还焦点
+            #[cfg(target_os = "macos")]
+            {
+                if let Some(bundle_id) =
+                    crate::system_commands::get_frontmost_app_bundle_id()
+                {
+                    if let Some(state) =
+                        app.try_state::<crate::system_commands::MacOSPreviousApp>()
+                    {
+                        *state.0.lock().unwrap() = Some(bundle_id);
+                    }
+                }
+            }
+
             // 依次尝试恢复窗口状态
             let _ = window.unminimize();
             let _ = window.show();
@@ -319,6 +333,11 @@ pub async fn create_or_show_plugin_window(
         } else {
             // 窗口已聚焦，最小化它
             println!("[plugin/window] 最小化窗口 {}", window_label);
+
+            // macOS：最小化前先把焦点归还给上一个应用
+            #[cfg(target_os = "macos")]
+            crate::system_commands::activate_previous_app(&app);
+
             if let Err(e) = window.minimize() {
                 eprintln!("最小化插件窗口失败: {}", e);
             }

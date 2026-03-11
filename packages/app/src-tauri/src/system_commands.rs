@@ -448,6 +448,31 @@ pub fn get_frontmost_app_bundle_id() -> Option<String> {
         .map(|id| id.to_string())
 }
 
+/// 通过 bundle ID 激活应用
+#[cfg(target_os = "macos")]
+pub fn activate_app_by_bundle_id(bundle_id: &str) {
+    use std::process::Command;
+    println!("[SystemCommand] Activating app: {}", bundle_id);
+    let _ = Command::new("osascript")
+        .args(["-e", &format!(r#"tell application id "{}" to activate"#, bundle_id)])
+        .output();
+}
+
+/// 隐藏应用窗口前，将焦点归还给上一个前台应用
+/// 使用 MacOSPreviousApp 状态中记录的 bundle ID
+#[cfg(target_os = "macos")]
+pub fn activate_previous_app(app: &tauri::AppHandle) {
+    if let Some(state) = app.try_state::<MacOSPreviousApp>() {
+        let bundle_id = state.0.lock().ok().and_then(|guard| guard.clone());
+        if let Some(bundle_id) = bundle_id {
+            activate_app_by_bundle_id(&bundle_id);
+            return;
+        }
+    }
+    println!("[SystemCommand] No previous app recorded, skipping activation");
+}
+
+
 
 
 
