@@ -12,6 +12,9 @@ use crate::{
     plugin_server, shortcut_manager, tray_manager, window_manager,
 };
 
+#[cfg(target_os = "macos")]
+use crate::system_commands;
+
 /// 应用启动时的主要初始化逻辑
 ///
 /// 这个函数在 Tauri 的 `setup()` 阶段被调用，负责：

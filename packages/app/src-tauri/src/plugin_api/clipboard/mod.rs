@@ -18,5 +18,6 @@ pub use commands::{
     plugin_clipboard_clear, plugin_clipboard_get_metadata, plugin_clipboard_read_image,
     plugin_clipboard_read_text, plugin_clipboard_write_image, plugin_clipboard_write_text,
 };
+#[allow(unused_imports)]
 pub use monitor::start_clipboard_monitor;
 pub use types::{WriteImageOptions, WriteTextOptions};
