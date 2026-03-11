@@ -12,7 +12,6 @@
 
   let fileCommands = $state<LaunchableItem[]>([]);
   let listContainerEl: HTMLDivElement | undefined = $state();
-  let mainContainerEl: HTMLElement | undefined = $state();
   let isLoading = $state(true);
   let isProcessing = $state(false);
   let isDraggingOver = $state(false);
@@ -162,15 +161,12 @@
     });
   };
 
-  // 使用 $effect 可以安全地在元素绑定后添加/移除事件监听器
+  // 将粘贴事件绑定到 document，避免 main 元素需要 tabindex
   $effect(() => {
-    const el = mainContainerEl;
-    if (el) {
-      el.addEventListener("paste", handlePaste);
-      return () => {
-        el.removeEventListener("paste", handlePaste);
-      };
-    }
+    document.addEventListener("paste", handlePaste);
+    return () => {
+      document.removeEventListener("paste", handlePaste);
+    };
   });
 
   onMount(() => {
@@ -185,8 +181,6 @@
 
 <main
   class="flex h-full w-full flex-col"
-  bind:this={mainContainerEl}
-  tabindex="0"
 >
   <h2 class="mb-2 text-xl font-bold">文件启动设置</h2>
   {#if fileCommands.length > 0}
