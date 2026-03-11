@@ -203,6 +203,7 @@ struct PlatformCommand<'a> {
     log_message: &'static str,
     #[allow(dead_code)]
     windows: Option<(&'static str, &'a [&'a str])>,
+    #[allow(dead_code)]
     macos: Option<(&'static str, &'a [&'a str])>,
     #[allow(dead_code)]
     linux: Option<(&'static str, &'a [&'a str])>,
@@ -316,13 +317,12 @@ fn refresh_list(app: AppHandle) {
 
 /// 模拟 Ctrl+V / Cmd+V 粘贴操作
 /// 这是一个内部辅助函数，非 Tauri Command
-pub fn simulate_paste_native(app: &AppHandle) -> Result<(), String> {
+pub fn simulate_paste_native(_app: &AppHandle) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         use std::mem;
         use windows::Win32::UI::Input::KeyboardAndMouse::{
-            SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
-            KEYEVENTF_KEYUP, VK_CONTROL, VK_V,
+            SendInput, INPUT, INPUT_KEYBOARD, KEYEVENTF_KEYUP, VK_CONTROL, VK_V,
         };
 
         unsafe {
@@ -363,7 +363,7 @@ pub fn simulate_paste_native(app: &AppHandle) -> Result<(), String> {
         println!("[SystemCommand] simulate_paste_native (macOS via osascript) started");
 
         // 获取记录的前一个应用的 Bundle ID
-        let bundle_id = app.state::<MacOSPreviousApp>()
+        let bundle_id = _app.state::<MacOSPreviousApp>()
             .0.lock().ok()
             .and_then(|guard| guard.clone());
         

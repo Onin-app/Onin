@@ -9,7 +9,7 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 
 use crate::{
     app_config, command_manager, file_command_manager, js_runtime, plugin, plugin_api,
-    plugin_server, shortcut_manager, system_commands, tray_manager, window_manager,
+    plugin_server, shortcut_manager, tray_manager, window_manager,
 };
 
 /// 应用启动时的主要初始化逻辑
