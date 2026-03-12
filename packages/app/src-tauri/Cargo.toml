@@ -40,6 +40,7 @@ windows = { version = "0.57", features = [
   "Win32_System_DataExchange",
   "Win32_Storage_FileSystem",
   "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_System_Threading",
 ] }
 base64 = "0.22"
 async-trait = "0.1"
@@ -75,7 +76,7 @@ tower = "0.4"
 tower-http = { version = "0.5", features = ["fs", "cors"] }
 zip = "2.2"
 tempfile = "3.13"
-meval = "0.2"
+evalexpr = "12"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"

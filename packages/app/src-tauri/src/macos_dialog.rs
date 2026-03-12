@@ -5,7 +5,7 @@
 
 use objc2::rc::Retained;
 use objc2::MainThreadMarker;
-use objc2_app_kit::{NSApplication, NSModalResponseOK, NSOpenPanel};
+use objc2_app_kit::{NSModalResponseOK, NSOpenPanel};
 use objc2_foundation::NSURL;
 
 /// 打开一个可以同时选择文件和文件夹的对话框
@@ -15,32 +15,30 @@ pub fn open_file_and_folder_dialog() -> Vec<String> {
     // 获取主线程标记，NSOpenPanel 必须在主线程上运行
     let mtm = unsafe { MainThreadMarker::new_unchecked() };
 
-    unsafe {
-        let panel = NSOpenPanel::openPanel(mtm);
+    let panel = NSOpenPanel::openPanel(mtm);
 
-        // 关键设置：同时允许选择文件和文件夹
-        panel.setCanChooseFiles(true);
-        panel.setCanChooseDirectories(true);
-        panel.setAllowsMultipleSelection(true);
-        panel.setCanCreateDirectories(true);
+    // 关键设置：同时允许选择文件和文件夹
+    panel.setCanChooseFiles(true);
+    panel.setCanChooseDirectories(true);
+    panel.setAllowsMultipleSelection(true);
+    panel.setCanCreateDirectories(true);
 
-        // 使用 runModal 同步运行对话框
-        let response = panel.runModal();
+    // 使用 runModal 同步运行对话框
+    let response = panel.runModal();
 
-        if response == NSModalResponseOK {
-            let urls: Retained<objc2_foundation::NSArray<NSURL>> = panel.URLs();
-            let count = urls.count();
+    if response == NSModalResponseOK {
+        let urls: Retained<objc2_foundation::NSArray<NSURL>> = panel.URLs();
+        let count = urls.count();
 
-            let mut paths = Vec::with_capacity(count);
-            for i in 0..count {
-                if let Some(url) = urls.objectAtIndex(i).path() {
-                    paths.push(url.to_string());
-                }
+        let mut paths = Vec::with_capacity(count);
+        for i in 0..count {
+            if let Some(url) = urls.objectAtIndex(i).path() {
+                paths.push(url.to_string());
             }
-            paths
-        } else {
-            Vec::new()
         }
+        paths
+    } else {
+        Vec::new()
     }
 }
 

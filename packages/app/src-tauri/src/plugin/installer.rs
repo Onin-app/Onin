@@ -13,7 +13,7 @@ use super::state::{
 };
 use super::types::{
     find_plugin_by_id, make_plugin_dir_name, InstallSource, LoadedPlugin, PluginManifest,
-    PluginState, PluginStore,
+    PluginStore,
 };
 use crate::js_runtime;
 

@@ -113,9 +113,9 @@ pub enum CommandAction {
     System(String),
     App(String), // The string will hold the executable path
     File(String),
-    #[deprecated(note = "Use PluginCommand instead. Will be removed in v2.0")]
-    Plugin(String), // The string will hold the plugin id (deprecated, kept for compatibility)
-    // TODO: Remove Plugin(String) variant in v2.0 and migrate existing data
+    PluginEntry {
+        plugin_id: String,
+    }, // Open a plugin entry by plugin id
     PluginCommand {
         plugin_id: String,
         command_code: String,
@@ -203,3 +203,6 @@ pub struct DynamicCommand {
     /// Timestamp when the command was created (milliseconds since epoch)
     pub created_at: u64,
 }
+
+
+

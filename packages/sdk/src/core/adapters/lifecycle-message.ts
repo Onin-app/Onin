@@ -1,9 +1,9 @@
 /**
- * 统一 PostMessage 适配器
+ * 生命周期消息适配器
  *
- * 所有插件都在 iframe 中运行，父窗口通过 postMessage 发送事件。
- * - Inline 模式：父窗口是主应用窗口
- * - Window 模式：父窗口是独立的插件窗口
+ * 插件窗口生命周期由宿主通过消息转发到页面。
+ * - Inline 模式：消息由主应用内联容器转发
+ * - Window 模式：消息由独立插件窗口转发
  *
  * 消息格式：
  * - plugin-runtime-init: { type, runtime: { mode, pluginId, ... } }
@@ -23,9 +23,9 @@ interface RuntimeInfo {
 }
 
 /**
- * 统一 PostMessage 适配器
+ * 生命周期消息适配器
  */
-export class PostMessageAdapter extends BaseAdapter {
+export class LifecycleMessageAdapter extends BaseAdapter {
   private messageHandler: ((event: MessageEvent) => void) | null = null;
   private runtimeResolve: ((runtime: RuntimeInfo) => void) | null = null;
   private runtimePromise: Promise<RuntimeInfo>;
@@ -47,17 +47,16 @@ export class PostMessageAdapter extends BaseAdapter {
    * 立即初始化
    */
   private initializeNow(): void {
-    console.log('[PostMessageAdapter] Initializing...');
-    console.log('[PostMessageAdapter] In iframe:', window.self !== window.top);
+    console.log('[LifecycleMessageAdapter] Initializing...');
 
     // 尝试从 URL 参数获取模式信息作为 fallback
     this.trySetRuntimeFromUrl();
 
-    // 监听来自父窗口的消息
+    // 监听来自宿主窗口的消息
     this.messageHandler = (event: MessageEvent) => {
       if (event.data && typeof event.data === 'object' && event.data.type) {
         console.log(
-          '[PostMessageAdapter] Received message:',
+          '[LifecycleMessageAdapter] Received message:',
           event.data.type,
           event.data,
         );
@@ -75,7 +74,7 @@ export class PostMessageAdapter extends BaseAdapter {
 
     window.addEventListener('message', this.messageHandler);
     this.initialized = true;
-    console.log('[PostMessageAdapter] Initialized, listening for postMessage');
+    console.log('[LifecycleMessageAdapter] Initialized, listening for lifecycle messages');
   }
 
   /**
@@ -88,7 +87,7 @@ export class PostMessageAdapter extends BaseAdapter {
       const pluginId = params.get('plugin_id') || 'unknown';
 
       if (modeParam === 'window' || modeParam === 'inline') {
-        console.log('[PostMessageAdapter] Setting runtime from URL params:', {
+        console.log('[LifecycleMessageAdapter] Setting runtime from URL params:', {
           mode: modeParam,
           pluginId,
         });
@@ -105,7 +104,7 @@ export class PostMessageAdapter extends BaseAdapter {
         }
       }
     } catch (error) {
-      console.warn('[PostMessageAdapter] Failed to read URL params:', error);
+      console.warn('[LifecycleMessageAdapter] Failed to read URL params:', error);
     }
   }
 
@@ -134,7 +133,7 @@ export class PostMessageAdapter extends BaseAdapter {
    * 处理运行时初始化
    */
   private handleRuntimeInit(runtime: RuntimeInfo): void {
-    console.log('[PostMessageAdapter] Runtime init received:', runtime);
+    console.log('[LifecycleMessageAdapter] Runtime init received:', runtime);
     this._runtime = runtime;
 
     // 设置初始状态
@@ -153,7 +152,7 @@ export class PostMessageAdapter extends BaseAdapter {
   private handleLifecycleEvent(
     event: 'show' | 'hide' | 'focus' | 'blur',
   ): void {
-    console.log('[PostMessageAdapter] Lifecycle event:', event);
+    console.log('[LifecycleMessageAdapter] Lifecycle event:', event);
 
     // 如果状态未知，设置正确的初始状态
     if ((this as any)._stateUnknown) {
@@ -196,6 +195,7 @@ export class PostMessageAdapter extends BaseAdapter {
     this.hideCallbacks = [];
     this.focusCallbacks = [];
     this.blurCallbacks = [];
-    console.log('[PostMessageAdapter] Destroyed');
+    console.log('[LifecycleMessageAdapter] Destroyed');
   }
 }
+

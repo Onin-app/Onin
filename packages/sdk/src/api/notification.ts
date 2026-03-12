@@ -12,6 +12,10 @@ export interface NotificationOptions {
   title: string;
   /** Notification body content */
   body: string;
+  /** Optional icon path or URL */
+  icon?: string;
+  /** Optional sound name (e.g. 'default') */
+  sound?: string;
 }
 
 /**
@@ -60,6 +64,26 @@ export function showNotification(options: NotificationOptions): Promise<void> {
     // Headless environment: pass options directly
     headless: () => invoke('show_notification', options),
   });
+}
+
+/**
+ * Checks if notification permission is granted.
+ * @returns Promise that resolves to true if granted, false otherwise
+ * @since 0.1.0
+ * @group API
+ */
+export function isPermissionGranted(): Promise<boolean> {
+  return invoke<boolean>('is_permission_granted');
+}
+
+/**
+ * Requests notification permission.
+ * @returns Promise that resolves to the permission state ('granted', 'denied', or 'default')
+ * @since 0.1.0
+ * @group API
+ */
+export function requestPermission(): Promise<'granted' | 'denied' | 'default'> {
+  return invoke<'granted' | 'denied' | 'default'>('request_permission');
 }
 
 /**
@@ -128,4 +152,6 @@ export const show = showNotification;
  */
 export const notification = {
   show: showNotification,
+  isPermissionGranted,
+  requestPermission,
 };

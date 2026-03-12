@@ -11,8 +11,7 @@ use std::collections::HashMap;
 use tauri::{Emitter, Manager, State};
 
 use super::state::{
-    collect_plugin_states, get_plugin_settings_path, load_plugin_settings,
-    save_plugin_settings_to_file, save_plugin_states,
+    collect_plugin_states, load_plugin_settings, save_plugin_settings_to_file, save_plugin_states,
 };
 use super::types::{
     find_plugin_by_id, find_plugin_by_id_mut, InstallSource, LoadedPlugin, PluginDetail,

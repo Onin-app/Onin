@@ -47,6 +47,7 @@ pub fn normalize_shortcut_string(shortcut_str: &str) -> String {
 }
 
 /// 检查 macOS 辅助功能权限
+#[allow(dead_code)]
 #[cfg(target_os = "macos")]
 pub fn check_accessibility_permissions() -> bool {
     use std::process::Command;
@@ -60,6 +61,7 @@ pub fn check_accessibility_permissions() -> bool {
 }
 
 /// 非 macOS 平台的占位实现
+#[allow(dead_code)]
 #[cfg(not(target_os = "macos"))]
 pub fn check_accessibility_permissions() -> bool {
     true

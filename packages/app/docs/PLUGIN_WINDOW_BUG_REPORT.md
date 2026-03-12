@@ -14,7 +14,7 @@
 - ✅ Hover 效果正常
 
 ### Resize 后
-- ❌ 所有 hover 效果失效（包括按钮、iframe 内容）
+- ❌ 所有 hover 效果失效（包括按钮、旧 iframe 内容）
 - ❌ 鼠标样式不再变化
 - ❌ 控制台疯狂打印日志，永不停止
 - ⚠️ 只能通过"重点出现 hover 效果，再轻点触发"的方式操作，体验像移动端
@@ -325,7 +325,7 @@ Bug 修复（Stashed changes）：
 - ❌ 使用 `invoke("plugin_start_dragging")`
 - ✅ 添加了开发模式支持（devMode/devServer）
 - ✅ 添加了"切换到主窗口"功能（`handleBackToInline`）
-- ✅ 添加了 iframe load 事件处理（`handleIframeLoad`）
+- ✅ 添加了旧 iframe load 事件处理（`handleIframeLoad`）
 - ✅ 添加了窗口可见性事件监听
 - ✅ 添加了 `backdrop-filter` 样式
 
@@ -393,7 +393,7 @@ function handleTitlebarMouseDown(event: MouseEvent) {
 
 6. **保留所有新功能**
 ```typescript
-// 保留 iframe load 处理
+// 保留旧 iframe load 处理
 const handleIframeLoad = () => { /* ... */ };
 
 // 保留窗口可见性监听
@@ -436,7 +436,7 @@ const handleBackToInline = async () => { /* ... */ };
 - ✅ **新功能验证**
   - 开发模式可以加载 devServer
   - "切换到主窗口"按钮可用
-  - iframe 可以接收 plugin_id
+  - 旧 iframe 方案可以接收 plugin_id
   - 窗口状态可以保存和恢复
   - 窗口菜单正常显示
 

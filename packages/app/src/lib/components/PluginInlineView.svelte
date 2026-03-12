@@ -42,7 +42,7 @@
     }
   });
 
-  // 暴露元素给父组件 (保持接口兼容，虽然不再是 iframe)
+  // 暴露元素给父组件 (保持接口兼容，当前为 div 占位符)
   // 父组件可能用它来获取焦点等，对于 div 也可以
   export function getElement(): HTMLDivElement | null {
     return containerElement;
@@ -122,7 +122,7 @@
   ) {
     try {
       // 使用后端命令发送消息到 Native Webview
-      await invoke("send_inline_plugin_message", {
+      await invoke("post_inline_plugin_message", {
         message: {
           type: "plugin-lifecycle-event",
           event,
@@ -166,8 +166,8 @@
         });
 
         // 初始化后发送 runtime-init (虽然 native bridge 可能会自己处理?)
-        // 我们的 bridge script 检查了 native window 模式，跳过了 iframe 桥接 logic。
-        // 所以我们需要通过 send_inline_plugin_message 发送 init data
+        // 运行时初始化改由宿主消息完成，这里不再依赖旧桥接路径。
+        // 所以我们需要通过 post_inline_plugin_message 发送 init data
         // Moved to showWebview to ensure it sends on every load
         // sendRuntimeInit();
       } catch (e) {
@@ -223,7 +223,7 @@
         mainWindowLabel: "main",
       },
     };
-    invoke("send_inline_plugin_message", { message: runtimeInit }).catch(
+    invoke("post_inline_plugin_message", { message: runtimeInit }).catch(
       console.error,
     );
   }

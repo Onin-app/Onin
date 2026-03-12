@@ -241,6 +241,7 @@ export async function removeCommand(code: string): Promise<void> {
  * @group API
  */
 export const handle = handleCommand;
+export const registerCommandHandler = handleCommand;
 
 /**
  * Simplified method name alias for registerCommand

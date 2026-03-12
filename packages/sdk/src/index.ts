@@ -1,4 +1,4 @@
-// Auto-initialize plugin ID from URL or parent window
+// Auto-initialize plugin ID from URL parameters
 if (typeof window !== 'undefined') {
   // Try to get plugin ID from URL parameters
   const urlParams = new URLSearchParams(window.location.search);
@@ -8,15 +8,6 @@ if (typeof window !== 'undefined') {
     (window as any).__PLUGIN_ID__ = pluginIdFromUrl;
     (globalThis as any).__PLUGIN_ID__ = pluginIdFromUrl;
   }
-
-  // Listen for plugin ID from parent window (for iframe mode)
-  window.addEventListener('message', (event) => {
-    if (event.data?.type === 'set-plugin-id') {
-      const pluginId = event.data.pluginId;
-      (window as any).__PLUGIN_ID__ = pluginId;
-      (globalThis as any).__PLUGIN_ID__ = pluginId;
-    }
-  });
 }
 
 /**
@@ -95,7 +86,6 @@ import { lifecycle } from './api/lifecycle';
 import { scheduler } from './api/scheduler';
 import { pluginWindow } from './api/window';
 import { ai } from './api/ai';
-
 
 import { invoke, listen } from './core/ipc';
 import { debug } from './utils/debug';

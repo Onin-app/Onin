@@ -22,18 +22,17 @@ fn write_to_clipboard(app: &tauri::AppHandle, item: &ClipboardItem) -> Result<()
                          if let Ok(bytes) = std::fs::read(&image_file) {
                              // macOS Optimization: Write raw PNG bytes directly to NSPasteboard
                              // This bypasses image::load_from_memory decoding (CPU heavy) and re-encoding.
-                             use objc2::rc::Retained;
                              use objc2_app_kit::NSPasteboard;
                              use objc2_foundation::{NSData, NSString};
                              
-                             let pb = unsafe { NSPasteboard::generalPasteboard() };
-                             let _ = unsafe { pb.clearContents() };
+                             let pb = NSPasteboard::generalPasteboard();
+                             let _ = pb.clearContents();
                              
                              // Allow "public.png"
                              let type_png = NSString::from_str("public.png");
                              let ns_data = NSData::from_vec(bytes); // objc2-foundation 0.3+ supports this
                              
-                             let success = unsafe { pb.setData_forType(Some(&ns_data), &type_png) };
+                             let success = pb.setData_forType(Some(&ns_data), &type_png);
                              if success {
                                  return Ok(());
                              }

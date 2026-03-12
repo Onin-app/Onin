@@ -166,6 +166,7 @@ pub async fn plugin_request(
     }
 }
 
+#[allow(dead_code)]
 async fn check_http_permission(
     _app: &AppHandle,
     plugin_store: &State<'_, crate::plugin::PluginStore>,
@@ -231,6 +232,7 @@ async fn check_http_permission(
     })
 }
 
+#[allow(dead_code)]
 fn is_url_allowed(request_url: &Url, permission: &str) -> bool {
     // 解析权限 URL
     let permission_url = match Url::parse(permission) {

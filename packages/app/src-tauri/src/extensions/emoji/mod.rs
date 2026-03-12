@@ -9,8 +9,8 @@ pub mod data;
 
 use crate::extension::registry::Extension;
 use crate::extension::types::{
-    EmojiGridData, EmojiGroup, EmojiItem, ExtensionCommand, ExtensionManifest, ExtensionPreview,
-    ExtensionResult, PreviewViewType,
+    EmojiGridData, ExtensionCommand, ExtensionManifest, ExtensionPreview, ExtensionResult,
+    PreviewViewType,
 };
 
 // ============================================================================
@@ -25,8 +25,6 @@ pub static EMOJI_MANIFEST: ExtensionManifest = ExtensionManifest {
     icon: "smiley",
     commands: &[ExtensionCommand {
         code: "search",
-        name: "搜索 Emoji",
-        description: "浏览和搜索 Emoji 表情",
         keywords: &["emoji", "表情", "😀", "smiley", "emoticon"],
         matches: None, // 不参与匹配指令，仅通过关键词触发
     }],

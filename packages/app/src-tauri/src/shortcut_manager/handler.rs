@@ -5,6 +5,8 @@ use super::utils::normalize_shortcut_string;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_global_shortcut::{Shortcut, ShortcutState as GlobalShortcutPluginState};
 
+const SHORTCUT_DEBOUNCE_MS: u128 = 400;
+
 /// 处理全局快捷键事件
 pub fn handle_global_shortcut(
     app: &AppHandle,
@@ -17,22 +19,7 @@ pub fn handle_global_shortcut(
 
     let shortcut_str = shortcut.to_string();
     let triggered_shortcut = normalize_shortcut_string(&shortcut_str);
-
-    // Debounce check
     let state: State<ShortcutState> = app.state();
-    if let Ok(mut last_executed) = state.last_executed.lock() {
-        if let Some(last_time) = last_executed.get(&triggered_shortcut) {
-            if last_time.elapsed().as_millis() < 400 {
-                println!(
-                    "Debouncing shortcut: {} (elapsed: {}ms)",
-                    triggered_shortcut,
-                    last_time.elapsed().as_millis()
-                );
-                return;
-            }
-        }
-        last_executed.insert(triggered_shortcut.clone(), std::time::Instant::now());
-    }
 
     println!(
         "Handling shortcut: {} (normalized: {})",
@@ -59,6 +46,12 @@ pub fn handle_global_shortcut(
     });
 
     if let Some(app_shortcut) = matching_shortcut {
+        if app_shortcut.command_name != "toggle_window"
+            && should_debounce_shortcut(&state, &triggered_shortcut)
+        {
+            return;
+        }
+
         println!(
             "Found matching shortcut: {} -> {}",
             app_shortcut.shortcut, app_shortcut.command_name
@@ -67,6 +60,24 @@ pub fn handle_global_shortcut(
     } else {
         handle_special_keys(app, &triggered_shortcut);
     }
+}
+
+fn should_debounce_shortcut(state: &State<ShortcutState>, triggered_shortcut: &str) -> bool {
+    if let Ok(mut last_executed) = state.last_executed.lock() {
+        if let Some(last_time) = last_executed.get(triggered_shortcut) {
+            let elapsed = last_time.elapsed().as_millis();
+            if elapsed < SHORTCUT_DEBOUNCE_MS {
+                println!(
+                    "Debouncing shortcut: {} (elapsed: {}ms)",
+                    triggered_shortcut, elapsed
+                );
+                return true;
+            }
+        }
+        last_executed.insert(triggered_shortcut.to_string(), std::time::Instant::now());
+    }
+
+    false
 }
 
 /// 执行快捷键动作
@@ -79,11 +90,19 @@ fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::
         if let Some(window) = app.get_webview_window("main") {
             match window.is_visible() {
                 Ok(true) => {
+                    // macOS：隐藏前先把焦点归还给上一个应用
+                    #[cfg(target_os = "macos")]
+                    crate::system_commands::activate_previous_app(app);
+
+                    // Windows：隐藏前先把焦点归还给上一个窗口
+                    #[cfg(target_os = "windows")]
+                    crate::system_commands::activate_previous_app(app);
+
                     let _ = window.hide();
                     let _ = window.emit("window_visibility", &false);
                 }
                 Ok(false) => {
-                    // macOS logic
+                    // macOS logic：记录当前前台应用，以便下次隐藏时归还焦点
                     #[cfg(target_os = "macos")]
                     {
                         if let Some(bundle_id) =
@@ -97,8 +116,28 @@ fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::
                         }
                     }
 
+                    // Windows logic：记录当前前台窗口，以便下次隐藏时归还焦点
+                    #[cfg(target_os = "windows")]
+                    {
+                        if let Some(hwnd) = crate::system_commands::get_frontmost_window_handle() {
+                            if let Some(state) =
+                                app.try_state::<crate::system_commands::WindowsPreviousWindow>()
+                            {
+                                *state.0.lock().unwrap() = Some(hwnd);
+                            }
+                        }
+                    }
+
+                    #[cfg(target_os = "windows")]
+                    if let Ok(hwnd) = window.hwnd() {
+                        let isize_hwnd = unsafe { std::mem::transmute_copy(&hwnd) };
+                        crate::system_commands::force_set_foreground_window(isize_hwnd);
+                    }
+
                     let _ = window.show();
+
                     let _ = window.set_focus();
+
                     let _ = window.emit("window_visibility", &true);
                 }
                 Err(e) => eprintln!("Error checking window visibility: {}", e),
@@ -107,11 +146,19 @@ fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::
             // Fallback block for Window
             match window.is_visible() {
                 Ok(true) => {
+                    // macOS：隐藏前先把焦点归还给上一个应用
+                    #[cfg(target_os = "macos")]
+                    crate::system_commands::activate_previous_app(app);
+
+                    // Windows：隐藏前先把焦点归还给上一个应用
+                    #[cfg(target_os = "windows")]
+                    crate::system_commands::activate_previous_app(app);
+
                     let _ = window.hide();
                     let _ = window.emit("window_visibility", &false);
                 }
                 Ok(false) => {
-                    // macOS logic (same)
+                    // macOS logic (same)：记录当前前台应用
                     #[cfg(target_os = "macos")]
                     {
                         if let Some(bundle_id) =
@@ -124,8 +171,28 @@ fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::
                             }
                         }
                     }
+
+                    // Windows logic (same)：记录当前前台窗口
+                    #[cfg(target_os = "windows")]
+                    {
+                        if let Some(hwnd) = crate::system_commands::get_frontmost_window_handle() {
+                            if let Some(state) =
+                                app.try_state::<crate::system_commands::WindowsPreviousWindow>()
+                            {
+                                *state.0.lock().unwrap() = Some(hwnd);
+                            }
+                        }
+                    }
+
+                    #[cfg(target_os = "windows")]
+                    if let Ok(hwnd) = window.hwnd() {
+                        let isize_hwnd = unsafe { std::mem::transmute_copy(&hwnd) };
+                        crate::system_commands::force_set_foreground_window(isize_hwnd);
+                    }
+
                     let _ = window.show();
                     let _ = window.set_focus();
+
                     let _ = window.emit("window_visibility", &true);
                 }
                 Err(e) => eprintln!("Error checking window visibility (fallback): {}", e),

@@ -8,9 +8,9 @@ use tauri::AppHandle;
 use super::ops::console::op_console_log;
 use super::ops::invoke::op_invoke;
 
-/// 定义 Deno 扩展
-///
-/// 注册所有可用的 ops 并设置初始状态
+// 定义 Deno 扩展
+//
+// 注册所有可用的 ops 并设置初始状态
 deno_core::extension!(
     onin_plugin_api,
     ops = [op_invoke, op_console_log],
@@ -50,11 +50,6 @@ const GLOBAL_SETUP_CODE: &str = r#"
         }
     };
 "#;
-
-/// 创建 JS 运行时（无插件ID）
-pub fn create_runtime(app_handle: &AppHandle) -> Result<JsRuntime, String> {
-    create_runtime_with_plugin_id(app_handle, "")
-}
 
 /// 创建带有插件ID的 JS 运行时
 ///

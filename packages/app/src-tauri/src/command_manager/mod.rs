@@ -16,8 +16,6 @@ mod refresh;
 mod storage;
 
 // 重新导出公共接口（非 Tauri 命令）
-pub use generators::{get_plugin_commands, get_plugin_id_name_mapping};
-pub use refresh::RefreshResult;
 pub use storage::load_commands;
 
 use tauri::{AppHandle, Emitter};

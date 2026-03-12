@@ -94,7 +94,7 @@ interface MarketplacePlugin {
 ### 检查 Icon 不显示
 
 1. 打开浏览器控制台，检查 `icon` 字段值
-2. 相对路径会自动转换为 `plugin://{dir_name}/{icon}`
+2. 相对路径会通过本地插件服务器转换为 `http://127.0.0.1:{port}/plugin/{dir_name}/{icon}`
 3. HTTP URL 直接显示
 
 ### 检查已安装状态

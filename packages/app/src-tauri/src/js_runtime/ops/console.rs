@@ -4,8 +4,6 @@
 
 use deno_core::op2;
 use deno_core::OpState;
-use std::cell::RefCell;
-use std::rc::Rc;
 use tauri::{AppHandle, Emitter, Manager};
 
 /// 同步 op：处理 console 输出

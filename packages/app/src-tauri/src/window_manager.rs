@@ -66,6 +66,7 @@ pub fn close_main_window(app: tauri::AppHandle, state: State<WindowState>) {
     }
 }
 
+#[allow(dead_code)]
 pub fn show_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let app_handle_clone = app.clone();

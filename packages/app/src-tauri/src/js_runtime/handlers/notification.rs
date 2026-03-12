@@ -41,3 +41,25 @@ pub async fn handle_show_notification(
         },
     }
 }
+
+/// 处理检查通知权限的请求
+pub async fn handle_is_permission_granted(
+    app_handle: AppHandle,
+    _arg: serde_json::Value,
+) -> InvokeResult {
+    match plugin_api::notification::is_permission_granted(app_handle) {
+        Ok(granted) => super::ok_value(serde_json::json!(granted)),
+        Err(e) => super::err(e),
+    }
+}
+
+/// 处理请求通知权限的请求
+pub async fn handle_request_permission(
+    app_handle: AppHandle,
+    _arg: serde_json::Value,
+) -> InvokeResult {
+    match plugin_api::notification::request_permission(app_handle).await {
+        Ok(status) => super::ok_value(serde_json::json!(status)),
+        Err(e) => super::err(e),
+    }
+}

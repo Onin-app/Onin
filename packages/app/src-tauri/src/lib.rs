@@ -94,8 +94,6 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_opener::init())
-        // 自定义协议
-        .register_uri_scheme_protocol("plugin", plugin::handle_plugin_protocol)
         // 命令
         // 命令
         .invoke_handler(commands::get_invoke_handler())
@@ -104,14 +102,14 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
-    app.run(|app_handle, event| {
+    app.run(|_app_handle, _event| {
         #[cfg(target_os = "macos")]
-        match event {
+        match _event {
             tauri::RunEvent::Reopen { .. } => {
-                window_manager::show_main_window(app_handle);
+                window_manager::show_main_window(_app_handle);
             }
             tauri::RunEvent::Resumed => {
-                window_manager::show_main_window(app_handle);
+                window_manager::show_main_window(_app_handle);
             }
             _ => {}
         }

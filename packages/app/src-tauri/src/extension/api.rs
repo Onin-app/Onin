@@ -25,7 +25,6 @@ pub fn execute_extension(extension_id: String, input: String) -> extension::Exte
 /// Emoji 页面专用 API，直接获取 emoji 数据而不经过 preview 机制
 #[command]
 pub fn get_emoji_data(search_query: String) -> Option<EmojiGridData> {
-    use crate::extension::types::EmojiGroup;
     use crate::extensions::emoji::data;
 
     let groups = if search_query.is_empty() {

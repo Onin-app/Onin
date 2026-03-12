@@ -146,10 +146,11 @@
     return action && typeof action === "object" && "PluginCommand" in action;
   }
 
-  function isPluginAction(action: any): action is { Plugin: string } {
-    return action && typeof action === "object" && "Plugin" in action;
+  function isPluginEntryAction(
+    action: any,
+  ): action is { PluginEntry: { plugin_id: string } } {
+    return action && typeof action === "object" && "PluginEntry" in action;
   }
-
   let pluginIdToNameMap = $derived.by(() => {
     const map = new Map<string, string>();
     commands
@@ -160,8 +161,8 @@
           !cmd.name.startsWith("plugin_cmd_"),
       )
       .forEach((cmd) => {
-        if (isPluginAction(cmd.action)) {
-          map.set(cmd.action.Plugin, cmd.title);
+        if (isPluginEntryAction(cmd.action)) {
+          map.set(cmd.action.PluginEntry.plugin_id, cmd.title);
         }
       });
     return map;
@@ -363,3 +364,5 @@
     </Tabs.Root>
   </div>
 </main>
+
+

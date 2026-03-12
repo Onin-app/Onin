@@ -13,10 +13,6 @@ pub fn init(app: &tauri::AppHandle) {
     let _ = APP_HANDLE.set(app.clone());
 }
 
-pub fn get_invoke_handler(
-) -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
-    tauri::generate_handler![commands::open_translator_window]
-}
 
 // ============================================================================
 // Translator 清单定义
@@ -29,8 +25,6 @@ pub static TRANSLATOR_MANIFEST: ExtensionManifest = ExtensionManifest {
     icon: "translate",
     commands: &[ExtensionCommand {
         code: "open",
-        name: "打开翻译器",
-        description: "打开翻译窗口",
         keywords: &[
             "translate",
             "translator",

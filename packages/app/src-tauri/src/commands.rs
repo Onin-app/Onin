@@ -8,10 +8,6 @@ use crate::{
     shortcut_manager, system_commands, tray_manager, unified_launch_manager, usage_tracker,
     window_manager,
 };
-use tauri::{
-    webview::WebviewBuilder, AppHandle, Emitter, Listener, Manager, WebviewUrl,
-    WebviewWindowBuilder, WindowBuilder,
-};
 
 /// 生成包含所有 Tauri 命令的 invoke handler
 pub fn get_invoke_handler(
@@ -44,6 +40,7 @@ pub fn get_invoke_handler(
         system_commands::execute_command,
         system_commands::get_basic_commands,
         system_commands::open_app_data_dir,
+        system_commands::force_focus,
         // Plugin loader
         plugin::loader::load_plugins,
         plugin::loader::get_loaded_plugins,
@@ -59,7 +56,6 @@ pub fn get_invoke_handler(
         plugin::window::plugin_show_window,
         plugin::window::plugin_set_focus,
         plugin::window::plugin_open_devtools,
-        plugin::window::plugin_start_dragging,
         plugin::window::return_to_inline_from_window,
         plugin::window::plugin_toggle_window_pin,
         // Plugin Inline
@@ -67,7 +63,7 @@ pub fn get_invoke_handler(
         plugin::inline::update_inline_plugin_bounds,
         plugin::inline::hide_inline_plugin,
         plugin::inline::close_inline_plugin,
-        plugin::inline::send_inline_plugin_message,
+        plugin::inline::post_inline_plugin_message,
         plugin::inline::open_inline_plugin_devtools,
         // Plugin executor
         plugin::executor::execute_plugin_entry,
@@ -88,6 +84,8 @@ pub fn get_invoke_handler(
         plugin::installer::download_and_install_plugin,
         // Plugin API: notification
         plugin_api::notification::show_notification,
+        plugin_api::notification::is_permission_granted,
+        plugin_api::notification::request_permission,
         // Plugin API: command
         plugin_api::command::execute_plugin_command,
         plugin_api::command::plugin_command_result,

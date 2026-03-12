@@ -34,10 +34,6 @@ pub struct ExtensionManifest {
 pub struct ExtensionCommand {
     /// 命令代码，如 "calculate"
     pub code: &'static str,
-    /// 命令显示名称，如 "计算"
-    pub name: &'static str,
-    /// 命令描述
-    pub description: &'static str,
     /// 触发关键词
     pub keywords: &'static [&'static str],
     /// 匹配规则（可选），使用统一的 StaticCommandMatch 格式
@@ -147,18 +143,6 @@ impl ExtensionResult {
             result_type: ExtensionResultType::Currency,
             copyable: Some(value),
             subtitle: rate_date,
-            error: None,
-        }
-    }
-
-    /// 创建加载中的货币结果
-    pub fn currency_loading() -> Self {
-        Self {
-            success: true,
-            value: Some("正在获取汇率...".to_string()),
-            result_type: ExtensionResultType::Currency,
-            copyable: None,
-            subtitle: None,
             error: None,
         }
     }

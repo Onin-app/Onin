@@ -492,6 +492,7 @@ impl WindowBounds {
     }
 
     /// 创建默认窗口边界
+    #[allow(dead_code)]
     pub fn new_default() -> Self {
         WindowBounds {
             x: 100,
@@ -592,6 +593,7 @@ pub fn find_plugin_by_id_mut<'a>(
 }
 
 /// 获取同一 plugin_id 的所有版本
+#[allow(dead_code)]
 pub fn find_all_versions(store: &HashMap<String, LoadedPlugin>, plugin_id: &str) -> Vec<String> {
     store
         .iter()
