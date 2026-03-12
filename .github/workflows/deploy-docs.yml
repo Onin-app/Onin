@@ -16,6 +16,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: read
 
 # 同一时间只允许一个部署，有新任务进来时取消正在运行的旧任务，确保始终以最新提交为准
 concurrency:
