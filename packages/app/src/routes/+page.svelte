@@ -25,7 +25,7 @@
   import { Theme, type LaunchableItem } from "$lib/type";
   import { theme, getTheme } from "$lib/utils/theme";
   import { escapeHandler } from "$lib/stores/escapeHandler";
-  import { focusInputTrigger } from "$lib/stores/focusInput";
+  import { focusInputTrigger, requestInputFocusWithRetry } from "$lib/stores/focusInput";
   import { detachWindowShortcut } from "$lib/stores/shortcuts";
 
   // Composables
@@ -427,6 +427,11 @@
     // 获取应用列表
     await appListManager.fetchApps();
 
+    // 初始启动时，窗口默认可见但可能不会触发 window_visibility 事件，所以在此主动请求一次焦点
+    // 并且向后端发送命令激进地获取前台权限
+    await invoke("force_focus");
+    requestInputFocusWithRetry();
+
     // 监听窗口显示事件
     const unlistenWindowShow = await listen<boolean>(
       "window_visibility",
@@ -435,7 +440,7 @@
           await clipboard.autoPasteClipboard();
           updateMatchedCommands();
           await updateExtensionPreview(); // 更新 Extension 预览（如计算器）
-          queueMicrotask(() => searchInputRef?.focus());
+          requestInputFocusWithRetry();
         }
 
         // 转发可见性事件给插件

@@ -40,6 +40,7 @@ pub fn get_invoke_handler(
         system_commands::execute_command,
         system_commands::get_basic_commands,
         system_commands::open_app_data_dir,
+        system_commands::force_focus,
         // Plugin loader
         plugin::loader::load_plugins,
         plugin::loader::get_loaded_plugins,

@@ -324,6 +324,25 @@ pub async fn create_or_show_plugin_window(
                 }
             }
 
+            // Windows：记录当前前台窗口，以便隐藏时归还焦点
+            #[cfg(target_os = "windows")]
+            {
+                if let Some(hwnd) = crate::system_commands::get_frontmost_window_handle() {
+                    if let Some(state) =
+                        app.try_state::<crate::system_commands::WindowsPreviousWindow>()
+                    {
+                        *state.0.lock().unwrap() = Some(hwnd);
+                    }
+                }
+            }
+
+            // Windows: Clean Alt key state and force foreground via AttachThreadInput before showing
+            #[cfg(target_os = "windows")]
+            if let Ok(hwnd) = window.hwnd() {
+                let isize_hwnd = unsafe { std::mem::transmute_copy(&hwnd) };
+                crate::system_commands::force_set_foreground_window(isize_hwnd);
+            }
+
             // 依次尝试恢复窗口状态
             let _ = window.unminimize();
             let _ = window.show();
@@ -336,6 +355,10 @@ pub async fn create_or_show_plugin_window(
 
             // macOS：最小化前先把焦点归还给上一个应用
             #[cfg(target_os = "macos")]
+            crate::system_commands::activate_previous_app(&app);
+
+            // Windows：最小化前先把焦点归还给上一个窗口
+            #[cfg(target_os = "windows")]
             crate::system_commands::activate_previous_app(&app);
 
             if let Err(e) = window.minimize() {

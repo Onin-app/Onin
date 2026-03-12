@@ -74,10 +74,7 @@ fn should_debounce_shortcut(state: &State<ShortcutState>, triggered_shortcut: &s
                 return true;
             }
         }
-        last_executed.insert(
-            triggered_shortcut.to_string(),
-            std::time::Instant::now(),
-        );
+        last_executed.insert(triggered_shortcut.to_string(), std::time::Instant::now());
     }
 
     false
@@ -95,6 +92,10 @@ fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::
                 Ok(true) => {
                     // macOS：隐藏前先把焦点归还给上一个应用
                     #[cfg(target_os = "macos")]
+                    crate::system_commands::activate_previous_app(app);
+
+                    // Windows：隐藏前先把焦点归还给上一个窗口
+                    #[cfg(target_os = "windows")]
                     crate::system_commands::activate_previous_app(app);
 
                     let _ = window.hide();
@@ -115,8 +116,28 @@ fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::
                         }
                     }
 
+                    // Windows logic：记录当前前台窗口，以便下次隐藏时归还焦点
+                    #[cfg(target_os = "windows")]
+                    {
+                        if let Some(hwnd) = crate::system_commands::get_frontmost_window_handle() {
+                            if let Some(state) =
+                                app.try_state::<crate::system_commands::WindowsPreviousWindow>()
+                            {
+                                *state.0.lock().unwrap() = Some(hwnd);
+                            }
+                        }
+                    }
+
+                    #[cfg(target_os = "windows")]
+                    if let Ok(hwnd) = window.hwnd() {
+                        let isize_hwnd = unsafe { std::mem::transmute_copy(&hwnd) };
+                        crate::system_commands::force_set_foreground_window(isize_hwnd);
+                    }
+
                     let _ = window.show();
+
                     let _ = window.set_focus();
+
                     let _ = window.emit("window_visibility", &true);
                 }
                 Err(e) => eprintln!("Error checking window visibility: {}", e),
@@ -127,6 +148,10 @@ fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::
                 Ok(true) => {
                     // macOS：隐藏前先把焦点归还给上一个应用
                     #[cfg(target_os = "macos")]
+                    crate::system_commands::activate_previous_app(app);
+
+                    // Windows：隐藏前先把焦点归还给上一个应用
+                    #[cfg(target_os = "windows")]
                     crate::system_commands::activate_previous_app(app);
 
                     let _ = window.hide();
@@ -146,8 +171,28 @@ fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::
                             }
                         }
                     }
+
+                    // Windows logic (same)：记录当前前台窗口
+                    #[cfg(target_os = "windows")]
+                    {
+                        if let Some(hwnd) = crate::system_commands::get_frontmost_window_handle() {
+                            if let Some(state) =
+                                app.try_state::<crate::system_commands::WindowsPreviousWindow>()
+                            {
+                                *state.0.lock().unwrap() = Some(hwnd);
+                            }
+                        }
+                    }
+
+                    #[cfg(target_os = "windows")]
+                    if let Ok(hwnd) = window.hwnd() {
+                        let isize_hwnd = unsafe { std::mem::transmute_copy(&hwnd) };
+                        crate::system_commands::force_set_foreground_window(isize_hwnd);
+                    }
+
                     let _ = window.show();
                     let _ = window.set_focus();
+
                     let _ = window.emit("window_visibility", &true);
                 }
                 Err(e) => eprintln!("Error checking window visibility (fallback): {}", e),
