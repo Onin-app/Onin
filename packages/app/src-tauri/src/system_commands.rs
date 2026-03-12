@@ -550,7 +550,7 @@ pub fn force_set_foreground_window(hwnd_isize: isize) {
     };
     use windows::Win32::System::Threading::AttachThreadInput;
     use windows::Win32::Foundation::{HWND, BOOL, LPARAM};
-    use windows::Win32::UI::Input::KeyboardAndMouse::{keybd_event, VK_MENU, VK_LMENU, VK_RMENU, KEYEVENTF_KEYUP, SetFocus};
+    use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
 
     let hwnd_val = HWND(hwnd_isize as _);
     unsafe {
