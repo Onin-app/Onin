@@ -115,6 +115,7 @@ pub fn plugin_set_focus(app: tauri::AppHandle, label: String) -> Result<(), Stri
 
 #[tauri::command]
 pub fn plugin_open_devtools(window: tauri::WebviewWindow) -> Result<(), String> {
+    #[cfg(debug_assertions)]
     window.open_devtools();
     Ok(())
 }
