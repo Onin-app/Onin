@@ -12,6 +12,7 @@ mod commands;
 mod extension;
 mod extensions;
 mod file_command_manager;
+mod focus_manager;
 pub mod icon_utils;
 mod installed_apps;
 mod js_runtime;

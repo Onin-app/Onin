@@ -5,13 +5,10 @@ use tauri::{
     App, AppHandle, Manager, State,
 };
 
-// 托盘图标的唯一ID
 pub const TRAY_ICON_ID: &str = "main_tray_icon";
 
-// 用于管理托盘图标可见性的状态
 pub struct TrayVisibilityState(pub Mutex<bool>);
 
-// 设置托盘图标可见性的命令
 #[tauri::command]
 pub fn set_tray_visibility(
     visible: bool,
@@ -27,13 +24,11 @@ pub fn set_tray_visibility(
     }
 }
 
-// 获取托盘图标当前可见性状态的命令
 #[tauri::command]
 pub fn is_tray_visible(state: State<'_, TrayVisibilityState>) -> bool {
     *state.0.lock().unwrap()
 }
 
-// 用于构建和初始化托盘图标的函数
 pub fn setup_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&quit_i])?;
@@ -51,8 +46,8 @@ pub fn setup_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
             } => {
                 let app = tray.app_handle();
                 if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.show();
-                    let _ = window.set_focus();
+                    crate::focus_manager::capture_previous_foreground(&app);
+                    crate::focus_manager::focus_webview_window(&window);
                 }
             }
             _ => {}

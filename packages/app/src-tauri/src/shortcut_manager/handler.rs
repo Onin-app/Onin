@@ -84,115 +84,30 @@ fn should_debounce_shortcut(state: &State<ShortcutState>, triggered_shortcut: &s
 /// 执行快捷键动作
 fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::Shortcut) {
     if app_shortcut.command_name == "toggle_window" {
-        // Helper to handle toggle logic to avoid code duplication across window types
-        // Using a macro or just duplicating blocks since types differ slightly in Rust strictness
-        // Block for WebviewWindow
         if let Some(window) = app.get_webview_window("main") {
             match window.is_visible() {
                 Ok(true) => {
-                    // macOS：隐藏前先把焦点归还给上一个应用
-                    #[cfg(target_os = "macos")]
-                    crate::system_commands::activate_previous_app(app);
-
-                    // Windows：隐藏前先把焦点归还给上一个窗口
-                    #[cfg(target_os = "windows")]
-                    crate::system_commands::activate_previous_app(app);
-
+                    crate::focus_manager::restore_previous_foreground(app);
                     let _ = window.hide();
                     let _ = window.emit("window_visibility", &false);
                 }
                 Ok(false) => {
-                    // macOS logic：记录当前前台应用，以便下次隐藏时归还焦点
-                    #[cfg(target_os = "macos")]
-                    {
-                        if let Some(bundle_id) =
-                            crate::system_commands::get_frontmost_app_bundle_id()
-                        {
-                            if let Some(state) =
-                                app.try_state::<crate::system_commands::MacOSPreviousApp>()
-                            {
-                                *state.0.lock().unwrap() = Some(bundle_id);
-                            }
-                        }
-                    }
-
-                    // Windows logic：记录当前前台窗口，以便下次隐藏时归还焦点
-                    #[cfg(target_os = "windows")]
-                    {
-                        if let Some(hwnd) = crate::system_commands::get_frontmost_window_handle() {
-                            if let Some(state) =
-                                app.try_state::<crate::system_commands::WindowsPreviousWindow>()
-                            {
-                                *state.0.lock().unwrap() = Some(hwnd);
-                            }
-                        }
-                    }
-
-                    #[cfg(target_os = "windows")]
-                    if let Ok(hwnd) = window.hwnd() {
-                        let isize_hwnd = unsafe { std::mem::transmute_copy(&hwnd) };
-                        crate::system_commands::force_set_foreground_window(isize_hwnd);
-                    }
-
-                    let _ = window.show();
-
-                    let _ = window.set_focus();
-
+                    crate::focus_manager::capture_previous_foreground(app);
+                    crate::focus_manager::focus_webview_window(&window);
                     let _ = window.emit("window_visibility", &true);
                 }
                 Err(e) => eprintln!("Error checking window visibility: {}", e),
             }
         } else if let Some(window) = app.get_window("main") {
-            // Fallback block for Window
             match window.is_visible() {
                 Ok(true) => {
-                    // macOS：隐藏前先把焦点归还给上一个应用
-                    #[cfg(target_os = "macos")]
-                    crate::system_commands::activate_previous_app(app);
-
-                    // Windows：隐藏前先把焦点归还给上一个应用
-                    #[cfg(target_os = "windows")]
-                    crate::system_commands::activate_previous_app(app);
-
+                    crate::focus_manager::restore_previous_foreground(app);
                     let _ = window.hide();
                     let _ = window.emit("window_visibility", &false);
                 }
                 Ok(false) => {
-                    // macOS logic (same)：记录当前前台应用
-                    #[cfg(target_os = "macos")]
-                    {
-                        if let Some(bundle_id) =
-                            crate::system_commands::get_frontmost_app_bundle_id()
-                        {
-                            if let Some(state) =
-                                app.try_state::<crate::system_commands::MacOSPreviousApp>()
-                            {
-                                *state.0.lock().unwrap() = Some(bundle_id);
-                            }
-                        }
-                    }
-
-                    // Windows logic (same)：记录当前前台窗口
-                    #[cfg(target_os = "windows")]
-                    {
-                        if let Some(hwnd) = crate::system_commands::get_frontmost_window_handle() {
-                            if let Some(state) =
-                                app.try_state::<crate::system_commands::WindowsPreviousWindow>()
-                            {
-                                *state.0.lock().unwrap() = Some(hwnd);
-                            }
-                        }
-                    }
-
-                    #[cfg(target_os = "windows")]
-                    if let Ok(hwnd) = window.hwnd() {
-                        let isize_hwnd = unsafe { std::mem::transmute_copy(&hwnd) };
-                        crate::system_commands::force_set_foreground_window(isize_hwnd);
-                    }
-
-                    let _ = window.show();
-                    let _ = window.set_focus();
-
+                    crate::focus_manager::capture_previous_foreground(app);
+                    crate::focus_manager::focus_window(&window);
                     let _ = window.emit("window_visibility", &true);
                 }
                 Err(e) => eprintln!("Error checking window visibility (fallback): {}", e),

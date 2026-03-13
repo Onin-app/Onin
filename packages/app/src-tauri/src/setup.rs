@@ -8,12 +8,9 @@ use tauri::{App, Manager};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 
 use crate::{
-    app_config, command_manager, file_command_manager, js_runtime, plugin, plugin_api,
-    plugin_server, shortcut_manager, tray_manager, window_manager,
+    app_config, command_manager, file_command_manager, focus_manager, js_runtime, plugin,
+    plugin_api, plugin_server, shortcut_manager, tray_manager, window_manager,
 };
-
-#[cfg(any(target_os = "macos", target_os = "windows"))]
-use crate::system_commands;
 
 /// 应用启动时的主要初始化逻辑
 ///
@@ -85,7 +82,7 @@ fn load_app_config(app: &App) {
 fn load_ai_config(app: &App) {
     // 创建 AIManager 并加载配置
     let ai_manager = std::sync::Arc::new(crate::ai_manager::AIManager::new(app.handle().clone()));
-    
+
     // 异步加载配置
     let ai_manager_clone = ai_manager.clone();
     tauri::async_runtime::spawn(async move {
@@ -100,21 +97,15 @@ fn load_ai_config(app: &App) {
             }
         }
     });
-    
+
     // 注册到 managed state
     app.manage(ai_manager);
 }
 
 /// 初始化调度器状态
 fn init_scheduler_state(app: &mut App) {
-    // macOS: 初始化前一个应用追踪器
-    #[cfg(target_os = "macos")]
-    app.manage(system_commands::MacOSPreviousApp(std::sync::Mutex::new(None)));
-    
-    // Windows: 初始化前一个窗口追踪器
-    #[cfg(target_os = "windows")]
-    app.manage(system_commands::WindowsPreviousWindow(std::sync::Mutex::new(None)));
-    
+    focus_manager::setup(app);
+
     let scheduler_state = tauri::async_runtime::block_on(async {
         plugin_api::scheduler::SchedulerState::new().await
     });
@@ -229,7 +220,10 @@ fn setup_desktop_features(app: &mut App) -> Result<(), Box<dyn std::error::Error
     }
 
     #[cfg(target_os = "macos")]
-    if let Err(e) = app.handle().set_activation_policy(tauri::ActivationPolicy::Regular) {
+    if let Err(e) = app
+        .handle()
+        .set_activation_policy(tauri::ActivationPolicy::Regular)
+    {
         eprintln!("[ERROR] Failed to set activation policy: {}", e);
     }
 
