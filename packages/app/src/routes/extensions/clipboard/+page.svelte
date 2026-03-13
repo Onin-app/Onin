@@ -194,18 +194,18 @@
                   <div class="flex min-w-0 flex-1 flex-col justify-center">
                     {#if item.item_type === "File"}
                       <div
-                        class="w-full truncate font-medium leading-tight text-neutral-900 dark:text-neutral-100"
+                        class="w-full truncate leading-tight font-medium text-neutral-900 dark:text-neutral-100"
                         title={item.text}
                       >
                         {getDisplayName(item)}
                       </div>
                     {:else if item.item_type === "Image"}
-                      <span class="text-xs italic text-neutral-500"
+                      <span class="text-xs text-neutral-500 italic"
                         >Image Bitmap</span
                       >
                     {:else}
                       <div
-                        class="line-clamp-2 w-full break-all leading-tight text-neutral-600 dark:text-neutral-300"
+                        class="line-clamp-2 w-full leading-tight break-all text-neutral-600 dark:text-neutral-300"
                       >
                         {item.text}
                       </div>
@@ -217,11 +217,11 @@
                     class="flex flex-shrink-0 flex-col items-end gap-0.5 self-start pt-1"
                   >
                     <span
-                      class="text-[9px] font-semibold uppercase tracking-wider text-neutral-400/70"
+                      class="text-[9px] font-semibold tracking-wider text-neutral-400/70 uppercase"
                     >
                       {item.item_type}
                     </span>
-                    <span class="text-[10px] tabular-nums text-neutral-400">
+                    <span class="text-[10px] text-neutral-400 tabular-nums">
                       {formatTime(item.timestamp)}
                     </span>
                   </div>
@@ -232,7 +232,7 @@
         </ScrollArea.Viewport>
         <ScrollArea.Scrollbar
           orientation="vertical"
-          class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none select-none rounded-full border-l border-l-transparent p-px transition-all duration-200 hover:w-3"
+          class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none rounded-full border-l border-l-transparent p-px transition-all duration-200 select-none hover:w-3"
         >
           <ScrollArea.Thumb class="bg-muted-foreground flex-1 rounded-full" />
         </ScrollArea.Scrollbar>
@@ -269,7 +269,7 @@
               class="flex-shrink-0 border-b border-neutral-100 bg-neutral-50/50 p-2 px-4 text-xs dark:border-neutral-800 dark:bg-neutral-900/30"
             >
               <div
-                class="cursor-text select-text break-all font-mono text-neutral-500"
+                class="cursor-text font-mono break-all text-neutral-500 select-text"
               >
                 {selectedItem.text}
               </div>
@@ -313,7 +313,7 @@
                 {:else}
                   <!-- Text Content -->
                   <div
-                    class="cursor-text select-text whitespace-pre-wrap break-words font-mono text-sm leading-relaxed text-neutral-800 dark:text-neutral-200"
+                    class="cursor-text font-mono text-sm leading-relaxed break-words whitespace-pre-wrap text-neutral-800 select-text dark:text-neutral-200"
                   >
                     {selectedItem.text}
                   </div>
@@ -321,7 +321,7 @@
               </ScrollArea.Viewport>
               <ScrollArea.Scrollbar
                 orientation="vertical"
-                class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none select-none rounded-full border-l border-l-transparent p-px transition-all duration-200 hover:w-3"
+                class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none rounded-full border-l border-l-transparent p-px transition-all duration-200 select-none hover:w-3"
               >
                 <ScrollArea.Thumb
                   class="bg-muted-foreground flex-1 rounded-full"
@@ -350,4 +350,3 @@
     </div>
   </div>
 </div>
-

@@ -10,7 +10,13 @@
     onCancel: () => void;
   }
 
-  let { open = $bindable(false), title, description, onConfirm, onCancel }: Props = $props();
+  let {
+    open = $bindable(false),
+    title,
+    description,
+    onConfirm,
+    onCancel,
+  }: Props = $props();
 
   function handleOpenChange(newOpen: boolean) {
     open = newOpen;
@@ -34,40 +40,47 @@
 <AlertDialog.Root {open} onOpenChange={handleOpenChange}>
   <AlertDialog.Portal>
     <AlertDialog.Overlay
-      class="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+      class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50"
     />
     <AlertDialog.Content
-      class="fixed top-[50%] left-[50%] z-50 w-full max-w-md translate-x-[-50%] translate-y-[-50%] rounded-lg bg-white p-6 shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] dark:bg-neutral-900"
+      class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] fixed top-[50%] left-[50%] z-50 w-full max-w-md translate-x-[-50%] translate-y-[-50%] rounded-lg bg-white p-6 shadow-xl dark:bg-neutral-900"
     >
       <!-- 警告图标 -->
       <div class="mb-4 flex items-center gap-3">
         <div
           class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30"
         >
-          <WarningCircle class="h-6 w-6 text-red-600 dark:text-red-400" weight="fill" />
+          <WarningCircle
+            class="h-6 w-6 text-red-600 dark:text-red-400"
+            weight="fill"
+          />
         </div>
         <div class="flex-1">
-          <AlertDialog.Title class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+          <AlertDialog.Title
+            class="text-lg font-semibold text-neutral-900 dark:text-neutral-100"
+          >
             {title}
           </AlertDialog.Title>
         </div>
       </div>
 
       <!-- 描述 -->
-      <AlertDialog.Description class="mb-6 text-sm text-neutral-600 dark:text-neutral-400">
+      <AlertDialog.Description
+        class="mb-6 text-sm text-neutral-600 dark:text-neutral-400"
+      >
         {description}
       </AlertDialog.Description>
 
       <!-- 操作按钮 -->
       <div class="flex justify-end gap-3">
         <AlertDialog.Cancel
-          class="inline-flex h-9 items-center justify-center rounded-md border border-neutral-300 bg-white px-4 text-sm font-medium text-neutral-700 hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-2 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+          class="inline-flex h-9 items-center justify-center rounded-md border border-neutral-300 bg-white px-4 text-sm font-medium text-neutral-700 hover:bg-neutral-50 focus:ring-2 focus:ring-neutral-400 focus:ring-offset-2 focus:outline-none dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
           onclick={handleCancel}
         >
           取消
         </AlertDialog.Cancel>
         <AlertDialog.Action
-          class="inline-flex h-9 items-center justify-center rounded-md bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:bg-red-700 dark:hover:bg-red-800"
+          class="inline-flex h-9 items-center justify-center rounded-md bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:outline-none dark:bg-red-700 dark:hover:bg-red-800"
           onclick={handleConfirm}
         >
           确认
@@ -76,4 +89,3 @@
     </AlertDialog.Content>
   </AlertDialog.Portal>
 </AlertDialog.Root>
-

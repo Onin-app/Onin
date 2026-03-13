@@ -242,5 +242,3 @@ export function getMatchedCommands(
     checkCommandMatch(item, attachedText, attachedFiles, inputText),
   );
 }
-
-

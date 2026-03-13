@@ -9,7 +9,7 @@
 
   // 截取文本预览（最多显示50个字符）
   const preview = $derived(
-    text.length > 50 ? text.substring(0, 50) + "..." : text
+    text.length > 50 ? text.substring(0, 50) + "..." : text,
   );
 </script>
 

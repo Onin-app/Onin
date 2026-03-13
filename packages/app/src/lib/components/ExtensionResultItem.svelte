@@ -15,7 +15,13 @@
     onClick: () => void;
   }
 
-  let { title, description, icon = "calculator", isSelected = false, onClick }: Props = $props();
+  let {
+    title,
+    description,
+    icon = "calculator",
+    isSelected = false,
+    onClick,
+  }: Props = $props();
 </script>
 
 <button
@@ -30,23 +36,22 @@
   <div
     class="mr-2 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-blue-100 dark:bg-blue-900"
   >
-    <PhosphorIcon
-      icon={icon}
-      class="h-5 w-5 text-blue-600 dark:text-blue-400"
-    />
+    <PhosphorIcon {icon} class="h-5 w-5 text-blue-600 dark:text-blue-400" />
   </div>
 
   <div class="relative min-w-0 flex-1">
     <!-- 来源标签 -->
     <span
-      class="absolute right-0 top-0 rounded-md bg-neutral-200 px-1.5 py-0.5 text-xs text-neutral-700 dark:bg-neutral-700 dark:text-neutral-300"
+      class="absolute top-0 right-0 rounded-md bg-neutral-200 px-1.5 py-0.5 text-xs text-neutral-700 dark:bg-neutral-700 dark:text-neutral-300"
     >
       Extension
     </span>
 
     <!-- 第一行：计算结果 -->
     <div class="flex items-center gap-2 overflow-hidden pr-24">
-      <span class="truncate text-blue-600 dark:text-blue-400 font-medium">{title}</span>
+      <span class="truncate font-medium text-blue-600 dark:text-blue-400"
+        >{title}</span
+      >
     </div>
 
     <!-- 第二行：描述信息 -->

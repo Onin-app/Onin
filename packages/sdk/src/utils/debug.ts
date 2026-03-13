@@ -6,12 +6,13 @@ import { getEnvironment } from '../core/environment';
  * @fileoverview Provides debugging utilities and SDK information
  */
 export const debug = {
-  version: "0.0.1",
+  version: '0.0.1',
   getEnvironment,
   getRuntimeInfo: () => ({
     timestamp: Date.now(),
-    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'Deno Runtime',
-    platform: typeof navigator !== 'undefined' ? navigator.platform : 'Unknown'
+    userAgent:
+      typeof navigator !== 'undefined' ? navigator.userAgent : 'Deno Runtime',
+    platform: typeof navigator !== 'undefined' ? navigator.platform : 'Unknown',
   }),
   async testConnection() {
     try {
@@ -19,7 +20,10 @@ export const debug = {
       const result = await invoke('plugin_test_connection', {});
       return { success: true, result };
     } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
     }
-  }
+  },
 };

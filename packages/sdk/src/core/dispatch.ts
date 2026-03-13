@@ -14,11 +14,11 @@ export interface Handlers<T> {
 
 /**
  * Automatically selects and executes the appropriate handler function based on the current runtime environment.
- * 
+ *
  * This function provides environment-aware execution, allowing the same code to work seamlessly
  * in both webview (UI) and headless (background) environments. It automatically detects the
  * current runtime and calls the appropriate handler.
- * 
+ *
  * @typeParam T - The return type of the handler functions
  * @param handlers - An object containing implementations for both webview and headless environments
  * @returns The execution result of the selected handler function
@@ -36,7 +36,7 @@ export interface Handlers<T> {
  *     return Deno.env.get('SOME_VALUE');
  *   }
  * });
- * 
+ *
  * // API calls that work in both environments
  * await dispatch({
  *   webview: () => invoke('some_command', args),

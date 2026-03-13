@@ -48,7 +48,9 @@ function buildMetadata() {
     contentType,
     timestamp: clipboardState.timestamp,
     age:
-      clipboardState.timestamp === null ? null : Math.max(0, now - clipboardState.timestamp),
+      clipboardState.timestamp === null
+        ? null
+        : Math.max(0, now - clipboardState.timestamp),
   };
 }
 
@@ -66,7 +68,12 @@ describe('Clipboard Metadata API v2', () => {
     mockInvoke.mockImplementation(async (method: string, args?: any) => {
       switch (method) {
         case 'plugin_clipboard_clear':
-          clipboardState = { text: null, files: null, image: null, timestamp: Math.floor(Date.now() / 1000) };
+          clipboardState = {
+            text: null,
+            files: null,
+            image: null,
+            timestamp: Math.floor(Date.now() / 1000),
+          };
           return undefined;
         case 'plugin_clipboard_write_text':
           clipboardState = {
@@ -123,7 +130,7 @@ describe('Clipboard Metadata API v2', () => {
   describe('Age Field', () => {
     it('should provide age field for convenience', async () => {
       await clipboard.writeText('Test age field');
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       const metadata = await clipboard.getMetadata();
 
       expect(metadata.age).toBeGreaterThanOrEqual(1);
@@ -192,7 +199,9 @@ describe('Clipboard Metadata API v2', () => {
   describe('Files Detection', () => {
     it('should have files field', async () => {
       const metadata = await clipboard.getMetadata();
-      expect(metadata.files === null || Array.isArray(metadata.files)).toBe(true);
+      expect(metadata.files === null || Array.isArray(metadata.files)).toBe(
+        true,
+      );
     });
 
     it('should have correct file structure when files exist', async () => {
@@ -204,7 +213,7 @@ describe('Clipboard Metadata API v2', () => {
 
       if (metadata.files && metadata.files.length > 0) {
         expect(metadata.contentType).toBe('files');
-        metadata.files.forEach(file => {
+        metadata.files.forEach((file) => {
           expect(file).toHaveProperty('path');
           expect(file).toHaveProperty('name');
           expect(file).toHaveProperty('is_directory');
@@ -221,7 +230,7 @@ describe('Clipboard Metadata API v2', () => {
       const testText = 'Consistent timestamp test';
       await clipboard.writeText(testText);
       const metadata1 = await clipboard.getMetadata();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
       const metadata2 = await clipboard.getMetadata();
 
       expect(metadata1.timestamp).toBe(metadata2.timestamp);
@@ -233,7 +242,7 @@ describe('Clipboard Metadata API v2', () => {
     it('should update timestamp when content changes', async () => {
       await clipboard.writeText('First content');
       const metadata1 = await clipboard.getMetadata();
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       await clipboard.writeText('Second content');
       const metadata2 = await clipboard.getMetadata();
 
@@ -262,11 +271,21 @@ describe('Clipboard Metadata API v2', () => {
       await clipboard.writeText('Type test');
       const metadata = await clipboard.getMetadata();
 
-      expect(metadata.text === null || typeof metadata.text === 'string').toBe(true);
-      expect(metadata.files === null || Array.isArray(metadata.files)).toBe(true);
-      expect(['text', 'image', 'files', 'empty'].includes(metadata.contentType)).toBe(true);
-      expect(metadata.timestamp === null || typeof metadata.timestamp === 'number').toBe(true);
-      expect(metadata.age === null || typeof metadata.age === 'number').toBe(true);
+      expect(metadata.text === null || typeof metadata.text === 'string').toBe(
+        true,
+      );
+      expect(metadata.files === null || Array.isArray(metadata.files)).toBe(
+        true,
+      );
+      expect(
+        ['text', 'image', 'files', 'empty'].includes(metadata.contentType),
+      ).toBe(true);
+      expect(
+        metadata.timestamp === null || typeof metadata.timestamp === 'number',
+      ).toBe(true);
+      expect(metadata.age === null || typeof metadata.age === 'number').toBe(
+        true,
+      );
     });
   });
 

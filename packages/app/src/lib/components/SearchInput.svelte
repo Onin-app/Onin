@@ -128,7 +128,7 @@
     bind:this={inputElement}
     class="{showAllFiles
       ? 'w-full'
-      : 'min-w-0 flex-1'} h-[34px] bg-transparent text-2xl focus:outline-none focus:ring-0 active:outline-none active:ring-0"
+      : 'min-w-0 flex-1'} h-[34px] bg-transparent text-2xl focus:ring-0 focus:outline-none active:ring-0 active:outline-none"
     type="text"
     {placeholder}
     bind:value

@@ -90,56 +90,56 @@
 </script>
 
 <div class="h-screen w-full bg-transparent p-1">
-<main
-  class="flex h-full w-full overflow-hidden rounded-xl bg-neutral-50 text-neutral-900 selection:bg-neutral-200 dark:bg-neutral-900 dark:text-neutral-100 dark:selection:bg-neutral-700"
-  data-tauri-drag-region
->
-  <aside
-    class="flex w-52 flex-col border-r border-neutral-200 bg-neutral-100/50 p-3 pt-6 dark:border-neutral-800 dark:bg-neutral-900/50"
+  <main
+    class="flex h-full w-full overflow-hidden rounded-xl bg-neutral-50 text-neutral-900 selection:bg-neutral-200 dark:bg-neutral-900 dark:text-neutral-100 dark:selection:bg-neutral-700"
     data-tauri-drag-region
   >
-    <div
-      class="mb-6 px-3 text-sm font-medium text-neutral-500"
+    <aside
+      class="flex w-52 flex-col border-r border-neutral-200 bg-neutral-100/50 p-3 pt-6 dark:border-neutral-800 dark:bg-neutral-900/50"
       data-tauri-drag-region
     >
-      设置
-    </div>
-    <nav class="flex flex-1 flex-col gap-1">
-      {#each settings as setting}
-        {@const Icon = setting.icon}
+      <div
+        class="mb-6 px-3 text-sm font-medium text-neutral-500"
+        data-tauri-drag-region
+      >
+        设置
+      </div>
+      <nav class="flex flex-1 flex-col gap-1">
+        {#each settings as setting}
+          {@const Icon = setting.icon}
+          <Button.Root
+            class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors {activeSetting.id ===
+            setting.id
+              ? 'bg-white text-neutral-900 shadow-sm dark:bg-neutral-800 dark:text-white'
+              : 'text-neutral-600 hover:bg-neutral-200/50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white'}"
+            onclick={() => handleClickSetting(setting)}
+          >
+            <Icon size={18} />
+            {setting.name}
+          </Button.Root>
+        {/each}
+      </nav>
+
+      <div
+        class="mt-auto border-t border-neutral-200 pt-4 dark:border-neutral-800"
+      >
         <Button.Root
-          class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors {activeSetting.id ===
-          setting.id
-            ? 'bg-white text-neutral-900 shadow-sm dark:bg-neutral-800 dark:text-white'
-            : 'text-neutral-600 hover:bg-neutral-200/50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white'}"
-          onclick={() => handleClickSetting(setting)}
+          class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-200/50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white"
+          onclick={() => goto("/plugins")}
         >
-          <Icon size={18} />
-          {setting.name}
+          <PlugsConnected size={18} />
+          插件管理
         </Button.Root>
-      {/each}
-    </nav>
+      </div>
+    </aside>
 
     <div
-      class="mt-auto border-t border-neutral-200 pt-4 dark:border-neutral-800"
+      class="flex-1 overflow-hidden bg-white p-6 dark:bg-neutral-950"
+      data-tauri-drag-region
     >
-      <Button.Root
-        class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-200/50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white"
-        onclick={() => goto("/plugins")}
-      >
-        <PlugsConnected size={18} />
-        插件管理
-      </Button.Root>
+      <div class="mx-auto flex h-full max-w-3xl flex-col">
+        <ActiveComponent />
+      </div>
     </div>
-  </aside>
-
-  <div
-    class="flex-1 overflow-hidden bg-white p-6 dark:bg-neutral-950"
-    data-tauri-drag-region
-  >
-    <div class="mx-auto flex h-full max-w-3xl flex-col">
-      <ActiveComponent />
-    </div>
-  </div>
-</main>
+  </main>
 </div>

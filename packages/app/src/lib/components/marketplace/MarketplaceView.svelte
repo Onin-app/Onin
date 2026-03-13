@@ -162,21 +162,27 @@
     loadPlugins();
 
     // 监听插件卸载事件，刷新已安装列表
-    const unlistenUninstalled = await listen<string>("plugin-uninstalled", async () => {
-      await loadInstalledPlugins();
-    });
+    const unlistenUninstalled = await listen<string>(
+      "plugin-uninstalled",
+      async () => {
+        await loadInstalledPlugins();
+      },
+    );
     unlistenFns.push(unlistenUninstalled);
 
     // 监听插件安装事件，刷新已安装列表
-    const unlistenInstalled = await listen<string>("plugin-installed", async () => {
-      await loadInstalledPlugins();
-    });
+    const unlistenInstalled = await listen<string>(
+      "plugin-installed",
+      async () => {
+        await loadInstalledPlugins();
+      },
+    );
     unlistenFns.push(unlistenInstalled);
   });
 
   onDestroy(() => {
     // 清理事件监听
-    unlistenFns.forEach(fn => fn());
+    unlistenFns.forEach((fn) => fn());
   });
 
   // 搜索和筛选变化时重新加载
@@ -252,9 +258,7 @@
       <div class="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
         {#each plugins as plugin (plugin.id)}
           {@const isInstalled = installedPluginIds.has(plugin.id)}
-          {#if isInstalled}
-            
-          {/if}
+          {#if isInstalled}{/if}
           <PluginCard
             {plugin}
             {isInstalled}
@@ -301,13 +305,16 @@
 
 <!-- 插件详情弹窗 -->
 {#if selectedPlugin}
-  <Dialog.Root open={detailDialogOpen} onOpenChange={handleDetailDialogOpenChange}>
+  <Dialog.Root
+    open={detailDialogOpen}
+    onOpenChange={handleDetailDialogOpenChange}
+  >
     <Dialog.Portal>
       <Dialog.Overlay
-        class="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+        class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50"
       />
       <Dialog.Content
-        class="fixed top-[50%] left-[50%] z-50 max-h-[80vh] w-full max-w-2xl translate-x-[-50%] translate-y-[-50%] overflow-auto rounded-lg bg-white p-6 shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] dark:bg-neutral-900"
+        class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] fixed top-[50%] left-[50%] z-50 max-h-[80vh] w-full max-w-2xl translate-x-[-50%] translate-y-[-50%] overflow-auto rounded-lg bg-white p-6 shadow-xl dark:bg-neutral-900"
       >
         <Dialog.Close
           class="absolute top-4 right-4 rounded p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800"
@@ -328,136 +335,135 @@
           </svg>
         </Dialog.Close>
 
-      {#if loadingDetail}
-        <div class="flex h-64 items-center justify-center">
-          <div class="text-neutral-500">加载中...</div>
-        </div>
-      {:else}
-        <!-- 插件头部 -->
-        <div class="mb-6 flex items-start gap-4">
+        {#if loadingDetail}
+          <div class="flex h-64 items-center justify-center">
+            <div class="text-neutral-500">加载中...</div>
+          </div>
+        {:else}
+          <!-- 插件头部 -->
+          <div class="mb-6 flex items-start gap-4">
+            <div
+              class="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-neutral-100 to-neutral-200 dark:from-neutral-800 dark:to-neutral-700"
+            >
+              {#if selectedPlugin.icon}
+                <img
+                  src={selectedPlugin.icon}
+                  alt={selectedPlugin.name}
+                  class="h-16 w-16 rounded object-contain"
+                />
+              {:else}
+                <div class="text-4xl">🧩</div>
+              {/if}
+            </div>
+
+            <div class="flex-1">
+              <h2 class="mb-2 text-2xl font-bold">{selectedPlugin.name}</h2>
+              <p class="mb-2 text-neutral-600 dark:text-neutral-400">
+                {selectedPlugin.description}
+              </p>
+              <div class="flex items-center gap-4 text-sm text-neutral-500">
+                <span>作者: {selectedPlugin.author}</span>
+                <span>分类: {selectedPlugin.category}</span>
+                {#if selectedPlugin.version}
+                  <span>版本: {selectedPlugin.version}</span>
+                {/if}
+              </div>
+            </div>
+          </div>
+
+          <!-- 统计信息 -->
           <div
-            class="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-neutral-100 to-neutral-200 dark:from-neutral-800 dark:to-neutral-700"
+            class="mb-6 flex justify-around rounded-lg bg-neutral-50 p-4 dark:bg-neutral-800"
           >
-            {#if selectedPlugin.icon}
-              <img
-                src={selectedPlugin.icon}
-                alt={selectedPlugin.name}
-                class="h-16 w-16 rounded object-contain"
-              />
-            {:else}
-              <div class="text-4xl">🧩</div>
+            <div class="flex items-center gap-3">
+              <Star class="h-8 w-8 text-yellow-500" weight="fill" />
+              <div>
+                <div class="text-xl font-semibold">{selectedPlugin.stars}</div>
+                <div class="text-xs text-neutral-500">Stars</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <Download class="h-8 w-8 text-blue-500" weight="fill" />
+              <div>
+                <div class="text-xl font-semibold">
+                  {selectedPlugin.downloads}
+                </div>
+                <div class="text-xs text-neutral-500">Downloads</div>
+              </div>
+            </div>
+            {#if selectedPlugin.size}
+              <div class="flex items-center gap-3">
+                <Package class="h-8 w-8 text-green-500" weight="fill" />
+                <div>
+                  <div class="text-xl font-semibold">
+                    {(selectedPlugin.size / 1024 / 1024).toFixed(2)} MB
+                  </div>
+                  <div class="text-xs text-neutral-500">Size</div>
+                </div>
+              </div>
             {/if}
           </div>
 
-          <div class="flex-1">
-            <h2 class="mb-2 text-2xl font-bold">{selectedPlugin.name}</h2>
-            <p class="mb-2 text-neutral-600 dark:text-neutral-400">
-              {selectedPlugin.description}
-            </p>
-            <div class="flex items-center gap-4 text-sm text-neutral-500">
-              <span>作者: {selectedPlugin.author}</span>
-              <span>分类: {selectedPlugin.category}</span>
-              {#if selectedPlugin.version}
-                <span>版本: {selectedPlugin.version}</span>
-              {/if}
-            </div>
-          </div>
-        </div>
-
-        <!-- 统计信息 -->
-        <div
-          class="mb-6 flex justify-around rounded-lg bg-neutral-50 p-4 dark:bg-neutral-800"
-        >
-          <div class="flex items-center gap-3">
-            <Star class="h-8 w-8 text-yellow-500" weight="fill" />
-            <div>
-              <div class="text-xl font-semibold">{selectedPlugin.stars}</div>
-              <div class="text-xs text-neutral-500">Stars</div>
-            </div>
-          </div>
-          <div class="flex items-center gap-3">
-            <Download class="h-8 w-8 text-blue-500" weight="fill" />
-            <div>
-              <div class="text-xl font-semibold">
-                {selectedPlugin.downloads}
-              </div>
-              <div class="text-xs text-neutral-500">Downloads</div>
-            </div>
-          </div>
-          {#if selectedPlugin.size}
-            <div class="flex items-center gap-3">
-              <Package class="h-8 w-8 text-green-500" weight="fill" />
-              <div>
-                <div class="text-xl font-semibold">
-                  {(selectedPlugin.size / 1024 / 1024).toFixed(2)} MB
-                </div>
-                <div class="text-xs text-neutral-500">Size</div>
+          <!-- README -->
+          {#if selectedPlugin.readme}
+            <div class="mb-6">
+              <h3 class="mb-3 text-lg font-semibold">插件说明</h3>
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <div
+                class="prose prose-sm dark:prose-invert max-w-none rounded-lg bg-neutral-50 p-4 dark:bg-neutral-800"
+                onclick={handleMarkdownClick}
+              >
+                {@html renderMarkdown(selectedPlugin.readme)}
               </div>
             </div>
           {/if}
-        </div>
 
-        <!-- README -->
-        {#if selectedPlugin.readme}
-          <div class="mb-6">
-            <h3 class="mb-3 text-lg font-semibold">插件说明</h3>
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <div
-              class="prose prose-sm dark:prose-invert max-w-none rounded-lg bg-neutral-50 p-4 dark:bg-neutral-800"
-              onclick={handleMarkdownClick}
+          <!-- 更新说明 -->
+          {#if selectedPlugin.releaseNotes}
+            <div class="mb-6">
+              <h3 class="mb-3 text-lg font-semibold">更新说明</h3>
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <div
+                class="prose prose-sm dark:prose-invert max-w-none rounded-lg bg-neutral-50 p-4 dark:bg-neutral-800"
+                onclick={handleMarkdownClick}
+              >
+                {@html renderMarkdown(selectedPlugin.releaseNotes)}
+              </div>
+            </div>
+          {/if}
+
+          <!-- 关键词 -->
+          {#if selectedPlugin.keywords && selectedPlugin.keywords.length > 0}
+            <div class="mb-6">
+              <h3 class="mb-2 font-semibold">标签</h3>
+              <div class="flex flex-wrap gap-2">
+                {#each selectedPlugin.keywords as keyword}
+                  <span
+                    class="rounded bg-neutral-100 px-2 py-1 text-xs dark:bg-neutral-800"
+                  >
+                    {keyword}
+                  </span>
+                {/each}
+              </div>
+            </div>
+          {/if}
+
+          <!-- 底部操作 -->
+          <div class="border-t border-neutral-200 pt-4 dark:border-neutral-700">
+            <a
+              href={selectedPlugin.repository}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="flex items-center gap-2 text-sm text-blue-600 hover:underline dark:text-blue-400"
             >
-              {@html renderMarkdown(selectedPlugin.readme)}
-            </div>
+              <GithubLogo class="h-4 w-4" />
+              查看源码
+            </a>
           </div>
         {/if}
-
-        <!-- 更新说明 -->
-        {#if selectedPlugin.releaseNotes}
-          <div class="mb-6">
-            <h3 class="mb-3 text-lg font-semibold">更新说明</h3>
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <div
-              class="prose prose-sm dark:prose-invert max-w-none rounded-lg bg-neutral-50 p-4 dark:bg-neutral-800"
-              onclick={handleMarkdownClick}
-            >
-              {@html renderMarkdown(selectedPlugin.releaseNotes)}
-            </div>
-          </div>
-        {/if}
-
-        <!-- 关键词 -->
-        {#if selectedPlugin.keywords && selectedPlugin.keywords.length > 0}
-          <div class="mb-6">
-            <h3 class="mb-2 font-semibold">标签</h3>
-            <div class="flex flex-wrap gap-2">
-              {#each selectedPlugin.keywords as keyword}
-                <span
-                  class="rounded bg-neutral-100 px-2 py-1 text-xs dark:bg-neutral-800"
-                >
-                  {keyword}
-                </span>
-              {/each}
-            </div>
-          </div>
-        {/if}
-
-        <!-- 底部操作 -->
-        <div class="border-t border-neutral-200 pt-4 dark:border-neutral-700">
-          <a
-            href={selectedPlugin.repository}
-            target="_blank"
-            rel="noopener noreferrer"
-            class="flex items-center gap-2 text-sm text-blue-600 hover:underline dark:text-blue-400"
-          >
-            <GithubLogo class="h-4 w-4" />
-            查看源码
-          </a>
-        </div>
-      {/if}
       </Dialog.Content>
     </Dialog.Portal>
   </Dialog.Root>
 {/if}
-

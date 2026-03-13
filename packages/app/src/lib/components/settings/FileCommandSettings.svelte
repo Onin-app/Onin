@@ -175,9 +175,7 @@
   });
 </script>
 
-<main
-  class="flex h-full w-full flex-col"
->
+<main class="flex h-full w-full flex-col">
   <h2 class="mb-2 text-xl font-bold">文件启动设置</h2>
   {#if fileCommands.length > 0}
     <Accordion.Root class="mb-2" type="single">
@@ -387,5 +385,3 @@
     <ScrollArea.Corner />
   </ScrollArea.Root>
 </main>
-
-

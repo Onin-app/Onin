@@ -8,19 +8,19 @@
  * @enum {string}
  */
 export enum RuntimeEnvironment {
-  Headless = 'headless',  /** Headless Deno environment */
-  Webview = 'webview',    /** Webview environment with UI */
+  Headless = 'headless' /** Headless Deno environment */,
+  Webview = 'webview' /** Webview environment with UI */,
   Unknown = 'unknown',
 }
 
 /**
  * Gets the current runtime environment.
- * 
+ *
  * Determines the current code's runtime environment by checking global objects and runtime characteristics.
  * - If `window.__TAURI_INTERNALS__` object exists, it's considered a Webview environment
  * - If `Deno.core` exists, it's considered a Headless environment (including plugin runtime)
  * - Otherwise, it's considered an unknown environment.
- * 
+ *
  * @returns The current runtime environment
  */
 export function getEnvironment(): RuntimeEnvironment {

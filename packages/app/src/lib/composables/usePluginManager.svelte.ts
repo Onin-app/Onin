@@ -69,9 +69,9 @@ export function usePluginManager(): PluginManagerReturn {
     state.currentPluginRunAtStartup = false;
 
     // 未勾选 terminate_on_bg 时，仅隐藏并保活；勾选时才销毁
-    invoke(shouldTerminate ? "close_inline_plugin" : "hide_inline_plugin").catch(
-      console.error,
-    );
+    invoke(
+      shouldTerminate ? "close_inline_plugin" : "hide_inline_plugin",
+    ).catch(console.error);
   };
 
   /**
@@ -143,7 +143,6 @@ export function usePluginManager(): PluginManagerReturn {
       });
     }
   };
-
 
   /**
    * 发送生命周期事件给插件
@@ -245,7 +244,6 @@ export function usePluginManager(): PluginManagerReturn {
       plugin_name: string;
       plugin_url: string;
     }>("show_plugin_inline", async (event) => {
-
       state.showPluginInline = true;
       state.currentPluginUrl = event.payload.plugin_url;
       state.currentPluginId = event.payload.plugin_id;
@@ -304,4 +302,3 @@ export function usePluginManager(): PluginManagerReturn {
     setupListeners,
   };
 }
-

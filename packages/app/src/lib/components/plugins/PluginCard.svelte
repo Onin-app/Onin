@@ -89,7 +89,7 @@
       <!-- 来源标识 -->
       {#if plugin.install_source === "local"}
         <span
-          class="absolute -right-1 -top-1 rounded bg-orange-500 px-1.5 py-0.5 text-[10px] font-medium text-white shadow-sm"
+          class="absolute -top-1 -right-1 rounded bg-orange-500 px-1.5 py-0.5 text-[10px] font-medium text-white shadow-sm"
         >
           本地
         </span>
@@ -100,7 +100,7 @@
     <div class="flex min-w-0 flex-1 flex-col">
       <div class="mb-1 flex items-start justify-between gap-2">
         <div class="flex min-w-0 items-baseline gap-2">
-          <h3 class="truncate text-base font-semibold leading-tight">
+          <h3 class="truncate text-base leading-tight font-semibold">
             {plugin.name}
           </h3>
           {#if plugin.version}
@@ -110,7 +110,7 @@
           {/if}
         </div>
         <Button.Root
-          class="shrink-0 rounded p-1 opacity-0 transition-opacity hover:bg-neutral-100 group-hover:opacity-100 dark:hover:bg-neutral-800"
+          class="shrink-0 rounded p-1 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-neutral-100 dark:hover:bg-neutral-800"
           onclick={(e: MouseEvent) => {
             e.stopPropagation();
           }}
@@ -155,7 +155,7 @@
         onCheckedChange={(checked) => {
           onToggle(plugin.dir_name || plugin.id, checked);
         }}
-        class="focus-visible:ring-foreground focus-visible:ring-offset-background data-[state=checked]:bg-foreground data-[state=unchecked]:bg-dark-10 data-[state=unchecked]:shadow-mini-inset dark:data-[state=checked]:bg-foreground focus-visible:outline-hidden peer inline-flex h-[20px] min-h-[20px] w-[36px] shrink-0 cursor-pointer items-center rounded-full px-[2px] transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        class="focus-visible:ring-foreground focus-visible:ring-offset-background data-[state=checked]:bg-foreground data-[state=unchecked]:bg-dark-10 data-[state=unchecked]:shadow-mini-inset dark:data-[state=checked]:bg-foreground peer inline-flex h-[20px] min-h-[20px] w-[36px] shrink-0 cursor-pointer items-center rounded-full px-[2px] transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50"
       >
         <Switch.Thumb
           class="bg-background data-[state=unchecked]:shadow-mini dark:border-background/30 dark:bg-foreground dark:shadow-popover pointer-events-none block size-[16px] shrink-0 rounded-full transition-transform data-[state=checked]:translate-x-[14px] data-[state=unchecked]:translate-x-0 dark:border dark:data-[state=unchecked]:border"
@@ -188,7 +188,7 @@
         </Popover.Trigger>
         <Popover.Portal>
           <Popover.Content
-            class="border-dark-10 bg-background shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-(--bits-popover-content-transform-origin) z-30 w-full max-w-[328px] rounded-[12px] border p-4"
+            class="border-dark-10 bg-background shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-30 w-full max-w-[328px] origin-(--bits-popover-content-transform-origin) rounded-[12px] border p-4"
             sideOffset={8}
           >
             <div class="mb-2 flex items-center">
@@ -212,4 +212,3 @@
     </div>
   </div>
 </div>
-

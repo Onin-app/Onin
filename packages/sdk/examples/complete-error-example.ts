@@ -1,10 +1,10 @@
-import { 
-  http, 
-  fs, 
-  clipboard, 
-  dialog, 
-  errorCode, 
-  errorUtils 
+import {
+  http,
+  fs,
+  clipboard,
+  dialog,
+  errorCode,
+  errorUtils,
 } from '../src/index';
 
 /**
@@ -98,7 +98,7 @@ async function handleDialogErrors() {
   try {
     const result = await dialog.showConfirm({
       title: '确认',
-      message: '是否继续？'
+      message: '是否继续？',
     });
     console.log('用户选择:', result ? '确认' : '取消');
   } catch (error) {
@@ -123,7 +123,7 @@ function handleAnyPluginError(error: unknown, operation: string) {
     console.error(`操作 "${operation}" 失败:`);
     console.error(`错误码: ${error.code}`);
     console.error(`错误信息: ${error.message}`);
-    
+
     if (error.context) {
       console.error('上下文信息:', error.context);
     }
@@ -152,10 +152,12 @@ async function useConvenientChecking() {
   } catch (error) {
     if (errorUtils.isPluginError(error)) {
       // 检查是否为网络相关错误
-      if (errorUtils.isOneOfErrorCodes(error, [
-        errorCode.http.NETWORK_ERROR, 
-        errorCode.http.TIMEOUT
-      ])) {
+      if (
+        errorUtils.isOneOfErrorCodes(error, [
+          errorCode.http.NETWORK_ERROR,
+          errorCode.http.TIMEOUT,
+        ])
+      ) {
         console.error('🌐 网络问题，请稍后重试');
         return;
       }
@@ -179,5 +181,5 @@ export {
   handleClipboardErrors,
   handleDialogErrors,
   handleAnyPluginError,
-  useConvenientChecking
+  useConvenientChecking,
 };

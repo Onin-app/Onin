@@ -25,7 +25,10 @@
   import { Theme, type LaunchableItem } from "$lib/type";
   import { theme, getTheme } from "$lib/utils/theme";
   import { escapeHandler } from "$lib/stores/escapeHandler";
-  import { focusInputTrigger, requestInputFocusWithRetry } from "$lib/stores/focusInput";
+  import {
+    focusInputTrigger,
+    requestInputFocusWithRetry,
+  } from "$lib/stores/focusInput";
   import { detachWindowShortcut } from "$lib/stores/shortcuts";
 
   // Composables
@@ -420,7 +423,6 @@
   onMount(async () => {
     escapeHandler.set(handleEsc);
 
-
     // 加载配置
     await appListManager.loadConfig();
 
@@ -492,7 +494,6 @@
     if (unlisten) {
       unlisten();
     }
-
   });
 </script>
 

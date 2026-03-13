@@ -50,8 +50,9 @@
   }
 
   function executeCommand(commandName: string) {
-    invoke("execute_command", { name: commandName })
-      .catch((error) => console.error("Failed to execute command:", error));
+    invoke("execute_command", { name: commandName }).catch((error) =>
+      console.error("Failed to execute command:", error),
+    );
   }
 
   function toggleKeywordDisabled(commandName: string, keywordName: string) {
@@ -362,5 +363,3 @@
     </Tabs.Root>
   </div>
 </main>
-
-

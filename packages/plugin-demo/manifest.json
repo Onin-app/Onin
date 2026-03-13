@@ -78,12 +78,7 @@
           "type": "file",
           "name": "文件",
           "description": "选择文件进行处理",
-          "extensions": [
-            ".txt",
-            ".md",
-            ".json",
-            ".pdf"
-          ],
+          "extensions": [".txt", ".md", ".json", ".pdf"],
           "min": 1,
           "max": 10
         }
@@ -177,9 +172,7 @@
   "permissions": {
     "http": {
       "enable": true,
-      "allowUrls": [
-        "*"
-      ],
+      "allowUrls": ["*"],
       "timeout": 30000
     },
     "storage": {

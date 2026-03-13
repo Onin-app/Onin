@@ -1,10 +1,10 @@
-import { 
-  http, 
-  fs, 
-  clipboard, 
-  dialog, 
-  errorCode, 
-  errorUtils 
+import {
+  http,
+  fs,
+  clipboard,
+  dialog,
+  errorCode,
+  errorUtils,
 } from '../src/index';
 
 /**
@@ -40,17 +40,19 @@ export const httpExamples = {
     } catch (error) {
       if (errorUtils.isPluginError(error)) {
         // 使用便捷的检查方法
-        if (errorUtils.isOneOfErrorCodes(error, [
-          errorCode.http.NETWORK_ERROR,
-          errorCode.http.TIMEOUT
-        ])) {
+        if (
+          errorUtils.isOneOfErrorCodes(error, [
+            errorCode.http.NETWORK_ERROR,
+            errorCode.http.TIMEOUT,
+          ])
+        ) {
           console.error('网络问题，上传失败');
           return null;
         }
       }
       throw error;
     }
-  }
+  },
 };
 
 // 文件系统 API 命名空间使用示例
@@ -89,7 +91,7 @@ export const fsExamples = {
       }
       throw error;
     }
-  }
+  },
 };
 
 // 剪贴板 API 命名空间使用示例
@@ -127,7 +129,7 @@ export const clipboardExamples = {
       }
       throw error;
     }
-  }
+  },
 };
 
 // 对话框 API 命名空间使用示例
@@ -136,7 +138,7 @@ export const dialogExamples = {
     try {
       return await dialog.showConfirm({
         title: '确认操作',
-        message
+        message,
       });
     } catch (error) {
       if (errorUtils.isPluginError(error)) {
@@ -160,7 +162,7 @@ export const dialogExamples = {
     try {
       const result = await dialog.showOpen({
         title: '选择文件',
-        multiple: false
+        multiple: false,
       });
       return result as string | null;
     } catch (error) {
@@ -171,7 +173,7 @@ export const dialogExamples = {
       }
       throw error;
     }
-  }
+  },
 };
 
 // 统一的错误处理工具
@@ -209,7 +211,7 @@ export const errorHandling = {
       return errorUtils.isOneOfErrorCodes(error, [
         errorCode.http.NETWORK_ERROR,
         errorCode.http.TIMEOUT,
-        errorCode.clipboard.UNAVAILABLE
+        errorCode.clipboard.UNAVAILABLE,
       ]);
     }
     return false;
@@ -223,10 +225,10 @@ export const errorHandling = {
       console.error(`[${context}] 插件错误:`, {
         code: error.code,
         message: error.message,
-        context: error.context
+        context: error.context,
       });
     } else {
       console.error(`[${context}] 未知错误:`, error);
     }
-  }
+  },
 };

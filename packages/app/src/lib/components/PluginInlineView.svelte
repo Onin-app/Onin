@@ -232,4 +232,3 @@
   class="relative h-full w-full bg-transparent"
   role="none"
 ></div>
-

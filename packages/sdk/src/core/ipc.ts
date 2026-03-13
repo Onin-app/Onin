@@ -124,13 +124,13 @@ async function loadListen() {
         // This is special handling logic for registerCommandHandler
         (globalThis as any).__ONIN_COMMAND_HANDLER__ = handler;
         // Headless mode has no concept of unlisten, return an empty function
-        return Promise.resolve(() => { });
+        return Promise.resolve(() => {});
       }
 
       console.warn(
         `Event listening for '${event.toString()}' is not supported in headless mode.`,
       );
-      return Promise.resolve(() => { }); // Return an empty unlisten function
+      return Promise.resolve(() => {}); // Return an empty unlisten function
     };
   } else {
     throw new Error('Unsupported runtime environment for listen');

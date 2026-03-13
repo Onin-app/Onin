@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Mock the dependencies
 vi.mock('../../../src/core/ipc', () => ({
   invoke: vi.fn(),
-  listen: vi.fn(() => Promise.resolve(() => {}))
+  listen: vi.fn(() => Promise.resolve(() => {})),
 }));
 
 describe('Scheduler API', () => {
@@ -13,7 +13,7 @@ describe('Scheduler API', () => {
   beforeEach(async () => {
     // Clear all mocks
     vi.clearAllMocks();
-    
+
     // Import the actual module after clearing mocks
     schedulerModule = await import('../../../src/api/scheduler');
     const { invoke } = await import('../../../src/core/ipc');
@@ -48,11 +48,11 @@ describe('Scheduler API', () => {
         const parts = cron.split(/\s+/);
         if (parts.length !== 5) {
           throw new Error(
-            `Invalid cron format: ${cron}. Expected format: 'minute hour day month weekday'`
+            `Invalid cron format: ${cron}. Expected format: 'minute hour day month weekday'`,
           );
         }
       };
-      
+
       expect(() => validateCronFormat('0 8 * * *')).not.toThrow();
       expect(() => validateCronFormat('30 9 * * 1')).not.toThrow();
       expect(() => validateCronFormat('0 12 1 * *')).not.toThrow();
@@ -63,13 +63,13 @@ describe('Scheduler API', () => {
         const parts = cron.split(/\s+/);
         if (parts.length !== 5) {
           throw new Error(
-            `Invalid cron format: ${cron}. Expected format: 'minute hour day month weekday'`
+            `Invalid cron format: ${cron}. Expected format: 'minute hour day month weekday'`,
           );
         }
       };
-      
+
       expect(() => validateCronFormat('0 8 * *')).toThrow(
-        'Invalid cron format: 0 8 * *. Expected format: \'minute hour day month weekday\''
+        "Invalid cron format: 0 8 * *. Expected format: 'minute hour day month weekday'",
       );
     });
 
@@ -78,13 +78,13 @@ describe('Scheduler API', () => {
         const parts = cron.split(/\s+/);
         if (parts.length !== 5) {
           throw new Error(
-            `Invalid cron format: ${cron}. Expected format: 'minute hour day month weekday'`
+            `Invalid cron format: ${cron}. Expected format: 'minute hour day month weekday'`,
           );
         }
       };
-      
+
       expect(() => validateCronFormat('0 8 * * * *')).toThrow(
-        'Invalid cron format: 0 8 * * * *. Expected format: \'minute hour day month weekday\''
+        "Invalid cron format: 0 8 * * * *. Expected format: 'minute hour day month weekday'",
       );
     });
 
@@ -93,10 +93,12 @@ describe('Scheduler API', () => {
       const validateTimeFormat = (time: string) => {
         const timeRegex = /^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$/;
         if (!timeRegex.test(time)) {
-          throw new Error(`Invalid time format: ${time}. Expected format: HH:MM (e.g., 08:30)`);
+          throw new Error(
+            `Invalid time format: ${time}. Expected format: HH:MM (e.g., 08:30)`,
+          );
         }
       };
-      
+
       expect(() => validateTimeFormat('00:00')).not.toThrow();
       expect(() => validateTimeFormat('08:30')).not.toThrow();
       expect(() => validateTimeFormat('23:59')).not.toThrow();
@@ -108,20 +110,25 @@ describe('Scheduler API', () => {
       const validateTimeFormat = (time: string) => {
         const timeRegex = /^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$/;
         if (!timeRegex.test(time)) {
-          throw new Error(`Invalid time format: ${time}. Expected format: HH:MM (e.g., 08:30)`);
+          throw new Error(
+            `Invalid time format: ${time}. Expected format: HH:MM (e.g., 08:30)`,
+          );
         }
       };
-      
-      expect(() => validateTimeFormat('25:30')).toThrow( // Invalid hour
-        'Invalid time format: 25:30. Expected format: HH:MM (e.g., 08:30)'
+
+      expect(() => validateTimeFormat('25:30')).toThrow(
+        // Invalid hour
+        'Invalid time format: 25:30. Expected format: HH:MM (e.g., 08:30)',
       );
-      
-      expect(() => validateTimeFormat('12:60')).toThrow( // Invalid minute
-        'Invalid time format: 12:60. Expected format: HH:MM (e.g., 08:30)'
+
+      expect(() => validateTimeFormat('12:60')).toThrow(
+        // Invalid minute
+        'Invalid time format: 12:60. Expected format: HH:MM (e.g., 08:30)',
       );
-      
-      expect(() => validateTimeFormat('24:00')).toThrow( // Invalid hour (24)
-        'Invalid time format: 24:00. Expected format: HH:MM (e.g., 08:30)'
+
+      expect(() => validateTimeFormat('24:00')).toThrow(
+        // Invalid hour (24)
+        'Invalid time format: 24:00. Expected format: HH:MM (e.g., 08:30)',
       );
     });
 
@@ -129,10 +136,12 @@ describe('Scheduler API', () => {
       // Test the weekly function's weekday validation
       const validateWeekday = (weekday: number) => {
         if (weekday < 0 || weekday > 6) {
-          throw new Error(`Invalid weekday: ${weekday}. Expected 0-6 (0=Sunday, 6=Saturday)`);
+          throw new Error(
+            `Invalid weekday: ${weekday}. Expected 0-6 (0=Sunday, 6=Saturday)`,
+          );
         }
       };
-      
+
       for (let day = 0; day <= 6; day++) {
         expect(() => validateWeekday(day)).not.toThrow();
       }
@@ -141,20 +150,22 @@ describe('Scheduler API', () => {
     it('should throw error for invalid weekday', () => {
       const validateWeekday = (weekday: number) => {
         if (weekday < 0 || weekday > 6) {
-          throw new Error(`Invalid weekday: ${weekday}. Expected 0-6 (0=Sunday, 6=Saturday)`);
+          throw new Error(
+            `Invalid weekday: ${weekday}. Expected 0-6 (0=Sunday, 6=Saturday)`,
+          );
         }
       };
-      
+
       expect(() => validateWeekday(7)).toThrow(
-        'Invalid weekday: 7. Expected 0-6 (0=Sunday, 6=Saturday)'
+        'Invalid weekday: 7. Expected 0-6 (0=Sunday, 6=Saturday)',
       );
-      
+
       expect(() => validateWeekday(-1)).toThrow(
-        'Invalid weekday: -1. Expected 0-6 (0=Sunday, 6=Saturday)'
+        'Invalid weekday: -1. Expected 0-6 (0=Sunday, 6=Saturday)',
       );
-      
+
       expect(() => validateWeekday(8)).toThrow(
-        'Invalid weekday: 8. Expected 0-6 (0=Sunday, 6=Saturday)'
+        'Invalid weekday: 8. Expected 0-6 (0=Sunday, 6=Saturday)',
       );
     });
   });
@@ -167,7 +178,7 @@ describe('Scheduler API', () => {
         // The actual implementation in scheduler.ts uses string conversion as is
         return `${minute} ${hour} * * *`;
       };
-      
+
       expect(convertDailyToCron('08:30')).toBe('30 08 * * *');
       expect(convertDailyToCron('23:59')).toBe('59 23 * * *');
       expect(convertDailyToCron('00:00')).toBe('00 00 * * *');
@@ -179,7 +190,7 @@ describe('Scheduler API', () => {
       const convertHourlyToCron = (minute: number) => {
         return `${minute} * * * *`;
       };
-      
+
       expect(convertHourlyToCron(0)).toBe('0 * * * *');
       expect(convertHourlyToCron(30)).toBe('30 * * * *');
       expect(convertHourlyToCron(59)).toBe('59 * * * *');
@@ -191,7 +202,7 @@ describe('Scheduler API', () => {
         const [hour, minute] = time.split(':');
         return `${minute} ${hour} * * ${weekday}`;
       };
-      
+
       expect(convertWeeklyToCron(1, '09:00')).toBe('00 09 * * 1'); // Monday 9 AM
       expect(convertWeeklyToCron(0, '12:30')).toBe('30 12 * * 0'); // Sunday noon
       expect(convertWeeklyToCron(6, '23:59')).toBe('59 23 * * 6'); // Saturday 11:59 PM
@@ -204,7 +215,7 @@ describe('Scheduler API', () => {
       expect(typeof schedulerModule.scheduler.schedule).toBe('function');
       expect(typeof schedulerModule.scheduler.cancel).toBe('function');
       expect(typeof schedulerModule.scheduler.list).toBe('function');
-      
+
       // The actual backend calls would be tested in integration tests
     });
   });
