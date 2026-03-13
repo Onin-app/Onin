@@ -1,7 +1,7 @@
-use std::error::Error;
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 use futures::stream::BoxStream;
+use serde::{Deserialize, Serialize};
+use std::error::Error;
 
 /// Represents the request payload for a chat completion
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -22,7 +22,7 @@ pub struct ChatMessage {
     pub role: String,
     /// Content is always an array of content parts (text, images, etc.)
     /// This matches the OpenAI API format and TypeScript SDK
-    pub content: Vec<ContentPart>, 
+    pub content: Vec<ContentPart>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -30,14 +30,12 @@ pub struct ChatMessage {
 pub enum ContentPart {
     #[serde(rename = "text")]
     Text { text: String },
-    
+
     #[serde(rename = "image_url")]
-    ImageUrl { 
-        image_url: ImageUrl 
-    },
-    
+    ImageUrl { image_url: ImageUrl },
+
     #[serde(rename = "image_base64")]
-    ImageBase64 { 
+    ImageBase64 {
         image_base64: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         media_type: Option<String>,
@@ -95,14 +93,17 @@ pub trait AIProvider: Send + Sync {
     async fn stream(
         &self,
         request: ChatRequest,
-    ) -> Result<BoxStream<'static, Result<String, Box<dyn Error + Send + Sync>>>, Box<dyn Error + Send + Sync>>;
-    
+    ) -> Result<
+        BoxStream<'static, Result<String, Box<dyn Error + Send + Sync>>>,
+        Box<dyn Error + Send + Sync>,
+    >;
+
     /// Validate the provider configuration (check API key, connectivity)
     async fn validate(&self) -> Result<ValidationResult, Box<dyn Error + Send + Sync>>;
-    
+
     /// List available models from the provider
     async fn list_models(&self) -> Result<Vec<ModelInfo>, Box<dyn Error + Send + Sync>>;
-    
+
     /// Get static capabilities of this provider
     fn capabilities(&self) -> ProviderCapabilities;
 }

@@ -9,9 +9,7 @@ use std::path::Path;
 use tauri::{Manager, State};
 
 use super::state::load_plugin_states;
-use super::types::{
-    parse_plugin_dir_name, LoadedPlugin, PluginManifest, PluginStore,
-};
+use super::types::{parse_plugin_dir_name, LoadedPlugin, PluginManifest, PluginStore};
 use crate::js_runtime;
 
 // ============================================================================
@@ -55,7 +53,7 @@ pub fn load_plugins_internal(
     for entry in std::fs::read_dir(plugins_dir).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
         let path = entry.path();
-        
+
         // 跳过非目录
         if !path.is_dir() {
             continue;
@@ -74,7 +72,7 @@ pub fn load_plugins_internal(
             serde_json::from_str(&manifest_content).map_err(|e| e.to_string())?;
 
         let dir_name = path.file_name().unwrap().to_str().unwrap().to_string();
-        
+
         // 解析目录名，提取插件 ID 和安装来源
         let (_parsed_id, install_source) = parse_plugin_dir_name(&dir_name);
 
@@ -87,14 +85,14 @@ pub fn load_plugins_internal(
                     state.terminate_on_bg,
                     state.run_at_startup,
                 )
-        } else {
-            (
-                true,
-                manifest.auto_detach,
-                manifest.terminate_on_bg,
-                manifest.run_at_startup,
-            )
-        };
+            } else {
+                (
+                    true,
+                    manifest.auto_detach,
+                    manifest.terminate_on_bg,
+                    manifest.run_at_startup,
+                )
+            };
 
         let mut manifest_with_state = manifest.clone();
         manifest_with_state.auto_detach = auto_detach;
@@ -114,11 +112,7 @@ pub fn load_plugins_internal(
                 match extension {
                     "js" => {
                         // Headless 插件：直接执行 index.js
-                        plugins_to_init.push((
-                            manifest.id.clone(),
-                            entry_path,
-                            dir_name.clone(),
-                        ));
+                        plugins_to_init.push((manifest.id.clone(), entry_path, dir_name.clone()));
                     }
                     "html" => {
                         // View 插件：查找并执行 lifecycle.js
@@ -169,7 +163,8 @@ pub fn load_plugins_internal(
             rt.block_on(async {
                 for (plugin_id, entry_path, _dir_name) in plugins_to_init {
                     if let Ok(js_code) = std::fs::read_to_string(&entry_path) {
-                        let _ = js_runtime::execute_js(&app_clone, &js_code, Some(&plugin_id)).await;
+                        let _ =
+                            js_runtime::execute_js(&app_clone, &js_code, Some(&plugin_id)).await;
                     }
                 }
             });
@@ -222,4 +217,3 @@ pub async fn refresh_plugins(
     // 重新加载所有插件
     load_plugins_internal(&app, &store, true)
 }
-

@@ -71,4 +71,3 @@ pub fn get_plugin_clipboard_timestamp() -> Option<u64> {
         Some(*ts)
     }
 }
-

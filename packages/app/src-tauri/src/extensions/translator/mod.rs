@@ -1,8 +1,8 @@
 pub mod commands;
 
 use crate::extension::types::{
-    ExtensionCommand, ExtensionManifest, ExtensionPreview, ExtensionResult,
-    ExtensionResultType, StaticCommandMatch,
+    ExtensionCommand, ExtensionManifest, ExtensionPreview, ExtensionResult, ExtensionResultType,
+    StaticCommandMatch,
 };
 
 /// 全局 AppHandle 引用
@@ -12,7 +12,6 @@ static APP_HANDLE: std::sync::OnceLock<tauri::AppHandle> = std::sync::OnceLock::
 pub fn init(app: &tauri::AppHandle) {
     let _ = APP_HANDLE.set(app.clone());
 }
-
 
 // ============================================================================
 // Translator 清单定义
@@ -25,13 +24,7 @@ pub static TRANSLATOR_MANIFEST: ExtensionManifest = ExtensionManifest {
     icon: "translate",
     commands: &[ExtensionCommand {
         code: "open",
-        keywords: &[
-            "translate",
-            "translator",
-            "fy",
-            "fanyi",
-            "翻译",
-        ],
+        keywords: &["translate", "translator", "fy", "fanyi", "翻译"],
         // 使用统一的 CommandMatch 声明式配置
         // 匹配任意文本（≥1 字符），由前端 matchCommand.ts 处理
         matches: Some(&[StaticCommandMatch {
@@ -111,4 +104,3 @@ impl crate::extension::registry::Extension for TranslatorExtension {
         })
     }
 }
-

@@ -321,4 +321,3 @@ pub fn collect_plugin_states(
     }
     states
 }
-

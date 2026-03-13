@@ -149,5 +149,3 @@ fn apply_usage_sorting(
 
     Ok(items)
 }
-
-

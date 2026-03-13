@@ -177,7 +177,6 @@ pub async fn execute_command(name: String, app: AppHandle, args: Option<serde_js
                 extension_id,
                 command_code: _command_code,
             } => {
-
                 let result = crate::extension::execute_extension_command(extension_id, "");
                 if let Some(error) = result.error {
                     eprintln!("Extension command failed: {}", error);
@@ -194,7 +193,8 @@ pub async fn execute_command(name: String, app: AppHandle, args: Option<serde_js
 // ============================================================================
 
 /// 跨平台系统命令配置
-struct PlatformCommand<'a> {    #[allow(dead_code)]
+struct PlatformCommand<'a> {
+    #[allow(dead_code)]
     windows: Option<(&'static str, &'a [&'a str])>,
     #[allow(dead_code)]
     macos: Option<(&'static str, &'a [&'a str])>,
@@ -204,7 +204,6 @@ struct PlatformCommand<'a> {    #[allow(dead_code)]
 
 /// 执行跨平台系统命令
 fn execute_platform_command(cmd: &PlatformCommand) {
-
     #[cfg(target_os = "windows")]
     if let Some((program, args)) = cmd.windows {
         if let Err(e) = std::process::Command::new(program).args(args).output() {
@@ -232,7 +231,8 @@ fn execute_platform_command(cmd: &PlatformCommand) {
 // ============================================================================
 
 fn shutdown() {
-    execute_platform_command(&PlatformCommand {        windows: Some(("shutdown", &["/s", "/t", "0"])),
+    execute_platform_command(&PlatformCommand {
+        windows: Some(("shutdown", &["/s", "/t", "0"])),
         macos: Some((
             "osascript",
             &["-e", "tell app \"System Events\" to shut down"],
@@ -242,7 +242,8 @@ fn shutdown() {
 }
 
 fn reboot() {
-    execute_platform_command(&PlatformCommand {        windows: Some(("shutdown", &["/r", "/t", "0"])),
+    execute_platform_command(&PlatformCommand {
+        windows: Some(("shutdown", &["/r", "/t", "0"])),
         macos: Some((
             "osascript",
             &["-e", "tell app \"System Events\" to restart"],
@@ -252,7 +253,8 @@ fn reboot() {
 }
 
 fn sleep() {
-    execute_platform_command(&PlatformCommand {        windows: Some((
+    execute_platform_command(&PlatformCommand {
+        windows: Some((
             "rundll32.exe",
             &["powrprof.dll,SetSuspendState", "0", "1", "0"],
         )),
@@ -262,7 +264,8 @@ fn sleep() {
 }
 
 fn lock_screen() {
-    execute_platform_command(&PlatformCommand {        windows: Some(("rundll32.exe", &["user32.dll,LockWorkStation"])),
+    execute_platform_command(&PlatformCommand {
+        windows: Some(("rundll32.exe", &["user32.dll,LockWorkStation"])),
         macos: Some(("pmset", &["displaysleepnow"])),
         linux: Some(("xdg-screensaver", &["lock"])),
     });
@@ -274,7 +277,8 @@ fn logout() {
     #[cfg(target_os = "linux")]
     let linux_args: &[&str] = &["-KILL", "-u", &username];
 
-    execute_platform_command(&PlatformCommand {        windows: Some(("shutdown", &["/l"])),
+    execute_platform_command(&PlatformCommand {
+        windows: Some(("shutdown", &["/l"])),
         macos: Some((
             "osascript",
             &["-e", "tell app \"System Events\" to log out"],
@@ -354,7 +358,6 @@ pub fn simulate_paste_native(_app: &AppHandle) -> Result<(), String> {
         use std::thread;
         use std::time::Duration;
 
-
         // 获取记录的前一个应用的 Bundle ID
         let bundle_id = crate::focus_manager::previous_bundle_id(_app);
 
@@ -382,9 +385,7 @@ pub fn simulate_paste_native(_app: &AppHandle) -> Result<(), String> {
             .output();
 
         match result {
-            Ok(output) if output.status.success() => {
-                Ok(())
-            }
+            Ok(output) if output.status.success() => Ok(()),
             Ok(output) => {
                 let stderr = String::from_utf8_lossy(&output.stderr);
                 eprintln!("[SystemCommand] osascript failed: {}", stderr);
@@ -433,5 +434,3 @@ pub fn simulate_paste(app: AppHandle) -> Result<(), String> {
 pub fn force_focus(window: tauri::Window) {
     crate::focus_manager::focus_window(&window);
 }
-
-

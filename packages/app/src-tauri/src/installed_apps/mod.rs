@@ -60,7 +60,6 @@ pub async fn fetch_installed_apps() -> Result<Vec<AppInfo>, String> {
 
 #[command]
 pub fn open_app(path: String, app: AppHandle) -> Result<(), String> {
-
     #[cfg(target_os = "windows")]
     {
         windows::open_app(&path)?;
@@ -84,4 +83,3 @@ pub fn open_app(path: String, app: AppHandle) -> Result<(), String> {
 
     Ok(())
 }
-

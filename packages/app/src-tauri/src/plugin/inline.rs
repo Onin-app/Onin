@@ -55,11 +55,12 @@ pub async fn show_inline_plugin<R: Runtime>(
 
     if let Some(webview) = window.get_webview("plugin-inline") {
         let current_url_str = webview.url().unwrap().to_string();
-        let is_different = if let (Ok(u1), Ok(u2)) = (Url::parse(&current_url_str), Url::parse(&url)) {
-            u1.as_str().trim_end_matches('/') != u2.as_str().trim_end_matches('/')
-        } else {
-            current_url_str != url
-        };
+        let is_different =
+            if let (Ok(u1), Ok(u2)) = (Url::parse(&current_url_str), Url::parse(&url)) {
+                u1.as_str().trim_end_matches('/') != u2.as_str().trim_end_matches('/')
+            } else {
+                current_url_str != url
+            };
 
         if is_different {
             webview
@@ -98,9 +99,7 @@ pub async fn show_inline_plugin<R: Runtime>(
                 tauri::Position::Physical(PhysicalPosition::new(rect.x as i32, rect.y as i32)),
                 tauri::Size::Physical(PhysicalSize::new(rect.width as u32, rect.height as u32)),
             )
-            .map_err(|e| {
-                e.to_string()
-            })?;
+            .map_err(|e| e.to_string())?;
     }
 
     Ok(())
@@ -194,4 +193,3 @@ pub fn open_inline_plugin_devtools<R: Runtime>(app: AppHandle<R>) -> Result<(), 
         Err("插件视图未找到".to_string())
     }
 }
-

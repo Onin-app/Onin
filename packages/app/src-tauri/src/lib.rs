@@ -45,7 +45,6 @@ fn create_shortcut_handler(
             return;
         }
 
-
         // 使用 catch_unwind 包装快捷键处理，防止崩溃
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             shortcut_manager::handle_global_shortcut(app, shortcut, event.state());
@@ -115,4 +114,3 @@ pub fn run() {
         }
     });
 }
-

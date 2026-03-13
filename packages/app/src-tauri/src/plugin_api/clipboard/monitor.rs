@@ -126,7 +126,6 @@ fn start_auto_clear_thread() {
                 let elapsed_since_hide = now - hide_timestamp;
 
                 if elapsed_since_hide >= auto_clear_time_limit {
-
                     if let Err(_e) = app.emit("clear_app_clipboard", ()) {
                     } else {
                     }
@@ -141,5 +140,3 @@ fn start_auto_clear_thread() {
         }
     }
 }
-
-

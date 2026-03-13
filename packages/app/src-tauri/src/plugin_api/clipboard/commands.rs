@@ -12,19 +12,13 @@ use super::types::{
 
 /// 读取剪贴板文本
 #[tauri::command]
-pub async fn plugin_clipboard_read_text(
-    app: AppHandle,
-) -> Result<Option<String>, ClipboardError> {
+pub async fn plugin_clipboard_read_text(app: AppHandle) -> Result<Option<String>, ClipboardError> {
     match app.clipboard().read_text() {
-        Ok(text) => {
-            Ok(Some(text))
-        }
-        Err(e) => {
-            Err(ClipboardError::from(format!(
-                "Failed to read clipboard text: {}",
-                e
-            )))
-        }
+        Ok(text) => Ok(Some(text)),
+        Err(e) => Err(ClipboardError::from(format!(
+            "Failed to read clipboard text: {}",
+            e
+        ))),
     }
 }
 
@@ -35,15 +29,11 @@ pub async fn plugin_clipboard_write_text(
     options: WriteTextOptions,
 ) -> Result<(), ClipboardError> {
     match app.clipboard().write_text(options.text.clone()) {
-        Ok(_) => {
-            Ok(())
-        }
-        Err(e) => {
-            Err(ClipboardError::from(format!(
-                "Failed to write clipboard text: {}",
-                e
-            )))
-        }
+        Ok(_) => Ok(()),
+        Err(e) => Err(ClipboardError::from(format!(
+            "Failed to write clipboard text: {}",
+            e
+        ))),
     }
 }
 
@@ -72,15 +62,11 @@ pub async fn plugin_clipboard_write_image(
 #[tauri::command]
 pub async fn plugin_clipboard_clear(app: AppHandle) -> Result<(), ClipboardError> {
     match app.clipboard().clear() {
-        Ok(_) => {
-            Ok(())
-        }
-        Err(e) => {
-            Err(ClipboardError::from(format!(
-                "Failed to clear clipboard: {}",
-                e
-            )))
-        }
+        Ok(_) => Ok(()),
+        Err(e) => Err(ClipboardError::from(format!(
+            "Failed to clear clipboard: {}",
+            e
+        ))),
     }
 }
 
@@ -176,9 +162,7 @@ pub async fn plugin_clipboard_get_metadata(
 
 /// 读取剪贴板内容
 #[tauri::command]
-pub async fn get_clipboard_content(
-    app: AppHandle,
-) -> Result<ClipboardContent, ClipboardError> {
+pub async fn get_clipboard_content(app: AppHandle) -> Result<ClipboardContent, ClipboardError> {
     let timestamp = get_clipboard_timestamp();
 
     // 先尝试读取文件路径
@@ -231,4 +215,3 @@ pub async fn get_clipboard_content(
         ))),
     }
 }
-

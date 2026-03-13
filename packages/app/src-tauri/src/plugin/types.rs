@@ -601,4 +601,3 @@ pub fn find_all_versions(store: &HashMap<String, LoadedPlugin>, plugin_id: &str)
         .map(|(dir_name, _)| dir_name.clone())
         .collect()
 }
-

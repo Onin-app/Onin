@@ -49,7 +49,11 @@ async fn try_start_server(
     let state = Arc::new(PluginServerState { plugins_dir });
 
     let cors = CorsLayer::new()
-        .allow_origin("http://localhost:1420".parse::<header::HeaderValue>().unwrap())
+        .allow_origin(
+            "http://localhost:1420"
+                .parse::<header::HeaderValue>()
+                .unwrap(),
+        )
         .allow_methods([Method::GET])
         .allow_headers(vec![header::CONTENT_TYPE]);
 
@@ -134,7 +138,11 @@ fn handle_file_not_found(file_path: &str) -> Response {
             .into_response();
     }
 
-    (StatusCode::NOT_FOUND, format!("File not found: {}", file_path)).into_response()
+    (
+        StatusCode::NOT_FOUND,
+        format!("File not found: {}", file_path),
+    )
+        .into_response()
 }
 
 /// 根据文件扩展名获取 MIME 类型
@@ -206,4 +214,3 @@ fn inject_tauri_bridge(html: &str, plugin_id: &str) -> String {
         format!("{}{}", bridge_script, html)
     }
 }
-

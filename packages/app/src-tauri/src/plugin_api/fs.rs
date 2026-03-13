@@ -116,7 +116,9 @@ fn resolve_plugin_path(
             }
             Component::CurDir => {}
             Component::ParentDir => {
-                return Err(FileSystemError::from("Parent path traversal is not allowed"));
+                return Err(FileSystemError::from(
+                    "Parent path traversal is not allowed",
+                ));
             }
             Component::Normal(part) => {
                 resolved_path.push(part);
@@ -344,4 +346,3 @@ pub async fn plugin_fs_move_file(
     fs::rename(&source_file_path, &dest_file_path).await?;
     Ok(())
 }
-

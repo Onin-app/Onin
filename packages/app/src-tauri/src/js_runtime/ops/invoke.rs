@@ -24,7 +24,6 @@ pub async fn op_invoke(
     #[string] method: String,
     #[serde] arg: serde_json::Value,
 ) -> InvokeResult {
-
     // 在进入 async 之前提取所需数据，避免生命周期问题
     let (app_handle, plugin_id) = {
         let borrowed = state.borrow();
@@ -42,4 +41,3 @@ pub async fn op_invoke(
 
     result
 }
-

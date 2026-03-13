@@ -294,13 +294,11 @@ pub async fn create_or_show_plugin_window(
         let is_focused = window.is_focused().unwrap_or(false);
 
         if !is_focused {
-
             crate::focus_manager::capture_previous_foreground(&app);
             crate::focus_manager::focus_webview_window(&window);
 
             trigger_window_visibility_event(&window, true);
         } else {
-
             crate::focus_manager::restore_previous_foreground(&app);
 
             if let Err(e) = window.minimize() {
@@ -382,7 +380,6 @@ pub async fn create_or_show_plugin_window(
 
     // 应用保存的窗口位置和大小
     if let Some(ref bounds) = saved_bounds {
-
         // 严格检查保存的边界是否合理
         let is_bounds_valid = bounds.x.abs() < 10000
             && bounds.y.abs() < 10000
@@ -608,5 +605,3 @@ fn save_window_state_on_close(
         }
     }
 }
-
-

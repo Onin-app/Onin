@@ -121,4 +121,3 @@ pub fn save_history(app: &AppHandle, items: &VecDeque<ClipboardItem>) {
         }
     }
 }
-

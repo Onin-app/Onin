@@ -11,9 +11,7 @@ pub struct NotificationOptions {
 
 #[tauri::command]
 pub fn is_permission_granted(app_handle: tauri::AppHandle) -> Result<bool, String> {
-    let result = app_handle
-        .notification()
-        .permission_state();
+    let result = app_handle.notification().permission_state();
 
     result
         .map(|s| s == tauri_plugin_notification::PermissionState::Granted)
@@ -21,10 +19,10 @@ pub fn is_permission_granted(app_handle: tauri::AppHandle) -> Result<bool, Strin
 }
 
 #[tauri::command]
-pub async fn request_permission(app_handle: tauri::AppHandle) -> Result<tauri_plugin_notification::PermissionState, String> {
-    let result = app_handle
-        .notification()
-        .request_permission();
+pub async fn request_permission(
+    app_handle: tauri::AppHandle,
+) -> Result<tauri_plugin_notification::PermissionState, String> {
+    let result = app_handle.notification().request_permission();
 
     result.map_err(|e| e.to_string())
 }
@@ -69,9 +67,7 @@ pub fn show_notification(
 }
 
 #[cfg(target_os = "macos")]
-fn show_notification_macos_dev(
-    options: &NotificationOptions,
-) -> Result<(), String> {
+fn show_notification_macos_dev(options: &NotificationOptions) -> Result<(), String> {
     let title = escape_for_applescript(&options.title);
     let body = escape_for_applescript(options.body.as_deref().unwrap_or(""));
     let script = if let Some(sound) = &options.sound {

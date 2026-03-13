@@ -5,7 +5,6 @@ use tauri_plugin_store::{Error, StoreBuilder};
 
 // Plugin ID retrieval now handled by crate::plugin::context
 
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StorageError {
     pub name: String,
@@ -45,9 +44,10 @@ fn get_plugin_store_path(plugin_id: &str) -> String {
 }
 
 // 获取当前执行插件的 ID
-pub fn get_current_plugin_id<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<String, StorageError> {
-    crate::plugin::context::get_current_plugin_id(app, None)
-        .map_err(|e| StorageError::from(e))
+pub fn get_current_plugin_id<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+) -> Result<String, StorageError> {
+    crate::plugin::context::get_current_plugin_id(app, None).map_err(|e| StorageError::from(e))
 }
 
 #[tauri::command]
@@ -80,10 +80,7 @@ pub async fn plugin_storage_get(
 }
 
 #[tauri::command]
-pub async fn plugin_storage_remove(
-    app: AppHandle,
-    key: String,
-) -> Result<(), StorageError> {
+pub async fn plugin_storage_remove(app: AppHandle, key: String) -> Result<(), StorageError> {
     let plugin_id = get_current_plugin_id(&app)?;
     let store_path = get_plugin_store_path(&plugin_id);
     let store = StoreBuilder::new(&app, store_path).build()?;
@@ -94,9 +91,7 @@ pub async fn plugin_storage_remove(
 }
 
 #[tauri::command]
-pub async fn plugin_storage_clear(
-    app: AppHandle,
-) -> Result<(), StorageError> {
+pub async fn plugin_storage_clear(app: AppHandle) -> Result<(), StorageError> {
     let plugin_id = get_current_plugin_id(&app)?;
     let store_path = get_plugin_store_path(&plugin_id);
     let store = StoreBuilder::new(&app, store_path).build()?;
@@ -107,9 +102,7 @@ pub async fn plugin_storage_clear(
 }
 
 #[tauri::command]
-pub async fn plugin_storage_keys(
-    app: AppHandle,
-) -> Result<Vec<String>, StorageError> {
+pub async fn plugin_storage_keys(app: AppHandle) -> Result<Vec<String>, StorageError> {
     let plugin_id = get_current_plugin_id(&app)?;
     let store_path = get_plugin_store_path(&plugin_id);
     let store = StoreBuilder::new(&app, store_path).build()?;
@@ -186,6 +179,3 @@ pub async fn plugin_storage_set_all(
     store.save()?;
     Ok(())
 }
-
-
-

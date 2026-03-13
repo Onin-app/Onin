@@ -5,8 +5,8 @@
 //! - 决定显示模式（内联/窗口）
 //! - 执行 JS 插件或加载 HTML 插件
 
-use std::path::Path;
 use serde::Serialize;
+use std::path::Path;
 use tauri::{Emitter, Manager, State};
 
 use super::types::{find_plugin_by_id, PluginServerPort, PluginStore};
@@ -31,7 +31,6 @@ pub fn execute_plugin_entry(
     store: State<'_, PluginStore>,
     plugin_id: String,
 ) -> Result<(), String> {
-
     // 尽快释放锁，克隆插件数据
     let plugin = {
         let store_lock = store.0.lock().unwrap();
@@ -85,7 +84,6 @@ fn execute_dev_mode_plugin(
     plugin: &super::types::LoadedPlugin,
 ) -> Result<(), String> {
     if let Some(dev_server) = &plugin.manifest.dev_server {
-
         // 判断是否在窗口中打开
         let should_open_in_window =
             plugin.manifest.auto_detach || plugin.manifest.display_mode.as_str() == "window";
@@ -114,7 +112,6 @@ fn execute_js_plugin(
     plugin: &super::types::LoadedPlugin,
     entry_path: std::path::PathBuf,
 ) -> Result<(), String> {
-
     // 读取 JS 代码
     let js_code = std::fs::read_to_string(&entry_path).map_err(|e| e.to_string())?;
     let app_clone = app.clone();
@@ -208,10 +205,8 @@ pub fn show_plugin_inline(
         plugin_url,
     };
 
-    app
-        .emit("show_plugin_inline", payload)
+    app.emit("show_plugin_inline", payload)
         .map_err(|e| format!("发送 show_plugin_inline 事件失败: {}", e))?;
 
     Ok(())
 }
-

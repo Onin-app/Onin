@@ -247,4 +247,3 @@ pub fn get_initial_dynamic_commands(app: &AppHandle) -> Vec<Command> {
         })
         .collect()
 }
-

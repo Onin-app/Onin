@@ -1,13 +1,11 @@
 use super::config::AIConfig;
-use tauri::{AppHandle, command, State, Emitter};
-use crate::ai_manager::AIManager;
 use crate::ai_manager::provider::ChatRequest;
+use crate::ai_manager::AIManager;
 use std::sync::Arc;
+use tauri::{command, AppHandle, Emitter, State};
 
 #[command]
-pub async fn get_ai_config(
-    ai_manager: State<'_, Arc<AIManager>>,
-) -> Result<AIConfig, String> {
+pub async fn get_ai_config(ai_manager: State<'_, Arc<AIManager>>) -> Result<AIConfig, String> {
     Ok(ai_manager.get_config().await)
 }
 
@@ -16,7 +14,10 @@ pub async fn update_ai_config(
     ai_manager: State<'_, Arc<AIManager>>,
     config: AIConfig,
 ) -> Result<(), String> {
-    ai_manager.update_config(config).await.map_err(|e| e.to_string())
+    ai_manager
+        .update_config(config)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[command]
@@ -34,10 +35,13 @@ pub async fn plugin_ai_stream(
     request: ChatRequest,
     event_id: String,
 ) -> Result<(), String> {
-    let mut stream = ai_manager.stream(request).await.map_err(|e| e.to_string())?;
-    
+    let mut stream = ai_manager
+        .stream(request)
+        .await
+        .map_err(|e| e.to_string())?;
+
     use futures::StreamExt;
-    
+
     // Spawn a task to handle the stream so we don't block the command handler
     // We can't return the stream directly from a command easily in Tauri v1/v2 without specialized plugins or valid return types
     // So we emit events.
@@ -65,7 +69,9 @@ pub async fn validate_ai_provider(
     api_key: Option<String>,
 ) -> Result<crate::ai_manager::provider::ValidationResult, String> {
     use crate::ai_manager::provider::AIProvider;
-    let provider = crate::ai_manager::providers::openai_compatible::OpenAICompatibleProvider::new(base_url, api_key);
+    let provider = crate::ai_manager::providers::openai_compatible::OpenAICompatibleProvider::new(
+        base_url, api_key,
+    );
     provider.validate().await.map_err(|e| e.to_string())
 }
 

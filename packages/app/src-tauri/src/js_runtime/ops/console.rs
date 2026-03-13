@@ -11,7 +11,6 @@ use tauri::{AppHandle, Emitter, Manager};
 /// 将插件的日志输出到 Rust 控制台，并尝试发送到前端
 #[op2(fast)]
 pub fn op_console_log(state: &OpState, #[string] message: String) {
-
     // 尝试发送到前端
     if let Some(app_handle) = state.try_borrow::<AppHandle>() {
         if let Some(window) = app_handle.get_webview_window("main") {
@@ -25,5 +24,3 @@ pub fn op_console_log(state: &OpState, #[string] message: String) {
         }
     }
 }
-
-

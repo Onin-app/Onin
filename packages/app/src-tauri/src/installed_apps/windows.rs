@@ -630,7 +630,7 @@ pub fn open_app(path: &str) -> Result<(), String> {
         use std::os::windows::process::CommandExt;
         const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
         const DETACHED_PROCESS: u32 = 0x00000008;
-        
+
         Command::new("cmd")
             .args(&["/C", "start", "", path])
             .creation_flags(CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS)
@@ -721,4 +721,3 @@ fn extract_icon_from_exe_or_image(
 
     None
 }
-

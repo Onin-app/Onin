@@ -75,4 +75,3 @@ fn activate_app_by_bundle_id(bundle_id: &str) {
         eprintln!("[focus_manager/macos] Failed to activate app {bundle_id}: {error}");
     }
 }
-

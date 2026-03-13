@@ -219,4 +219,3 @@ pub async fn plugin_dialog_save(
     let path_string = rx.await.unwrap_or(None);
     Ok(path_string)
 }
-

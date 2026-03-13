@@ -14,8 +14,8 @@ use super::state::{
     collect_plugin_states, load_plugin_settings, save_plugin_settings_to_file, save_plugin_states,
 };
 use super::types::{
-    find_plugin_by_id, find_plugin_by_id_mut, LoadedPlugin, PluginDetail,
-    PluginServerPort, PluginSettingsSchema, PluginStore,
+    find_plugin_by_id, find_plugin_by_id_mut, LoadedPlugin, PluginDetail, PluginServerPort,
+    PluginSettingsSchema, PluginStore,
 };
 
 // ============================================================================
@@ -190,7 +190,6 @@ pub fn register_plugin_settings_schema(
     plugin_id: String,
     schema: PluginSettingsSchema,
 ) -> Result<(), String> {
-
     let mut store_lock = store.0.lock().unwrap();
 
     if let Some(plugin) = find_plugin_by_id_mut(&mut store_lock, &plugin_id) {
@@ -298,6 +297,3 @@ pub fn get_plugin_server_port(app: tauri::AppHandle) -> Result<u16, String> {
         .ok_or_else(|| "插件服务器未启动".to_string())?;
     Ok(port)
 }
-
-
-

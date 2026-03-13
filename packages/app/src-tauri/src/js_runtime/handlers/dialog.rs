@@ -5,10 +5,7 @@ use crate::plugin_api;
 use tauri::AppHandle;
 
 /// 显示消息对话框
-pub async fn handle_dialog_message(
-    app_handle: AppHandle,
-    arg: serde_json::Value,
-) -> InvokeResult {
+pub async fn handle_dialog_message(app_handle: AppHandle, arg: serde_json::Value) -> InvokeResult {
     let options_result =
         serde_json::from_value::<plugin_api::dialog::MessageDialogOptions>(arg.clone());
 
@@ -24,10 +21,7 @@ pub async fn handle_dialog_message(
 }
 
 /// 显示确认对话框
-pub async fn handle_dialog_confirm(
-    app_handle: AppHandle,
-    arg: serde_json::Value,
-) -> InvokeResult {
+pub async fn handle_dialog_confirm(app_handle: AppHandle, arg: serde_json::Value) -> InvokeResult {
     let options_result =
         serde_json::from_value::<plugin_api::dialog::ConfirmDialogOptions>(arg.clone());
 

@@ -230,4 +230,3 @@ fn setup_desktop_features(app: &mut App) -> Result<(), Box<dyn std::error::Error
 
     Ok(())
 }
-

@@ -142,4 +142,3 @@ fn handle_special_keys(app: &AppHandle, triggered_shortcut: &str) {
         }
     }
 }
-

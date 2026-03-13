@@ -257,5 +257,3 @@ impl PluginRuntimeManager {
             .map_err(|_| "Failed to receive clear all plugins response")?
     }
 }
-
-

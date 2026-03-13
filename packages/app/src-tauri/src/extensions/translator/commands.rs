@@ -1,7 +1,4 @@
-use tauri::{
-    webview::WebviewBuilder, Listener, Manager, WebviewUrl,
-    WindowBuilder,
-};
+use tauri::{webview::WebviewBuilder, Listener, Manager, WebviewUrl, WindowBuilder};
 use tauri::{LogicalPosition, LogicalSize};
 
 /// Open Translator Window with Multi-Webview Architecture
@@ -13,7 +10,7 @@ pub async fn open_translator_window(app: tauri::AppHandle) -> Result<(), String>
 pub async fn open_window(app: &tauri::AppHandle, text: Option<String>) -> Result<(), String> {
     if let Some(window) = app.get_window("translator-host") {
         if let Err(e) = window.set_focus() {
-             return Err(e.to_string());
+            return Err(e.to_string());
         }
         // If window exists and text is provided, we might want to update the tabs.
         // But for now, let's just focus.
@@ -33,20 +30,27 @@ pub async fn open_window(app: &tauri::AppHandle, text: Option<String>) -> Result
     // This loads the local Svelte route: /extensions/translator
     let _ui_webview = window
         .add_child(
-            WebviewBuilder::new("translator-ui", WebviewUrl::App("/extensions/translator".into()))
-                .auto_resize(),
+            WebviewBuilder::new(
+                "translator-ui",
+                WebviewUrl::App("/extensions/translator".into()),
+            )
+            .auto_resize(),
             LogicalPosition::new(0.0, 0.0),
             LogicalSize::new(1000.0, 50.0),
         )
         .map_err(|e| e.to_string())?;
 
     let url_encoded_text = text.as_deref().unwrap_or("").to_string(); // Simple for now, need proper encoding
-    let encoded = url::form_urlencoded::byte_serialize(url_encoded_text.as_bytes()).collect::<String>();
-    
+    let encoded =
+        url::form_urlencoded::byte_serialize(url_encoded_text.as_bytes()).collect::<String>();
+
     // Helper to append query (simplified)
     // Google: ?text=...
     let google_url = if let Some(_) = &text {
-        format!("https://translate.google.com/?sl=auto&tl=zh-CN&text={}", encoded)
+        format!(
+            "https://translate.google.com/?sl=auto&tl=zh-CN&text={}",
+            encoded
+        )
     } else {
         "https://translate.google.com/".to_string()
     };
@@ -114,17 +118,17 @@ pub async fn open_window(app: &tauri::AppHandle, text: Option<String>) -> Result
 
     // 5. Listen for switch event
     // The UI webview will emit "translator_switch".
-    
+
     let google_webview_clone = google_webview.clone();
     let baidu_webview_clone = baidu_webview.clone();
     let sougou_webview_clone = sougou_webview.clone();
 
     window.listen("translator_switch", move |event| {
         let payload = event.payload();
-        
+
         // Simple check. ideally parse JSON.
         // Payload format: {"engine":"..."}
-        
+
         let engine = if payload.contains("google") {
             "google"
         } else if payload.contains("baidu") {
@@ -132,7 +136,7 @@ pub async fn open_window(app: &tauri::AppHandle, text: Option<String>) -> Result
         } else {
             "sougou"
         };
-        
+
         // Hide all first
         let _ = google_webview_clone.hide();
         let _ = baidu_webview_clone.hide();
@@ -143,11 +147,12 @@ pub async fn open_window(app: &tauri::AppHandle, text: Option<String>) -> Result
                 let _ = google_webview_clone.show();
                 let _ = google_webview_clone.set_focus();
             }
-             "baidu" => {
+            "baidu" => {
                 let _ = baidu_webview_clone.show();
                 let _ = baidu_webview_clone.set_focus();
             }
-            _ => { // sougou
+            _ => {
+                // sougou
                 let _ = sougou_webview_clone.show();
                 let _ = sougou_webview_clone.set_focus();
             }
@@ -156,4 +161,3 @@ pub async fn open_window(app: &tauri::AppHandle, text: Option<String>) -> Result
 
     Ok(())
 }
-

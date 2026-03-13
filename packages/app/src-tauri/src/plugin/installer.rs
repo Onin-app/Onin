@@ -33,7 +33,6 @@ pub fn import_plugin(
     store: State<'_, PluginStore>,
     source_path: String,
 ) -> Result<LoadedPlugin, String> {
-
     // 1. 验证源路径
     let source = std::path::PathBuf::from(&source_path);
     if !source.exists() || !source.is_dir() {
@@ -62,8 +61,8 @@ pub fn import_plugin(
     // 3. 读取并解析 manifest
     let manifest_content = std::fs::read_to_string(&manifest_path)
         .map_err(|e| format!("读取 manifest 失败: {}", e))?;
-    let manifest: PluginManifest = serde_json::from_str(&manifest_content)
-        .map_err(|e| format!("manifest 格式无效: {}", e))?;
+    let manifest: PluginManifest =
+        serde_json::from_str(&manifest_content).map_err(|e| format!("manifest 格式无效: {}", e))?;
 
     // 安全检查：验证插件 ID 格式
     let id_regex = regex::Regex::new(r"^[a-z0-9][a-z0-9.-]*[a-z0-9]$").unwrap();
@@ -120,14 +119,14 @@ pub fn import_plugin(
                 state.terminate_on_bg,
                 state.run_at_startup,
             )
-    } else {
-        (
-            true,
-            manifest.auto_detach,
-            manifest.terminate_on_bg,
-            manifest.run_at_startup,
-        )
-    };
+        } else {
+            (
+                true,
+                manifest.auto_detach,
+                manifest.terminate_on_bg,
+                manifest.run_at_startup,
+            )
+        };
 
     let mut manifest_with_state = manifest.clone();
     manifest_with_state.auto_detach = auto_detach;
@@ -166,7 +165,6 @@ pub fn uninstall_plugin(
     store: State<'_, PluginStore>,
     plugin_id: String,
 ) -> Result<(), String> {
-
     // 1. 从 store 中获取插件信息
     let (dir_name, actual_key) = {
         let store_lock = store.0.lock().unwrap();
@@ -234,10 +232,10 @@ pub fn uninstall_plugin(
     if !plugin_was_in_store && !plugin_link_path.exists() {
         return Err(format!("插件未找到: {}", plugin_id));
     }
-    
+
     // 发送事件通知前端插件已卸载
     let _ = app.emit("plugin-uninstalled", &plugin_id);
-    
+
     Ok(())
 }
 
@@ -256,10 +254,8 @@ pub async fn download_and_install_plugin(
     _plugin_id: String,
     icon_url: Option<String>,
 ) -> Result<LoadedPlugin, String> {
-
     // 1. 下载 ZIP 文件
-    let temp_dir = tempfile::tempdir()
-        .map_err(|e| format!("创建临时目录失败: {}", e))?;
+    let temp_dir = tempfile::tempdir().map_err(|e| format!("创建临时目录失败: {}", e))?;
     let zip_path = temp_dir.path().join("plugin.zip");
 
     let response = reqwest::get(&download_url)
@@ -275,13 +271,11 @@ pub async fn download_and_install_plugin(
         .await
         .map_err(|e| format!("读取响应失败: {}", e))?;
 
-    std::fs::write(&zip_path, &bytes)
-        .map_err(|e| format!("写入 zip 文件失败: {}", e))?;
+    std::fs::write(&zip_path, &bytes).map_err(|e| format!("写入 zip 文件失败: {}", e))?;
 
     // 2. 解压
     let extract_dir = temp_dir.path().join("extracted");
-    std::fs::create_dir_all(&extract_dir)
-        .map_err(|e| format!("创建解压目录失败: {}", e))?;
+    std::fs::create_dir_all(&extract_dir).map_err(|e| format!("创建解压目录失败: {}", e))?;
 
     extract_zip(&zip_path, &extract_dir)?;
 
@@ -296,8 +290,8 @@ pub async fn download_and_install_plugin(
 
     let manifest_content = std::fs::read_to_string(&manifest_path)
         .map_err(|e| format!("读取 manifest 失败: {}", e))?;
-    let mut manifest: PluginManifest = serde_json::from_str(&manifest_content)
-        .map_err(|e| format!("manifest 格式无效: {}", e))?;
+    let mut manifest: PluginManifest =
+        serde_json::from_str(&manifest_content).map_err(|e| format!("manifest 格式无效: {}", e))?;
 
     // 强制禁用开发模式
     if manifest.dev_mode {
@@ -364,27 +358,27 @@ pub async fn download_and_install_plugin(
     // 添加到 store，禁用其他版本
     {
         let mut store_lock = store.0.lock().unwrap();
-        
+
         let other_versions: Vec<String> = store_lock
             .iter()
             .filter(|(_, p)| p.manifest.id == manifest.id && p.enabled)
             .map(|(dir_name, _)| dir_name.clone())
             .collect();
-        
+
         for other_dir_name in other_versions {
             if let Some(other_plugin) = store_lock.get_mut(&other_dir_name) {
                 other_plugin.enabled = false;
             }
         }
-        
+
         store_lock.insert(dir_name.clone(), loaded_plugin.clone());
     }
 
     // 7. 初始化生命周期
     initialize_plugin_lifecycle(&app, &target_dir, &manifest);
-    
+
     let _ = app.emit("plugin-installed", &manifest.id);
-    
+
     Ok(loaded_plugin)
 }
 
@@ -394,25 +388,21 @@ pub async fn download_and_install_plugin(
 
 /// 移除插件符号链接
 fn remove_plugin_link(path: &Path) -> Result<(), String> {
-    
     #[cfg(windows)]
     {
         let metadata = std::fs::symlink_metadata(path)
             .map_err(|e| format!("获取符号链接元数据失败: {}", e))?;
         if metadata.is_dir() {
-            std::fs::remove_dir(path)
-                .map_err(|e| format!("删除插件链接失败: {}", e))?;
+            std::fs::remove_dir(path).map_err(|e| format!("删除插件链接失败: {}", e))?;
         } else {
-            std::fs::remove_file(path)
-                .map_err(|e| format!("删除插件链接失败: {}", e))?;
+            std::fs::remove_file(path).map_err(|e| format!("删除插件链接失败: {}", e))?;
         }
     }
     #[cfg(not(windows))]
     {
-        std::fs::remove_file(path)
-            .map_err(|e| format!("删除插件链接失败: {}", e))?;
+        std::fs::remove_file(path).map_err(|e| format!("删除插件链接失败: {}", e))?;
     }
-    
+
     Ok(())
 }
 
@@ -443,8 +433,7 @@ fn create_symlink(source: &Path, target: &Path) -> Result<(), String> {
     }
     #[cfg(unix)]
     {
-        std::os::unix::fs::symlink(source, target)
-            .map_err(|e| format!("创建符号链接失败: {}", e))
+        std::os::unix::fs::symlink(source, target).map_err(|e| format!("创建符号链接失败: {}", e))
     }
 }
 
@@ -461,27 +450,24 @@ fn remove_plugin_directory(path: &Path) -> Result<(), String> {
             // 符号链接：尝试目录删除，失败则尝试文件删除
             match std::fs::remove_dir(path) {
                 Ok(_) => Ok(()),
-                Err(_) => std::fs::remove_file(path)
-                    .map_err(|e| format!("删除插件链接失败: {}", e)),
+                Err(_) => {
+                    std::fs::remove_file(path).map_err(|e| format!("删除插件链接失败: {}", e))
+                }
             }
         } else if metadata.is_dir() {
-            std::fs::remove_dir_all(path)
-                .map_err(|e| format!("删除插件目录失败: {}", e))
+            std::fs::remove_dir_all(path).map_err(|e| format!("删除插件目录失败: {}", e))
         } else {
-            std::fs::remove_file(path)
-                .map_err(|e| format!("删除插件文件失败: {}", e))
+            std::fs::remove_file(path).map_err(|e| format!("删除插件文件失败: {}", e))
         }
     }
     #[cfg(not(windows))]
     {
-        std::fs::remove_file(path)
-            .map_err(|e| format!("删除插件链接失败: {}", e))
+        std::fs::remove_file(path).map_err(|e| format!("删除插件链接失败: {}", e))
     }
 }
 
 /// 扫描目录查找并删除插件
 fn scan_and_remove_plugin(plugins_dir: &Path, plugin_id: &str) -> Result<(), String> {
-
     if let Ok(entries) = std::fs::read_dir(plugins_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
@@ -505,10 +491,9 @@ fn scan_and_remove_plugin(plugins_dir: &Path, plugin_id: &str) -> Result<(), Str
 
 /// 解压 ZIP 文件
 fn extract_zip(zip_path: &Path, extract_dir: &Path) -> Result<(), String> {
-    let file = std::fs::File::open(zip_path)
-        .map_err(|e| format!("打开 zip 文件失败: {}", e))?;
-    let mut archive = zip::ZipArchive::new(file)
-        .map_err(|e| format!("读取 zip 归档失败: {}", e))?;
+    let file = std::fs::File::open(zip_path).map_err(|e| format!("打开 zip 文件失败: {}", e))?;
+    let mut archive =
+        zip::ZipArchive::new(file).map_err(|e| format!("读取 zip 归档失败: {}", e))?;
 
     for i in 0..archive.len() {
         let mut file = archive
@@ -520,19 +505,16 @@ fn extract_zip(zip_path: &Path, extract_dir: &Path) -> Result<(), String> {
         };
 
         if file.name().ends_with('/') {
-            std::fs::create_dir_all(&outpath)
-                .map_err(|e| format!("创建目录失败: {}", e))?;
+            std::fs::create_dir_all(&outpath).map_err(|e| format!("创建目录失败: {}", e))?;
         } else {
             if let Some(p) = outpath.parent() {
                 if !p.exists() {
-                    std::fs::create_dir_all(p)
-                        .map_err(|e| format!("创建父目录失败: {}", e))?;
+                    std::fs::create_dir_all(p).map_err(|e| format!("创建父目录失败: {}", e))?;
                 }
             }
-            let mut outfile = std::fs::File::create(&outpath)
-                .map_err(|e| format!("创建文件失败: {}", e))?;
-            std::io::copy(&mut file, &mut outfile)
-                .map_err(|e| format!("解压文件失败: {}", e))?;
+            let mut outfile =
+                std::fs::File::create(&outpath).map_err(|e| format!("创建文件失败: {}", e))?;
+            std::io::copy(&mut file, &mut outfile).map_err(|e| format!("解压文件失败: {}", e))?;
         }
     }
 
@@ -545,8 +527,7 @@ pub fn find_plugin_root(extract_dir: &Path) -> Result<std::path::PathBuf, String
         return Ok(extract_dir.to_path_buf());
     }
 
-    let entries = std::fs::read_dir(extract_dir)
-        .map_err(|e| format!("读取解压目录失败: {}", e))?;
+    let entries = std::fs::read_dir(extract_dir).map_err(|e| format!("读取解压目录失败: {}", e))?;
 
     for entry in entries {
         let entry = entry.map_err(|e| format!("读取目录条目失败: {}", e))?;
@@ -562,11 +543,9 @@ pub fn find_plugin_root(extract_dir: &Path) -> Result<std::path::PathBuf, String
 
 /// 递归复制目录
 pub fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), String> {
-    std::fs::create_dir_all(dst)
-        .map_err(|e| format!("创建目录 {:?} 失败: {}", dst, e))?;
+    std::fs::create_dir_all(dst).map_err(|e| format!("创建目录 {:?} 失败: {}", dst, e))?;
 
-    for entry in std::fs::read_dir(src)
-        .map_err(|e| format!("读取目录 {:?} 失败: {}", src, e))?
+    for entry in std::fs::read_dir(src).map_err(|e| format!("读取目录 {:?} 失败: {}", src, e))?
     {
         let entry = entry.map_err(|e| format!("读取条目失败: {}", e))?;
         let ty = entry
@@ -587,7 +566,11 @@ pub fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), String> {
 }
 
 /// 初始化插件生命周期
-fn initialize_plugin_lifecycle(app: &tauri::AppHandle, plugin_dir: &Path, manifest: &PluginManifest) {
+fn initialize_plugin_lifecycle(
+    app: &tauri::AppHandle,
+    plugin_dir: &Path,
+    manifest: &PluginManifest,
+) {
     let entry_path = plugin_dir.join(&manifest.entry);
     if !entry_path.is_file() {
         return;
@@ -598,9 +581,7 @@ fn initialize_plugin_lifecycle(app: &tauri::AppHandle, plugin_dir: &Path, manife
         .and_then(|s| s.to_str());
 
     let lifecycle_path = match extension {
-        Some("js") => {
-            Some(entry_path.clone())
-        }
+        Some("js") => Some(entry_path.clone()),
         Some("html") => {
             let lifecycle_file = manifest
                 .lifecycle
@@ -622,7 +603,7 @@ fn initialize_plugin_lifecycle(app: &tauri::AppHandle, plugin_dir: &Path, manife
         let app_clone = app.clone();
         let plugin_id = manifest.id.clone();
         let plugin_name = manifest.name.clone();
-        
+
         std::thread::spawn(move || {
             let rt = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
@@ -666,4 +647,3 @@ fn initialize_plugin_lifecycle(app: &tauri::AppHandle, plugin_dir: &Path, manife
         });
     }
 }
-

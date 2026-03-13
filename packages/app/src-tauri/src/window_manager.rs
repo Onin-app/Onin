@@ -56,7 +56,7 @@ pub fn close_main_window(app: tauri::AppHandle, state: State<WindowState>) {
         window.emit("window_visibility", &false).unwrap_or_default();
     } else if let Some(window) = app.get_window("main") {
         // Fallback to get_window
-         state
+        state
             .hiding_initiated_by_command
             .store(true, Ordering::Relaxed);
         window.hide().ok();
@@ -106,7 +106,7 @@ fn release_lock_if_held(app_handle: &AppHandle) {
 // ============================================================================
 
 /// 设置文件拖放事件监听器
-/// 
+///
 /// 在文件拖放期间锁定窗口，防止意外隐藏
 fn setup_file_drop_listeners(window: &tauri::WebviewWindow, app_handle: &AppHandle) {
     // 文件悬停：获取锁并取消隐藏任务
@@ -207,32 +207,28 @@ fn handle_window_focused(app_handle: &AppHandle, shortcut: Shortcut) {
             .unwrap_or_else(|err| {
                 // Ignore "already registered" error to reduce noise, or keep logging
                 if !err.to_string().contains("already registered") {
-                     eprintln!("[ERROR] Failed to register Esc shortcut: {}", err);
+                    eprintln!("[ERROR] Failed to register Esc shortcut: {}", err);
                 }
             });
     });
 }
 
 /// 处理窗口失去焦点
-fn handle_window_blur(
-    app_handle: &AppHandle,
-    window: &tauri::WebviewWindow,
-    shortcut: Shortcut,
-) {
+fn handle_window_blur(app_handle: &AppHandle, window: &tauri::WebviewWindow, shortcut: Shortcut) {
     let window_state: State<WindowState> = app_handle.state();
     let lock_state: State<WindowCloseLockState> = app_handle.state();
 
     // 注销 ESC 快捷键 (Async to avoid deadlock)
     let app_handle_unreg = app_handle.clone();
     tauri::async_runtime::spawn(async move {
-         app_handle_unreg
+        app_handle_unreg
             .global_shortcut()
             .unregister(shortcut)
             .unwrap_or_else(|err| {
-                 // Ignore "not registered" error
-                  if !err.to_string().contains("not registered") {
-                      eprintln!("[ERROR] Failed to unregister Esc shortcut: {}", err);
-                  }
+                // Ignore "not registered" error
+                if !err.to_string().contains("not registered") {
+                    eprintln!("[ERROR] Failed to unregister Esc shortcut: {}", err);
+                }
             });
     });
 
@@ -350,5 +346,3 @@ mod macos_activation {
         }
     }
 }
-
-
