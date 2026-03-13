@@ -58,6 +58,9 @@ pub fn handle_global_shortcut(
         );
         execute_shortcut_action(app, app_shortcut);
     } else {
+        if should_debounce_shortcut(&state, &triggered_shortcut) {
+            return;
+        }
         handle_special_keys(app, &triggered_shortcut);
     }
 }
@@ -144,7 +147,6 @@ fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::
 fn handle_special_keys(app: &AppHandle, triggered_shortcut: &str) {
     if triggered_shortcut.to_uppercase() == "ESCAPE" {
         println!("ESC key detected, checking for active plugin window");
-
         // 检查是否有活跃的插件窗口
         if let Some(active_window_state) = app.try_state::<crate::plugin::ActivePluginWindow>() {
             if let Ok(active) = active_window_state.0.lock() {
@@ -174,22 +176,14 @@ fn handle_special_keys(app: &AppHandle, triggered_shortcut: &str) {
         //     let _ = window.hide();
         //     let _ = window.emit("window_visibility", &false);
         // }
-        println!("ESC detected in backend. Delegating to frontend.");
         if let Some(window) = app.get_webview_window("main") {
-            println!("Found main window, emitting escape_pressed");
             if let Err(e) = window.emit("escape_pressed", ()) {
                 eprintln!("Error emitting escape_pressed event: {}", e);
             }
+        } else if let Some(window) = app.get_window("main") {
+            let _ = window.emit("escape_pressed", ());
         } else {
-            eprintln!("Main window not found when handling ESC. Available windows:");
-            for (label, _) in app.webview_windows() {
-                eprintln!(" - {}", label);
-            }
-            // Try get_window as fallback (though in v2 it might be same)
-            if let Some(w) = app.get_window("main") {
-                eprintln!("Found 'main' via get_window! Emitting...");
-                let _ = w.emit("escape_pressed", ());
-            }
+            eprintln!("Main window not found when handling ESC");
         }
     } else {
         println!("No matching shortcut found for: {}", triggered_shortcut);

@@ -37,7 +37,6 @@ fn resolve_host_window<R: Runtime>(app: &AppHandle<R>) -> Result<tauri::Window<R
             format!("Main window not found, available windows: [{}]", labels)
         })
 }
-
 #[tauri::command]
 pub async fn show_inline_plugin<R: Runtime>(
     app: AppHandle<R>,
@@ -88,21 +87,6 @@ pub async fn show_inline_plugin<R: Runtime>(
 
         let webview_builder = WebviewBuilder::new("plugin-inline", webview_url)
             .devtools(true)
-            .initialization_script(
-                r#"
-                window.addEventListener('keydown', (e) => {
-                    if (e.key === 'Escape') {
-                        if (window.__TAURI__ && window.__TAURI__.core) {
-                            window.__TAURI__.core.invoke('close_inline_plugin').catch(() => {});
-                        }
-
-                        if (window.__TAURI_IPC__) {
-                            window.__TAURI_IPC__('escape_pressed');
-                        }
-                    }
-                });
-                "#,
-            )
             .on_page_load(|webview, _payload| {
                 println!("[plugin/inline] Page loaded, emitting event");
                 use tauri::Emitter;
@@ -127,7 +111,6 @@ pub async fn show_inline_plugin<R: Runtime>(
 
     Ok(())
 }
-
 #[tauri::command]
 pub fn update_inline_plugin_bounds<R: Runtime>(
     app: AppHandle<R>,
@@ -149,7 +132,6 @@ pub fn update_inline_plugin_bounds<R: Runtime>(
     }
     Ok(())
 }
-
 #[tauri::command]
 pub fn hide_inline_plugin<R: Runtime>(
     app: AppHandle<R>,
@@ -173,7 +155,6 @@ pub fn hide_inline_plugin<R: Runtime>(
     }
     Ok(())
 }
-
 #[tauri::command]
 pub fn close_inline_plugin<R: Runtime>(
     app: AppHandle<R>,
@@ -195,7 +176,6 @@ pub fn close_inline_plugin<R: Runtime>(
 
     Ok(())
 }
-
 #[tauri::command]
 pub fn post_inline_plugin_message<R: Runtime>(
     app: AppHandle<R>,
@@ -220,4 +200,3 @@ pub fn open_inline_plugin_devtools<R: Runtime>(app: AppHandle<R>) -> Result<(), 
         Err("插件视图未找到".to_string())
     }
 }
-

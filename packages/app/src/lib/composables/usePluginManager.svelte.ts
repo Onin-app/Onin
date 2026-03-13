@@ -54,7 +54,8 @@ export function usePluginManager(): PluginManagerReturn {
    * 关闭插件内联显示
    */
   const closePlugin = () => {
-    // 发送隐藏事件给插件
+    // 内联返回列表时，先通知失焦，再通知隐藏，便于插件做窗口级清理。
+    sendLifecycleEvent("blur");
     sendLifecycleEvent("hide");
 
     // 缓存当前配置，避免清理 state 后丢失判断依据
@@ -86,7 +87,8 @@ export function usePluginManager(): PluginManagerReturn {
     const pluginId = state.currentPluginId;
 
     try {
-      // 步骤 1：先发送 hide 生命周期事件，并更新 UI 状态
+      // 步骤 1：先发送 blur/hide 生命周期事件，并更新 UI 状态
+      sendLifecycleEvent("blur");
       sendLifecycleEvent("hide");
       state.showPluginInline = false;
       state.currentPluginUrl = "";
@@ -277,13 +279,11 @@ export function usePluginManager(): PluginManagerReturn {
       "window_visibility",
       (event) => {
         const isVisible = event.payload;
-        if (
-          !isVisible &&
-          state.showPluginInline &&
-          state.currentPluginTerminateOnBg
-        ) {
+        if (!isVisible && state.showPluginInline) {
           console.log(
-            "[PluginManager] Terminating plugin on background hide:",
+            state.currentPluginTerminateOnBg
+              ? "[PluginManager] Terminating plugin on background hide:"
+              : "[PluginManager] Hiding inline plugin and returning to list:",
             state.currentPluginId,
           );
           closePlugin();

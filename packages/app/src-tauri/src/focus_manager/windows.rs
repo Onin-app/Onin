@@ -1,12 +1,12 @@
 use std::sync::Mutex;
 use tauri::{App, AppHandle, Manager, WebviewWindow, Window};
-use windows::Win32::Foundation::{BOOL, HWND, LPARAM};
+use windows::Win32::Foundation::{BOOL, HWND, LPARAM, RECT};
 use windows::Win32::System::Threading::AttachThreadInput;
 use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
 use windows::Win32::UI::WindowsAndMessaging::{
     AllowSetForegroundWindow, BringWindowToTop, EnumChildWindows, GetForegroundWindow,
-    GetWindowThreadProcessId, IsIconic, SetForegroundWindow, ShowWindow, ASFW_ANY, SW_RESTORE,
-    SW_SHOW,
+    GetWindowRect, GetWindowThreadProcessId, IsIconic, IsWindowVisible, SetForegroundWindow,
+    ShowWindow, ASFW_ANY, SW_RESTORE, SW_SHOW,
 };
 
 pub struct PreviousForegroundWindow(pub Mutex<Option<isize>>);
@@ -96,7 +96,9 @@ pub fn focus_window(window: &Window) {
 /// - EnumChildWindows 找到内部 WebView2 子窗口，而不是只操作外层宿主窗口。
 /// - SetFocus 最终打到真实接收输入的子 HWND，保证键盘事件进入 WebView DOM。
 ///
-/// 热键唤起、托盘点击唤起、首次强制聚焦都依赖这段逻辑；后续如果要调整，必须实机回归验证这些路径。
+/// 当存在 inline 插件 child webview 时，不能再拿“枚举到的第一个 child”直接聚焦，
+/// 否则隐藏但未销毁的插件 webview 可能会长期截获键盘焦点。
+/// 这里优先选择可见且面积最大的 child，通常就是主 WebView2。
 fn force_set_foreground_window(hwnd_isize: isize) {
     let hwnd_val = HWND(hwnd_isize as _);
 
@@ -107,21 +109,51 @@ fn force_set_foreground_window(hwnd_isize: isize) {
         let foreground_thread = GetWindowThreadProcessId(foreground_hwnd, None);
         let window_thread = GetWindowThreadProcessId(hwnd_val, None);
 
-        unsafe extern "system" fn enum_child_proc(hwnd: HWND, lparam: LPARAM) -> BOOL {
-            let out_hwnd = lparam.0 as *mut HWND;
-            *out_hwnd = hwnd;
-            BOOL(0)
+        #[derive(Clone, Copy)]
+        struct ChildWindowCandidate {
+            first_child: HWND,
+            best_visible_child: HWND,
+            best_visible_area: i64,
         }
 
-        let mut child_hwnd: HWND = HWND(0);
+        unsafe extern "system" fn enum_child_proc(hwnd: HWND, lparam: LPARAM) -> BOOL {
+            let state = &mut *(lparam.0 as *mut ChildWindowCandidate);
+
+            if state.first_child.0 == 0 {
+                state.first_child = hwnd;
+            }
+
+            if IsWindowVisible(hwnd).as_bool() {
+                let mut rect = RECT::default();
+                if GetWindowRect(hwnd, &mut rect).is_ok() {
+                    let width = (rect.right - rect.left).max(0) as i64;
+                    let height = (rect.bottom - rect.top).max(0) as i64;
+                    let area = width * height;
+                    if area > state.best_visible_area {
+                        state.best_visible_area = area;
+                        state.best_visible_child = hwnd;
+                    }
+                }
+            }
+
+            BOOL(1)
+        }
+
+        let mut child_state = ChildWindowCandidate {
+            first_child: HWND(0),
+            best_visible_child: HWND(0),
+            best_visible_area: -1,
+        };
         let _ = EnumChildWindows(
             hwnd_val,
             Some(enum_child_proc),
-            LPARAM(&mut child_hwnd as *mut _ as isize),
+            LPARAM(&mut child_state as *mut _ as isize),
         );
 
-        let target_focus_hwnd = if child_hwnd.0 != 0 {
-            child_hwnd
+        let target_focus_hwnd = if child_state.best_visible_child.0 != 0 {
+            child_state.best_visible_child
+        } else if child_state.first_child.0 != 0 {
+            child_state.first_child
         } else {
             hwnd_val
         };
