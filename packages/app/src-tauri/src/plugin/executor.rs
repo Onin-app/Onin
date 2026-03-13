@@ -31,10 +31,6 @@ pub fn execute_plugin_entry(
     store: State<'_, PluginStore>,
     plugin_id: String,
 ) -> Result<(), String> {
-    println!(
-        "[plugin/executor] 执行插件入口: {}",
-        plugin_id
-    );
 
     // 尽快释放锁，克隆插件数据
     let plugin = {
@@ -43,16 +39,7 @@ pub fn execute_plugin_entry(
     }
     .ok_or_else(|| format!("插件未找到: {}", plugin_id))?;
 
-    println!(
-        "[plugin/executor] 插件已找到: {}，启用状态: {}",
-        plugin.manifest.name, plugin.enabled
-    );
-
     // 调试日志
-    println!(
-        "[plugin/executor] 插件 dev_mode: {}, dev_server: {:?}",
-        plugin.manifest.dev_mode, plugin.manifest.dev_server
-    );
 
     // 检查插件是否启用
     if !plugin.enabled {
@@ -98,10 +85,6 @@ fn execute_dev_mode_plugin(
     plugin: &super::types::LoadedPlugin,
 ) -> Result<(), String> {
     if let Some(dev_server) = &plugin.manifest.dev_server {
-        println!(
-            "[plugin/executor] 插件 {} 处于开发模式，从 {} 加载",
-            plugin.manifest.id, dev_server
-        );
 
         // 判断是否在窗口中打开
         let should_open_in_window =
@@ -131,20 +114,11 @@ fn execute_js_plugin(
     plugin: &super::types::LoadedPlugin,
     entry_path: std::path::PathBuf,
 ) -> Result<(), String> {
-    println!(
-        "[plugin/executor] 执行 JS 插件: {}",
-        plugin.manifest.id
-    );
 
     // 读取 JS 代码
     let js_code = std::fs::read_to_string(&entry_path).map_err(|e| e.to_string())?;
     let app_clone = app.clone();
     let plugin_id = plugin.manifest.id.clone();
-
-    println!(
-        "[plugin/executor] 为插件 {} 创建 JS 执行线程",
-        plugin_id
-    );
 
     // 在后台线程中执行
     std::thread::spawn(move || {
@@ -171,14 +145,6 @@ fn execute_html_plugin(
     // 判断是否在窗口中打开
     let should_open_in_window =
         plugin.manifest.auto_detach || plugin.manifest.display_mode.as_str() == "window";
-
-    println!(
-        "[plugin/executor] 插件 {} - auto_detach: {}, display_mode: {}, should_open_in_window: {}",
-        plugin.manifest.id,
-        plugin.manifest.auto_detach,
-        plugin.manifest.display_mode,
-        should_open_in_window
-    );
 
     if should_open_in_window {
         // 在新窗口中打开
@@ -248,3 +214,4 @@ pub fn show_plugin_inline(
 
     Ok(())
 }
+

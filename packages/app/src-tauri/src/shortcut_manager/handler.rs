@@ -7,7 +7,6 @@ use tauri_plugin_global_shortcut::{Shortcut, ShortcutState as GlobalShortcutPlug
 
 const SHORTCUT_DEBOUNCE_MS: u128 = 400;
 
-/// 处理全局快捷键事件
 pub fn handle_global_shortcut(
     app: &AppHandle,
     shortcut: &Shortcut,
@@ -21,12 +20,6 @@ pub fn handle_global_shortcut(
     let triggered_shortcut = normalize_shortcut_string(&shortcut_str);
     let state: State<ShortcutState> = app.state();
 
-    println!(
-        "Handling shortcut: {} (normalized: {})",
-        shortcut_str, triggered_shortcut
-    );
-
-    // 获取状态
     let shortcuts = match state.shortcuts.lock() {
         Ok(shortcuts) => shortcuts,
         Err(e) => {
@@ -35,13 +28,8 @@ pub fn handle_global_shortcut(
         }
     };
 
-    // 查找匹配的快捷键
     let matching_shortcut = shortcuts.iter().find(|s| {
         let stored_shortcut = normalize_shortcut_string(&s.shortcut);
-        println!(
-            "Comparing with stored shortcut: {} (normalized: {})",
-            s.shortcut, stored_shortcut
-        );
         stored_shortcut == triggered_shortcut
     });
 
@@ -51,11 +39,6 @@ pub fn handle_global_shortcut(
         {
             return;
         }
-
-        println!(
-            "Found matching shortcut: {} -> {}",
-            app_shortcut.shortcut, app_shortcut.command_name
-        );
         execute_shortcut_action(app, app_shortcut);
     } else {
         if should_debounce_shortcut(&state, &triggered_shortcut) {
@@ -70,10 +53,6 @@ fn should_debounce_shortcut(state: &State<ShortcutState>, triggered_shortcut: &s
         if let Some(last_time) = last_executed.get(triggered_shortcut) {
             let elapsed = last_time.elapsed().as_millis();
             if elapsed < SHORTCUT_DEBOUNCE_MS {
-                println!(
-                    "Debouncing shortcut: {} (elapsed: {}ms)",
-                    triggered_shortcut, elapsed
-                );
                 return true;
             }
         }
@@ -83,8 +62,6 @@ fn should_debounce_shortcut(state: &State<ShortcutState>, triggered_shortcut: &s
     false
 }
 
-/// 执行快捷键动作
-/// 执行快捷键动作
 fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::Shortcut) {
     if app_shortcut.command_name == "toggle_window" {
         if let Some(window) = app.get_webview_window("main") {
@@ -119,7 +96,6 @@ fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::
             eprintln!("Main window not found for toggle_window");
         }
     } else if app_shortcut.command_name == "detach_window" {
-        println!("Executing detach window command");
         if let Some(window) = app.get_webview_window("main") {
             if let Err(e) = window.emit("detach_window_shortcut", ()) {
                 eprintln!("Error emitting detach window command: {}", e);
@@ -129,32 +105,22 @@ fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::
                 eprintln!("Error emitting detach window command (fallback): {}", e);
             }
         }
-    } else {
-        println!("Executing command: {}", app_shortcut.command_name);
-        if let Some(window) = app.get_webview_window("main") {
-            if let Err(e) = window.emit("execute_command_by_name", &app_shortcut.command_name) {
-                eprintln!("Error emitting command: {}", e);
-            }
-        } else if let Some(window) = app.get_window("main") {
-            if let Err(e) = window.emit("execute_command_by_name", &app_shortcut.command_name) {
-                eprintln!("Error emitting command (fallback): {}", e);
-            }
+    } else if let Some(window) = app.get_webview_window("main") {
+        if let Err(e) = window.emit("execute_command_by_name", &app_shortcut.command_name) {
+            eprintln!("Error emitting command: {}", e);
+        }
+    } else if let Some(window) = app.get_window("main") {
+        if let Err(e) = window.emit("execute_command_by_name", &app_shortcut.command_name) {
+            eprintln!("Error emitting command (fallback): {}", e);
         }
     }
 }
 
-/// 处理特殊按键（如 ESC）
 fn handle_special_keys(app: &AppHandle, triggered_shortcut: &str) {
     if triggered_shortcut.to_uppercase() == "ESCAPE" {
-        println!("ESC key detected, checking for active plugin window");
-        // 检查是否有活跃的插件窗口
         if let Some(active_window_state) = app.try_state::<crate::plugin::ActivePluginWindow>() {
             if let Ok(active) = active_window_state.0.lock() {
                 if let Some(window_label) = active.as_ref() {
-                    println!(
-                        "Active plugin window found: {}, minimizing it",
-                        window_label
-                    );
                     if let Some(window) = app.get_webview_window(window_label) {
                         if let Err(e) = window.minimize() {
                             eprintln!("Failed to minimize plugin window: {}", e);
@@ -165,17 +131,6 @@ fn handle_special_keys(app: &AppHandle, triggered_shortcut: &str) {
             }
         }
 
-        // 如果没有活跃的插件窗口，则隐藏主窗口
-        // MODIFY: 移除后端自动隐藏逻辑，交由前端控制
-        // println!("No active plugin window, hiding main window");
-        // if let Some(window) = app.get_webview_window("main") {
-        //     let state: State<crate::window_manager::WindowState> = app.state();
-        //     state
-        //         .hiding_initiated_by_command
-        //         .store(true, std::sync::atomic::Ordering::Relaxed);
-        //     let _ = window.hide();
-        //     let _ = window.emit("window_visibility", &false);
-        // }
         if let Some(window) = app.get_webview_window("main") {
             if let Err(e) = window.emit("escape_pressed", ()) {
                 eprintln!("Error emitting escape_pressed event: {}", e);
@@ -185,7 +140,6 @@ fn handle_special_keys(app: &AppHandle, triggered_shortcut: &str) {
         } else {
             eprintln!("Main window not found when handling ESC");
         }
-    } else {
-        println!("No matching shortcut found for: {}", triggered_shortcut);
     }
 }
+

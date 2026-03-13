@@ -128,7 +128,6 @@
           event,
         },
       });
-      console.log("[PluginInlineView] Sent lifecycle event:", event);
     } catch (err) {
       console.error("[PluginInlineView] Failed to send lifecycle event:", err);
     }
@@ -149,7 +148,6 @@
 
     // 监听 Native Webview 加载完成事件
     listen("plugin-inline-loaded", () => {
-      console.log("[PluginInlineView] Native webview loaded");
       onLoad?.();
       // Also send init again just in case? No, showWebview sent it.
       // But if load happened, maybe context cleared?
@@ -234,3 +232,4 @@
   class="relative h-full w-full bg-transparent"
   role="none"
 ></div>
+

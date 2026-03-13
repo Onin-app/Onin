@@ -57,7 +57,6 @@
         try {
           const { openUrl } = await import("@tauri-apps/plugin-opener");
           await openUrl(href);
-          console.log("[Marketplace] Opened URL in browser:", href);
         } catch (e) {
           console.error("Failed to open link:", e);
         }
@@ -69,10 +68,6 @@
     try {
       const installed = await invoke<any[]>("get_loaded_plugins");
       installedPluginIds = new Set(installed.map((p: any) => p.id));
-      console.log(
-        "[Marketplace] Installed plugin IDs:",
-        Array.from(installedPluginIds),
-      );
     } catch (e) {
       console.error("Failed to load installed plugins:", e);
     }
@@ -92,11 +87,6 @@
 
       plugins = response.data;
       total = response.meta.total;
-
-      console.log(
-        "[Marketplace] Loaded plugins:",
-        plugins.map((p) => ({ id: p.id, name: p.name, icon: p.icon })),
-      );
 
       // 同时加载已安装插件列表
       await loadInstalledPlugins();
@@ -126,12 +116,6 @@
     try {
       const { fetchPluginDetail } = await import("$lib/api/marketplace");
       const detail = await fetchPluginDetail(plugin.id);
-      console.log("[Marketplace] Plugin detail loaded:", {
-        id: detail.id,
-        name: detail.name,
-        hasReleaseNotes: !!detail.releaseNotes,
-        releaseNotes: detail.releaseNotes,
-      });
       selectedPlugin = detail; // 更新为完整详情
     } catch (e) {
       console.error("Failed to load plugin detail:", e);
@@ -179,14 +163,12 @@
 
     // 监听插件卸载事件，刷新已安装列表
     const unlistenUninstalled = await listen<string>("plugin-uninstalled", async () => {
-      console.log("[Marketplace] Plugin uninstalled, refreshing installed list");
       await loadInstalledPlugins();
     });
     unlistenFns.push(unlistenUninstalled);
 
     // 监听插件安装事件，刷新已安装列表
     const unlistenInstalled = await listen<string>("plugin-installed", async () => {
-      console.log("[Marketplace] Plugin installed, refreshing installed list");
       await loadInstalledPlugins();
     });
     unlistenFns.push(unlistenInstalled);
@@ -271,9 +253,7 @@
         {#each plugins as plugin (plugin.id)}
           {@const isInstalled = installedPluginIds.has(plugin.id)}
           {#if isInstalled}
-            {console.log(
-              `[Marketplace] Plugin ${plugin.id} (${plugin.name}) is installed`,
-            )}
+            
           {/if}
           <PluginCard
             {plugin}
@@ -480,3 +460,4 @@
     </Dialog.Portal>
   </Dialog.Root>
 {/if}
+

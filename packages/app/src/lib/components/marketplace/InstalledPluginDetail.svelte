@@ -57,7 +57,6 @@
         try {
           const { openUrl } = await import("@tauri-apps/plugin-opener");
           await openUrl(href);
-          console.log("[InstalledPluginDetail] Opened URL in browser:", href);
         } catch (e) {
           console.error("Failed to open link:", e);
         }
@@ -102,17 +101,12 @@
         pluginId,
       });
       detail = result;
-      console.log("[InstalledPluginDetail] Loaded local detail:", result);
 
       // 如果是市场插件，从接口获取完整详情
       if (result.install_source === "marketplace") {
         try {
           const { fetchPluginDetail } = await import("$lib/api/marketplace");
           const marketDetail = await fetchPluginDetail(result.id);
-          console.log(
-            "[InstalledPluginDetail] Loaded market detail:",
-            marketDetail,
-          );
 
           // 合并数据：优先使用市场数据
           detail = {
@@ -300,3 +294,4 @@
     </Dialog.Content>
   </Dialog.Portal>
 </Dialog.Root>
+

@@ -146,8 +146,6 @@ pub async fn plugin_fs_read_file(app: AppHandle, path: String) -> Result<String,
     let file_path = resolve_plugin_path(&app, &plugin_id, &path)?;
 
     let content = fs::read_to_string(&file_path).await?;
-
-    println!("[FS] Read file '{}' for plugin '{}'", path, plugin_id);
     Ok(content)
 }
 
@@ -166,8 +164,6 @@ pub async fn plugin_fs_write_file(
     }
 
     fs::write(&file_path, content).await?;
-
-    println!("[FS] Wrote file '{}' for plugin '{}'", path, plugin_id);
     Ok(())
 }
 
@@ -177,11 +173,6 @@ pub async fn plugin_fs_exists(app: AppHandle, path: String) -> Result<bool, File
     let file_path = resolve_plugin_path(&app, &plugin_id, &path)?;
 
     let exists = file_path.exists();
-
-    println!(
-        "[FS] Check exists '{}' for plugin '{}': {}",
-        path, plugin_id, exists
-    );
     Ok(exists)
 }
 
@@ -199,11 +190,6 @@ pub async fn plugin_fs_create_dir(
     } else {
         fs::create_dir(&dir_path).await?;
     }
-
-    println!(
-        "[FS] Created dir '{}' for plugin '{}' (recursive: {})",
-        path, plugin_id, recursive
-    );
     Ok(())
 }
 
@@ -251,13 +237,6 @@ pub async fn plugin_fs_list_dir(
             created_time,
         });
     }
-
-    println!(
-        "[FS] Listed dir '{}' for plugin '{}': {} items",
-        path,
-        plugin_id,
-        files.len()
-    );
     Ok(files)
 }
 
@@ -267,8 +246,6 @@ pub async fn plugin_fs_delete_file(app: AppHandle, path: String) -> Result<(), F
     let file_path = resolve_plugin_path(&app, &plugin_id, &path)?;
 
     fs::remove_file(&file_path).await?;
-
-    println!("[FS] Deleted file '{}' for plugin '{}'", path, plugin_id);
     Ok(())
 }
 
@@ -286,11 +263,6 @@ pub async fn plugin_fs_delete_dir(
     } else {
         fs::remove_dir(&dir_path).await?;
     }
-
-    println!(
-        "[FS] Deleted dir '{}' for plugin '{}' (recursive: {})",
-        path, plugin_id, recursive
-    );
     Ok(())
 }
 
@@ -332,8 +304,6 @@ pub async fn plugin_fs_get_file_info(
         modified_time,
         created_time,
     };
-
-    println!("[FS] Got file info '{}' for plugin '{}'", path, plugin_id);
     Ok(file_info)
 }
 
@@ -353,11 +323,6 @@ pub async fn plugin_fs_copy_file(
     }
 
     fs::copy(&source_file_path, &dest_file_path).await?;
-
-    println!(
-        "[FS] Copied file '{}' to '{}' for plugin '{}'",
-        source_path, dest_path, plugin_id
-    );
     Ok(())
 }
 
@@ -377,10 +342,6 @@ pub async fn plugin_fs_move_file(
     }
 
     fs::rename(&source_file_path, &dest_file_path).await?;
-
-    println!(
-        "[FS] Moved file '{}' to '{}' for plugin '{}'",
-        source_path, dest_path, plugin_id
-    );
     Ok(())
 }
+

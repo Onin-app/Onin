@@ -62,8 +62,6 @@ pub async fn plugin_storage_set(
 
     store.set(key.clone(), value);
     store.save()?;
-
-    println!("[Storage] Set key '{}' for plugin '{}'", key, plugin_id);
     Ok(())
 }
 
@@ -78,13 +76,6 @@ pub async fn plugin_storage_get(
 
     store.reload()?;
     let value = store.get(&key).map(|v| v.clone());
-
-    println!(
-        "[Storage] Get key '{}' for plugin '{}': {:?}",
-        key,
-        plugin_id,
-        value.is_some()
-    );
     Ok(value)
 }
 
@@ -99,8 +90,6 @@ pub async fn plugin_storage_remove(
 
     store.delete(&key);
     store.save()?;
-
-    println!("[Storage] Removed key '{}' for plugin '{}'", key, plugin_id);
     Ok(())
 }
 
@@ -114,8 +103,6 @@ pub async fn plugin_storage_clear(
 
     store.clear();
     store.save()?;
-
-    println!("[Storage] Cleared all data for plugin '{}'", plugin_id);
     Ok(())
 }
 
@@ -129,8 +116,6 @@ pub async fn plugin_storage_keys(
 
     store.reload()?;
     let keys: Vec<String> = store.keys().iter().cloned().collect();
-
-    println!("[Storage] Got {} keys for plugin '{}'", keys.len(), plugin_id);
     Ok(keys)
 }
 
@@ -142,17 +127,11 @@ pub async fn plugin_storage_set_items(
     let plugin_id = get_current_plugin_id(&app)?;
     let store_path = get_plugin_store_path(&plugin_id);
     let store = StoreBuilder::new(&app, store_path).build()?;
-    let items_len = items.len();
 
     for (key, value) in items {
         store.set(key, value);
     }
     store.save()?;
-
-    println!(
-        "[Storage] Set {} items for plugin '{}'",
-        items_len, plugin_id
-    );
     Ok(())
 }
 
@@ -172,12 +151,6 @@ pub async fn plugin_storage_get_items(
             result.insert(key, value.clone());
         }
     }
-
-    println!(
-        "[Storage] Got {} items for plugin '{}'",
-        result.len(),
-        plugin_id
-    );
     Ok(result)
 }
 
@@ -194,12 +167,6 @@ pub async fn plugin_storage_get_all(
     for (key, value) in store.entries() {
         result.insert(key.clone(), value.clone());
     }
-
-    println!(
-        "[Storage] Got all {} items for plugin '{}'",
-        result.len(),
-        plugin_id
-    );
     Ok(result)
 }
 
@@ -213,15 +180,12 @@ pub async fn plugin_storage_set_all(
     let store = StoreBuilder::new(&app, store_path).build()?;
 
     store.clear();
-    let data_len = data.len();
     for (key, value) in data {
         store.set(key, value);
     }
     store.save()?;
-
-    println!(
-        "[Storage] Replaced with {} items for plugin '{}'",
-        data_len, plugin_id
-    );
     Ok(())
 }
+
+
+

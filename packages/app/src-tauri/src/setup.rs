@@ -141,7 +141,6 @@ fn spawn_async_init_tasks(app_handle: tauri::AppHandle) {
 
         match plugin_server::start_plugin_server(plugins_dir).await {
             Ok(port) => {
-                println!("[INFO] Plugin server started on port {}", port);
                 let server_port = app_handle.state::<plugin::PluginServerPort>();
                 *server_port.0.lock().unwrap() = Some(port);
             }
@@ -167,7 +166,6 @@ fn spawn_async_init_tasks(app_handle: tauri::AppHandle) {
         };
 
         for plugin_id in plugins_to_start {
-            println!("[INFO] 正在启动设置为跟随启动的插件: {}", plugin_id);
             if let Err(e) = plugin::executor::execute_plugin_entry(
                 app_handle.clone(),
                 plugin_store.clone(),
@@ -232,3 +230,4 @@ fn setup_desktop_features(app: &mut App) -> Result<(), Box<dyn std::error::Error
 
     Ok(())
 }
+

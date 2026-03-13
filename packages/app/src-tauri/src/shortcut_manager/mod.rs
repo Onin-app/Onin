@@ -86,3 +86,4 @@ pub fn setup_shortcuts(app: &App) -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+

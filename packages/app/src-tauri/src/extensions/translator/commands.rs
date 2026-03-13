@@ -121,7 +121,6 @@ pub async fn open_window(app: &tauri::AppHandle, text: Option<String>) -> Result
 
     window.listen("translator_switch", move |event| {
         let payload = event.payload();
-        println!("Received switch event: {}", payload);
         
         // Simple check. ideally parse JSON.
         // Payload format: {"engine":"..."}
@@ -157,3 +156,4 @@ pub async fn open_window(app: &tauri::AppHandle, text: Option<String>) -> Result
 
     Ok(())
 }
+

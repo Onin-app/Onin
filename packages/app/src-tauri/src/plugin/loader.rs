@@ -169,7 +169,6 @@ pub fn load_plugins_internal(
             rt.block_on(async {
                 for (plugin_id, entry_path, _dir_name) in plugins_to_init {
                     if let Ok(js_code) = std::fs::read_to_string(&entry_path) {
-                        println!("[plugin/loader] 正在初始化插件: {}", plugin_id);
                         let _ = js_runtime::execute_js(&app_clone, &js_code, Some(&plugin_id)).await;
                     }
                 }
@@ -223,3 +222,4 @@ pub async fn refresh_plugins(
     // 重新加载所有插件
     load_plugins_internal(&app, &store, true)
 }
+

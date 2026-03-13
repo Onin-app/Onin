@@ -49,3 +49,4 @@ pub fn save_shortcuts_to_disk(app: &AppHandle, shortcuts: &[AppShortcut]) {
         eprintln!("Failed to write to shortcuts.json: {}", e);
     }
 }
+

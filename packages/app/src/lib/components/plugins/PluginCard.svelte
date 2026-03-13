@@ -113,7 +113,6 @@
           class="shrink-0 rounded p-1 opacity-0 transition-opacity hover:bg-neutral-100 group-hover:opacity-100 dark:hover:bg-neutral-800"
           onclick={(e: MouseEvent) => {
             e.stopPropagation();
-            console.log("Open GitHub for", plugin.id);
           }}
           aria-label="查看 GitHub"
         >
@@ -213,3 +212,4 @@
     </div>
   </div>
 </div>
+

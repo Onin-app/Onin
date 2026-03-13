@@ -34,21 +34,17 @@
       // BUT only handle it if we are NOT on the main page.
       // The main page (+page.svelte) has its own listener.
       const unlisten = await listen("escape_pressed", () => {
-        console.log("Layout: escape_pressed received. Route:", page.route.id);
 
         // Check if we are on the main page
         if (page.route.id === "/") {
             // Do NOTHING. Let +page.svelte handle it.
-            console.log("Layout: On main page, ignoring ESC to avoid double-handling.");
         } else {
           // If not on main page, check if there is a registered handler
           const handler = get(escapeHandler);
           if (handler && typeof handler === 'function') {
-             console.log("Layout: Executing registered escape handler.");
              handler();
           } else {
              // Fallback
-             console.log("Layout: No handler, going back.");
              window.history.back();
           }
         }

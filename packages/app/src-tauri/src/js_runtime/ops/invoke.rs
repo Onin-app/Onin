@@ -24,7 +24,6 @@ pub async fn op_invoke(
     #[string] method: String,
     #[serde] arg: serde_json::Value,
 ) -> InvokeResult {
-    println!("插件异步调用 invoke: method={}, arg={}", method, arg);
 
     // 在进入 async 之前提取所需数据，避免生命周期问题
     let (app_handle, plugin_id) = {
@@ -43,3 +42,4 @@ pub async fn op_invoke(
 
     result
 }
+

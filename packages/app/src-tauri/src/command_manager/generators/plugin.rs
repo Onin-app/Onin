@@ -18,7 +18,6 @@ fn get_plugin_icon_base64(app: &AppHandle, dir_name: &str, icon_path: &Option<St
     let icon_value = match icon_path {
         Some(path) if !path.is_empty() => path,
         _ => {
-            println!("[plugin/icon] 插件 {} 未配置图标", dir_name);
             return String::new();
         }
     };
@@ -28,15 +27,6 @@ fn get_plugin_icon_base64(app: &AppHandle, dir_name: &str, icon_path: &Option<St
         || icon_value.starts_with("https://")
         || icon_value.starts_with("data:")
     {
-        println!(
-            "[plugin/icon] 插件 {} 使用 URL 图标: {}",
-            dir_name,
-            if icon_value.len() > 50 {
-                format!("{}...", &icon_value[..50])
-            } else {
-                icon_value.clone()
-            }
-        );
         return icon_value.clone();
     }
 
@@ -50,12 +40,6 @@ fn get_plugin_icon_base64(app: &AppHandle, dir_name: &str, icon_path: &Option<St
     };
 
     let icon_full_path = plugins_dir.join(dir_name).join(icon_value);
-
-    println!(
-        "[plugin/icon] 尝试读取插件图标: {} (路径: {})",
-        dir_name,
-        icon_full_path.display()
-    );
 
     // 根据扩展名确定 MIME 类型
     let mime_type = match Path::new(icon_value)
@@ -76,12 +60,6 @@ fn get_plugin_icon_base64(app: &AppHandle, dir_name: &str, icon_path: &Option<St
     // 读取图标文件并编码为 Data URL
     match std::fs::read(&icon_full_path) {
         Ok(bytes) => {
-            println!(
-                "[plugin/icon] 成功读取插件图标: {} ({} 字节, MIME: {})",
-                dir_name,
-                bytes.len(),
-                mime_type
-            );
             format!(
                 "data:{};base64,{}",
                 mime_type,
@@ -269,3 +247,4 @@ pub fn get_initial_dynamic_commands(app: &AppHandle) -> Vec<Command> {
         })
         .collect()
 }
+

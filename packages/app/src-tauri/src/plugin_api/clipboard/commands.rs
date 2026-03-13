@@ -17,11 +17,9 @@ pub async fn plugin_clipboard_read_text(
 ) -> Result<Option<String>, ClipboardError> {
     match app.clipboard().read_text() {
         Ok(text) => {
-            println!("[Clipboard] Read text: {} chars", text.len());
             Ok(Some(text))
         }
         Err(e) => {
-            println!("[Clipboard] Failed to read text: {}", e);
             Err(ClipboardError::from(format!(
                 "Failed to read clipboard text: {}",
                 e
@@ -38,11 +36,9 @@ pub async fn plugin_clipboard_write_text(
 ) -> Result<(), ClipboardError> {
     match app.clipboard().write_text(options.text.clone()) {
         Ok(_) => {
-            println!("[Clipboard] Wrote text: {} chars", options.text.len());
             Ok(())
         }
         Err(e) => {
-            println!("[Clipboard] Failed to write text: {}", e);
             Err(ClipboardError::from(format!(
                 "Failed to write clipboard text: {}",
                 e
@@ -56,7 +52,6 @@ pub async fn plugin_clipboard_write_text(
 pub async fn plugin_clipboard_read_image(
     _app: AppHandle,
 ) -> Result<Option<String>, ClipboardError> {
-    println!("[Clipboard] Image reading is not yet implemented");
     Err(ClipboardError::from(
         "Image reading is not yet implemented. Please use text operations for now.",
     ))
@@ -68,7 +63,6 @@ pub async fn plugin_clipboard_write_image(
     _app: AppHandle,
     _options: WriteImageOptions,
 ) -> Result<(), ClipboardError> {
-    println!("[Clipboard] Image writing is not yet implemented");
     Err(ClipboardError::from(
         "Image writing is not yet implemented. Please use text operations for now.",
     ))
@@ -79,11 +73,9 @@ pub async fn plugin_clipboard_write_image(
 pub async fn plugin_clipboard_clear(app: AppHandle) -> Result<(), ClipboardError> {
     match app.clipboard().clear() {
         Ok(_) => {
-            println!("[Clipboard] Cleared clipboard");
             Ok(())
         }
         Err(e) => {
-            println!("[Clipboard] Failed to clear clipboard: {}", e);
             Err(ClipboardError::from(format!(
                 "Failed to clear clipboard: {}",
                 e
@@ -173,15 +165,6 @@ pub async fn plugin_clipboard_get_metadata(
         }
     }
 
-    println!(
-        "[Clipboard] Plugin read metadata: type={:?}, has_text={}, has_files={}, timestamp={:?}, age={:?}",
-        content_type,
-        text.is_some(),
-        files.is_some(),
-        timestamp,
-        age
-    );
-
     Ok(ClipboardMetadata {
         text,
         files,
@@ -248,3 +231,4 @@ pub async fn get_clipboard_content(
         ))),
     }
 }
+

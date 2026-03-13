@@ -79,7 +79,6 @@
 
   const handleItemSelect = async (item: ClipboardItem) => {
     const startTime = performance.now();
-    console.log(`[Clipboard Timing] START - Selecting item: ${item.id}`);
 
     try {
       // 1. Paste (Background: set clipboard + simulate paste)
@@ -88,20 +87,11 @@
       await invoke("paste_clipboard_item", { itemId: item.id });
 
       const t1 = performance.now();
-      console.log(
-        `[Clipboard Timing] paste_clipboard_item (sent): ${(t1 - startTime).toFixed(2)}ms`,
-      );
 
       // 2. Hide window immediately
       invoke("close_main_window");
 
       const t2 = performance.now();
-      console.log(
-        `[Clipboard Timing] close_main_window (fired): ${(t2 - t1).toFixed(2)}ms`,
-      );
-      console.log(
-        `[Clipboard Timing] TOTAL FRONTEND LATENCY: ${(t2 - startTime).toFixed(2)}ms`,
-      );
     } catch (e) {
       console.error("Failed to select item:", e);
     }
@@ -360,3 +350,4 @@
     </div>
   </div>
 </div>
+

@@ -147,7 +147,6 @@ function matchFiles(files: File[], match: CommandMatch): boolean {
 
   // 加载层：自动将 extensions 转换为 MIME 类型
   const effectiveMimeTypes = extensionsToMimes(match.extensions);
-  // Debug: console.log(`[Match] Auto-converted extensions to mimeTypes`);
 
   // 检查每个文件是否符合条件
   for (const file of filteredFiles) {
@@ -243,3 +242,5 @@ export function getMatchedCommands(
     checkCommandMatch(item, attachedText, attachedFiles, inputText),
   );
 }
+
+

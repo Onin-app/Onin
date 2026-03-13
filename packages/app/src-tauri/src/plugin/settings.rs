@@ -14,7 +14,7 @@ use super::state::{
     collect_plugin_states, load_plugin_settings, save_plugin_settings_to_file, save_plugin_states,
 };
 use super::types::{
-    find_plugin_by_id, find_plugin_by_id_mut, InstallSource, LoadedPlugin, PluginDetail,
+    find_plugin_by_id, find_plugin_by_id_mut, LoadedPlugin, PluginDetail,
     PluginServerPort, PluginSettingsSchema, PluginStore,
 };
 
@@ -58,14 +58,6 @@ pub fn toggle_plugin(
         for other_dir_name in other_versions {
             if let Some(other_plugin) = store_lock.get_mut(&other_dir_name) {
                 other_plugin.enabled = false;
-                println!(
-                    "[plugin/settings] 自动禁用插件 {} 的 {} 版本",
-                    manifest_id,
-                    match other_plugin.install_source {
-                        InstallSource::Local => "本地",
-                        InstallSource::Marketplace => "市场",
-                    }
-                );
             }
         }
     }
@@ -73,12 +65,6 @@ pub fn toggle_plugin(
     // 启用/禁用当前插件
     let plugin = store_lock.get_mut(&plugin_id).unwrap();
     plugin.enabled = enabled;
-    println!(
-        "[plugin/settings] 插件 {} ({}) 已{}",
-        manifest_id,
-        plugin_id,
-        if enabled { "启用" } else { "禁用" }
-    );
 
     // 收集所有插件的状态
     let states = collect_plugin_states(&store_lock);
@@ -109,10 +95,6 @@ pub fn toggle_plugin_auto_detach(
 
     if let Some(plugin) = find_plugin_by_id_mut(&mut store_lock, &plugin_id) {
         plugin.manifest.auto_detach = auto_detach;
-        println!(
-            "[plugin/settings] 插件 {} 的 auto_detach 已设为 {}",
-            plugin_id, auto_detach
-        );
 
         // 收集所有插件的状态
         let states = collect_plugin_states(&store_lock);
@@ -144,10 +126,6 @@ pub fn toggle_plugin_terminate_on_bg(
 
     if let Some(plugin) = find_plugin_by_id_mut(&mut store_lock, &plugin_id) {
         plugin.manifest.terminate_on_bg = terminate_on_bg;
-        println!(
-            "[plugin/settings] 插件 {} 的 terminate_on_bg 已设为 {}",
-            plugin_id, terminate_on_bg
-        );
 
         // 收集所有插件的状态
         let states = collect_plugin_states(&store_lock);
@@ -179,10 +157,6 @@ pub fn toggle_plugin_run_at_startup(
 
     if let Some(plugin) = find_plugin_by_id_mut(&mut store_lock, &plugin_id) {
         plugin.manifest.run_at_startup = run_at_startup;
-        println!(
-            "[plugin/settings] 插件 {} 的 run_at_startup 已设为 {}",
-            plugin_id, run_at_startup
-        );
 
         // 收集所有插件的状态
         let states = collect_plugin_states(&store_lock);
@@ -216,22 +190,12 @@ pub fn register_plugin_settings_schema(
     plugin_id: String,
     schema: PluginSettingsSchema,
 ) -> Result<(), String> {
-    println!(
-        "[plugin/settings] 注册插件设置模式: {}，字段数: {}",
-        plugin_id,
-        schema.fields.len()
-    );
 
     let mut store_lock = store.0.lock().unwrap();
 
     if let Some(plugin) = find_plugin_by_id_mut(&mut store_lock, &plugin_id) {
         // 将设置模式存储在 LoadedPlugin 中（而非 manifest）
         plugin.settings = Some(schema.clone());
-        println!(
-            "[plugin/settings] ✅ 已注册插件 {} 的设置模式: {} 个字段",
-            plugin_id,
-            schema.fields.len()
-        );
 
         // 发送事件通知前端设置模式已注册
         if let Err(e) = app.emit("plugin-settings-schema-registered", &plugin_id) {
@@ -334,3 +298,6 @@ pub fn get_plugin_server_port(app: tauri::AppHandle) -> Result<u16, String> {
         .ok_or_else(|| "插件服务器未启动".to_string())?;
     Ok(port)
 }
+
+
+

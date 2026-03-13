@@ -158,7 +158,6 @@ export function usePluginManager(): PluginManagerReturn {
       // Ignore error if webview is not ready or closed
       // console.error("Failed to send lifecycle event:", err);
     });
-    console.log("[PluginManager] Sent lifecycle event:", event);
   };
 
   /**
@@ -246,10 +245,6 @@ export function usePluginManager(): PluginManagerReturn {
       plugin_name: string;
       plugin_url: string;
     }>("show_plugin_inline", async (event) => {
-      console.log(
-        "Received show_plugin_inline event for:",
-        event.payload.plugin_id,
-      );
 
       state.showPluginInline = true;
       state.currentPluginUrl = event.payload.plugin_url;
@@ -263,9 +258,6 @@ export function usePluginManager(): PluginManagerReturn {
         state.currentPluginAutoDetach = plugin?.auto_detach ?? false;
         state.currentPluginTerminateOnBg = plugin?.terminate_on_bg ?? false;
         state.currentPluginRunAtStartup = plugin?.run_at_startup ?? false;
-        console.log(
-          `Plugin ${event.payload.plugin_id} auto_detach: ${state.currentPluginAutoDetach}, terminate_on_bg: ${state.currentPluginTerminateOnBg}, run_at_startup: ${state.currentPluginRunAtStartup}`,
-        );
       } catch (error) {
         console.error("Failed to get plugin settings:", error);
         state.currentPluginAutoDetach = false;
@@ -280,12 +272,6 @@ export function usePluginManager(): PluginManagerReturn {
       (event) => {
         const isVisible = event.payload;
         if (!isVisible && state.showPluginInline) {
-          console.log(
-            state.currentPluginTerminateOnBg
-              ? "[PluginManager] Terminating plugin on background hide:"
-              : "[PluginManager] Hiding inline plugin and returning to list:",
-            state.currentPluginId,
-          );
           closePlugin();
         }
       },
@@ -293,7 +279,6 @@ export function usePluginManager(): PluginManagerReturn {
 
     // 监听分离窗口快捷键事件
     const unlistenDetachWindow = await listen("detach_window_shortcut", () => {
-      console.log("Detach window shortcut triggered");
       detachPlugin();
     });
 
@@ -319,3 +304,4 @@ export function usePluginManager(): PluginManagerReturn {
     setupListeners,
   };
 }
+

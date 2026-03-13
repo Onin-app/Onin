@@ -106,8 +106,6 @@ pub async fn plugin_dialog_message(
         .title(&title)
         .kind(kind)
         .blocking_show();
-
-    println!("[Dialog] Showed message dialog: {:?}", title);
     Ok(())
 }
 
@@ -133,8 +131,6 @@ pub async fn plugin_dialog_confirm(
 
     // 等待用户选择
     let confirmed = rx.await.unwrap_or(false);
-
-    println!("[Dialog] Showed confirm dialog, result: {}", confirmed);
     Ok(confirmed)
 }
 
@@ -187,11 +183,6 @@ pub async fn plugin_dialog_open(
 
     // 等待对话框完成
     let final_result = rx.await.unwrap_or(None);
-
-    println!(
-        "[Dialog] Showed open dialog, selected: {:?}",
-        final_result.is_some()
-    );
     Ok(final_result)
 }
 
@@ -226,10 +217,6 @@ pub async fn plugin_dialog_save(
 
     // 等待对话框完成
     let path_string = rx.await.unwrap_or(None);
-
-    println!(
-        "[Dialog] Showed save dialog, selected: {:?}",
-        path_string.is_some()
-    );
     Ok(path_string)
 }
+

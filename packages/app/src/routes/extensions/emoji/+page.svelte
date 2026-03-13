@@ -64,7 +64,6 @@
   const handleEmojiSelect = async (emoji: EmojiItem) => {
     try {
       await navigator.clipboard.writeText(emoji.emoji);
-      console.log("[Emoji] Copied to clipboard:", emoji.emoji);
     } catch (e) {
       console.error("[Emoji] Failed to copy:", e);
     }
@@ -76,7 +75,6 @@
     setTimeout(async () => {
       try {
         await invoke("simulate_paste");
-        console.log("[Emoji] Simulated paste");
       } catch (e) {
         console.error("[Emoji] Failed to simulate paste:", e);
       }
@@ -117,3 +115,4 @@
     {/if}
   </div>
 </div>
+

@@ -157,3 +157,4 @@ pub fn paste_clipboard_item(
 
     Ok(())
 }
+

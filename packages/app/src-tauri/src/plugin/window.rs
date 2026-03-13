@@ -272,10 +272,6 @@ pub async fn create_or_show_plugin_window(
         if let Some(last_toggle) = debounce_map.get(&window_label) {
             let elapsed = now.duration_since(*last_toggle).as_millis() as u64;
             if elapsed < DEBOUNCE_MS {
-                println!(
-                    "[plugin/window] 窗口 {} 切换被防抖（距上次切换 {}ms）",
-                    window_label, elapsed
-                );
                 return Ok(());
             }
         }
@@ -288,7 +284,6 @@ pub async fn create_or_show_plugin_window(
     if let Some(creating_state) = app.try_state::<PluginWindowCreating>() {
         let creating = creating_state.0.lock().unwrap();
         if creating.contains(&window_label) {
-            println!("[plugin/window] 窗口 {} 正在创建中，跳过", window_label);
             return Ok(());
         }
     }
@@ -298,20 +293,13 @@ pub async fn create_or_show_plugin_window(
     if let Some(window) = app.get_webview_window(&window_label) {
         let is_focused = window.is_focused().unwrap_or(false);
 
-        println!(
-            "[plugin/window] 窗口 {} 焦点状态: {}",
-            window_label, is_focused
-        );
-
         if !is_focused {
-            println!("[plugin/window] 显示并聚焦窗口 {}", window_label);
 
             crate::focus_manager::capture_previous_foreground(&app);
             crate::focus_manager::focus_webview_window(&window);
 
             trigger_window_visibility_event(&window, true);
         } else {
-            println!("[plugin/window] 最小化窗口 {}", window_label);
 
             crate::focus_manager::restore_previous_foreground(&app);
 
@@ -333,7 +321,6 @@ pub async fn create_or_show_plugin_window(
             "{}{}mode=window&plugin_id={}",
             dev_server, separator, plugin.manifest.id
         );
-        println!("[plugin/window] 从 {} 加载插件窗口 (Dev Mode)", url);
         url
     } else {
         // 获取插件服务器端口 (仅在非 Dev Mode 或 Dev Mode 无 Server 时需要)
@@ -353,7 +340,6 @@ pub async fn create_or_show_plugin_window(
             entry,
             plugin.manifest.id
         );
-        println!("[plugin/window] 从 {} 加载插件窗口 (Native Mode)", url);
         url
     };
 
@@ -367,9 +353,7 @@ pub async fn create_or_show_plugin_window(
             version: "{ver}",
             mainWindowLabel: "main"
         }};
-        window.__PLUGIN_ID__ = "{id}";
-        console.log("[Tauri Native] Runtime injected:", window.__ONIN_RUNTIME__);
-        {fab}
+        window.__PLUGIN_ID__ = "{id}";        {fab}
         "#,
         id = plugin.manifest.id,
         ver = plugin.manifest.version,
@@ -398,15 +382,6 @@ pub async fn create_or_show_plugin_window(
 
     // 应用保存的窗口位置和大小
     if let Some(ref bounds) = saved_bounds {
-        println!(
-            "[plugin/window] 恢复窗口边界 {}：x={}, y={}, width={}, height={}, maximized={}",
-            plugin.manifest.id,
-            bounds.x,
-            bounds.y,
-            bounds.width,
-            bounds.height,
-            bounds.is_maximized
-        );
 
         // 严格检查保存的边界是否合理
         let is_bounds_valid = bounds.x.abs() < 10000
@@ -423,10 +398,6 @@ pub async fn create_or_show_plugin_window(
         } else if bounds.is_maximized {
             builder = builder.inner_size(800.0, 600.0);
         } else {
-            println!(
-                "[plugin/window] ⚠️ 保存的边界无效（width={}, height={}），使用默认大小",
-                bounds.width, bounds.height
-            );
             builder = builder.inner_size(800.0, 600.0);
         }
     } else {
@@ -450,7 +421,6 @@ pub async fn create_or_show_plugin_window(
             // 如果之前是最大化的，恢复最大化状态
             if let Some(ref bounds) = saved_bounds {
                 if bounds.is_maximized {
-                    println!("[plugin/window] 恢复 {} 的最大化状态", plugin.manifest.id);
                     if let Err(e) = window.maximize() {
                         eprintln!("最大化窗口失败: {}", e);
                     }
@@ -496,7 +466,6 @@ fn setup_window_events(app: &tauri::AppHandle, window: &tauri::WebviewWindow, pl
         if let Some(active_window_state) = app_for_immediate.try_state::<ActivePluginWindow>() {
             if let Ok(mut active) = active_window_state.0.lock() {
                 *active = Some(label_for_immediate.clone());
-                println!("[plugin/window] 设置活跃插件窗口: {}", label_for_immediate);
             }
         }
 
@@ -606,11 +575,6 @@ fn save_window_state_on_close(
                 let logical_x = (position.x as f64 / scale_factor) as i32;
                 let logical_y = (position.y as f64 / scale_factor) as i32;
 
-                println!(
-                    "[plugin/window] 窗口关闭 - 物理: {}x{}，缩放: {}，逻辑: {}x{}",
-                    size.width, size.height, scale_factor, logical_width, logical_height
-                );
-
                 // 边界检查
                 let is_bounds_valid = logical_x.abs() < 10000
                     && logical_y.abs() < 10000
@@ -628,11 +592,6 @@ fn save_window_state_on_close(
                         is_maximized,
                     };
 
-                    println!(
-                        "[plugin/window] 保存窗口状态: x={}, y={}, width={}, height={}, maximized={}",
-                        bounds.x, bounds.y, bounds.width, bounds.height, bounds.is_maximized
-                    );
-
                     // 异步保存，避免阻塞窗口关闭
                     let app_clone = app.clone();
                     let plugin_id_clone = plugin_id.to_string();
@@ -644,12 +603,10 @@ fn save_window_state_on_close(
                         }
                     });
                 } else {
-                    println!(
-                        "[plugin/window] ⚠️ 跳过保存无效边界: x={}, y={}, width={}, height={}",
-                        logical_x, logical_y, logical_width, logical_height
-                    );
                 }
             }
         }
     }
 }
+
+

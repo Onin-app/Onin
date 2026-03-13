@@ -1,6 +1,6 @@
 //! Console 操作模块
 //!
-//! 提供 console.log/error/warn 的 Rust 后端实现
+//! 提供插件控制台输出的 Rust 后端实现
 
 use deno_core::op2;
 use deno_core::OpState;
@@ -11,7 +11,6 @@ use tauri::{AppHandle, Emitter, Manager};
 /// 将插件的日志输出到 Rust 控制台，并尝试发送到前端
 #[op2(fast)]
 pub fn op_console_log(state: &OpState, #[string] message: String) {
-    println!("[Plugin Console] {}", message);
 
     // 尝试发送到前端
     if let Some(app_handle) = state.try_borrow::<AppHandle>() {
@@ -26,3 +25,5 @@ pub fn op_console_log(state: &OpState, #[string] message: String) {
         }
     }
 }
+
+

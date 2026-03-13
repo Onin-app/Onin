@@ -26,7 +26,6 @@ pub async fn execute_plugin_command(
     command_name: String,
     args: Option<serde_json::Value>,
 ) -> Result<CommandExecutionResult, String> {
-    println!("Executing plugin command: {} for plugin: {}", command_name, plugin_id);
 
     // 获取插件信息
     let plugin = {
@@ -35,7 +34,6 @@ pub async fn execute_plugin_command(
     }.ok_or_else(|| format!("Plugin '{}' not found", plugin_id))?;
 
     // 根据插件类型执行指令
-    println!("[Plugin] Plugin type: {:?}, Entry: {}", plugin.manifest.plugin_type, plugin.manifest.entry);
     
     // 根据entry文件扩展名判断插件类型
     let is_webview_plugin = plugin.manifest.entry.ends_with(".html") || 
@@ -80,8 +78,6 @@ async fn execute_headless_command(
         }
 
         let js_code = std::fs::read_to_string(entry_path).map_err(|e| e.to_string())?;
-        
-        println!("[Plugin] Initializing plugin: {}", plugin_id);
         manager.init_plugin(plugin_id.clone(), js_code).await?;
         
         // 标记为已初始化
@@ -92,7 +88,6 @@ async fn execute_headless_command(
     }
     
     // 执行指令
-    println!("[Plugin] Executing command '{}' on plugin: {}", command_name, plugin_id);
     let result = manager.execute_command(
         plugin_id.clone(),
         command_name.to_string(),

@@ -178,7 +178,6 @@ impl Drop for UsageTracker {
         // Save any pending changes when the tracker is dropped
         if self.pending_saves > 0 {
             self.save_to_file();
-            println!("[INFO] Usage tracker data saved on drop");
         }
     }
 }
@@ -269,3 +268,4 @@ pub fn clear_usage_stats(
         tracker.clear_all();
     })
 }
+

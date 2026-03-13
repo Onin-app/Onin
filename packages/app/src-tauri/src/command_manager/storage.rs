@@ -186,3 +186,4 @@ pub fn save_commands(app: &AppHandle, commands: &[Command]) {
     let json = serde_json::to_string_pretty(commands).unwrap();
     fs::write(path, json).unwrap();
 }
+

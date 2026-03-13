@@ -111,3 +111,4 @@ impl crate::extension::registry::Extension for TranslatorExtension {
         })
     }
 }
+

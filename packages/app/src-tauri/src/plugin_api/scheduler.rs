@@ -56,9 +56,6 @@ impl SchedulerState {
             if let Ok(saved_tasks) =
                 serde_json::from_value::<Vec<ScheduleTask>>(tasks_value.clone())
             {
-                let mut success_count = 0;
-                let mut failed_count = 0;
-                let mut skipped_count = 0;
 
                 // 重新注册所有任务
                 for task in saved_tasks {
@@ -76,12 +73,7 @@ impl SchedulerState {
 
                         // 已过期的 one-shot 任务直接丢弃，不触发
                         if execute_at <= now {
-                            println!(
-                                "[Scheduler] Skipping expired one-shot task {}: was scheduled for {}, now {}",
-                                task_key, execute_at, now
-                            );
                             // 从内存 map 中清除（store 在循环结束后统一保存）
-                            skipped_count += 1;
                             continue;
                         }
 
@@ -142,14 +134,12 @@ impl SchedulerState {
                                         .lock()
                                         .await
                                         .insert(task_key.clone(), restored_task);
-                                    success_count += 1;
                                 }
                                 Err(e) => {
                                     eprintln!(
                                         "[Scheduler] Failed to add task {} to scheduler: {}",
                                         task_key, e
                                     );
-                                    failed_count += 1;
                                 }
                             }
                         }
@@ -158,18 +148,9 @@ impl SchedulerState {
                                 "[Scheduler] Failed to create job for task {}: {}",
                                 task_key, e
                             );
-                            failed_count += 1;
                         }
                     }
                 }
-
-                println!(
-                    "[Scheduler] Loaded {} tasks from store ({} succeeded, {} failed, {} expired/skipped)",
-                    success_count + failed_count,
-                    success_count,
-                    failed_count,
-                    skipped_count
-                );
             }
         }
 
@@ -601,7 +582,8 @@ pub async fn init_scheduler(app_handle: &AppHandle) -> Result<(), String> {
 
     // 启动调度器
     state.start().await?;
-
-    println!("[Scheduler] Initialized successfully");
     Ok(())
 }
+
+
+

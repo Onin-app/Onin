@@ -69,12 +69,10 @@
   let ActiveComponent = $derived(activeSetting.component);
 
   const handleEsc = () => {
-    console.log("Settings page ESC handler executing");
     goto("/");
   };
 
   onMount(() => {
-    console.log("Settings component has mounted");
     // Register this page's ESC handler
     escapeHandler.set(handleEsc);
   });

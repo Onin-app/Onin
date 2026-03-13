@@ -36,7 +36,6 @@ pub async fn start_plugin_server(
 ) -> Result<u16, Box<dyn std::error::Error>> {
     for port in START_PORT..(START_PORT + MAX_PORT_ATTEMPTS) {
         if try_start_server(plugins_dir.clone(), port).await.is_ok() {
-            println!("[plugin_server] Started on port {}", port);
             return Ok(port);
         }
     }
@@ -61,7 +60,6 @@ async fn try_start_server(
 
     let addr = format!("127.0.0.1:{}", port);
     let listener = tokio::net::TcpListener::bind(&addr).await?;
-    println!("[plugin_server] Listening on http://{}", addr);
 
     tokio::spawn(async move {
         if let Err(e) = axum::serve(listener, app).await {
@@ -208,3 +206,4 @@ fn inject_tauri_bridge(html: &str, plugin_id: &str) -> String {
         format!("{}{}", bridge_script, html)
     }
 }
+

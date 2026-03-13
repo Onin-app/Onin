@@ -12,7 +12,6 @@ pub async fn handle_register_settings_schema(
     plugin_id: String,
     arg: serde_json::Value,
 ) -> InvokeResult {
-    println!("[js_runtime] Handling register_plugin_settings_schema");
 
     // 从 arg 中提取 pluginId 和 schema
     let plugin_id_from_arg = match arg.get("pluginId").and_then(|v| v.as_str()) {
@@ -69,3 +68,4 @@ pub async fn handle_register_settings_schema(
         Err(e) => super::err(e),
     }
 }
+

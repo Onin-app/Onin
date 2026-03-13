@@ -213,8 +213,6 @@ fn get_all_shortcuts_sync() -> Vec<PathBuf> {
     let mut shortcuts = Vec::new();
     let user_profile = std::env::var("USERPROFILE").unwrap();
 
-    println!("user_profile -> {:?}", user_profile);
-
     let start_menu_paths = vec![
         "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs".to_string(),
         format!(
@@ -723,3 +721,4 @@ fn extract_icon_from_exe_or_image(
 
     None
 }
+

@@ -83,7 +83,6 @@ export function usePluginList(): PluginListReturn {
                 downloads: plugin.downloads ?? Math.floor(Math.random() * 10000),
                 enabled: plugin.enabled ?? true,
             }));
-            console.log("Loaded plugins state:", state.plugins);
         } catch (error) {
             console.error("Failed to load plugins via invoke:", error);
         }
@@ -91,14 +90,12 @@ export function usePluginList(): PluginListReturn {
 
     const refreshPlugins = async () => {
         try {
-            console.log("正在刷新插件...");
             const result = await invoke("refresh_plugins");
             state.plugins = (result as PluginManifest[]).map((plugin) => ({
                 ...plugin,
                 stars: plugin.stars ?? Math.floor(Math.random() * 1000),
                 downloads: plugin.downloads ?? Math.floor(Math.random() * 10000),
             }));
-            console.log("插件刷新成功:", state.plugins);
 
             await invoke("show_notification", {
                 options: {
@@ -133,17 +130,12 @@ export function usePluginList(): PluginListReturn {
             await invoke("release_window_close_lock");
 
             if (!selected) {
-                console.log("用户取消了选择");
                 return;
             }
-
-            console.log("选择的插件目录:", selected);
 
             const result = await invoke<PluginManifest>("import_plugin", {
                 sourcePath: selected,
             });
-
-            console.log("插件导入成功:", result);
 
             await loadPlugins(false);
 
@@ -185,11 +177,8 @@ export function usePluginList(): PluginListReturn {
                 return pId === pluginId ? { ...p, enabled } : p;
             });
 
-            console.log(`Plugin ${pluginId} is now ${enabled ? "enabled" : "disabled"}`);
-
             try {
                 await invoke("refresh_commands");
-                console.log("Commands refreshed after plugin toggle");
             } catch (refreshError) {
                 console.error("Failed to refresh commands:", refreshError);
             }
@@ -293,7 +282,6 @@ export function usePluginList(): PluginListReturn {
     const executePlugin = async (pluginId: string) => {
         try {
             await invoke("execute_plugin_entry", { pluginId });
-            console.log(`Successfully executed plugin with ID: ${pluginId}`);
         } catch (e) {
             console.error(`Failed to execute plugin with ID ${pluginId}:`, e);
         }
@@ -310,7 +298,6 @@ export function usePluginList(): PluginListReturn {
 
     const setupListeners = async (): Promise<UnlistenFn> => {
         const unlistenInstalled = await listen<string>("plugin-installed", async () => {
-            console.log("[Plugins Page] Plugin installed, refreshing list");
             await loadPlugins(true);
         });
 
@@ -318,7 +305,6 @@ export function usePluginList(): PluginListReturn {
             "plugin-settings-schema-registered",
             async (event) => {
                 const pluginId = event.payload;
-                console.log("[Plugins Page] Settings schema registered for plugin:", pluginId);
 
                 try {
                     const updatedPlugin = await invoke<PluginManifest>("get_plugin_with_schema", {
@@ -351,7 +337,6 @@ export function usePluginList(): PluginListReturn {
         });
 
         const unlistenSuccess = await listen<string>("plugin-init-success", (event) => {
-            console.log("[Plugins Page] Plugin initialized successfully:", event.payload);
         });
 
         return () => {
@@ -383,3 +368,4 @@ export function usePluginList(): PluginListReturn {
         setupListeners,
     };
 }
+

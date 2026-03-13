@@ -388,7 +388,6 @@
         // 复制结果到剪贴板
         try {
           await navigator.clipboard.writeText(result);
-          console.log("[Extension] Copied to clipboard:", result);
         } catch (e) {
           console.error("[Extension] Failed to copy:", e);
         }
@@ -419,7 +418,6 @@
   });
 
   onMount(async () => {
-    console.log("Main page component has mounted");
     escapeHandler.set(handleEsc);
 
 
@@ -452,7 +450,6 @@
 
     // 监听清除剪贴板事件
     const unlistenClearClipboard = await listen("clear_app_clipboard", () => {
-      console.log("Clearing app clipboard content");
       clipboard.clearAttachments();
     });
 

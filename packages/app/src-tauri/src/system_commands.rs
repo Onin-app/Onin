@@ -177,7 +177,6 @@ pub async fn execute_command(name: String, app: AppHandle, args: Option<serde_js
                 extension_id,
                 command_code: _command_code,
             } => {
-                tracing::info!("Extension command triggered: {}", extension_id);
 
                 let result = crate::extension::execute_extension_command(extension_id, "");
                 if let Some(error) = result.error {
@@ -195,9 +194,7 @@ pub async fn execute_command(name: String, app: AppHandle, args: Option<serde_js
 // ============================================================================
 
 /// 跨平台系统命令配置
-struct PlatformCommand<'a> {
-    log_message: &'static str,
-    #[allow(dead_code)]
+struct PlatformCommand<'a> {    #[allow(dead_code)]
     windows: Option<(&'static str, &'a [&'a str])>,
     #[allow(dead_code)]
     macos: Option<(&'static str, &'a [&'a str])>,
@@ -207,7 +204,6 @@ struct PlatformCommand<'a> {
 
 /// 执行跨平台系统命令
 fn execute_platform_command(cmd: &PlatformCommand) {
-    println!("{}", cmd.log_message);
 
     #[cfg(target_os = "windows")]
     if let Some((program, args)) = cmd.windows {
@@ -236,9 +232,7 @@ fn execute_platform_command(cmd: &PlatformCommand) {
 // ============================================================================
 
 fn shutdown() {
-    execute_platform_command(&PlatformCommand {
-        log_message: "System shutdown initiated",
-        windows: Some(("shutdown", &["/s", "/t", "0"])),
+    execute_platform_command(&PlatformCommand {        windows: Some(("shutdown", &["/s", "/t", "0"])),
         macos: Some((
             "osascript",
             &["-e", "tell app \"System Events\" to shut down"],
@@ -248,9 +242,7 @@ fn shutdown() {
 }
 
 fn reboot() {
-    execute_platform_command(&PlatformCommand {
-        log_message: "System reboot initiated",
-        windows: Some(("shutdown", &["/r", "/t", "0"])),
+    execute_platform_command(&PlatformCommand {        windows: Some(("shutdown", &["/r", "/t", "0"])),
         macos: Some((
             "osascript",
             &["-e", "tell app \"System Events\" to restart"],
@@ -260,9 +252,7 @@ fn reboot() {
 }
 
 fn sleep() {
-    execute_platform_command(&PlatformCommand {
-        log_message: "System sleep initiated",
-        windows: Some((
+    execute_platform_command(&PlatformCommand {        windows: Some((
             "rundll32.exe",
             &["powrprof.dll,SetSuspendState", "0", "1", "0"],
         )),
@@ -272,9 +262,7 @@ fn sleep() {
 }
 
 fn lock_screen() {
-    execute_platform_command(&PlatformCommand {
-        log_message: "Screen lock initiated",
-        windows: Some(("rundll32.exe", &["user32.dll,LockWorkStation"])),
+    execute_platform_command(&PlatformCommand {        windows: Some(("rundll32.exe", &["user32.dll,LockWorkStation"])),
         macos: Some(("pmset", &["displaysleepnow"])),
         linux: Some(("xdg-screensaver", &["lock"])),
     });
@@ -286,9 +274,7 @@ fn logout() {
     #[cfg(target_os = "linux")]
     let linux_args: &[&str] = &["-KILL", "-u", &username];
 
-    execute_platform_command(&PlatformCommand {
-        log_message: "User logout initiated",
-        windows: Some(("shutdown", &["/l"])),
+    execute_platform_command(&PlatformCommand {        windows: Some(("shutdown", &["/l"])),
         macos: Some((
             "osascript",
             &["-e", "tell app \"System Events\" to log out"],
@@ -368,13 +354,11 @@ pub fn simulate_paste_native(_app: &AppHandle) -> Result<(), String> {
         use std::thread;
         use std::time::Duration;
 
-        println!("[SystemCommand] simulate_paste_native (macOS via osascript) started");
 
         // 获取记录的前一个应用的 Bundle ID
         let bundle_id = crate::focus_manager::previous_bundle_id(_app);
 
         if let Some(bundle_id) = bundle_id {
-            println!("[SystemCommand] Activating previous app: {}", bundle_id);
             // 激活应用
             let _ = Command::new("osascript")
                 .args([
@@ -386,11 +370,9 @@ pub fn simulate_paste_native(_app: &AppHandle) -> Result<(), String> {
             // 给一点时间让窗口激活
             thread::sleep(Duration::from_millis(100));
         } else {
-            println!("[SystemCommand] No previous app recorded, waiting generic time");
             thread::sleep(Duration::from_millis(200));
         }
 
-        println!("[SystemCommand] Sending Cmd+V via osascript");
         // 模拟按键
         let result = Command::new("osascript")
             .args([
@@ -401,7 +383,6 @@ pub fn simulate_paste_native(_app: &AppHandle) -> Result<(), String> {
 
         match result {
             Ok(output) if output.status.success() => {
-                println!("[SystemCommand] Paste successful");
                 Ok(())
             }
             Ok(output) => {
@@ -452,3 +433,5 @@ pub fn simulate_paste(app: AppHandle) -> Result<(), String> {
 pub fn force_focus(window: tauri::Window) {
     crate::focus_manager::focus_window(&window);
 }
+
+

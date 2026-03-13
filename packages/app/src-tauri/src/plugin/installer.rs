@@ -33,7 +33,6 @@ pub fn import_plugin(
     store: State<'_, PluginStore>,
     source_path: String,
 ) -> Result<LoadedPlugin, String> {
-    println!("[plugin/installer] 从 {} 导入插件", source_path);
 
     // 1. 验证源路径
     let source = std::path::PathBuf::from(&source_path);
@@ -65,11 +64,6 @@ pub fn import_plugin(
         .map_err(|e| format!("读取 manifest 失败: {}", e))?;
     let manifest: PluginManifest = serde_json::from_str(&manifest_content)
         .map_err(|e| format!("manifest 格式无效: {}", e))?;
-
-    println!(
-        "[plugin/installer] 插件 manifest 已加载: {} ({})",
-        manifest.name, manifest.id
-    );
 
     // 安全检查：验证插件 ID 格式
     let id_regex = regex::Regex::new(r"^[a-z0-9][a-z0-9.-]*[a-z0-9]$").unwrap();
@@ -116,11 +110,6 @@ pub fn import_plugin(
     // 创建符号链接
     create_symlink(&source, &plugin_link_path)?;
 
-    println!(
-        "[plugin/installer] 已创建符号链接: {:?} -> {:?}",
-        plugin_link_path, source
-    );
-
     // 6. 加载插件到 store
     let plugin_states = load_plugin_states(&app);
     let (enabled, auto_detach, terminate_on_bg, run_at_startup) =
@@ -161,11 +150,6 @@ pub fn import_plugin(
 
     // 8. 初始化插件生命周期
     initialize_plugin_lifecycle(&app, &source, &manifest);
-
-    println!(
-        "[plugin/installer] 成功导入插件: {}",
-        manifest.name
-    );
     Ok(loaded_plugin)
 }
 
@@ -182,7 +166,6 @@ pub fn uninstall_plugin(
     store: State<'_, PluginStore>,
     plugin_id: String,
 ) -> Result<(), String> {
-    println!("[plugin/installer] 卸载插件: {}", plugin_id);
 
     // 1. 从 store 中获取插件信息
     let (dir_name, actual_key) = {
@@ -213,11 +196,6 @@ pub fn uninstall_plugin(
     let plugins_dir = data_dir.join("plugins");
     let dir_to_remove = dir_name.clone().unwrap_or_else(|| plugin_id.clone());
     let plugin_link_path = plugins_dir.join(&dir_to_remove);
-
-    println!(
-        "[plugin/installer] 尝试删除插件目录: {:?}",
-        plugin_link_path
-    );
 
     if plugin_link_path.exists() {
         remove_plugin_directory(&plugin_link_path)?;
@@ -256,8 +234,6 @@ pub fn uninstall_plugin(
     if !plugin_was_in_store && !plugin_link_path.exists() {
         return Err(format!("插件未找到: {}", plugin_id));
     }
-
-    println!("[plugin/installer] 成功卸载插件: {}", plugin_id);
     
     // 发送事件通知前端插件已卸载
     let _ = app.emit("plugin-uninstalled", &plugin_id);
@@ -280,7 +256,6 @@ pub async fn download_and_install_plugin(
     _plugin_id: String,
     icon_url: Option<String>,
 ) -> Result<LoadedPlugin, String> {
-    println!("[plugin/installer] 从 {} 下载插件", download_url);
 
     // 1. 下载 ZIP 文件
     let temp_dir = tempfile::tempdir()
@@ -302,8 +277,6 @@ pub async fn download_and_install_plugin(
 
     std::fs::write(&zip_path, &bytes)
         .map_err(|e| format!("写入 zip 文件失败: {}", e))?;
-
-    println!("[plugin/installer] 已下载 {} 字节", bytes.len());
 
     // 2. 解压
     let extract_dir = temp_dir.path().join("extracted");
@@ -328,10 +301,6 @@ pub async fn download_and_install_plugin(
 
     // 强制禁用开发模式
     if manifest.dev_mode {
-        println!(
-            "[plugin/installer] 插件 {} 的 devMode=true，强制设为 false",
-            manifest.id
-        );
         manifest.dev_mode = false;
         manifest.dev_server = None;
     }
@@ -340,11 +309,6 @@ pub async fn download_and_install_plugin(
     if let Some(icon) = icon_url {
         manifest.icon = Some(icon);
     }
-
-    println!(
-        "[plugin/installer] 插件 manifest 已加载: {} ({})",
-        manifest.name, manifest.id
-    );
 
     // 5. 复制到 plugins 目录
     let dir_name = make_plugin_dir_name(&manifest.id, InstallSource::Marketplace);
@@ -372,11 +336,6 @@ pub async fn download_and_install_plugin(
         .map_err(|e| format!("序列化 manifest 失败: {}", e))?;
     std::fs::write(&target_manifest_path, updated_manifest_content)
         .map_err(|e| format!("写入更新后的 manifest 失败: {}", e))?;
-
-    println!(
-        "[plugin/installer] 插件文件已复制到: {:?}",
-        target_dir
-    );
 
     // 6. 加载到 store
     let plugin_states = load_plugin_states(&app);
@@ -415,13 +374,6 @@ pub async fn download_and_install_plugin(
         for other_dir_name in other_versions {
             if let Some(other_plugin) = store_lock.get_mut(&other_dir_name) {
                 other_plugin.enabled = false;
-                println!(
-                    "[plugin/installer] 安装市场版本时自动禁用 {} 版本",
-                    match other_plugin.install_source {
-                        InstallSource::Local => "本地",
-                        InstallSource::Marketplace => "市场",
-                    }
-                );
             }
         }
         
@@ -430,11 +382,6 @@ pub async fn download_and_install_plugin(
 
     // 7. 初始化生命周期
     initialize_plugin_lifecycle(&app, &target_dir, &manifest);
-
-    println!(
-        "[plugin/installer] 成功安装插件: {}",
-        manifest.name
-    );
     
     let _ = app.emit("plugin-installed", &manifest.id);
     
@@ -447,7 +394,6 @@ pub async fn download_and_install_plugin(
 
 /// 移除插件符号链接
 fn remove_plugin_link(path: &Path) -> Result<(), String> {
-    println!("[plugin/installer] 删除现有插件链接: {:?}", path);
     
     #[cfg(windows)]
     {
@@ -535,10 +481,6 @@ fn remove_plugin_directory(path: &Path) -> Result<(), String> {
 
 /// 扫描目录查找并删除插件
 fn scan_and_remove_plugin(plugins_dir: &Path, plugin_id: &str) -> Result<(), String> {
-    println!(
-        "[plugin/installer] 扫描 plugins 目录查找 ID 为 {} 的插件",
-        plugin_id
-    );
 
     if let Ok(entries) = std::fs::read_dir(plugins_dir) {
         for entry in entries.flatten() {
@@ -549,10 +491,6 @@ fn scan_and_remove_plugin(plugins_dir: &Path, plugin_id: &str) -> Result<(), Str
                     if let Ok(content) = std::fs::read_to_string(&manifest_path) {
                         if let Ok(manifest) = serde_json::from_str::<PluginManifest>(&content) {
                             if manifest.id == plugin_id {
-                                println!(
-                                    "[plugin/installer] 找到插件目录: {:?}",
-                                    path
-                                );
                                 return remove_plugin_directory(&path);
                             }
                         }
@@ -661,10 +599,6 @@ fn initialize_plugin_lifecycle(app: &tauri::AppHandle, plugin_dir: &Path, manife
 
     let lifecycle_path = match extension {
         Some("js") => {
-            println!(
-                "[plugin/installer] 初始化 Headless 插件: {}",
-                manifest.id
-            );
             Some(entry_path.clone())
         }
         Some("html") => {
@@ -676,16 +610,8 @@ fn initialize_plugin_lifecycle(app: &tauri::AppHandle, plugin_dir: &Path, manife
             let lc_path = plugin_dir.join(lifecycle_file);
 
             if lc_path.is_file() {
-                println!(
-                    "[plugin/installer] 初始化视图插件生命周期: {} ({})",
-                    manifest.id, lifecycle_file
-                );
                 Some(lc_path)
             } else {
-                println!(
-                    "[plugin/installer] 视图插件 {} 未找到生命周期文件 (查找: {})",
-                    manifest.id, lifecycle_file
-                );
                 None
             }
         }
@@ -740,3 +666,4 @@ fn initialize_plugin_lifecycle(app: &tauri::AppHandle, plugin_dir: &Path, manife
         });
     }
 }
+

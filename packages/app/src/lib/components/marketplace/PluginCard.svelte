@@ -24,7 +24,6 @@
   // 调试日志
   $effect(() => {
     if (isInstalled) {
-      console.log(`[PluginCard] ${plugin.name} is installed`);
     }
   });
 
@@ -187,3 +186,4 @@
     </div>
   </div>
 </div>
+

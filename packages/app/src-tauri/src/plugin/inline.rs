@@ -62,7 +62,6 @@ pub async fn show_inline_plugin<R: Runtime>(
         };
 
         if is_different {
-            println!("[plugin/inline] URL changed from {} to {}, reloading", current_url_str, url);
             webview
                 .eval(&format!("window.location.replace('{}')", url))
                 .map_err(|e| e.to_string())?;
@@ -78,7 +77,6 @@ pub async fn show_inline_plugin<R: Runtime>(
         webview.show().map_err(|e| e.to_string())?;
         webview.set_focus().map_err(|e| e.to_string())?;
     } else {
-        println!("[plugin/inline] Creating webview with URL: {}", url);
         let webview_url = if url.starts_with("http://") || url.starts_with("https://") {
             WebviewUrl::External(url.parse().map_err(|e: url::ParseError| e.to_string())?)
         } else {
@@ -88,7 +86,6 @@ pub async fn show_inline_plugin<R: Runtime>(
         let webview_builder = WebviewBuilder::new("plugin-inline", webview_url)
             .devtools(true)
             .on_page_load(|webview, _payload| {
-                println!("[plugin/inline] Page loaded, emitting event");
                 use tauri::Emitter;
                 if let Err(e) = webview.window().emit("plugin-inline-loaded", ()) {
                     eprintln!("[plugin/inline] Failed to emit plugin-inline-loaded: {}", e);
@@ -102,11 +99,8 @@ pub async fn show_inline_plugin<R: Runtime>(
                 tauri::Size::Physical(PhysicalSize::new(rect.width as u32, rect.height as u32)),
             )
             .map_err(|e| {
-                println!("[plugin/inline] ERROR adding child: {}", e);
                 e.to_string()
             })?;
-
-        println!("[plugin/inline] Child added successfully.");
     }
 
     Ok(())
@@ -200,3 +194,4 @@ pub fn open_inline_plugin_devtools<R: Runtime>(app: AppHandle<R>) -> Result<(), 
         Err("插件视图未找到".to_string())
     }
 }
+

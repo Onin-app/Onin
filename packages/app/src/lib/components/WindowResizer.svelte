@@ -7,7 +7,6 @@
   onMount(() => {
     // Synchronously check if the OS is Windows via user agent.
     isWindows = navigator.userAgent.toLowerCase().includes("win");
-    console.log("[WindowResizer] isWindows set to:", isWindows, navigator.userAgent);
   });
 
   const handleResize = (direction: string) => {

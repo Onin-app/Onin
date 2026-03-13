@@ -89,7 +89,6 @@ async fn cancel_hide_task(app: &AppHandle) {
     let state: State<HideTaskState> = app.state();
     let mut handle_guard = state.handle.lock().await;
     if let Some(handle) = handle_guard.take() {
-        println!("Cancelling pending hide task.");
         handle.abort();
     }
 }
@@ -114,7 +113,6 @@ fn setup_file_drop_listeners(window: &tauri::WebviewWindow, app_handle: &AppHand
     let app_handle_hover = app_handle.clone();
     let app_handle_hover_cancel = app_handle.clone();
     window.listen("tauri://file-drop-hover", move |_event| {
-        println!("File drag hover detected, acquiring window close lock and cancelling hide task.");
         let lock_state: State<WindowCloseLockState> = app_handle_hover.state();
         lock_state.0.fetch_add(1, Ordering::Relaxed);
 
@@ -127,14 +125,12 @@ fn setup_file_drop_listeners(window: &tauri::WebviewWindow, app_handle: &AppHand
     // 文件放下：释放锁
     let app_handle_drop = app_handle.clone();
     window.listen("tauri://file-drop", move |_event| {
-        println!("File dropped, releasing window close lock.");
         release_lock_if_held(&app_handle_drop);
     });
 
     // 拖放取消：释放锁
     let app_handle_cancel = app_handle.clone();
     window.listen("tauri://file-drop-cancelled", move |_event| {
-        println!("File drag cancelled, releasing window close lock.");
         release_lock_if_held(&app_handle_cancel);
     });
 }
@@ -156,7 +152,6 @@ fn spawn_smart_hide_task(
     tauri::async_runtime::spawn(async move {
         // 短延迟后尝试隐藏
         sleep(Duration::from_millis(50)).await;
-        println!("Short delay after focus loss. Attempting to hide window.");
 
         // 最终检查并隐藏
         let lock_state: State<WindowCloseLockState> = app_handle.state();
@@ -165,14 +160,11 @@ fn spawn_smart_hide_task(
 
         if !is_focused && !is_locked {
             if window.is_visible().unwrap_or(false) {
-                println!("Hiding window now.");
                 window.hide().ok();
                 window.emit("window_visibility", &false).unwrap_or_default();
             } else {
-                println!("Window already hidden, skipping hide event.");
             }
         } else {
-            println!("Hide cancelled at the last moment (window re-focused or locked).");
         }
 
         // 清理任务句柄
@@ -207,7 +199,6 @@ fn handle_window_focused(app_handle: &AppHandle, shortcut: Shortcut) {
     // 注册 ESC 快捷键 (Async to avoid deadlock if triggered by shortcut handler)
     let app_handle_reg = app_handle.clone();
     tauri::async_runtime::spawn(async move {
-        println!("Window focused, registering Esc shortcut (async).");
         // Optional: tiny delay to ensure lock release
         // sleep(Duration::from_millis(10)).await;
         app_handle_reg
@@ -247,7 +238,6 @@ fn handle_window_blur(
 
     // 如果窗口被锁定，跳过隐藏
     if lock_state.0.load(Ordering::Relaxed) > 0 {
-        println!("Window focus lost, but close is locked. Skipping hide.");
         return;
     }
 
@@ -256,7 +246,6 @@ fn handle_window_blur(
         .hiding_initiated_by_command
         .swap(false, Ordering::Relaxed)
     {
-        println!("Window focus lost due to command. Skipping redundant hide.");
         let app_handle_clone = app_handle.clone();
         tauri::async_runtime::spawn(async move {
             cancel_hide_task(&app_handle_clone).await;
@@ -265,7 +254,6 @@ fn handle_window_blur(
     }
 
     // 启动智能隐藏任务
-    println!("Window lost focus. Scheduling smart hide task.");
     let handle = spawn_smart_hide_task(window.clone(), app_handle.clone());
     store_hide_task_handle(app_handle, handle);
 }
@@ -362,3 +350,5 @@ mod macos_activation {
         }
     }
 }
+
+

@@ -14,7 +14,6 @@ use super::timestamp::{
 pub fn start_clipboard_monitor(app: AppHandle) {
     let mut started = CLIPBOARD_MONITOR_STARTED.lock().unwrap();
     if *started {
-        println!("[Clipboard] Monitor already started");
         return;
     }
     *started = true;
@@ -25,8 +24,6 @@ pub fn start_clipboard_monitor(app: AppHandle) {
         let mut handle = APP_HANDLE.lock().unwrap();
         *handle = Some(Arc::new(app.clone()));
     }
-
-    println!("[Clipboard] Starting clipboard monitor with clipboard-rs...");
 
     // 初始化时间戳
     update_clipboard_timestamp();
@@ -52,7 +49,6 @@ pub fn start_clipboard_monitor(app: AppHandle) {
 
         impl ClipboardHandler for ClipboardManager {
             fn on_clipboard_change(&mut self) {
-                println!("[Clipboard Monitor] Clipboard content changed");
                 update_clipboard_timestamp();
             }
         }
@@ -60,8 +56,6 @@ pub fn start_clipboard_monitor(app: AppHandle) {
         let manager = ClipboardManager::new();
         let mut watcher = ClipboardWatcherContext::new().unwrap();
         watcher.add_handler(manager);
-
-        println!("[Clipboard Monitor] Watcher started");
         watcher.start_watch();
     });
 
@@ -132,15 +126,9 @@ fn start_auto_clear_thread() {
                 let elapsed_since_hide = now - hide_timestamp;
 
                 if elapsed_since_hide >= auto_clear_time_limit {
-                    println!(
-                        "[Clipboard Monitor] Window hidden for {} seconds, clearing app clipboard content",
-                        elapsed_since_hide
-                    );
 
-                    if let Err(e) = app.emit("clear_app_clipboard", ()) {
-                        println!("[Clipboard Monitor] Failed to emit clear event: {}", e);
+                    if let Err(_e) = app.emit("clear_app_clipboard", ()) {
                     } else {
-                        println!("[Clipboard Monitor] Clear event sent to frontend");
                     }
 
                     // 重置时间戳
@@ -153,3 +141,5 @@ fn start_auto_clear_thread() {
         }
     }
 }
+
+
