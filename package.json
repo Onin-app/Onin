@@ -15,7 +15,7 @@
     "test": "pnpm -r test",
     "test:sdk": "pnpm --filter onin-sdk test",
     "check": "pnpm --filter app check",
-    "format": "prettier --write \"packages/**/*.{ts,svelte,json}\"",
+    "format": "prettier --write \"packages/**/*.{ts,svelte,json}\" && cargo fmt --manifest-path packages/app/src-tauri/Cargo.toml",
     "tauri": "cd packages/app && pnpm tauri",
     "tauri:dev": "pnpm --filter app tauri:dev",
     "tauri:build": "pnpm --filter app tauri:build",
