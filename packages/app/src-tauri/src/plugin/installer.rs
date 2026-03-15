@@ -239,6 +239,29 @@ pub fn uninstall_plugin(
     Ok(())
 }
 
+/// 扫描目录查找并删除插件
+fn scan_and_remove_plugin(plugins_dir: &Path, plugin_id: &str) -> Result<(), String> {
+    if let Ok(entries) = std::fs::read_dir(plugins_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                let manifest_path = path.join("manifest.json");
+                if manifest_path.is_file() {
+                    if let Ok(content) = std::fs::read_to_string(&manifest_path) {
+                        if let Ok(manifest) = serde_json::from_str::<PluginManifest>(&content) {
+                            if manifest.id == plugin_id {
+                                return remove_plugin_directory(&path);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
 // ============================================================================
 // Tauri 命令 - 市场下载安装
 // ============================================================================
@@ -470,28 +493,6 @@ fn remove_plugin_directory(path: &Path) -> Result<(), String> {
     }
 }
 
-/// 扫描目录查找并删除插件
-fn scan_and_remove_plugin(plugins_dir: &Path, plugin_id: &str) -> Result<(), String> {
-    if let Ok(entries) = std::fs::read_dir(plugins_dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                let manifest_path = path.join("manifest.json");
-                if manifest_path.is_file() {
-                    if let Ok(content) = std::fs::read_to_string(&manifest_path) {
-                        if let Ok(manifest) = serde_json::from_str::<PluginManifest>(&content) {
-                            if manifest.id == plugin_id {
-                                return remove_plugin_directory(&path);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(())
-}
 
 /// 解压 ZIP 文件
 fn extract_zip(zip_path: &Path, extract_dir: &Path) -> Result<(), String> {

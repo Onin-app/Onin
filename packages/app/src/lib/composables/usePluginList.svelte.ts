@@ -82,8 +82,8 @@ export function usePluginList(): PluginListReturn {
   const loadPlugins = async (forceReload = false) => {
     try {
       const command = forceReload ? "load_plugins" : "get_loaded_plugins";
-      const result = await invoke(command);
-      state.plugins = (result as PluginManifest[]).map((plugin) => ({
+      const result = await invoke<PluginManifest[]>(command);
+      state.plugins = result.map((plugin) => ({
         ...plugin,
         stars: plugin.stars ?? Math.floor(Math.random() * 1000),
         downloads: plugin.downloads ?? Math.floor(Math.random() * 10000),
@@ -96,8 +96,8 @@ export function usePluginList(): PluginListReturn {
 
   const refreshPlugins = async () => {
     try {
-      const result = await invoke("refresh_plugins");
-      state.plugins = (result as PluginManifest[]).map((plugin) => ({
+      const result = await invoke<PluginManifest[]>("refresh_plugins");
+      state.plugins = result.map((plugin) => ({
         ...plugin,
         stars: plugin.stars ?? Math.floor(Math.random() * 1000),
         downloads: plugin.downloads ?? Math.floor(Math.random() * 10000),
@@ -260,7 +260,8 @@ export function usePluginList(): PluginListReturn {
       await invoke("uninstall_plugin", { pluginId });
 
       try {
-        const refreshedPlugins = await invoke<any[]>("refresh_plugins");
+        const refreshedPlugins =
+          await invoke<PluginManifest[]>("refresh_plugins");
         state.plugins = refreshedPlugins.map((plugin) => ({
           ...plugin,
           downloads: plugin.downloads ?? Math.floor(Math.random() * 10000),

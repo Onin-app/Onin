@@ -13,6 +13,7 @@
   import PluginCard from "./PluginCard.svelte";
   import { fetchPlugins } from "$lib/api/marketplace";
   import type { MarketplacePlugin } from "$lib/types/marketplace";
+  import type { PluginManifest } from "$lib/composables/usePluginList.svelte";
   import { marked } from "marked";
 
   let plugins: MarketplacePlugin[] = $state([]);
@@ -66,8 +67,15 @@
 
   async function loadInstalledPlugins() {
     try {
-      const installed = await invoke<any[]>("get_loaded_plugins");
-      installedPluginIds = new Set(installed.map((p: any) => p.id));
+      const installed =
+        await invoke<PluginManifest[]>("get_loaded_plugins");
+      // 只有来源明确为“marketplace”的插件才在市场显示为“已安装”
+      // 排除本地导入(@local)或其他非市场来源的版本
+      installedPluginIds = new Set(
+        installed
+          .filter((p) => p.install_source === "marketplace")
+          .map((p) => p.id),
+      );
     } catch (e) {
       console.error("Failed to load installed plugins:", e);
     }
