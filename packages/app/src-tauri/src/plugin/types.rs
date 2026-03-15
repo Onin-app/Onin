@@ -534,33 +534,29 @@ pub struct PluginDetail {
 
 /// 从目录名解析插件 ID 和安装来源
 ///
-/// 例如：
-/// - "translate@local" -> ("translate", InstallSource::Local)
-/// - "translate@market" -> ("translate", InstallSource::Marketplace)
-/// - "translate" -> ("translate", InstallSource::Local) // 兼容旧版本
+/// 现在逻辑如下：
+/// - "plugin-id@local" -> ("plugin-id", InstallSource::Local)
+/// - "plugin-id" -> ("plugin-id", InstallSource::Marketplace)
+/// - 其他情况（如不识别的后缀）一律视为 Marketplace，且名字即 ID
 pub fn parse_plugin_dir_name(dir_name: &str) -> (String, InstallSource) {
     if let Some(at_pos) = dir_name.rfind('@') {
-        let plugin_id = dir_name[..at_pos].to_string();
         let suffix = &dir_name[at_pos + 1..];
 
-        let source = match suffix {
-            "market" | "marketplace" => InstallSource::Marketplace,
-            "local" => InstallSource::Local,
-            _ => InstallSource::Local, // 未知后缀默认为 Local
-        };
-
-        (plugin_id, source)
-    } else {
-        // 没有后缀，默认为 Local（兼容旧版本）
-        (dir_name.to_string(), InstallSource::Local)
+        if suffix == "local" {
+            let plugin_id = dir_name[..at_pos].to_string();
+            return (plugin_id, InstallSource::Local);
+        }
     }
+
+    // 其他情况（无后缀或后缀非 local）一律视为 Marketplace，且名字即 ID
+    (dir_name.to_string(), InstallSource::Marketplace)
 }
 
 /// 生成带后缀的目录名
 pub fn make_plugin_dir_name(plugin_id: &str, source: InstallSource) -> String {
     match source {
         InstallSource::Local => format!("{}@local", plugin_id),
-        InstallSource::Marketplace => format!("{}@market", plugin_id),
+        InstallSource::Marketplace => plugin_id.to_string(),
     }
 }
 
@@ -601,3 +597,11 @@ pub fn find_all_versions(store: &HashMap<String, LoadedPlugin>, plugin_id: &str)
         .map(|(dir_name, _)| dir_name.clone())
         .collect()
 }
+
+// ============================================================================
+// 单元测试
+// ============================================================================
+
+#[cfg(test)]
+#[path = "types_tests.rs"]
+mod tests;
