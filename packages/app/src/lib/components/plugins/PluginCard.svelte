@@ -119,7 +119,7 @@
           <GithubLogo class="h-4 w-4" />
         </Button.Root>
       </div>
-      <p class="line-clamp-2 text-sm text-neutral-500 dark:text-neutral-400">
+      <p class="line-clamp-1 text-sm text-neutral-500 dark:text-neutral-400">
         {plugin.description}
       </p>
     </div>
