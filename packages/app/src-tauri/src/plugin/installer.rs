@@ -388,10 +388,10 @@ pub async fn download_and_install_plugin(
 
 /// 移除插件符号链接
 fn remove_plugin_link(path: &Path) -> Result<(), String> {
+    let metadata = std::fs::symlink_metadata(path).map_err(|e| format!("获取符号链接元数据失败: {}", e))?;
+
     #[cfg(windows)]
     {
-        let metadata = std::fs::symlink_metadata(path)
-            .map_err(|e| format!("获取符号链接元数据失败: {}", e))?;
         if metadata.is_dir() {
             std::fs::remove_dir(path).map_err(|e| format!("删除插件链接失败: {}", e))?;
         } else {
@@ -400,7 +400,13 @@ fn remove_plugin_link(path: &Path) -> Result<(), String> {
     }
     #[cfg(not(windows))]
     {
-        std::fs::remove_file(path).map_err(|e| format!("删除插件链接失败: {}", e))?;
+        if metadata.file_type().is_symlink() {
+            std::fs::remove_file(path).map_err(|e| format!("删除插件链接失败: {}", e))?;
+        } else if metadata.is_dir() {
+            std::fs::remove_dir_all(path).map_err(|e| format!("删除插件目录失败: {}", e))?;
+        } else {
+            std::fs::remove_file(path).map_err(|e| format!("删除插件文件失败: {}", e))?;
+        }
     }
 
     Ok(())
@@ -439,30 +445,28 @@ fn create_symlink(source: &Path, target: &Path) -> Result<(), String> {
 
 /// 移除插件目录
 fn remove_plugin_directory(path: &Path) -> Result<(), String> {
-    #[cfg(windows)]
-    {
-        let metadata = std::fs::symlink_metadata(path)
-            .map_err(|e| format!("获取符号链接元数据失败: {}", e))?;
+    let metadata = std::fs::symlink_metadata(path).map_err(|e| format!("获取符号链接元数据失败: {}", e))?;
+    let is_symlink = metadata.file_type().is_symlink();
 
-        let is_symlink = metadata.file_type().is_symlink();
-
-        if is_symlink {
-            // 符号链接：尝试目录删除，失败则尝试文件删除
+    if is_symlink {
+        #[cfg(windows)]
+        {
+            // Windows 下符号链接删除可能视具体类型而定
             match std::fs::remove_dir(path) {
                 Ok(_) => Ok(()),
                 Err(_) => {
                     std::fs::remove_file(path).map_err(|e| format!("删除插件链接失败: {}", e))
                 }
             }
-        } else if metadata.is_dir() {
-            std::fs::remove_dir_all(path).map_err(|e| format!("删除插件目录失败: {}", e))
-        } else {
-            std::fs::remove_file(path).map_err(|e| format!("删除插件文件失败: {}", e))
         }
-    }
-    #[cfg(not(windows))]
-    {
-        std::fs::remove_file(path).map_err(|e| format!("删除插件链接失败: {}", e))
+        #[cfg(not(windows))]
+        {
+            std::fs::remove_file(path).map_err(|e| format!("删除插件链接失败: {}", e))
+        }
+    } else if metadata.is_dir() {
+        std::fs::remove_dir_all(path).map_err(|e| format!("删除插件目录失败: {}", e))
+    } else {
+        std::fs::remove_file(path).map_err(|e| format!("删除插件文件失败: {}", e))
     }
 }
 
