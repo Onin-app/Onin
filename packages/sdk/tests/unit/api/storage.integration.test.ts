@@ -2,37 +2,40 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock the modules using factory functions
 vi.mock('../../../src/core/ipc', () => ({
-  invoke: vi.fn()
+  invoke: vi.fn(),
 }));
 
 vi.mock('../../../src/core/dispatch', () => ({
-  dispatch: vi.fn()
+  dispatch: vi.fn(),
 }));
 
 vi.mock('../../../src/core/environment', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
-    getEnvironment: vi.fn()
+    getEnvironment: vi.fn(),
   };
 });
 
 // Import after mocking
-import { 
-  setItem, 
-  getItem, 
-  removeItem, 
-  clear, 
-  keys, 
-  setItems, 
-  getItems, 
+import {
+  setItem,
+  getItem,
+  removeItem,
+  clear,
+  keys,
+  setItems,
+  getItems,
   storage,
   createStorageError,
-  isStorageError 
+  isStorageError,
 } from '../../../src/api/storage';
 import { invoke } from '../../../src/core/ipc';
 import { dispatch } from '../../../src/core/dispatch';
-import { getEnvironment, RuntimeEnvironment } from '../../../src/core/environment';
+import {
+  getEnvironment,
+  RuntimeEnvironment,
+} from '../../../src/core/environment';
 
 // Get the mocked functions
 const mockInvoke = vi.mocked(invoke);
@@ -50,11 +53,11 @@ describe('Storage API Integration', () => {
     // Test webview environment
     mockGetEnvironment.mockReturnValue(RuntimeEnvironment.Webview);
     mockInvoke.mockResolvedValue(undefined);
-    
+
     await setItem('test-key', 'webview-value');
-    expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_set', { 
-      key: 'test-key', 
-      value: 'webview-value' 
+    expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_set', {
+      key: 'test-key',
+      value: 'webview-value',
     });
 
     // Reset and test headless environment
@@ -64,12 +67,14 @@ describe('Storage API Integration', () => {
 
     const result = await getItem('test-key');
     expect(result).toBe('headless-value');
-    expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_get', { key: 'test-key' });
+    expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_get', {
+      key: 'test-key',
+    });
   });
 
   it('should handle complete application state management workflow', async () => {
     mockGetEnvironment.mockReturnValue(RuntimeEnvironment.Webview);
-    
+
     // Simulate a complete application state management workflow
     const initialState = {
       user: {
@@ -79,19 +84,19 @@ describe('Storage API Integration', () => {
         preferences: {
           theme: 'dark',
           language: 'en',
-          notifications: true
-        }
+          notifications: true,
+        },
       },
       session: {
         token: 'abc123',
         expires: Date.now() + 3600000,
-        lastActivity: Date.now()
+        lastActivity: Date.now(),
       },
       cache: {
         recentFiles: ['file1.txt', 'file2.txt'],
         searchHistory: ['query1', 'query2'],
-        tempData: { processing: false }
-      }
+        tempData: { processing: false },
+      },
     };
 
     mockInvoke
@@ -100,8 +105,11 @@ describe('Storage API Integration', () => {
       .mockResolvedValueOnce(initialState.user) // getItem user
       .mockResolvedValueOnce(undefined) // setItem - update user preferences
       .mockResolvedValueOnce({
-        user: { ...initialState.user, preferences: { ...initialState.user.preferences, theme: 'light' } },
-        session: initialState.session
+        user: {
+          ...initialState.user,
+          preferences: { ...initialState.user.preferences, theme: 'light' },
+        },
+        session: initialState.session,
       }) // getItems - get updated state
       .mockResolvedValueOnce(undefined) // removeItem - clear cache
       .mockResolvedValueOnce(['user', 'session']) // keys - after cache removal
@@ -109,7 +117,9 @@ describe('Storage API Integration', () => {
 
     // Initialize application state
     await storage.setItems(initialState);
-    expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_set_items', { items: initialState });
+    expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_set_items', {
+      items: initialState,
+    });
 
     // Get all stored keys
     const allKeys = await storage.keys();
@@ -122,7 +132,7 @@ describe('Storage API Integration', () => {
     // Update user preferences
     const updatedUser = {
       ...initialState.user,
-      preferences: { ...initialState.user.preferences, theme: 'light' }
+      preferences: { ...initialState.user.preferences, theme: 'light' },
     };
     await storage.setItem('user', updatedUser);
 
@@ -155,18 +165,18 @@ describe('Storage API Integration', () => {
         maxRetries: 3,
         endpoints: {
           api: 'https://api.example.com',
-          cdn: 'https://cdn.example.com'
-        }
+          cdn: 'https://cdn.example.com',
+        },
       },
       features: {
         experimental: false,
         beta: ['feature1', 'feature2'],
-        disabled: []
+        disabled: [],
       },
       userOverrides: {
-        'setting1': 'custom-value',
-        'setting2': false
-      }
+        setting1: 'custom-value',
+        setting2: false,
+      },
     };
 
     mockInvoke
@@ -175,7 +185,11 @@ describe('Storage API Integration', () => {
       .mockResolvedValueOnce(undefined) // setItem - update settings
       .mockResolvedValueOnce({
         ...pluginConfig,
-        settings: { ...pluginConfig.settings, autoSave: false, interval: 10000 }
+        settings: {
+          ...pluginConfig.settings,
+          autoSave: false,
+          interval: 10000,
+        },
       }) // getItem - updated config
       .mockResolvedValueOnce(undefined); // setItem - save final config
 
@@ -192,8 +206,8 @@ describe('Storage API Integration', () => {
       settings: {
         ...pluginConfig.settings,
         autoSave: false,
-        interval: 10000
-      }
+        interval: 10000,
+      },
     };
     await setItem('plugin-config', updatedConfig);
 
@@ -205,7 +219,7 @@ describe('Storage API Integration', () => {
     // Save configuration with version bump
     await setItem('plugin-config', {
       ...finalConfig,
-      version: '1.0.1'
+      version: '1.0.1',
     });
 
     expect(mockInvoke).toHaveBeenCalledTimes(5);
@@ -218,18 +232,18 @@ describe('Storage API Integration', () => {
     const v1Data = {
       userSettings: 'old-format-string',
       preferences: 'theme:dark,lang:en',
-      version: 1
+      version: 1,
     };
 
     const v2Data = {
       user: {
         settings: { migrated: true },
-        preferences: { theme: 'dark', lang: 'en' }
+        preferences: { theme: 'dark', lang: 'en' },
       },
       meta: {
         version: 2,
-        migratedAt: Date.now()
-      }
+        migratedAt: Date.now(),
+      },
     };
 
     mockInvoke
@@ -278,17 +292,17 @@ describe('Storage API Integration', () => {
       'api-response-1': {
         data: { users: [{ id: 1, name: 'John' }] },
         timestamp: Date.now(),
-        ttl: 300000 // 5 minutes
+        ttl: 300000, // 5 minutes
       },
       'api-response-2': {
         data: { posts: [{ id: 1, title: 'Post 1' }] },
         timestamp: Date.now(),
-        ttl: 600000 // 10 minutes
+        ttl: 600000, // 10 minutes
       },
       'user-preferences': {
         theme: 'dark',
-        lastAccessed: Date.now()
-      }
+        lastAccessed: Date.now(),
+      },
     };
 
     const cacheKeys = Object.keys(cacheData);
@@ -301,7 +315,7 @@ describe('Storage API Integration', () => {
       .mockResolvedValueOnce(['api-response-2', 'user-preferences']) // keys - after cleanup
       .mockResolvedValueOnce({
         'api-response-2': cacheData['api-response-2'],
-        'user-preferences': cacheData['user-preferences']
+        'user-preferences': cacheData['user-preferences'],
       }); // getItems - remaining cache
 
     // Populate cache
@@ -347,14 +361,14 @@ describe('Storage API Integration', () => {
       // Concurrent writes
       setItem('user1', 'user1-data'),
       setItem('user2', 'user2-data'),
-      setItem('user3', 'user3-data')
+      setItem('user3', 'user3-data'),
     ]);
 
     // Concurrent reads
     const [user1, user2, user3] = await Promise.all([
       getItem('user1'),
       getItem('user2'),
-      getItem('user3')
+      getItem('user3'),
     ]);
 
     expect(user1).toBe('user1-data');
@@ -362,10 +376,7 @@ describe('Storage API Integration', () => {
     expect(user3).toBe('user3-data');
 
     // Mixed operations
-    const [, finalKeys] = await Promise.all([
-      removeItem('user2'),
-      keys()
-    ]);
+    const [, finalKeys] = await Promise.all([removeItem('user2'), keys()]);
 
     expect(finalKeys).toEqual(['user1', 'user3']);
     expect(mockInvoke).toHaveBeenCalledTimes(8);
@@ -385,7 +396,9 @@ describe('Storage API Integration', () => {
       .mockResolvedValueOnce(undefined); // removeItem succeeds (retry)
 
     // First operation fails
-    await expect(setItem('large-data', 'x'.repeat(10000))).rejects.toThrow('Storage quota exceeded');
+    await expect(setItem('large-data', 'x'.repeat(10000))).rejects.toThrow(
+      'Storage quota exceeded',
+    );
 
     // Retry with smaller data succeeds
     await setItem('small-data', fallbackData);
@@ -410,22 +423,25 @@ describe('Storage API Integration', () => {
       metadata: {
         created: new Date('2023-01-01'),
         tags: new Set(['tag1', 'tag2', 'tag3']),
-        map: new Map([['key1', 'value1'], ['key2', 'value2']])
+        map: new Map([
+          ['key1', 'value1'],
+          ['key2', 'value2'],
+        ]),
       },
       nested: {
         level1: {
           level2: {
             level3: {
               data: 'deep nested value',
-              array: [1, 2, { nested: true }]
-            }
-          }
-        }
+              array: [1, 2, { nested: true }],
+            },
+          },
+        },
       },
       functions: {
         // Functions should be handled appropriately
-        callback: () => 'test'
-      }
+        callback: () => 'test',
+      },
     };
 
     // Note: The actual serialization behavior depends on the implementation
@@ -444,11 +460,14 @@ describe('Storage API Integration', () => {
   it('should handle storage quota and cleanup scenarios', async () => {
     mockGetEnvironment.mockReturnValue(RuntimeEnvironment.Headless);
 
-    const quotaError = createStorageError('Storage quota exceeded', 'large-file');
+    const quotaError = createStorageError(
+      'Storage quota exceeded',
+      'large-file',
+    );
     const cleanupData = {
       'temp-1': { data: 'temporary', priority: 'low' },
       'temp-2': { data: 'temporary', priority: 'low' },
-      'important': { data: 'important', priority: 'high' }
+      important: { data: 'important', priority: 'high' },
     };
 
     mockInvoke

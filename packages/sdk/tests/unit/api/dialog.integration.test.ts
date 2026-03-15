@@ -2,39 +2,42 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock the modules using factory functions
 vi.mock('../../../src/core/ipc', () => ({
-  invoke: vi.fn()
+  invoke: vi.fn(),
 }));
 
 vi.mock('../../../src/core/environment', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
-    getEnvironment: vi.fn()
+    getEnvironment: vi.fn(),
   };
 });
 
 vi.mock('../../../src/utils/error-parser', () => ({
-  parseDialogError: vi.fn()
+  parseDialogError: vi.fn(),
 }));
 
 vi.mock('../../../src/types/errors', () => ({
   createPluginError: vi.fn(),
   errorUtils: {
-    isPluginError: vi.fn()
-  }
+    isPluginError: vi.fn(),
+  },
 }));
 
 // Import after mocking
-import { 
-  showMessage, 
-  showConfirm, 
-  showOpen, 
-  selectFile, 
+import {
+  showMessage,
+  showConfirm,
+  showOpen,
+  selectFile,
   dialog,
-  type DialogFilter 
+  type DialogFilter,
 } from '../../../src/api/dialog';
 import { invoke } from '../../../src/core/ipc';
-import { getEnvironment, RuntimeEnvironment } from '../../../src/core/environment';
+import {
+  getEnvironment,
+  RuntimeEnvironment,
+} from '../../../src/core/environment';
 import { parseDialogError } from '../../../src/utils/error-parser';
 import { createPluginError, errorUtils } from '../../../src/types/errors';
 
@@ -61,9 +64,11 @@ describe('Dialog API Integration', () => {
     // Test webview environment
     mockGetEnvironment.mockReturnValue(RuntimeEnvironment.Webview);
     mockInvoke.mockResolvedValue(undefined);
-    
+
     await showMessage({ message: 'Test message' });
-    expect(mockInvoke).toHaveBeenCalledWith('plugin_dialog_message', { message: 'Test message' });
+    expect(mockInvoke).toHaveBeenCalledWith('plugin_dialog_message', {
+      message: 'Test message',
+    });
 
     // Reset and test headless environment
     mockInvoke.mockClear();
@@ -72,39 +77,46 @@ describe('Dialog API Integration', () => {
 
     const result = await showConfirm({ message: 'Confirm?' });
     expect(result).toBe(true);
-    expect(mockInvoke).toHaveBeenCalledWith('plugin_dialog_confirm', { message: 'Confirm?' });
+    expect(mockInvoke).toHaveBeenCalledWith('plugin_dialog_confirm', {
+      message: 'Confirm?',
+    });
   });
 
   it('should properly handle error parsing in different environments', async () => {
     const originalError = new Error('Permission denied');
-    const parsedError = mockCreatePluginError('DIALOG_PERMISSION_DENIED', 'Permission denied');
-    
+    const parsedError = mockCreatePluginError(
+      'DIALOG_PERMISSION_DENIED',
+      'Permission denied',
+    );
+
     mockInvoke.mockRejectedValue(originalError);
     mockParseDialogError.mockReturnValue(parsedError);
 
     // Test in webview environment
     mockGetEnvironment.mockReturnValue(RuntimeEnvironment.Webview);
-    
+
     await expect(showMessage({ message: 'test' })).rejects.toThrow(parsedError);
     expect(mockParseDialogError).toHaveBeenCalledWith(originalError, {
       method: 'plugin_dialog_message',
-      args: { message: 'test' }
+      args: { message: 'test' },
     });
 
     // Reset and test in headless environment
     mockParseDialogError.mockClear();
     mockGetEnvironment.mockReturnValue(RuntimeEnvironment.Headless);
-    
-    await expect(showConfirm({ message: 'test?' })).rejects.toThrow(parsedError);
+
+    await expect(showConfirm({ message: 'test?' })).rejects.toThrow(
+      parsedError,
+    );
     expect(mockParseDialogError).toHaveBeenCalledWith(originalError, {
       method: 'plugin_dialog_confirm',
-      args: { message: 'test?' }
+      args: { message: 'test?' },
     });
   });
 
   it('should handle complex dialog workflow', async () => {
     mockGetEnvironment.mockReturnValue(RuntimeEnvironment.Webview);
-    
+
     // Simulate a complete dialog workflow
     mockInvoke
       .mockResolvedValueOnce(undefined) // info message
@@ -117,7 +129,7 @@ describe('Dialog API Integration', () => {
     expect(mockInvoke).toHaveBeenCalledWith('plugin_dialog_message', {
       message: 'Starting process...',
       title: undefined,
-      kind: 'info'
+      kind: 'info',
     });
 
     // Confirm action
@@ -125,11 +137,13 @@ describe('Dialog API Integration', () => {
     expect(confirmed).toBe(true);
     expect(mockInvoke).toHaveBeenCalledWith('plugin_dialog_confirm', {
       message: 'Continue with process?',
-      title: undefined
+      title: undefined,
     });
 
     // Select input file
-    const inputFile = await dialog.selectFile([{ name: 'Text Files', extensions: ['txt'] }]);
+    const inputFile = await dialog.selectFile([
+      { name: 'Text Files', extensions: ['txt'] },
+    ]);
     expect(inputFile).toBe('/path/to/file.txt');
 
     // Select output location
@@ -175,7 +189,7 @@ describe('Dialog API Integration', () => {
 
     const filters: DialogFilter[] = [
       { name: 'Images', extensions: ['png', 'jpg', 'gif'] },
-      { name: 'All Files', extensions: ['*'] }
+      { name: 'All Files', extensions: ['*'] },
     ];
 
     // Test file selection
@@ -185,7 +199,7 @@ describe('Dialog API Integration', () => {
       filters,
       defaultPath: '/home/user/pictures',
       multiple: false,
-      directory: false
+      directory: false,
     });
 
     // Test folder selection
@@ -194,7 +208,7 @@ describe('Dialog API Integration', () => {
     expect(mockInvoke).toHaveBeenCalledWith('plugin_dialog_open', {
       defaultPath: '/home/user',
       multiple: false,
-      directory: true
+      directory: true,
     });
 
     // Test multiple file selection
@@ -205,7 +219,7 @@ describe('Dialog API Integration', () => {
       filters,
       defaultPath: undefined,
       multiple: true,
-      directory: false
+      directory: false,
     });
   });
 
@@ -218,21 +232,21 @@ describe('Dialog API Integration', () => {
     expect(mockInvoke).toHaveBeenCalledWith('plugin_dialog_message', {
       message: 'Info message',
       title: 'Information',
-      kind: 'info'
+      kind: 'info',
     });
 
     await dialog.warning('Warning message');
     expect(mockInvoke).toHaveBeenCalledWith('plugin_dialog_message', {
       message: 'Warning message',
       title: undefined,
-      kind: 'warning'
+      kind: 'warning',
     });
 
     await dialog.error('Error message', 'Error');
     expect(mockInvoke).toHaveBeenCalledWith('plugin_dialog_message', {
       message: 'Error message',
       title: 'Error',
-      kind: 'error'
+      kind: 'error',
     });
   });
 
@@ -245,7 +259,7 @@ describe('Dialog API Integration', () => {
     expect(result1).toBe(true);
     expect(mockInvoke).toHaveBeenCalledWith('plugin_dialog_confirm', {
       message: 'Simple confirm?',
-      title: undefined
+      title: undefined,
     });
 
     // Test detailed confirm
@@ -255,7 +269,7 @@ describe('Dialog API Integration', () => {
       title: 'Dangerous Action',
       kind: 'warning',
       okLabel: 'Delete All',
-      cancelLabel: 'Keep Files'
+      cancelLabel: 'Keep Files',
     });
     expect(result2).toBe(false);
     expect(mockInvoke).toHaveBeenCalledWith('plugin_dialog_confirm', {
@@ -263,7 +277,7 @@ describe('Dialog API Integration', () => {
       title: 'Dangerous Action',
       kind: 'warning',
       okLabel: 'Delete All',
-      cancelLabel: 'Keep Files'
+      cancelLabel: 'Keep Files',
     });
   });
 
@@ -281,7 +295,7 @@ describe('Dialog API Integration', () => {
       dialog.info('Processing...'),
       dialog.confirm('Continue?'),
       dialog.selectFile(),
-      dialog.saveFile('output.txt')
+      dialog.saveFile('output.txt'),
     ]);
 
     expect(confirmResult).toBe(true);
@@ -294,12 +308,15 @@ describe('Dialog API Integration', () => {
     mockGetEnvironment.mockReturnValue(RuntimeEnvironment.Webview);
 
     const error = new Error('Dialog system unavailable');
-    const parsedError = mockCreatePluginError('DIALOG_SYSTEM_ERROR', 'Dialog system unavailable');
-    
+    const parsedError = mockCreatePluginError(
+      'DIALOG_SYSTEM_ERROR',
+      'Dialog system unavailable',
+    );
+
     mockInvoke
       .mockRejectedValueOnce(error) // First call fails
       .mockResolvedValueOnce(true); // Second call succeeds
-    
+
     mockParseDialogError.mockReturnValue(parsedError);
 
     // First dialog fails

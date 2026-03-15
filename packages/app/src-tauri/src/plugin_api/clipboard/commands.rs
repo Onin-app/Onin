@@ -12,21 +12,13 @@ use super::types::{
 
 /// 读取剪贴板文本
 #[tauri::command]
-pub async fn plugin_clipboard_read_text(
-    app: AppHandle,
-) -> Result<Option<String>, ClipboardError> {
+pub async fn plugin_clipboard_read_text(app: AppHandle) -> Result<Option<String>, ClipboardError> {
     match app.clipboard().read_text() {
-        Ok(text) => {
-            println!("[Clipboard] Read text: {} chars", text.len());
-            Ok(Some(text))
-        }
-        Err(e) => {
-            println!("[Clipboard] Failed to read text: {}", e);
-            Err(ClipboardError::from(format!(
-                "Failed to read clipboard text: {}",
-                e
-            )))
-        }
+        Ok(text) => Ok(Some(text)),
+        Err(e) => Err(ClipboardError::from(format!(
+            "Failed to read clipboard text: {}",
+            e
+        ))),
     }
 }
 
@@ -37,17 +29,11 @@ pub async fn plugin_clipboard_write_text(
     options: WriteTextOptions,
 ) -> Result<(), ClipboardError> {
     match app.clipboard().write_text(options.text.clone()) {
-        Ok(_) => {
-            println!("[Clipboard] Wrote text: {} chars", options.text.len());
-            Ok(())
-        }
-        Err(e) => {
-            println!("[Clipboard] Failed to write text: {}", e);
-            Err(ClipboardError::from(format!(
-                "Failed to write clipboard text: {}",
-                e
-            )))
-        }
+        Ok(_) => Ok(()),
+        Err(e) => Err(ClipboardError::from(format!(
+            "Failed to write clipboard text: {}",
+            e
+        ))),
     }
 }
 
@@ -56,7 +42,6 @@ pub async fn plugin_clipboard_write_text(
 pub async fn plugin_clipboard_read_image(
     _app: AppHandle,
 ) -> Result<Option<String>, ClipboardError> {
-    println!("[Clipboard] Image reading is not yet implemented");
     Err(ClipboardError::from(
         "Image reading is not yet implemented. Please use text operations for now.",
     ))
@@ -68,7 +53,6 @@ pub async fn plugin_clipboard_write_image(
     _app: AppHandle,
     _options: WriteImageOptions,
 ) -> Result<(), ClipboardError> {
-    println!("[Clipboard] Image writing is not yet implemented");
     Err(ClipboardError::from(
         "Image writing is not yet implemented. Please use text operations for now.",
     ))
@@ -78,17 +62,11 @@ pub async fn plugin_clipboard_write_image(
 #[tauri::command]
 pub async fn plugin_clipboard_clear(app: AppHandle) -> Result<(), ClipboardError> {
     match app.clipboard().clear() {
-        Ok(_) => {
-            println!("[Clipboard] Cleared clipboard");
-            Ok(())
-        }
-        Err(e) => {
-            println!("[Clipboard] Failed to clear clipboard: {}", e);
-            Err(ClipboardError::from(format!(
-                "Failed to clear clipboard: {}",
-                e
-            )))
-        }
+        Ok(_) => Ok(()),
+        Err(e) => Err(ClipboardError::from(format!(
+            "Failed to clear clipboard: {}",
+            e
+        ))),
     }
 }
 
@@ -173,15 +151,6 @@ pub async fn plugin_clipboard_get_metadata(
         }
     }
 
-    println!(
-        "[Clipboard] Plugin read metadata: type={:?}, has_text={}, has_files={}, timestamp={:?}, age={:?}",
-        content_type,
-        text.is_some(),
-        files.is_some(),
-        timestamp,
-        age
-    );
-
     Ok(ClipboardMetadata {
         text,
         files,
@@ -193,9 +162,7 @@ pub async fn plugin_clipboard_get_metadata(
 
 /// 读取剪贴板内容
 #[tauri::command]
-pub async fn get_clipboard_content(
-    app: AppHandle,
-) -> Result<ClipboardContent, ClipboardError> {
+pub async fn get_clipboard_content(app: AppHandle) -> Result<ClipboardContent, ClipboardError> {
     let timestamp = get_clipboard_timestamp();
 
     // 先尝试读取文件路径

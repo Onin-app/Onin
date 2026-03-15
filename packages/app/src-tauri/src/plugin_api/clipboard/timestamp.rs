@@ -46,8 +46,6 @@ pub fn update_clipboard_timestamp() {
     // 更新插件层时间戳
     let mut plugin_ts = PLUGIN_CLIPBOARD_TIMESTAMP.lock().unwrap();
     *plugin_ts = timestamp;
-
-    println!("[Clipboard] Updated timestamp: {}", timestamp);
 }
 
 /// 获取应用层剪贴板时间戳

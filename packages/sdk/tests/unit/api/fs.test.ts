@@ -2,22 +2,22 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock the dependencies using factory functions
 vi.mock('../../../src/core/ipc', () => ({
-  invoke: vi.fn()
+  invoke: vi.fn(),
 }));
 
 vi.mock('../../../src/core/dispatch', () => ({
-  dispatch: vi.fn()
+  dispatch: vi.fn(),
 }));
 
 vi.mock('../../../src/utils/error-parser', () => ({
-  parseFsError: vi.fn()
+  parseFsError: vi.fn(),
 }));
 
 vi.mock('../../../src/types/errors', () => ({
   createPluginError: vi.fn(),
   errorUtils: {
-    isPluginError: vi.fn()
-  }
+    isPluginError: vi.fn(),
+  },
 }));
 
 // Import after mocking
@@ -33,7 +33,7 @@ import {
   copyFile,
   moveFile,
   fs,
-  type FileInfo
+  type FileInfo,
 } from '../../../src/api/fs';
 import { invoke } from '../../../src/core/ipc';
 import { dispatch } from '../../../src/core/dispatch';
@@ -73,9 +73,11 @@ describe('FileSystem API', () => {
       expect(result).toBe(content);
       expect(mockDispatch).toHaveBeenCalledWith({
         webview: expect.any(Function),
-        headless: expect.any(Function)
+        headless: expect.any(Function),
       });
-      expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_read_file', { path: 'test.txt' });
+      expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_read_file', {
+        path: 'test.txt',
+      });
     });
 
     it('should handle empty file', async () => {
@@ -97,8 +99,11 @@ describe('FileSystem API', () => {
 
     it('should handle errors', async () => {
       const error = new Error('File not found');
-      const parsedError = mockCreatePluginError('FS_FILE_NOT_FOUND', 'File not found');
-      
+      const parsedError = mockCreatePluginError(
+        'FS_FILE_NOT_FOUND',
+        'File not found',
+      );
+
       mockInvoke.mockRejectedValue(error);
       mockParseFsError.mockReturnValue(parsedError);
 
@@ -106,7 +111,7 @@ describe('FileSystem API', () => {
       expect(mockParseFsError).toHaveBeenCalledWith(error, {
         path: 'nonexistent.txt',
         method: 'plugin_fs_read_file',
-        args: { path: 'nonexistent.txt' }
+        args: { path: 'nonexistent.txt' },
       });
     });
   });
@@ -119,7 +124,7 @@ describe('FileSystem API', () => {
 
       expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_write_file', {
         path: 'output.txt',
-        content: 'Hello, World!'
+        content: 'Hello, World!',
       });
     });
 
@@ -130,7 +135,7 @@ describe('FileSystem API', () => {
 
       expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_write_file', {
         path: 'empty.txt',
-        content: ''
+        content: '',
       });
     });
 
@@ -142,7 +147,7 @@ describe('FileSystem API', () => {
 
       expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_write_file', {
         path: 'large.txt',
-        content: largeContent
+        content: largeContent,
       });
     });
 
@@ -154,18 +159,23 @@ describe('FileSystem API', () => {
 
       expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_write_file', {
         path: 'special.txt',
-        content: specialContent
+        content: specialContent,
       });
     });
 
     it('should handle errors', async () => {
       const error = new Error('Permission denied');
-      const parsedError = mockCreatePluginError('FS_PERMISSION_DENIED', 'Permission denied');
-      
+      const parsedError = mockCreatePluginError(
+        'FS_PERMISSION_DENIED',
+        'Permission denied',
+      );
+
       mockInvoke.mockRejectedValue(error);
       mockParseFsError.mockReturnValue(parsedError);
 
-      await expect(writeFile('readonly.txt', 'content')).rejects.toThrow(parsedError);
+      await expect(writeFile('readonly.txt', 'content')).rejects.toThrow(
+        parsedError,
+      );
     });
   });
 
@@ -176,7 +186,9 @@ describe('FileSystem API', () => {
       const result = await exists('existing.txt');
 
       expect(result).toBe(true);
-      expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_exists', { path: 'existing.txt' });
+      expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_exists', {
+        path: 'existing.txt',
+      });
     });
 
     it('should return false for non-existing file', async () => {
@@ -193,13 +205,18 @@ describe('FileSystem API', () => {
       const result = await exists('some/directory');
 
       expect(result).toBe(true);
-      expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_exists', { path: 'some/directory' });
+      expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_exists', {
+        path: 'some/directory',
+      });
     });
 
     it('should handle errors', async () => {
       const error = new Error('Access denied');
-      const parsedError = mockCreatePluginError('FS_ACCESS_DENIED', 'Access denied');
-      
+      const parsedError = mockCreatePluginError(
+        'FS_ACCESS_DENIED',
+        'Access denied',
+      );
+
       mockInvoke.mockRejectedValue(error);
       mockParseFsError.mockReturnValue(parsedError);
 
@@ -215,7 +232,7 @@ describe('FileSystem API', () => {
 
       expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_create_dir', {
         path: 'new/directory',
-        recursive: true
+        recursive: true,
       });
     });
 
@@ -226,7 +243,7 @@ describe('FileSystem API', () => {
 
       expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_create_dir', {
         path: 'another/directory',
-        recursive: false
+        recursive: false,
       });
     });
 
@@ -237,14 +254,17 @@ describe('FileSystem API', () => {
 
       expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_create_dir', {
         path: 'single',
-        recursive: true
+        recursive: true,
       });
     });
 
     it('should handle errors', async () => {
       const error = new Error('Directory already exists');
-      const parsedError = mockCreatePluginError('FS_DIR_EXISTS', 'Directory already exists');
-      
+      const parsedError = mockCreatePluginError(
+        'FS_DIR_EXISTS',
+        'Directory already exists',
+      );
+
       mockInvoke.mockRejectedValue(error);
       mockParseFsError.mockReturnValue(parsedError);
 
@@ -262,7 +282,7 @@ describe('FileSystem API', () => {
           isDirectory: false,
           size: 1024,
           modifiedTime: 1640995200000,
-          createdTime: 1640995100000
+          createdTime: 1640995100000,
         },
         {
           name: 'subdir',
@@ -271,15 +291,17 @@ describe('FileSystem API', () => {
           isDirectory: true,
           size: 0,
           modifiedTime: 1640995300000,
-          createdTime: 1640995200000
-        }
+          createdTime: 1640995200000,
+        },
       ];
       mockInvoke.mockResolvedValue(fileInfos);
 
       const result = await listDir('dir');
 
       expect(result).toEqual(fileInfos);
-      expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_list_dir', { path: 'dir' });
+      expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_list_dir', {
+        path: 'dir',
+      });
     });
 
     it('should handle empty directory', async () => {
@@ -299,8 +321,8 @@ describe('FileSystem API', () => {
           isDirectory: false,
           size: 512,
           modifiedTime: 1640995400000,
-          createdTime: 1640995300000
-        }
+          createdTime: 1640995300000,
+        },
       ];
       mockInvoke.mockResolvedValue(rootContents);
 
@@ -311,8 +333,11 @@ describe('FileSystem API', () => {
 
     it('should handle errors', async () => {
       const error = new Error('Directory not found');
-      const parsedError = mockCreatePluginError('FS_DIR_NOT_FOUND', 'Directory not found');
-      
+      const parsedError = mockCreatePluginError(
+        'FS_DIR_NOT_FOUND',
+        'Directory not found',
+      );
+
       mockInvoke.mockRejectedValue(error);
       mockParseFsError.mockReturnValue(parsedError);
 
@@ -326,7 +351,9 @@ describe('FileSystem API', () => {
 
       await deleteFile('unwanted.txt');
 
-      expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_delete_file', { path: 'unwanted.txt' });
+      expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_delete_file', {
+        path: 'unwanted.txt',
+      });
     });
 
     it('should handle nested file deletion', async () => {
@@ -334,13 +361,18 @@ describe('FileSystem API', () => {
 
       await deleteFile('deep/nested/file.txt');
 
-      expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_delete_file', { path: 'deep/nested/file.txt' });
+      expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_delete_file', {
+        path: 'deep/nested/file.txt',
+      });
     });
 
     it('should handle errors', async () => {
       const error = new Error('File in use');
-      const parsedError = mockCreatePluginError('FS_FILE_IN_USE', 'File in use');
-      
+      const parsedError = mockCreatePluginError(
+        'FS_FILE_IN_USE',
+        'File in use',
+      );
+
       mockInvoke.mockRejectedValue(error);
       mockParseFsError.mockReturnValue(parsedError);
 
@@ -356,7 +388,7 @@ describe('FileSystem API', () => {
 
       expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_delete_dir', {
         path: 'empty-dir',
-        recursive: false
+        recursive: false,
       });
     });
 
@@ -367,14 +399,17 @@ describe('FileSystem API', () => {
 
       expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_delete_dir', {
         path: 'full-dir',
-        recursive: true
+        recursive: true,
       });
     });
 
     it('should handle errors', async () => {
       const error = new Error('Directory not empty');
-      const parsedError = mockCreatePluginError('FS_DIR_NOT_EMPTY', 'Directory not empty');
-      
+      const parsedError = mockCreatePluginError(
+        'FS_DIR_NOT_EMPTY',
+        'Directory not empty',
+      );
+
       mockInvoke.mockRejectedValue(error);
       mockParseFsError.mockReturnValue(parsedError);
 
@@ -391,14 +426,16 @@ describe('FileSystem API', () => {
         isDirectory: false,
         size: 2048576,
         modifiedTime: 1640995500000,
-        createdTime: 1640995400000
+        createdTime: 1640995400000,
       };
       mockInvoke.mockResolvedValue(fileInfo);
 
       const result = await getFileInfo('docs/document.pdf');
 
       expect(result).toEqual(fileInfo);
-      expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_get_file_info', { path: 'docs/document.pdf' });
+      expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_get_file_info', {
+        path: 'docs/document.pdf',
+      });
     });
 
     it('should get directory information', async () => {
@@ -409,7 +446,7 @@ describe('FileSystem API', () => {
         isDirectory: true,
         size: 0,
         modifiedTime: 1640995600000,
-        createdTime: 1640995500000
+        createdTime: 1640995500000,
       };
       mockInvoke.mockResolvedValue(dirInfo);
 
@@ -420,8 +457,11 @@ describe('FileSystem API', () => {
 
     it('should handle errors', async () => {
       const error = new Error('Path not found');
-      const parsedError = mockCreatePluginError('FS_PATH_NOT_FOUND', 'Path not found');
-      
+      const parsedError = mockCreatePluginError(
+        'FS_PATH_NOT_FOUND',
+        'Path not found',
+      );
+
       mockInvoke.mockRejectedValue(error);
       mockParseFsError.mockReturnValue(parsedError);
 
@@ -437,7 +477,7 @@ describe('FileSystem API', () => {
 
       expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_copy_file', {
         sourcePath: 'source.txt',
-        destPath: 'destination.txt'
+        destPath: 'destination.txt',
       });
     });
 
@@ -448,22 +488,27 @@ describe('FileSystem API', () => {
 
       expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_copy_file', {
         sourcePath: 'docs/original.pdf',
-        destPath: 'backup/copy.pdf'
+        destPath: 'backup/copy.pdf',
       });
     });
 
     it('should handle errors', async () => {
       const error = new Error('Source file not found');
-      const parsedError = mockCreatePluginError('FS_SOURCE_NOT_FOUND', 'Source file not found');
-      
+      const parsedError = mockCreatePluginError(
+        'FS_SOURCE_NOT_FOUND',
+        'Source file not found',
+      );
+
       mockInvoke.mockRejectedValue(error);
       mockParseFsError.mockReturnValue(parsedError);
 
-      await expect(copyFile('missing.txt', 'copy.txt')).rejects.toThrow(parsedError);
+      await expect(copyFile('missing.txt', 'copy.txt')).rejects.toThrow(
+        parsedError,
+      );
       expect(mockParseFsError).toHaveBeenCalledWith(error, {
         path: 'missing.txt', // sourcePath takes precedence
         method: 'plugin_fs_copy_file',
-        args: { sourcePath: 'missing.txt', destPath: 'copy.txt' }
+        args: { sourcePath: 'missing.txt', destPath: 'copy.txt' },
       });
     });
   });
@@ -476,7 +521,7 @@ describe('FileSystem API', () => {
 
       expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_move_file', {
         sourcePath: 'old-location.txt',
-        destPath: 'new-location.txt'
+        destPath: 'new-location.txt',
       });
     });
 
@@ -487,7 +532,7 @@ describe('FileSystem API', () => {
 
       expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_move_file', {
         sourcePath: 'oldname.txt',
-        destPath: 'newname.txt'
+        destPath: 'newname.txt',
       });
     });
 
@@ -498,18 +543,23 @@ describe('FileSystem API', () => {
 
       expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_move_file', {
         sourcePath: 'temp/file.txt',
-        destPath: 'permanent/file.txt'
+        destPath: 'permanent/file.txt',
       });
     });
 
     it('should handle errors', async () => {
       const error = new Error('Destination already exists');
-      const parsedError = mockCreatePluginError('FS_DEST_EXISTS', 'Destination already exists');
-      
+      const parsedError = mockCreatePluginError(
+        'FS_DEST_EXISTS',
+        'Destination already exists',
+      );
+
       mockInvoke.mockRejectedValue(error);
       mockParseFsError.mockReturnValue(parsedError);
 
-      await expect(moveFile('source.txt', 'existing.txt')).rejects.toThrow(parsedError);
+      await expect(moveFile('source.txt', 'existing.txt')).rejects.toThrow(
+        parsedError,
+      );
     });
   });
 
@@ -533,13 +583,18 @@ describe('FileSystem API', () => {
       const result = await fs.readFile('namespace-test.txt');
 
       expect(result).toBe('namespace content');
-      expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_read_file', { path: 'namespace-test.txt' });
+      expect(mockInvoke).toHaveBeenCalledWith('plugin_fs_read_file', {
+        path: 'namespace-test.txt',
+      });
     });
   });
 
   describe('error handling', () => {
     it('should not re-parse PluginError instances', async () => {
-      const pluginError = mockCreatePluginError('FS_ACCESS_DENIED', 'Already parsed');
+      const pluginError = mockCreatePluginError(
+        'FS_ACCESS_DENIED',
+        'Already parsed',
+      );
       mockInvoke.mockRejectedValue(pluginError);
       // Mock isPluginError to return true for this specific error
       mockErrorUtils.isPluginError.mockReturnValue(true);
@@ -551,7 +606,7 @@ describe('FileSystem API', () => {
     it('should pass correct context to error parser for single path operations', async () => {
       const error = new Error('Test error');
       const parsedError = mockCreatePluginError('FS_ERROR', 'Parsed error');
-      
+
       mockInvoke.mockRejectedValue(error);
       mockParseFsError.mockReturnValue(parsedError);
 
@@ -559,22 +614,24 @@ describe('FileSystem API', () => {
       expect(mockParseFsError).toHaveBeenCalledWith(error, {
         path: 'test.txt',
         method: 'plugin_fs_read_file',
-        args: { path: 'test.txt' }
+        args: { path: 'test.txt' },
       });
     });
 
     it('should pass correct context to error parser for dual path operations', async () => {
       const error = new Error('Copy error');
       const parsedError = mockCreatePluginError('FS_COPY_ERROR', 'Copy error');
-      
+
       mockInvoke.mockRejectedValue(error);
       mockParseFsError.mockReturnValue(parsedError);
 
-      await expect(copyFile('source.txt', 'dest.txt')).rejects.toThrow(parsedError);
+      await expect(copyFile('source.txt', 'dest.txt')).rejects.toThrow(
+        parsedError,
+      );
       expect(mockParseFsError).toHaveBeenCalledWith(error, {
         path: 'source.txt', // sourcePath takes precedence
         method: 'plugin_fs_copy_file',
-        args: { sourcePath: 'source.txt', destPath: 'dest.txt' }
+        args: { sourcePath: 'source.txt', destPath: 'dest.txt' },
       });
     });
   });
@@ -587,11 +644,11 @@ describe('FileSystem API', () => {
         .mockResolvedValueOnce(true) // exists
         .mockResolvedValueOnce(undefined); // deleteFile
 
-      const [content, , fileExists, ] = await Promise.all([
+      const [content, , fileExists] = await Promise.all([
         readFile('file1.txt'),
         writeFile('file2.txt', 'content'),
         exists('file3.txt'),
-        deleteFile('file4.txt')
+        deleteFile('file4.txt'),
       ]);
 
       expect(content).toBe('file1 content');
@@ -602,20 +659,22 @@ describe('FileSystem API', () => {
     it('should handle mixed success and failure scenarios', async () => {
       const error = new Error('Operation failed');
       const parsedError = mockCreatePluginError('FS_ERROR', 'Operation failed');
-      
+
       mockInvoke
         .mockResolvedValueOnce('success content') // success
         .mockRejectedValueOnce(error); // failure
-      
+
       mockParseFsError.mockReturnValue(parsedError);
 
       const results = await Promise.allSettled([
         readFile('success.txt'),
-        readFile('failure.txt')
+        readFile('failure.txt'),
       ]);
 
       expect(results[0].status).toBe('fulfilled');
-      expect((results[0] as PromiseFulfilledResult<string>).value).toBe('success content');
+      expect((results[0] as PromiseFulfilledResult<string>).value).toBe(
+        'success content',
+      );
       expect(results[1].status).toBe('rejected');
       expect((results[1] as PromiseRejectedResult).reason).toBe(parsedError);
     });
@@ -633,10 +692,18 @@ describe('FileSystem API', () => {
       await exists('../parent.txt');
 
       expect(mockInvoke).toHaveBeenCalledTimes(4);
-      expect(mockInvoke).toHaveBeenNthCalledWith(1, 'plugin_fs_exists', { path: 'simple.txt' });
-      expect(mockInvoke).toHaveBeenNthCalledWith(2, 'plugin_fs_exists', { path: './relative.txt' });
-      expect(mockInvoke).toHaveBeenNthCalledWith(3, 'plugin_fs_exists', { path: 'deep/nested/path/file.txt' });
-      expect(mockInvoke).toHaveBeenNthCalledWith(4, 'plugin_fs_exists', { path: '../parent.txt' });
+      expect(mockInvoke).toHaveBeenNthCalledWith(1, 'plugin_fs_exists', {
+        path: 'simple.txt',
+      });
+      expect(mockInvoke).toHaveBeenNthCalledWith(2, 'plugin_fs_exists', {
+        path: './relative.txt',
+      });
+      expect(mockInvoke).toHaveBeenNthCalledWith(3, 'plugin_fs_exists', {
+        path: 'deep/nested/path/file.txt',
+      });
+      expect(mockInvoke).toHaveBeenNthCalledWith(4, 'plugin_fs_exists', {
+        path: '../parent.txt',
+      });
     });
 
     it('should handle special characters in paths', async () => {

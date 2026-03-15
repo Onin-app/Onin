@@ -31,7 +31,7 @@
   {#if isHovered}
     <button
       onclick={onRemove}
-      class="absolute right-1 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded bg-red-500 text-white hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700"
+      class="absolute top-1/2 right-1 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded bg-red-500 text-white hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700"
       aria-label="移除文件 {file.name}"
     >
       <X class="size-3" weight="bold" />

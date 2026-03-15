@@ -2,11 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock the modules using factory functions
 vi.mock('../../../src/core/ipc', () => ({
-  invoke: vi.fn()
+  invoke: vi.fn(),
 }));
 
 vi.mock('../../../src/utils/error-parser', () => ({
-  parseHttpError: vi.fn()
+  parseHttpError: vi.fn(),
 }));
 
 vi.mock('../../../src/types/errors', () => ({
@@ -14,29 +14,29 @@ vi.mock('../../../src/types/errors', () => ({
     http: {
       httpError: vi.fn(),
       networkError: vi.fn(),
-      timeout: vi.fn()
+      timeout: vi.fn(),
     },
     common: {
       unknown: vi.fn(),
-      permissionDenied: vi.fn()
-    }
+      permissionDenied: vi.fn(),
+    },
   },
   errorUtils: {
-    isPluginError: vi.fn()
-  }
+    isPluginError: vi.fn(),
+  },
 }));
 
 // Import after mocking
-import { 
-  request, 
-  get, 
-  post, 
-  put, 
-  patch, 
-  del, 
+import {
+  request,
+  get,
+  post,
+  put,
+  patch,
+  del,
   http,
   type Response,
-  type RequestOptions 
+  type RequestOptions,
 } from '../../../src/api/request';
 import { invoke } from '../../../src/core/ipc';
 import { parseHttpError } from '../../../src/utils/error-parser';
@@ -52,16 +52,18 @@ describe('Request API Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockErrorUtils.isPluginError.mockReturnValue(false);
-    
+
     // Mock createError functions
-    mockCreateError.http.httpError.mockImplementation((status, statusText, context) => {
-      const error = new Error(`HTTP ${status}: ${statusText}`) as any;
-      error.name = 'PluginError';
-      error.code = 'HTTP_HTTP_ERROR';
-      error.context = context;
-      return error;
-    });
-    
+    mockCreateError.http.httpError.mockImplementation(
+      (status, statusText, context) => {
+        const error = new Error(`HTTP ${status}: ${statusText}`) as any;
+        error.name = 'PluginError';
+        error.code = 'HTTP_HTTP_ERROR';
+        error.context = context;
+        return error;
+      },
+    );
+
     mockCreateError.http.networkError.mockImplementation((message, context) => {
       const error = new Error(message) as any;
       error.name = 'PluginError';
@@ -69,9 +71,11 @@ describe('Request API Integration', () => {
       error.context = context;
       return error;
     });
-    
+
     mockCreateError.http.timeout.mockImplementation((url, timeout, context) => {
-      const error = new Error(`Request to ${url} timed out after ${timeout}ms`) as any;
+      const error = new Error(
+        `Request to ${url} timed out after ${timeout}ms`,
+      ) as any;
       error.name = 'PluginError';
       error.code = 'HTTP_TIMEOUT';
       error.context = context;
@@ -85,28 +89,38 @@ describe('Request API Integration', () => {
       status: 201,
       statusText: 'Created',
       headers: { 'content-type': 'application/json' },
-      body: { id: 123, name: 'John Doe', email: 'john@example.com' }
+      body: { id: 123, name: 'John Doe', email: 'john@example.com' },
     };
 
     const userGetResponse: Response = {
       status: 200,
       statusText: 'OK',
       headers: { 'content-type': 'application/json' },
-      body: { id: 123, name: 'John Doe', email: 'john@example.com', created: '2023-01-01' }
+      body: {
+        id: 123,
+        name: 'John Doe',
+        email: 'john@example.com',
+        created: '2023-01-01',
+      },
     };
 
     const userUpdateResponse: Response = {
       status: 200,
       statusText: 'OK',
       headers: { 'content-type': 'application/json' },
-      body: { id: 123, name: 'John Smith', email: 'john.smith@example.com', updated: '2023-01-02' }
+      body: {
+        id: 123,
+        name: 'John Smith',
+        email: 'john.smith@example.com',
+        updated: '2023-01-02',
+      },
     };
 
     const userDeleteResponse: Response = {
       status: 204,
       statusText: 'No Content',
       headers: {},
-      body: null
+      body: null,
     };
 
     mockInvoke
@@ -118,26 +132,33 @@ describe('Request API Integration', () => {
     // Create user
     const createResult = await http.post('https://api.example.com/users', {
       name: 'John Doe',
-      email: 'john@example.com'
+      email: 'john@example.com',
     });
     expect(createResult.status).toBe(201);
     expect(createResult.body.id).toBe(123);
 
     // Get user details
-    const getResult = await http.get(`https://api.example.com/users/${createResult.body.id}`);
+    const getResult = await http.get(
+      `https://api.example.com/users/${createResult.body.id}`,
+    );
     expect(getResult.status).toBe(200);
     expect(getResult.body.name).toBe('John Doe');
 
     // Update user
-    const updateResult = await http.put(`https://api.example.com/users/${createResult.body.id}`, {
-      name: 'John Smith',
-      email: 'john.smith@example.com'
-    });
+    const updateResult = await http.put(
+      `https://api.example.com/users/${createResult.body.id}`,
+      {
+        name: 'John Smith',
+        email: 'john.smith@example.com',
+      },
+    );
     expect(updateResult.status).toBe(200);
     expect(updateResult.body.name).toBe('John Smith');
 
     // Delete user
-    const deleteResult = await http.delete(`https://api.example.com/users/${createResult.body.id}`);
+    const deleteResult = await http.delete(
+      `https://api.example.com/users/${createResult.body.id}`,
+    );
     expect(deleteResult.status).toBe(204);
     expect(deleteResult.body).toBeNull();
 
@@ -149,21 +170,21 @@ describe('Request API Integration', () => {
       status: 200,
       statusText: 'OK',
       headers: { 'content-type': 'application/json' },
-      body: { 
+      body: {
         token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
         expires: '2023-12-31T23:59:59Z',
-        user: { id: 1, username: 'testuser' }
-      }
+        user: { id: 1, username: 'testuser' },
+      },
     };
 
     const protectedResponse: Response = {
       status: 200,
       statusText: 'OK',
       headers: { 'content-type': 'application/json' },
-      body: { 
+      body: {
         data: 'sensitive information',
-        timestamp: '2023-01-01T12:00:00Z'
-      }
+        timestamp: '2023-01-01T12:00:00Z',
+      },
     };
 
     mockInvoke
@@ -173,7 +194,7 @@ describe('Request API Integration', () => {
     // Login to get token
     const loginResult = await post('https://api.example.com/auth/login', {
       username: 'testuser',
-      password: 'password123'
+      password: 'password123',
     });
 
     expect(loginResult.status).toBe(200);
@@ -182,9 +203,9 @@ describe('Request API Integration', () => {
     // Use token to access protected resource
     const protectedResult = await get('https://api.example.com/protected', {
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
     });
 
     expect(protectedResult.status).toBe(200);
@@ -195,9 +216,9 @@ describe('Request API Integration', () => {
       url: 'https://api.example.com/protected',
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
     });
   });
 
@@ -210,8 +231,8 @@ describe('Request API Integration', () => {
         fileId: 'file_123',
         filename: 'document.pdf',
         size: 1024000,
-        url: 'https://cdn.example.com/files/file_123.pdf'
-      }
+        url: 'https://cdn.example.com/files/file_123.pdf',
+      },
     };
 
     const statusResponse: Response = {
@@ -221,8 +242,8 @@ describe('Request API Integration', () => {
       body: {
         fileId: 'file_123',
         status: 'processed',
-        downloadUrl: 'https://cdn.example.com/processed/file_123.pdf'
-      }
+        downloadUrl: 'https://cdn.example.com/processed/file_123.pdf',
+      },
     };
 
     mockInvoke
@@ -231,19 +252,25 @@ describe('Request API Integration', () => {
 
     // Simulate file upload with binary data
     const fileData = new ArrayBuffer(1024);
-    const uploadResult = await post('https://api.example.com/files/upload', fileData, {
-      headers: {
-        'Content-Type': 'application/octet-stream',
-        'X-Filename': 'document.pdf'
+    const uploadResult = await post(
+      'https://api.example.com/files/upload',
+      fileData,
+      {
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          'X-Filename': 'document.pdf',
+        },
+        timeout: 30000,
       },
-      timeout: 30000
-    });
+    );
 
     expect(uploadResult.status).toBe(201);
     expect(uploadResult.body.fileId).toBe('file_123');
 
     // Check upload status
-    const statusResult = await get(`https://api.example.com/files/${uploadResult.body.fileId}/status`);
+    const statusResult = await get(
+      `https://api.example.com/files/${uploadResult.body.fileId}/status`,
+    );
     expect(statusResult.status).toBe(200);
     expect(statusResult.body.status).toBe('processed');
 
@@ -255,19 +282,19 @@ describe('Request API Integration', () => {
     const downloadResponse: Response = {
       status: 200,
       statusText: 'OK',
-      headers: { 
+      headers: {
         'content-type': 'application/pdf',
         'content-length': '1024',
-        'content-disposition': 'attachment; filename="document.pdf"'
+        'content-disposition': 'attachment; filename="document.pdf"',
       },
-      body: base64Data
+      body: base64Data,
     };
 
     mockInvoke.mockResolvedValue(downloadResponse);
 
     const result = await get('https://api.example.com/files/download/123', {
       responseType: 'arraybuffer',
-      timeout: 60000
+      timeout: 60000,
     });
 
     expect(result.status).toBe(200);
@@ -288,16 +315,16 @@ describe('Request API Integration', () => {
       body: {
         data: [
           { id: 1, name: 'Item 1' },
-          { id: 2, name: 'Item 2' }
+          { id: 2, name: 'Item 2' },
         ],
         pagination: {
           page: 1,
           limit: 2,
           total: 5,
           hasNext: true,
-          nextUrl: 'https://api.example.com/items?page=2&limit=2'
-        }
-      }
+          nextUrl: 'https://api.example.com/items?page=2&limit=2',
+        },
+      },
     };
 
     const page2Response: Response = {
@@ -307,16 +334,16 @@ describe('Request API Integration', () => {
       body: {
         data: [
           { id: 3, name: 'Item 3' },
-          { id: 4, name: 'Item 4' }
+          { id: 4, name: 'Item 4' },
         ],
         pagination: {
           page: 2,
           limit: 2,
           total: 5,
           hasNext: true,
-          nextUrl: 'https://api.example.com/items?page=3&limit=2'
-        }
-      }
+          nextUrl: 'https://api.example.com/items?page=3&limit=2',
+        },
+      },
     };
 
     mockInvoke
@@ -338,16 +365,19 @@ describe('Request API Integration', () => {
 
   it('should handle error recovery and retry scenarios', async () => {
     const networkError = new Error('Network connection failed');
-    const parsedError = mockCreateError.http.networkError('Network connection failed', {
-      url: 'https://api.example.com/unstable',
-      method: 'GET'
-    });
+    const parsedError = mockCreateError.http.networkError(
+      'Network connection failed',
+      {
+        url: 'https://api.example.com/unstable',
+        method: 'GET',
+      },
+    );
 
     const successResponse: Response = {
       status: 200,
       statusText: 'OK',
       headers: {},
-      body: { message: 'success after retry' }
+      body: { message: 'success after retry' },
     };
 
     mockInvoke
@@ -357,7 +387,9 @@ describe('Request API Integration', () => {
     mockParseHttpError.mockReturnValue(parsedError);
 
     // First request fails
-    await expect(get('https://api.example.com/unstable')).rejects.toThrow(parsedError);
+    await expect(get('https://api.example.com/unstable')).rejects.toThrow(
+      parsedError,
+    );
 
     // Second request succeeds (simulating retry)
     const result = await get('https://api.example.com/stable');
@@ -371,10 +403,30 @@ describe('Request API Integration', () => {
       { status: 200, statusText: 'OK', headers: {}, body: 'success' },
       { status: 201, statusText: 'Created', headers: {}, body: { id: 1 } },
       { status: 204, statusText: 'No Content', headers: {}, body: null },
-      { status: 400, statusText: 'Bad Request', headers: {}, body: { error: 'Invalid input' } },
-      { status: 401, statusText: 'Unauthorized', headers: {}, body: { error: 'Token expired' } },
-      { status: 404, statusText: 'Not Found', headers: {}, body: { error: 'Resource not found' } },
-      { status: 500, statusText: 'Internal Server Error', headers: {}, body: { error: 'Server error' } }
+      {
+        status: 400,
+        statusText: 'Bad Request',
+        headers: {},
+        body: { error: 'Invalid input' },
+      },
+      {
+        status: 401,
+        statusText: 'Unauthorized',
+        headers: {},
+        body: { error: 'Token expired' },
+      },
+      {
+        status: 404,
+        statusText: 'Not Found',
+        headers: {},
+        body: { error: 'Resource not found' },
+      },
+      {
+        status: 500,
+        statusText: 'Internal Server Error',
+        headers: {},
+        body: { error: 'Server error' },
+      },
     ];
 
     for (const response of responses) {
@@ -382,11 +434,15 @@ describe('Request API Integration', () => {
 
       if (response.status >= 200 && response.status < 300) {
         // Success cases
-        const result = await get(`https://api.example.com/status/${response.status}`);
+        const result = await get(
+          `https://api.example.com/status/${response.status}`,
+        );
         expect(result.status).toBe(response.status);
       } else {
         // Error cases
-        await expect(get(`https://api.example.com/status/${response.status}`)).rejects.toThrow();
+        await expect(
+          get(`https://api.example.com/status/${response.status}`),
+        ).rejects.toThrow();
       }
     }
 
@@ -395,10 +451,30 @@ describe('Request API Integration', () => {
 
   it('should handle concurrent API calls with different patterns', async () => {
     const responses = [
-      { status: 200, statusText: 'OK', headers: {}, body: { type: 'user', data: 'user data' } },
-      { status: 200, statusText: 'OK', headers: {}, body: { type: 'posts', data: ['post1', 'post2'] } },
-      { status: 200, statusText: 'OK', headers: {}, body: { type: 'comments', data: ['comment1'] } },
-      { status: 404, statusText: 'Not Found', headers: {}, body: { error: 'Profile not found' } }
+      {
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        body: { type: 'user', data: 'user data' },
+      },
+      {
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        body: { type: 'posts', data: ['post1', 'post2'] },
+      },
+      {
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        body: { type: 'comments', data: ['comment1'] },
+      },
+      {
+        status: 404,
+        statusText: 'Not Found',
+        headers: {},
+        body: { error: 'Profile not found' },
+      },
     ];
 
     mockInvoke
@@ -411,7 +487,7 @@ describe('Request API Integration', () => {
       get('https://api.example.com/user/123'),
       get('https://api.example.com/user/123/posts'),
       get('https://api.example.com/user/123/comments'),
-      get('https://api.example.com/user/123/profile') // This will fail
+      get('https://api.example.com/user/123/profile'), // This will fail
     ]);
 
     expect(results[0].status).toBe('fulfilled');
@@ -421,7 +497,8 @@ describe('Request API Integration', () => {
 
     const userResult = (results[0] as PromiseFulfilledResult<Response>).value;
     const postsResult = (results[1] as PromiseFulfilledResult<Response>).value;
-    const commentsResult = (results[2] as PromiseFulfilledResult<Response>).value;
+    const commentsResult = (results[2] as PromiseFulfilledResult<Response>)
+      .value;
 
     expect(userResult.body.type).toBe('user');
     expect(postsResult.body.data).toHaveLength(2);
@@ -432,11 +509,11 @@ describe('Request API Integration', () => {
     const complexResponse: Response = {
       status: 200,
       statusText: 'OK',
-      headers: { 
+      headers: {
         'x-rate-limit-remaining': '99',
-        'x-response-time': '150ms'
+        'x-response-time': '150ms',
       },
-      body: { success: true, processed: true }
+      body: { success: true, processed: true },
     };
 
     mockInvoke.mockResolvedValue(complexResponse);
@@ -445,11 +522,11 @@ describe('Request API Integration', () => {
       url: 'https://api.example.com/complex',
       method: 'POST',
       headers: {
-        'Authorization': 'Bearer complex-token',
+        Authorization: 'Bearer complex-token',
         'Content-Type': 'application/json',
         'X-API-Version': '2.0',
         'X-Client-ID': 'test-client',
-        'User-Agent': 'TestApp/1.0'
+        'User-Agent': 'TestApp/1.0',
       },
       body: {
         operation: 'complex-operation',
@@ -458,12 +535,12 @@ describe('Request API Integration', () => {
           options: ['option1', 'option2'],
           metadata: {
             source: 'integration-test',
-            timestamp: new Date().toISOString()
-          }
-        }
+            timestamp: new Date().toISOString(),
+          },
+        },
       },
       timeout: 15000,
-      responseType: 'json'
+      responseType: 'json',
     };
 
     const result = await request(complexOptions);
@@ -480,13 +557,15 @@ describe('Request API Integration', () => {
     const parsedTimeoutError = mockCreateError.http.timeout(
       'https://api.example.com/slow',
       10000,
-      { originalError: timeoutError }
+      { originalError: timeoutError },
     );
 
     mockInvoke.mockRejectedValue(timeoutError);
     mockParseHttpError.mockReturnValue(parsedTimeoutError);
 
-    await expect(get('https://api.example.com/slow', { timeout: 10000 })).rejects.toThrow(parsedTimeoutError);
+    await expect(
+      get('https://api.example.com/slow', { timeout: 10000 }),
+    ).rejects.toThrow(parsedTimeoutError);
 
     expect(mockParseHttpError).toHaveBeenCalledWith(timeoutError, {
       url: 'https://api.example.com/slow',
@@ -494,8 +573,8 @@ describe('Request API Integration', () => {
       options: {
         timeout: 10000,
         url: 'https://api.example.com/slow',
-        method: 'GET'
-      }
+        method: 'GET',
+      },
     });
   });
 });

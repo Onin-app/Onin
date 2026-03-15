@@ -213,8 +213,6 @@ fn get_all_shortcuts_sync() -> Vec<PathBuf> {
     let mut shortcuts = Vec::new();
     let user_profile = std::env::var("USERPROFILE").unwrap();
 
-    println!("user_profile -> {:?}", user_profile);
-
     let start_menu_paths = vec![
         "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs".to_string(),
         format!(
@@ -632,7 +630,7 @@ pub fn open_app(path: &str) -> Result<(), String> {
         use std::os::windows::process::CommandExt;
         const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
         const DETACHED_PROCESS: u32 = 0x00000008;
-        
+
         Command::new("cmd")
             .args(&["/C", "start", "", path])
             .creation_flags(CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS)

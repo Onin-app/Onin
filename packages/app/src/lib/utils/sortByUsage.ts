@@ -7,7 +7,7 @@ export function sortByUsage(
   items: LaunchableItem[],
   usageStats: CommandUsageStats[],
   sortMode: SortMode,
-  enableTracking: boolean
+  enableTracking: boolean,
 ): LaunchableItem[] {
   // 如果未启用追踪或使用默认模式，返回原数组
   if (!enableTracking || sortMode === "default") {
@@ -16,14 +16,14 @@ export function sortByUsage(
 
   // 创建使用统计的映射
   const statsMap = new Map<string, CommandUsageStats>();
-  usageStats.forEach(stat => {
+  usageStats.forEach((stat) => {
     statsMap.set(stat.command_name, stat);
   });
 
   // 计算分数
   const calculateScore = (item: LaunchableItem): number => {
     if (!item.action) return 0;
-    
+
     const stat = statsMap.get(item.action);
     if (!stat) return 0;
 

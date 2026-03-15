@@ -28,7 +28,7 @@ deno_core::extension!(
 ///
 /// 重写 console 对象以使用我们的 op
 const GLOBAL_SETUP_CODE: &str = r#"
-    // 重写 console.log 以使用我们的 op
+    // 重写插件控制台输出到自定义 op
     globalThis.console = {
         log: (...args) => {
             const message = args.map(arg => 

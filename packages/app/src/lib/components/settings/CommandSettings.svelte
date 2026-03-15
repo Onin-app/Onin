@@ -34,7 +34,6 @@
   onMount(async () => {
     try {
       commands = await invoke<Command[]>("get_commands");
-      console.log("Fetched commands:", commands);
     } catch (error) {
       console.error("Failed to fetch commands:", error);
     }
@@ -51,9 +50,9 @@
   }
 
   function executeCommand(commandName: string) {
-    invoke("execute_command", { name: commandName })
-      .then(() => console.log("Command executed:", commandName))
-      .catch((error) => console.error("Failed to execute command:", error));
+    invoke("execute_command", { name: commandName }).catch((error) =>
+      console.error("Failed to execute command:", error),
+    );
   }
 
   function toggleKeywordDisabled(commandName: string, keywordName: string) {
@@ -364,5 +363,3 @@
     </Tabs.Root>
   </div>
 </main>
-
-

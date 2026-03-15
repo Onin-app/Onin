@@ -97,10 +97,6 @@ impl PluginRuntimeManager {
     ) -> Result<(), String> {
         // 如果插件已经存在，先清除它（支持热重载）
         if runtimes.contains_key(plugin_id) {
-            println!(
-                "[Plugin] Clearing existing runtime for plugin: {}",
-                plugin_id
-            );
             runtimes.remove(plugin_id);
         }
 
@@ -118,7 +114,6 @@ impl PluginRuntimeManager {
             .map_err(|e| e.to_string())?;
 
         runtimes.insert(plugin_id.to_string(), runtime);
-        println!("[Plugin] Initialized plugin runtime: {}", plugin_id);
 
         Ok(())
     }
@@ -129,18 +124,14 @@ impl PluginRuntimeManager {
         plugin_id: &str,
     ) -> Result<(), String> {
         if runtimes.remove(plugin_id).is_some() {
-            println!("[Plugin] Cleared runtime for plugin: {}", plugin_id);
         } else {
-            println!("[Plugin] No runtime found for plugin: {}", plugin_id);
         }
         Ok(())
     }
 
     /// 处理清除所有插件
     fn handle_clear_all_plugins(runtimes: &mut HashMap<String, JsRuntime>) -> Result<(), String> {
-        let count = runtimes.len();
         runtimes.clear();
-        println!("[Plugin] Cleared all {} plugin runtimes", count);
         Ok(())
     }
 
@@ -165,9 +156,7 @@ impl PluginRuntimeManager {
             (async () => {{
                 try {{
                     if (typeof globalThis.__ONIN_COMMAND_HANDLER__ === 'function') {{
-                        const result = await globalThis.__ONIN_COMMAND_HANDLER__('{}', {});
-                        console.log('Command execution result:', JSON.stringify(result));
-                        return result;
+                        const result = await globalThis.__ONIN_COMMAND_HANDLER__('{}', {});                        return result;
                     }} else {{
                         throw new Error('No command handler registered');
                     }}

@@ -144,10 +144,7 @@ pub async fn register_dynamic_command(
     let plugin_commands = store.commands.entry(plugin_id.clone()).or_default();
 
     // 检查是否已存在相同 code 的命令，如果存在则更新
-    if let Some(existing) = plugin_commands
-        .iter_mut()
-        .find(|c| c.code == command.code)
-    {
+    if let Some(existing) = plugin_commands.iter_mut().find(|c| c.code == command.code) {
         *existing = dynamic_command;
     } else {
         plugin_commands.push(dynamic_command);
@@ -202,15 +199,10 @@ pub async fn remove_dynamic_command(
 /// 获取所有动态命令（用于合并到命令列表）
 pub fn get_all_dynamic_commands(app: &AppHandle) -> Vec<DynamicCommand> {
     let store = load_dynamic_commands(app);
-    store
-        .commands
-        .into_values()
-        .flatten()
-        .collect()
+    store.commands.into_values().flatten().collect()
 }
 
 // get_plugin_id_from_context has been moved to crate::plugin::context::get_current_plugin_id
-
 
 #[cfg(test)]
 mod tests {

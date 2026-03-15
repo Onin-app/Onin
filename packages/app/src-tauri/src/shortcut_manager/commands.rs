@@ -118,13 +118,7 @@ pub async fn set_toggle_shortcut(
     state: State<'_, ShortcutState>,
     shortcut_str: String,
 ) -> Result<(), String> {
-    set_named_shortcut(
-        app,
-        state,
-        shortcut_str,
-        "toggle_window",
-        "显示/隐藏窗口",
-    )
+    set_named_shortcut(app, state, shortcut_str, "toggle_window", "显示/隐藏窗口")
 }
 
 /// 获取切换窗口快捷键
@@ -140,13 +134,7 @@ pub async fn set_detach_window_shortcut(
     state: State<'_, ShortcutState>,
     shortcut_str: String,
 ) -> Result<(), String> {
-    set_named_shortcut(
-        app,
-        state,
-        shortcut_str,
-        "detach_window",
-        "分离窗口",
-    )
+    set_named_shortcut(app, state, shortcut_str, "detach_window", "分离窗口")
 }
 
 /// 获取分离窗口快捷键
@@ -171,10 +159,16 @@ fn set_named_shortcut(
         .map_err(|_| "Failed to acquire lock on shortcut state".to_string())?;
 
     // 移除旧快捷键
-    if let Some(index) = shortcuts.iter().position(|s| s.command_name == command_name) {
+    if let Some(index) = shortcuts
+        .iter()
+        .position(|s| s.command_name == command_name)
+    {
         let old_shortcut_str = &shortcuts[index].shortcut;
         let old_tauri_shortcut = Shortcut::from_str(old_shortcut_str).map_err(|e| e.to_string())?;
-        if app.global_shortcut().is_registered(old_tauri_shortcut.clone()) {
+        if app
+            .global_shortcut()
+            .is_registered(old_tauri_shortcut.clone())
+        {
             app.global_shortcut()
                 .unregister(old_tauri_shortcut)
                 .map_err(|e| e.to_string())?;

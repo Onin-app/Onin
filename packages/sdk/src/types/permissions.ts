@@ -144,12 +144,12 @@ export interface PluginCommandKeyword {
 
 /**
  * Plugin command match configuration
- * 
+ *
  * Three-layer graceful degradation model:
  * 1. Developer layer: Only configure extensions (e.g., [".png", ".jpg"])
  * 2. System layer: Automatically map extensions to internal MIME types
  * 3. Runtime layer: Prioritize MIME type matching, fallback to extensions
- * 
+ *
  * @interface PluginCommandMatch
  */
 export interface PluginCommandMatch {
@@ -165,7 +165,7 @@ export interface PluginCommandMatch {
   min?: number;
   /** Maximum count (text: character count, file/image/folder: file count) */
   max?: number;
-  /** 
+  /**
    * File extensions filter (e.g., [".png", ".jpg"], [".pdf"], [".txt", ".md"])
    * Supports wildcards like "*"
    * Only for type="file" or "image"

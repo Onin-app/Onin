@@ -74,7 +74,9 @@ export class LifecycleMessageAdapter extends BaseAdapter {
 
     window.addEventListener('message', this.messageHandler);
     this.initialized = true;
-    console.log('[LifecycleMessageAdapter] Initialized, listening for lifecycle messages');
+    console.log(
+      '[LifecycleMessageAdapter] Initialized, listening for lifecycle messages',
+    );
   }
 
   /**
@@ -87,10 +89,13 @@ export class LifecycleMessageAdapter extends BaseAdapter {
       const pluginId = params.get('plugin_id') || 'unknown';
 
       if (modeParam === 'window' || modeParam === 'inline') {
-        console.log('[LifecycleMessageAdapter] Setting runtime from URL params:', {
-          mode: modeParam,
-          pluginId,
-        });
+        console.log(
+          '[LifecycleMessageAdapter] Setting runtime from URL params:',
+          {
+            mode: modeParam,
+            pluginId,
+          },
+        );
         this._runtime = {
           mode: modeParam,
           pluginId,
@@ -104,7 +109,10 @@ export class LifecycleMessageAdapter extends BaseAdapter {
         }
       }
     } catch (error) {
-      console.warn('[LifecycleMessageAdapter] Failed to read URL params:', error);
+      console.warn(
+        '[LifecycleMessageAdapter] Failed to read URL params:',
+        error,
+      );
     }
   }
 
@@ -198,4 +206,3 @@ export class LifecycleMessageAdapter extends BaseAdapter {
     console.log('[LifecycleMessageAdapter] Destroyed');
   }
 }
-

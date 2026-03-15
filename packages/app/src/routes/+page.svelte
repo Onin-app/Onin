@@ -25,7 +25,10 @@
   import { Theme, type LaunchableItem } from "$lib/type";
   import { theme, getTheme } from "$lib/utils/theme";
   import { escapeHandler } from "$lib/stores/escapeHandler";
-  import { focusInputTrigger, requestInputFocusWithRetry } from "$lib/stores/focusInput";
+  import {
+    focusInputTrigger,
+    requestInputFocusWithRetry,
+  } from "$lib/stores/focusInput";
   import { detachWindowShortcut } from "$lib/stores/shortcuts";
 
   // Composables
@@ -128,19 +131,21 @@
   // ===== Event Handlers =====
 
   const handleEsc = () => {
-    console.log("handleEsc triggered, route:", page.route.id);
     // Only handle ESC on main page
     if (page.route.id !== "/") {
-      console.log("Not on main page, ignoring ESC");
       return;
     }
 
     if (plugin.state.showPluginInline) {
-      console.log("Closing inline plugin");
+      invoke("acquire_window_close_lock").catch(console.error);
       plugin.closePlugin();
+      requestInputFocusWithRetry();
+      setTimeout(() => {
+        invoke("release_window_close_lock").catch(console.error);
+      }, 200);
       return;
     }
-    console.log("Clearing input/closing main window");
+
     inputValue = "";
     clipboard.clearAttachments();
     matchedCommands = [];
@@ -386,7 +391,6 @@
         // 复制结果到剪贴板
         try {
           await navigator.clipboard.writeText(result);
-          console.log("[Extension] Copied to clipboard:", result);
         } catch (e) {
           console.error("[Extension] Failed to copy:", e);
         }
@@ -417,9 +421,7 @@
   });
 
   onMount(async () => {
-    console.log("Main page component has mounted");
     escapeHandler.set(handleEsc);
-
 
     // 加载配置
     await appListManager.loadConfig();
@@ -450,7 +452,6 @@
 
     // 监听清除剪贴板事件
     const unlistenClearClipboard = await listen("clear_app_clipboard", () => {
-      console.log("Clearing app clipboard content");
       clipboard.clearAttachments();
     });
 
@@ -466,7 +467,6 @@
 
     // 监听后端发来的 ESC 事件 (当焦点在插件窗口或全局快捷键捕获时)
     const unlistenEsc = await listen("escape_pressed", () => {
-      console.log("Received escape_pressed event from backend");
       handleEsc();
     });
 
@@ -494,7 +494,6 @@
     if (unlisten) {
       unlisten();
     }
-
   });
 </script>
 

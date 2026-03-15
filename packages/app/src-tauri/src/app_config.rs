@@ -135,6 +135,5 @@ pub fn update_app_config(
     // 保存到文件
     save_config(&app, &config)?;
 
-    println!("[app_config] Config updated: {:?}", config);
     Ok(())
 }

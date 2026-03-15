@@ -112,9 +112,7 @@ export function _resetRegistrationState() {
  * @since 0.1.0
  * @group API
  */
-export async function handleCommand(
-  handler: CommandHandler,
-): Promise<void> {
+export async function handleCommand(handler: CommandHandler): Promise<void> {
   if (isHandlerRegistered) {
     console.warn(
       'CommandHandler has already been registered. Ignoring subsequent calls.',
@@ -164,7 +162,7 @@ export async function handleCommand(
 
 /**
  * Dynamically register a command for the current plugin.
- * 
+ *
  * This allows plugins to create commands at runtime based on user data,
  * external APIs, or other dynamic sources. Registered commands are persisted
  * and will appear in the command list.

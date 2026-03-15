@@ -14,7 +14,7 @@ function createDetachWindowShortcutStore() {
       .catch((e) => console.error("Failed to load detach window shortcut:", e));
 
     // Return cleanup function (optional)
-    return () => { };
+    return () => {};
   });
 
   return {

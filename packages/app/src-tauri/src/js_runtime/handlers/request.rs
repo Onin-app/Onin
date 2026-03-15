@@ -5,10 +5,7 @@ use crate::plugin_api;
 use tauri::AppHandle;
 
 /// 处理 HTTP 请求
-pub async fn handle_plugin_request(
-    app_handle: AppHandle,
-    arg: serde_json::Value,
-) -> InvokeResult {
+pub async fn handle_plugin_request(app_handle: AppHandle, arg: serde_json::Value) -> InvokeResult {
     // 处理两种格式：直接的 RequestOptions 或 {"options": RequestOptions}
     let request_options = if let Some(options) = arg.get("options") {
         options.clone()

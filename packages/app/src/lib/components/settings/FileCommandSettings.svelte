@@ -56,9 +56,6 @@
     const text = clipboardData.getData("text/plain");
 
     if (!text) {
-      console.log(
-        "提示：从 Finder 复制的文件无法直接粘贴。请右键文件选择'拷贝路径'，或使用拖放功能。",
-      );
       return;
     }
 
@@ -128,7 +125,6 @@
   const listenDragDrop = async () => {
     // 修复：正确赋值给 state 变量，以便组件销毁时可以注销监听器
     unlistenDragDrop = await getCurrentWebview().onDragDropEvent(async (e) => {
-      console.log("拖放移动", e);
       const event = e.event;
       const payload = e.payload as {
         paths: string[];
@@ -179,9 +175,7 @@
   });
 </script>
 
-<main
-  class="flex h-full w-full flex-col"
->
+<main class="flex h-full w-full flex-col">
   <h2 class="mb-2 text-xl font-bold">文件启动设置</h2>
   {#if fileCommands.length > 0}
     <Accordion.Root class="mb-2" type="single">

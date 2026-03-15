@@ -38,16 +38,16 @@ export async function simplifiedHttpErrorHandling() {
               throw new Error(`HTTP 错误 ${status}: ${error.message}`);
           }
           break;
-        
+
         case errorCode.http.TIMEOUT:
           throw new Error('请求超时，请检查网络连接');
-        
+
         case errorCode.http.NETWORK_ERROR:
           throw new Error('网络连接失败');
-        
+
         case errorCode.common.PERMISSION_DENIED:
           throw new Error('需要在插件配置中添加 API 访问权限');
-        
+
         default:
           throw new Error(`请求失败: ${error.message}`);
       }
@@ -58,9 +58,12 @@ export async function simplifiedHttpErrorHandling() {
 
 // 通用的 HTTP 状态码处理函数
 export function getHttpErrorMessage(error: unknown): string {
-  if (errorUtils.isPluginError(error) && error.code === errorCode.http.HTTP_ERROR) {
+  if (
+    errorUtils.isPluginError(error) &&
+    error.code === errorCode.http.HTTP_ERROR
+  ) {
     const status = error.context?.status;
-    
+
     // 使用标准的 HTTP 状态码分类
     if (status >= 400 && status < 500) {
       // 客户端错误
@@ -75,7 +78,7 @@ export function getHttpErrorMessage(error: unknown): string {
       };
       return clientErrorMessages[status] || `客户端错误 ${status}`;
     }
-    
+
     if (status >= 500 && status < 600) {
       // 服务器错误
       const serverErrorMessages: Record<number, string> = {
@@ -86,23 +89,28 @@ export function getHttpErrorMessage(error: unknown): string {
       };
       return serverErrorMessages[status] || `服务器错误 ${status}`;
     }
-    
+
     return `HTTP 错误 ${status}`;
   }
-  
+
   return '未知错误';
 }
 
 // 检查是否为特定类型的 HTTP 错误
 export function isHttpStatus(error: unknown, status: number): boolean {
-  return errorUtils.isPluginError(error) && 
-         error.code === errorCode.http.HTTP_ERROR && 
-         error.context?.status === status;
+  return (
+    errorUtils.isPluginError(error) &&
+    error.code === errorCode.http.HTTP_ERROR &&
+    error.context?.status === status
+  );
 }
 
 // 检查是否为客户端错误 (4xx)
 export function isClientError(error: unknown): boolean {
-  if (errorUtils.isPluginError(error) && error.code === errorCode.http.HTTP_ERROR) {
+  if (
+    errorUtils.isPluginError(error) &&
+    error.code === errorCode.http.HTTP_ERROR
+  ) {
     const status = error.context?.status;
     return status >= 400 && status < 500;
   }
@@ -111,7 +119,10 @@ export function isClientError(error: unknown): boolean {
 
 // 检查是否为服务器错误 (5xx)
 export function isServerError(error: unknown): boolean {
-  if (errorUtils.isPluginError(error) && error.code === errorCode.http.HTTP_ERROR) {
+  if (
+    errorUtils.isPluginError(error) &&
+    error.code === errorCode.http.HTTP_ERROR
+  ) {
     const status = error.context?.status;
     return status >= 500 && status < 600;
   }
@@ -125,12 +136,18 @@ export function isRetryableHttpError(error: unknown): boolean {
       case errorCode.http.TIMEOUT:
       case errorCode.http.NETWORK_ERROR:
         return true;
-      
+
       case errorCode.http.HTTP_ERROR:
         const status = error.context?.status;
         // 只重试特定的服务器错误和限流错误
-        return status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
-      
+        return (
+          status === 429 ||
+          status === 500 ||
+          status === 502 ||
+          status === 503 ||
+          status === 504
+        );
+
       default:
         return false;
     }
@@ -170,5 +187,5 @@ export {
   isClientError,
   isServerError,
   isRetryableHttpError,
-  exampleUsage
+  exampleUsage,
 };

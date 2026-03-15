@@ -54,7 +54,8 @@ export function usePluginManager(): PluginManagerReturn {
    * 关闭插件内联显示
    */
   const closePlugin = () => {
-    // 发送隐藏事件给插件
+    // 内联返回列表时，先通知失焦，再通知隐藏，便于插件做窗口级清理。
+    sendLifecycleEvent("blur");
     sendLifecycleEvent("hide");
 
     // 缓存当前配置，避免清理 state 后丢失判断依据
@@ -68,9 +69,9 @@ export function usePluginManager(): PluginManagerReturn {
     state.currentPluginRunAtStartup = false;
 
     // 未勾选 terminate_on_bg 时，仅隐藏并保活；勾选时才销毁
-    invoke(shouldTerminate ? "close_inline_plugin" : "hide_inline_plugin").catch(
-      console.error,
-    );
+    invoke(
+      shouldTerminate ? "close_inline_plugin" : "hide_inline_plugin",
+    ).catch(console.error);
   };
 
   /**
@@ -86,7 +87,8 @@ export function usePluginManager(): PluginManagerReturn {
     const pluginId = state.currentPluginId;
 
     try {
-      // 步骤 1：先发送 hide 生命周期事件，并更新 UI 状态
+      // 步骤 1：先发送 blur/hide 生命周期事件，并更新 UI 状态
+      sendLifecycleEvent("blur");
       sendLifecycleEvent("hide");
       state.showPluginInline = false;
       state.currentPluginUrl = "";
@@ -142,7 +144,6 @@ export function usePluginManager(): PluginManagerReturn {
     }
   };
 
-
   /**
    * 发送生命周期事件给插件
    */
@@ -156,7 +157,6 @@ export function usePluginManager(): PluginManagerReturn {
       // Ignore error if webview is not ready or closed
       // console.error("Failed to send lifecycle event:", err);
     });
-    console.log("[PluginManager] Sent lifecycle event:", event);
   };
 
   /**
@@ -244,11 +244,6 @@ export function usePluginManager(): PluginManagerReturn {
       plugin_name: string;
       plugin_url: string;
     }>("show_plugin_inline", async (event) => {
-      console.log(
-        "Received show_plugin_inline event for:",
-        event.payload.plugin_id,
-      );
-
       state.showPluginInline = true;
       state.currentPluginUrl = event.payload.plugin_url;
       state.currentPluginId = event.payload.plugin_id;
@@ -261,9 +256,6 @@ export function usePluginManager(): PluginManagerReturn {
         state.currentPluginAutoDetach = plugin?.auto_detach ?? false;
         state.currentPluginTerminateOnBg = plugin?.terminate_on_bg ?? false;
         state.currentPluginRunAtStartup = plugin?.run_at_startup ?? false;
-        console.log(
-          `Plugin ${event.payload.plugin_id} auto_detach: ${state.currentPluginAutoDetach}, terminate_on_bg: ${state.currentPluginTerminateOnBg}, run_at_startup: ${state.currentPluginRunAtStartup}`,
-        );
       } catch (error) {
         console.error("Failed to get plugin settings:", error);
         state.currentPluginAutoDetach = false;
@@ -277,15 +269,7 @@ export function usePluginManager(): PluginManagerReturn {
       "window_visibility",
       (event) => {
         const isVisible = event.payload;
-        if (
-          !isVisible &&
-          state.showPluginInline &&
-          state.currentPluginTerminateOnBg
-        ) {
-          console.log(
-            "[PluginManager] Terminating plugin on background hide:",
-            state.currentPluginId,
-          );
+        if (!isVisible && state.showPluginInline) {
           closePlugin();
         }
       },
@@ -293,7 +277,6 @@ export function usePluginManager(): PluginManagerReturn {
 
     // 监听分离窗口快捷键事件
     const unlistenDetachWindow = await listen("detach_window_shortcut", () => {
-      console.log("Detach window shortcut triggered");
       detachPlugin();
     });
 

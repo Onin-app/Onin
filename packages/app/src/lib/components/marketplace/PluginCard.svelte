@@ -17,14 +17,19 @@
     showStats?: boolean; // 是否显示统计信息（star 和 downloads）
   }
 
-  let { plugin, isInstalled = false, onclick, oninstall, showStats = true }: Props = $props();
+  let {
+    plugin,
+    isInstalled = false,
+    onclick,
+    oninstall,
+    showStats = true,
+  }: Props = $props();
   let imageError = $state(false);
   let installing = $state(false);
-  
+
   // 调试日志
   $effect(() => {
     if (isInstalled) {
-      console.log(`[PluginCard] ${plugin.name} is installed`);
     }
   });
 
@@ -48,7 +53,11 @@
 
     try {
       installing = true;
-      await downloadAndInstallPlugin(plugin.downloadUrl, plugin.id, plugin.icon);
+      await downloadAndInstallPlugin(
+        plugin.downloadUrl,
+        plugin.id,
+        plugin.icon,
+      );
       oninstall?.();
     } catch (error) {
       console.error("Failed to install plugin:", error);
@@ -94,12 +103,14 @@
     <div class="flex min-w-0 flex-1 flex-col gap-1">
       <!-- 标题、版本和 GitHub 链接 -->
       <div class="flex items-start justify-between gap-2">
-        <div class="flex items-baseline gap-2 min-w-0">
+        <div class="flex min-w-0 items-baseline gap-2">
           <h3 class="truncate text-base leading-tight font-semibold">
             {plugin.name}
           </h3>
           {#if plugin.version}
-            <span class="shrink-0 text-xs text-neutral-400">v{plugin.version}</span>
+            <span class="shrink-0 text-xs text-neutral-400"
+              >v{plugin.version}</span
+            >
           {/if}
         </div>
         <a
@@ -115,14 +126,18 @@
       </div>
 
       <!-- 描述 -->
-      <p class="line-clamp-2 text-sm text-neutral-500 dark:text-neutral-400">
+      <p class="line-clamp-1 text-sm text-neutral-500 dark:text-neutral-400">
         {plugin.description}
       </p>
 
       <!-- 作者和 ID -->
-      <div class="flex items-center justify-between gap-2 text-xs text-neutral-400">
+      <div
+        class="flex items-center justify-between gap-2 text-xs text-neutral-400"
+      >
         <span class="truncate">{plugin.author}</span>
-        <span class="shrink-0 text-neutral-300 dark:text-neutral-600">ID: {plugin.id}</span>
+        <span class="shrink-0 text-neutral-300 dark:text-neutral-600"
+          >ID: {plugin.id}</span
+        >
       </div>
     </div>
   </div>

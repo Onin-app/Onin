@@ -7,7 +7,6 @@ use tauri_plugin_global_shortcut::{Shortcut, ShortcutState as GlobalShortcutPlug
 
 const SHORTCUT_DEBOUNCE_MS: u128 = 400;
 
-/// 处理全局快捷键事件
 pub fn handle_global_shortcut(
     app: &AppHandle,
     shortcut: &Shortcut,
@@ -21,12 +20,6 @@ pub fn handle_global_shortcut(
     let triggered_shortcut = normalize_shortcut_string(&shortcut_str);
     let state: State<ShortcutState> = app.state();
 
-    println!(
-        "Handling shortcut: {} (normalized: {})",
-        shortcut_str, triggered_shortcut
-    );
-
-    // 获取状态
     let shortcuts = match state.shortcuts.lock() {
         Ok(shortcuts) => shortcuts,
         Err(e) => {
@@ -35,13 +28,8 @@ pub fn handle_global_shortcut(
         }
     };
 
-    // 查找匹配的快捷键
     let matching_shortcut = shortcuts.iter().find(|s| {
         let stored_shortcut = normalize_shortcut_string(&s.shortcut);
-        println!(
-            "Comparing with stored shortcut: {} (normalized: {})",
-            s.shortcut, stored_shortcut
-        );
         stored_shortcut == triggered_shortcut
     });
 
@@ -51,13 +39,11 @@ pub fn handle_global_shortcut(
         {
             return;
         }
-
-        println!(
-            "Found matching shortcut: {} -> {}",
-            app_shortcut.shortcut, app_shortcut.command_name
-        );
         execute_shortcut_action(app, app_shortcut);
     } else {
+        if should_debounce_shortcut(&state, &triggered_shortcut) {
+            return;
+        }
         handle_special_keys(app, &triggered_shortcut);
     }
 }
@@ -67,10 +53,6 @@ fn should_debounce_shortcut(state: &State<ShortcutState>, triggered_shortcut: &s
         if let Some(last_time) = last_executed.get(triggered_shortcut) {
             let elapsed = last_time.elapsed().as_millis();
             if elapsed < SHORTCUT_DEBOUNCE_MS {
-                println!(
-                    "Debouncing shortcut: {} (elapsed: {}ms)",
-                    triggered_shortcut, elapsed
-                );
                 return true;
             }
         }
@@ -80,119 +62,32 @@ fn should_debounce_shortcut(state: &State<ShortcutState>, triggered_shortcut: &s
     false
 }
 
-/// 执行快捷键动作
-/// 执行快捷键动作
 fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::Shortcut) {
     if app_shortcut.command_name == "toggle_window" {
-        // Helper to handle toggle logic to avoid code duplication across window types
-        // Using a macro or just duplicating blocks since types differ slightly in Rust strictness
-        // Block for WebviewWindow
         if let Some(window) = app.get_webview_window("main") {
             match window.is_visible() {
                 Ok(true) => {
-                    // macOS：隐藏前先把焦点归还给上一个应用
-                    #[cfg(target_os = "macos")]
-                    crate::system_commands::activate_previous_app(app);
-
-                    // Windows：隐藏前先把焦点归还给上一个窗口
-                    #[cfg(target_os = "windows")]
-                    crate::system_commands::activate_previous_app(app);
-
+                    crate::focus_manager::restore_previous_foreground(app);
                     let _ = window.hide();
                     let _ = window.emit("window_visibility", &false);
                 }
                 Ok(false) => {
-                    // macOS logic：记录当前前台应用，以便下次隐藏时归还焦点
-                    #[cfg(target_os = "macos")]
-                    {
-                        if let Some(bundle_id) =
-                            crate::system_commands::get_frontmost_app_bundle_id()
-                        {
-                            if let Some(state) =
-                                app.try_state::<crate::system_commands::MacOSPreviousApp>()
-                            {
-                                *state.0.lock().unwrap() = Some(bundle_id);
-                            }
-                        }
-                    }
-
-                    // Windows logic：记录当前前台窗口，以便下次隐藏时归还焦点
-                    #[cfg(target_os = "windows")]
-                    {
-                        if let Some(hwnd) = crate::system_commands::get_frontmost_window_handle() {
-                            if let Some(state) =
-                                app.try_state::<crate::system_commands::WindowsPreviousWindow>()
-                            {
-                                *state.0.lock().unwrap() = Some(hwnd);
-                            }
-                        }
-                    }
-
-                    #[cfg(target_os = "windows")]
-                    if let Ok(hwnd) = window.hwnd() {
-                        let isize_hwnd = unsafe { std::mem::transmute_copy(&hwnd) };
-                        crate::system_commands::force_set_foreground_window(isize_hwnd);
-                    }
-
-                    let _ = window.show();
-
-                    let _ = window.set_focus();
-
+                    crate::focus_manager::capture_previous_foreground(app);
+                    crate::focus_manager::focus_webview_window(&window);
                     let _ = window.emit("window_visibility", &true);
                 }
                 Err(e) => eprintln!("Error checking window visibility: {}", e),
             }
         } else if let Some(window) = app.get_window("main") {
-            // Fallback block for Window
             match window.is_visible() {
                 Ok(true) => {
-                    // macOS：隐藏前先把焦点归还给上一个应用
-                    #[cfg(target_os = "macos")]
-                    crate::system_commands::activate_previous_app(app);
-
-                    // Windows：隐藏前先把焦点归还给上一个应用
-                    #[cfg(target_os = "windows")]
-                    crate::system_commands::activate_previous_app(app);
-
+                    crate::focus_manager::restore_previous_foreground(app);
                     let _ = window.hide();
                     let _ = window.emit("window_visibility", &false);
                 }
                 Ok(false) => {
-                    // macOS logic (same)：记录当前前台应用
-                    #[cfg(target_os = "macos")]
-                    {
-                        if let Some(bundle_id) =
-                            crate::system_commands::get_frontmost_app_bundle_id()
-                        {
-                            if let Some(state) =
-                                app.try_state::<crate::system_commands::MacOSPreviousApp>()
-                            {
-                                *state.0.lock().unwrap() = Some(bundle_id);
-                            }
-                        }
-                    }
-
-                    // Windows logic (same)：记录当前前台窗口
-                    #[cfg(target_os = "windows")]
-                    {
-                        if let Some(hwnd) = crate::system_commands::get_frontmost_window_handle() {
-                            if let Some(state) =
-                                app.try_state::<crate::system_commands::WindowsPreviousWindow>()
-                            {
-                                *state.0.lock().unwrap() = Some(hwnd);
-                            }
-                        }
-                    }
-
-                    #[cfg(target_os = "windows")]
-                    if let Ok(hwnd) = window.hwnd() {
-                        let isize_hwnd = unsafe { std::mem::transmute_copy(&hwnd) };
-                        crate::system_commands::force_set_foreground_window(isize_hwnd);
-                    }
-
-                    let _ = window.show();
-                    let _ = window.set_focus();
-
+                    crate::focus_manager::capture_previous_foreground(app);
+                    crate::focus_manager::focus_window(&window);
                     let _ = window.emit("window_visibility", &true);
                 }
                 Err(e) => eprintln!("Error checking window visibility (fallback): {}", e),
@@ -201,7 +96,6 @@ fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::
             eprintln!("Main window not found for toggle_window");
         }
     } else if app_shortcut.command_name == "detach_window" {
-        println!("Executing detach window command");
         if let Some(window) = app.get_webview_window("main") {
             if let Err(e) = window.emit("detach_window_shortcut", ()) {
                 eprintln!("Error emitting detach window command: {}", e);
@@ -211,33 +105,22 @@ fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::
                 eprintln!("Error emitting detach window command (fallback): {}", e);
             }
         }
-    } else {
-        println!("Executing command: {}", app_shortcut.command_name);
-        if let Some(window) = app.get_webview_window("main") {
-            if let Err(e) = window.emit("execute_command_by_name", &app_shortcut.command_name) {
-                eprintln!("Error emitting command: {}", e);
-            }
-        } else if let Some(window) = app.get_window("main") {
-            if let Err(e) = window.emit("execute_command_by_name", &app_shortcut.command_name) {
-                eprintln!("Error emitting command (fallback): {}", e);
-            }
+    } else if let Some(window) = app.get_webview_window("main") {
+        if let Err(e) = window.emit("execute_command_by_name", &app_shortcut.command_name) {
+            eprintln!("Error emitting command: {}", e);
+        }
+    } else if let Some(window) = app.get_window("main") {
+        if let Err(e) = window.emit("execute_command_by_name", &app_shortcut.command_name) {
+            eprintln!("Error emitting command (fallback): {}", e);
         }
     }
 }
 
-/// 处理特殊按键（如 ESC）
 fn handle_special_keys(app: &AppHandle, triggered_shortcut: &str) {
     if triggered_shortcut.to_uppercase() == "ESCAPE" {
-        println!("ESC key detected, checking for active plugin window");
-
-        // 检查是否有活跃的插件窗口
         if let Some(active_window_state) = app.try_state::<crate::plugin::ActivePluginWindow>() {
             if let Ok(active) = active_window_state.0.lock() {
                 if let Some(window_label) = active.as_ref() {
-                    println!(
-                        "Active plugin window found: {}, minimizing it",
-                        window_label
-                    );
                     if let Some(window) = app.get_webview_window(window_label) {
                         if let Err(e) = window.minimize() {
                             eprintln!("Failed to minimize plugin window: {}", e);
@@ -248,35 +131,14 @@ fn handle_special_keys(app: &AppHandle, triggered_shortcut: &str) {
             }
         }
 
-        // 如果没有活跃的插件窗口，则隐藏主窗口
-        // MODIFY: 移除后端自动隐藏逻辑，交由前端控制
-        // println!("No active plugin window, hiding main window");
-        // if let Some(window) = app.get_webview_window("main") {
-        //     let state: State<crate::window_manager::WindowState> = app.state();
-        //     state
-        //         .hiding_initiated_by_command
-        //         .store(true, std::sync::atomic::Ordering::Relaxed);
-        //     let _ = window.hide();
-        //     let _ = window.emit("window_visibility", &false);
-        // }
-        println!("ESC detected in backend. Delegating to frontend.");
         if let Some(window) = app.get_webview_window("main") {
-            println!("Found main window, emitting escape_pressed");
             if let Err(e) = window.emit("escape_pressed", ()) {
                 eprintln!("Error emitting escape_pressed event: {}", e);
             }
+        } else if let Some(window) = app.get_window("main") {
+            let _ = window.emit("escape_pressed", ());
         } else {
-            eprintln!("Main window not found when handling ESC. Available windows:");
-            for (label, _) in app.webview_windows() {
-                eprintln!(" - {}", label);
-            }
-            // Try get_window as fallback (though in v2 it might be same)
-            if let Some(w) = app.get_window("main") {
-                eprintln!("Found 'main' via get_window! Emitting...");
-                let _ = w.emit("escape_pressed", ());
-            }
+            eprintln!("Main window not found when handling ESC");
         }
-    } else {
-        println!("No matching shortcut found for: {}", triggered_shortcut);
     }
 }

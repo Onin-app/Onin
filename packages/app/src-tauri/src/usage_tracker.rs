@@ -1,3 +1,4 @@
+use crate::app_config::SortMode;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -5,7 +6,6 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager};
-use crate::app_config::SortMode;
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct CommandUsageStats {
@@ -178,11 +178,9 @@ impl Drop for UsageTracker {
         // Save any pending changes when the tracker is dropped
         if self.pending_saves > 0 {
             self.save_to_file();
-            println!("[INFO] Usage tracker data saved on drop");
         }
     }
 }
-
 
 // 全局状态管理
 pub struct UsageTrackerState(pub Mutex<Option<UsageTracker>>);
@@ -197,11 +195,11 @@ where
     F: FnOnce(&mut UsageTracker) -> R,
 {
     let mut tracker_opt = state.0.lock().map_err(|e| e.to_string())?;
-    
+
     if tracker_opt.is_none() {
         *tracker_opt = Some(UsageTracker::new(app));
     }
-    
+
     tracker_opt
         .as_mut()
         .map(operation)
@@ -218,11 +216,11 @@ where
     F: FnOnce(&UsageTracker) -> R,
 {
     let mut tracker_opt = state.0.lock().map_err(|e| e.to_string())?;
-    
+
     if tracker_opt.is_none() {
         *tracker_opt = Some(UsageTracker::new(app));
     }
-    
+
     tracker_opt
         .as_ref()
         .map(operation)
@@ -239,12 +237,12 @@ pub fn record_command_usage(
     // 检查是否启用使用追踪
     let config_state = app.state::<crate::app_config::AppConfigState>();
     let config = config_state.0.lock().map_err(|e| e.to_string())?;
-    
+
     if !config.enable_usage_tracking {
         return Ok(());
     }
     drop(config); // 释放锁
-    
+
     with_tracker(&app, &state, |tracker| {
         tracker.record_usage(&command_name);
     })
@@ -255,9 +253,7 @@ pub fn get_usage_stats(
     app: AppHandle,
     state: tauri::State<'_, UsageTrackerState>,
 ) -> Result<Vec<CommandUsageStats>, String> {
-    with_tracker_readonly(&app, &state, |tracker| {
-        tracker.get_all_stats()
-    })
+    with_tracker_readonly(&app, &state, |tracker| tracker.get_all_stats())
 }
 
 #[tauri::command]

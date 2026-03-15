@@ -12,8 +12,8 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 
 use super::state::{load_plugin_window_states, save_plugin_window_state};
 use super::types::{
-    find_plugin_by_id, ActivePluginWindow, LoadedPlugin, PluginStore,
-    PluginWindowCreating, PluginWindowToggleDebounce, WindowBounds,
+    find_plugin_by_id, ActivePluginWindow, LoadedPlugin, PluginStore, PluginWindowCreating,
+    PluginWindowToggleDebounce, WindowBounds,
 };
 
 /// 编译期嵌入的 FAB 悬浮菜单脚本（CSS + HTML + JS）
@@ -119,7 +119,6 @@ pub fn plugin_open_devtools(window: tauri::WebviewWindow) -> Result<(), String> 
     window.open_devtools();
     Ok(())
 }
-
 
 // ============================================================================
 // 窗口创建和管理
@@ -237,7 +236,7 @@ pub fn plugin_toggle_window_pin(
 /// 向插件窗口发送可见性变化事件
 pub fn trigger_window_visibility_event(window: &tauri::WebviewWindow, is_visible: bool) {
     use tauri::Emitter;
-    
+
     // 发送具体的 show/hide 事件
     if is_visible {
         if let Err(e) = window.emit("window_show", ()) {
@@ -248,7 +247,7 @@ pub fn trigger_window_visibility_event(window: &tauri::WebviewWindow, is_visible
             eprintln!("[plugin/window] 发送 window_hide 事件失败: {}", e);
         }
     }
-    
+
     // 同时发送通用的 visibility 事件（带 payload）
     if let Err(e) = window.emit("window_visibility", is_visible) {
         eprintln!("[plugin/window] 发送 window_visibility 事件失败: {}", e);
@@ -273,10 +272,6 @@ pub async fn create_or_show_plugin_window(
         if let Some(last_toggle) = debounce_map.get(&window_label) {
             let elapsed = now.duration_since(*last_toggle).as_millis() as u64;
             if elapsed < DEBOUNCE_MS {
-                println!(
-                    "[plugin/window] 窗口 {} 切换被防抖（距上次切换 {}ms）",
-                    window_label, elapsed
-                );
                 return Ok(());
             }
         }
@@ -289,10 +284,6 @@ pub async fn create_or_show_plugin_window(
     if let Some(creating_state) = app.try_state::<PluginWindowCreating>() {
         let creating = creating_state.0.lock().unwrap();
         if creating.contains(&window_label) {
-            println!(
-                "[plugin/window] 窗口 {} 正在创建中，跳过",
-                window_label
-            );
             return Ok(());
         }
     }
@@ -302,65 +293,13 @@ pub async fn create_or_show_plugin_window(
     if let Some(window) = app.get_webview_window(&window_label) {
         let is_focused = window.is_focused().unwrap_or(false);
 
-        println!(
-            "[plugin/window] 窗口 {} 焦点状态: {}",
-            window_label, is_focused
-        );
-
         if !is_focused {
-            // 窗口无焦点（可能最小化、隐藏或在后台），恢复并聚焦
-            println!("[plugin/window] 显示并聚焦窗口 {}", window_label);
-
-            // macOS：记录当前前台应用，以便隐藏时归还焦点
-            #[cfg(target_os = "macos")]
-            {
-                if let Some(bundle_id) =
-                    crate::system_commands::get_frontmost_app_bundle_id()
-                {
-                    if let Some(state) =
-                        app.try_state::<crate::system_commands::MacOSPreviousApp>()
-                    {
-                        *state.0.lock().unwrap() = Some(bundle_id);
-                    }
-                }
-            }
-
-            // Windows：记录当前前台窗口，以便隐藏时归还焦点
-            #[cfg(target_os = "windows")]
-            {
-                if let Some(hwnd) = crate::system_commands::get_frontmost_window_handle() {
-                    if let Some(state) =
-                        app.try_state::<crate::system_commands::WindowsPreviousWindow>()
-                    {
-                        *state.0.lock().unwrap() = Some(hwnd);
-                    }
-                }
-            }
-
-            // Windows: Clean Alt key state and force foreground via AttachThreadInput before showing
-            #[cfg(target_os = "windows")]
-            if let Ok(hwnd) = window.hwnd() {
-                let isize_hwnd = unsafe { std::mem::transmute_copy(&hwnd) };
-                crate::system_commands::force_set_foreground_window(isize_hwnd);
-            }
-
-            // 依次尝试恢复窗口状态
-            let _ = window.unminimize();
-            let _ = window.show();
-            let _ = window.set_focus();
+            crate::focus_manager::capture_previous_foreground(&app);
+            crate::focus_manager::focus_webview_window(&window);
 
             trigger_window_visibility_event(&window, true);
         } else {
-            // 窗口已聚焦，最小化它
-            println!("[plugin/window] 最小化窗口 {}", window_label);
-
-            // macOS：最小化前先把焦点归还给上一个应用
-            #[cfg(target_os = "macos")]
-            crate::system_commands::activate_previous_app(&app);
-
-            // Windows：最小化前先把焦点归还给上一个窗口
-            #[cfg(target_os = "windows")]
-            crate::system_commands::activate_previous_app(&app);
+            crate::focus_manager::restore_previous_foreground(&app);
 
             if let Err(e) = window.minimize() {
                 eprintln!("最小化插件窗口失败: {}", e);
@@ -379,10 +318,6 @@ pub async fn create_or_show_plugin_window(
         let url = format!(
             "{}{}mode=window&plugin_id={}",
             dev_server, separator, plugin.manifest.id
-        );
-        println!(
-            "[plugin/window] 从 {} 加载插件窗口 (Dev Mode)",
-            url
         );
         url
     } else {
@@ -403,10 +338,6 @@ pub async fn create_or_show_plugin_window(
             entry,
             plugin.manifest.id
         );
-        println!(
-            "[plugin/window] 从 {} 加载插件窗口 (Native Mode)",
-            url
-        );
         url
     };
 
@@ -420,11 +351,9 @@ pub async fn create_or_show_plugin_window(
             version: "{ver}",
             mainWindowLabel: "main"
         }};
-        window.__PLUGIN_ID__ = "{id}";
-        console.log("[Tauri Native] Runtime injected:", window.__ONIN_RUNTIME__);
-        {fab}
+        window.__PLUGIN_ID__ = "{id}";        {fab}
         "#,
-        id  = plugin.manifest.id,
+        id = plugin.manifest.id,
         ver = plugin.manifest.version,
         fab = PLUGIN_WINDOW_FAB_SCRIPT,
     );
@@ -432,31 +361,32 @@ pub async fn create_or_show_plugin_window(
     // 加载保存的窗口状态
     let window_states = load_plugin_window_states(&app);
     let saved_bounds = window_states.get(&plugin.manifest.id).cloned();
-    
+
     // 创建窗口构建器
     let mut builder = WebviewWindowBuilder::new(
         &app,
         window_label.clone(),
-        tauri::WebviewUrl::External(plugin_url.parse().map_err(|e: url::ParseError| e.to_string())?),
+        tauri::WebviewUrl::External(
+            plugin_url
+                .parse()
+                .map_err(|e: url::ParseError| e.to_string())?,
+        ),
     )
     .title(plugin.manifest.name.clone())
     .resizable(true)
     .decorations(true) // 使用系统原生装饰
     .transparent(false) // 确保窗口不透明
     .initialization_script(&runtime_script);
-    
+
     // 应用保存的窗口位置和大小
     if let Some(ref bounds) = saved_bounds {
-        println!(
-            "[plugin/window] 恢复窗口边界 {}：x={}, y={}, width={}, height={}, maximized={}",
-            plugin.manifest.id, bounds.x, bounds.y, bounds.width, bounds.height, bounds.is_maximized
-        );
-
         // 严格检查保存的边界是否合理
         let is_bounds_valid = bounds.x.abs() < 10000
             && bounds.y.abs() < 10000
-            && bounds.width >= 200 && bounds.width <= 3000
-            && bounds.height >= 200 && bounds.height <= 2000;
+            && bounds.width >= 200
+            && bounds.width <= 3000
+            && bounds.height >= 200
+            && bounds.height <= 2000;
 
         if is_bounds_valid && !bounds.is_maximized {
             builder = builder
@@ -465,10 +395,6 @@ pub async fn create_or_show_plugin_window(
         } else if bounds.is_maximized {
             builder = builder.inner_size(800.0, 600.0);
         } else {
-            println!(
-                "[plugin/window] ⚠️ 保存的边界无效（width={}, height={}），使用默认大小",
-                bounds.width, bounds.height
-            );
             builder = builder.inner_size(800.0, 600.0);
         }
     } else {
@@ -488,11 +414,10 @@ pub async fn create_or_show_plugin_window(
                 let mut creating = creating_state.0.lock().unwrap();
                 creating.remove(&window_label);
             }
-            
+
             // 如果之前是最大化的，恢复最大化状态
             if let Some(ref bounds) = saved_bounds {
                 if bounds.is_maximized {
-                    println!("[plugin/window] 恢复 {} 的最大化状态", plugin.manifest.id);
                     if let Err(e) = window.maximize() {
                         eprintln!("最大化窗口失败: {}", e);
                     }
@@ -500,11 +425,7 @@ pub async fn create_or_show_plugin_window(
             }
 
             // 设置 ESC 快捷键和窗口事件
-            setup_window_events(
-                &app,
-                &window,
-                plugin.manifest.id.clone(),
-            );
+            setup_window_events(&app, &window, plugin.manifest.id.clone());
 
             Ok(())
         }
@@ -523,11 +444,7 @@ pub async fn create_or_show_plugin_window(
 /// 设置窗口事件监听
 ///
 /// 包括焦点变化、ESC 快捷键注册/注销、窗口关闭时保存状态
-fn setup_window_events(
-    app: &tauri::AppHandle,
-    window: &tauri::WebviewWindow,
-    plugin_id: String,
-) {
+fn setup_window_events(app: &tauri::AppHandle, window: &tauri::WebviewWindow, plugin_id: String) {
     let esc_shortcut = Shortcut::from_str("escape").unwrap();
     let app_for_window_event = app.clone();
     let window_label_for_tracking = window.label().to_string();
@@ -546,7 +463,6 @@ fn setup_window_events(
         if let Some(active_window_state) = app_for_immediate.try_state::<ActivePluginWindow>() {
             if let Ok(mut active) = active_window_state.0.lock() {
                 *active = Some(label_for_immediate.clone());
-                println!("[plugin/window] 设置活跃插件窗口: {}", label_for_immediate);
             }
         }
 
@@ -565,7 +481,9 @@ fn setup_window_events(
         match event {
             tauri::WindowEvent::Focused(true) => {
                 // 记录活跃窗口
-                if let Some(active_window_state) = app_for_window_event.try_state::<ActivePluginWindow>() {
+                if let Some(active_window_state) =
+                    app_for_window_event.try_state::<ActivePluginWindow>()
+                {
                     if let Ok(mut active) = active_window_state.0.lock() {
                         *active = Some(label_for_event.clone());
                     }
@@ -578,14 +496,21 @@ fn setup_window_events(
                 }
 
                 // 重新注册 ESC 快捷键
-                let _ = app_for_window_event.global_shortcut().unregister(esc_shortcut);
-                if let Err(e) = app_for_window_event.global_shortcut().register(esc_shortcut) {
+                let _ = app_for_window_event
+                    .global_shortcut()
+                    .unregister(esc_shortcut);
+                if let Err(e) = app_for_window_event
+                    .global_shortcut()
+                    .register(esc_shortcut)
+                {
                     eprintln!("[plugin/window] 注册 ESC 快捷键失败: {}", e);
                 }
             }
             tauri::WindowEvent::Focused(false) => {
                 // 清除活跃窗口记录
-                if let Some(active_window_state) = app_for_window_event.try_state::<ActivePluginWindow>() {
+                if let Some(active_window_state) =
+                    app_for_window_event.try_state::<ActivePluginWindow>()
+                {
                     if let Ok(mut active) = active_window_state.0.lock() {
                         if active.as_ref() == Some(&label_for_event) {
                             *active = None;
@@ -600,20 +525,21 @@ fn setup_window_events(
                 }
 
                 // 注销 ESC 快捷键
-                if let Err(e) = app_for_window_event.global_shortcut().unregister(esc_shortcut) {
+                if let Err(e) = app_for_window_event
+                    .global_shortcut()
+                    .unregister(esc_shortcut)
+                {
                     eprintln!("注销 ESC 快捷键失败: {}", e);
                 }
             }
             tauri::WindowEvent::CloseRequested { .. } => {
                 // 保存窗口状态
-                save_window_state_on_close(
-                    &window_for_event,
-                    &app_for_save,
-                    &plugin_id_for_event,
-                );
-                
+                save_window_state_on_close(&window_for_event, &app_for_save, &plugin_id_for_event);
+
                 // 清除活跃窗口记录
-                if let Some(active_window_state) = app_for_window_event.try_state::<ActivePluginWindow>() {
+                if let Some(active_window_state) =
+                    app_for_window_event.try_state::<ActivePluginWindow>()
+                {
                     if let Ok(mut active) = active_window_state.0.lock() {
                         if active.as_ref() == Some(&label_for_event) {
                             *active = None;
@@ -621,7 +547,9 @@ fn setup_window_events(
                     }
                 }
 
-                let _ = app_for_window_event.global_shortcut().unregister(esc_shortcut);
+                let _ = app_for_window_event
+                    .global_shortcut()
+                    .unregister(esc_shortcut);
             }
             _ => {}
         }
@@ -643,17 +571,14 @@ fn save_window_state_on_close(
                 let logical_height = (size.height as f64 / scale_factor) as u32;
                 let logical_x = (position.x as f64 / scale_factor) as i32;
                 let logical_y = (position.y as f64 / scale_factor) as i32;
-                
-                println!(
-                    "[plugin/window] 窗口关闭 - 物理: {}x{}，缩放: {}，逻辑: {}x{}",
-                    size.width, size.height, scale_factor, logical_width, logical_height
-                );
-                
+
                 // 边界检查
                 let is_bounds_valid = logical_x.abs() < 10000
                     && logical_y.abs() < 10000
-                    && logical_width >= 200 && logical_width <= 3000
-                    && logical_height >= 200 && logical_height <= 2000;
+                    && logical_width >= 200
+                    && logical_width <= 3000
+                    && logical_height >= 200
+                    && logical_height <= 2000;
 
                 if is_bounds_valid || is_maximized {
                     let bounds = WindowBounds {
@@ -663,25 +588,18 @@ fn save_window_state_on_close(
                         height: logical_height,
                         is_maximized,
                     };
-                    
-                    println!(
-                        "[plugin/window] 保存窗口状态: x={}, y={}, width={}, height={}, maximized={}",
-                        bounds.x, bounds.y, bounds.width, bounds.height, bounds.is_maximized
-                    );
-                    
+
                     // 异步保存，避免阻塞窗口关闭
                     let app_clone = app.clone();
                     let plugin_id_clone = plugin_id.to_string();
                     std::thread::spawn(move || {
-                        if let Err(e) = save_plugin_window_state(&app_clone, &plugin_id_clone, bounds) {
+                        if let Err(e) =
+                            save_plugin_window_state(&app_clone, &plugin_id_clone, bounds)
+                        {
                             eprintln!("[plugin/window] 关闭时保存窗口状态失败: {}", e);
                         }
                     });
                 } else {
-                    println!(
-                        "[plugin/window] ⚠️ 跳过保存无效边界: x={}, y={}, width={}, height={}",
-                        logical_x, logical_y, logical_width, logical_height
-                    );
                 }
             }
         }

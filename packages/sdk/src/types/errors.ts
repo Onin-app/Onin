@@ -1,10 +1,10 @@
 /**
  * Error code definitions organized by namespace
- * 
+ *
  * Provides a comprehensive set of error codes organized by functional area.
  * Each error code follows a consistent naming pattern: `CATEGORY_SPECIFIC_ERROR`.
  * This organization helps with error handling and debugging.
- * 
+ *
  * @fileoverview Defines all error codes and error handling utilities for the plugin SDK
  * @version 0.1.0
  * @since 0.1.0
@@ -62,20 +62,20 @@ export const errorCode = {
  * Flattened error code type union
  */
 export type ErrorCode =
-  | typeof errorCode.common[keyof typeof errorCode.common]
-  | typeof errorCode.http[keyof typeof errorCode.http]
-  | typeof errorCode.fs[keyof typeof errorCode.fs]
-  | typeof errorCode.clipboard[keyof typeof errorCode.clipboard]
-  | typeof errorCode.dialog[keyof typeof errorCode.dialog]
-  | typeof errorCode.storage[keyof typeof errorCode.storage];
+  | (typeof errorCode.common)[keyof typeof errorCode.common]
+  | (typeof errorCode.http)[keyof typeof errorCode.http]
+  | (typeof errorCode.fs)[keyof typeof errorCode.fs]
+  | (typeof errorCode.clipboard)[keyof typeof errorCode.clipboard]
+  | (typeof errorCode.dialog)[keyof typeof errorCode.dialog]
+  | (typeof errorCode.storage)[keyof typeof errorCode.storage];
 
 /**
  * Plugin error interface - uses plain objects instead of classes
- * 
+ *
  * Represents errors that occur within the plugin system. These errors provide
  * structured information including error codes, context data, and human-readable
  * messages for better debugging and error handling.
- * 
+ *
  * @interface PluginError
  * @extends Error
  * @since 0.1.0
@@ -99,10 +99,13 @@ export interface PluginError extends Error {
 function createPluginError(
   code: ErrorCode,
   message: string,
-  context?: Record<string, any>
+  context?: Record<string, any>,
 ): PluginError {
   const error = new Error(message) as PluginError;
-  Object.defineProperty(error, 'name', { value: 'PluginError', writable: false });
+  Object.defineProperty(error, 'name', {
+    value: 'PluginError',
+    writable: false,
+  });
   (error as any).code = code;
   (error as any).context = context;
   return error;
@@ -110,11 +113,11 @@ function createPluginError(
 
 /**
  * Error factory functions organized by namespace
- * 
+ *
  * Provides convenient factory functions for creating specific types of plugin errors.
  * Each namespace corresponds to a functional area (HTTP, file system, clipboard, etc.)
  * and contains functions for creating the most common error scenarios.
- * 
+ *
  * @namespace createError
  * @version 0.1.0
  * @since 0.1.0
@@ -124,14 +127,14 @@ function createPluginError(
  * // Create HTTP errors
  * throw createError.http.networkError('Connection failed');
  * throw createError.http.timeout('https://api.example.com', 5000);
- * 
+ *
  * // Create file system errors
  * throw createError.fs.fileNotFound('/path/to/file.txt');
  * throw createError.fs.accessDenied('/restricted/path');
- * 
+ *
  * // Create clipboard errors
  * throw createError.clipboard.formatUnsupported('image/gif');
- * 
+ *
  * // Create with additional context
  * throw createError.common.unknown('Unexpected error', {
  *   operation: 'data-processing',
@@ -149,14 +152,14 @@ export const createError = {
       createPluginError(
         errorCode.common.PERMISSION_DENIED,
         `Permission denied for ${resource}`,
-        context
+        context,
       ),
 
     invalidArgument: (argument: string, context?: Record<string, any>) =>
       createPluginError(
         errorCode.common.INVALID_ARGUMENT,
         `Invalid argument: ${argument}`,
-        context
+        context,
       ),
   },
 
@@ -169,14 +172,18 @@ export const createError = {
       createPluginError(
         errorCode.http.TIMEOUT,
         `Request to ${url} timed out after ${timeout}ms`,
-        { url, timeout, ...context }
+        { url, timeout, ...context },
       ),
 
-    httpError: (status: number, statusText: string, context?: Record<string, any>) =>
+    httpError: (
+      status: number,
+      statusText: string,
+      context?: Record<string, any>,
+    ) =>
       createPluginError(
         errorCode.http.HTTP_ERROR,
         `HTTP ${status}: ${statusText}`,
-        { status, statusText, ...context }
+        { status, statusText, ...context },
       ),
   },
 
@@ -186,36 +193,35 @@ export const createError = {
       createPluginError(
         errorCode.fs.FILE_NOT_FOUND,
         `File not found: ${path}`,
-        { path, ...context }
+        { path, ...context },
       ),
 
     fileAccessDenied: (path: string, context?: Record<string, any>) =>
       createPluginError(
         errorCode.fs.FILE_ACCESS_DENIED,
         `Access denied: ${path}`,
-        { path, ...context }
+        { path, ...context },
       ),
 
     diskFull: (path: string, context?: Record<string, any>) =>
       createPluginError(
         errorCode.fs.DISK_FULL,
         `Disk full while accessing: ${path}`,
-        { path, ...context }
+        { path, ...context },
       ),
 
     fileAlreadyExists: (path: string, context?: Record<string, any>) =>
       createPluginError(
         errorCode.fs.FILE_ALREADY_EXISTS,
         `File already exists: ${path}`,
-        { path, ...context }
+        { path, ...context },
       ),
 
     invalidPath: (path: string, context?: Record<string, any>) =>
-      createPluginError(
-        errorCode.fs.INVALID_PATH,
-        `Invalid path: ${path}`,
-        { path, ...context }
-      ),
+      createPluginError(errorCode.fs.INVALID_PATH, `Invalid path: ${path}`, {
+        path,
+        ...context,
+      }),
   },
 
   /** Clipboard error factories */
@@ -224,28 +230,28 @@ export const createError = {
       createPluginError(
         errorCode.clipboard.UNAVAILABLE,
         'Clipboard is not available',
-        context
+        context,
       ),
 
     formatUnsupported: (format?: string, context?: Record<string, any>) =>
       createPluginError(
         errorCode.clipboard.FORMAT_UNSUPPORTED,
         `Clipboard format not supported${format ? `: ${format}` : ''}`,
-        { format, ...context }
+        { format, ...context },
       ),
 
     empty: (context?: Record<string, any>) =>
       createPluginError(
         errorCode.clipboard.EMPTY,
         'Clipboard is empty',
-        context
+        context,
       ),
 
     accessDenied: (context?: Record<string, any>) =>
       createPluginError(
         errorCode.clipboard.ACCESS_DENIED,
         'Clipboard access denied',
-        context
+        context,
       ),
   },
 
@@ -255,21 +261,21 @@ export const createError = {
       createPluginError(
         errorCode.dialog.CANCELLED,
         'Dialog was cancelled by user',
-        context
+        context,
       ),
 
     unavailable: (context?: Record<string, any>) =>
       createPluginError(
         errorCode.dialog.UNAVAILABLE,
         'Dialog is not available',
-        context
+        context,
       ),
 
     invalidOptions: (reason?: string, context?: Record<string, any>) =>
       createPluginError(
         errorCode.dialog.INVALID_OPTIONS,
         `Invalid dialog options${reason ? `: ${reason}` : ''}`,
-        { reason, ...context }
+        { reason, ...context },
       ),
   },
 
@@ -279,25 +285,25 @@ export const createError = {
       createPluginError(
         errorCode.storage.QUOTA_EXCEEDED,
         'Storage quota exceeded',
-        context
+        context,
       ),
 
     unavailable: (context?: Record<string, any>) =>
       createPluginError(
         errorCode.storage.UNAVAILABLE,
         'Storage is not available',
-        context
+        context,
       ),
   },
 };
 
 /**
  * Error checking utility functions
- * 
+ *
  * Provides utility functions for checking and analyzing plugin errors.
  * These functions help identify error types, extract error information,
  * and implement error-specific handling logic.
- * 
+ *
  * @namespace errorUtils
  * @version 0.1.0
  * @since 0.1.0
@@ -309,11 +315,11 @@ export const createError = {
  * } catch (error) {
  *   if (errorUtils.isPluginError(error)) {
  *     console.log('Plugin error:', error.code);
- *     
+ *
  *     if (errorUtils.isErrorCode(error, 'HTTP_NETWORK_ERROR')) {
  *       console.log('Network error occurred');
  *     }
- *     
+ *
  *     const info = errorUtils.getErrorInfo(error);
  *     console.log('Error details:', info);
  *   } else {
@@ -329,7 +335,9 @@ export const errorUtils = {
    * @returns True if the error is a PluginError
    */
   isPluginError: (error: any): error is PluginError => {
-    return error && error.name === 'PluginError' && typeof error.code === 'string';
+    return (
+      error && error.name === 'PluginError' && typeof error.code === 'string'
+    );
   },
 
   /**

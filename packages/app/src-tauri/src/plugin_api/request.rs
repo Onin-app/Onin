@@ -1,9 +1,9 @@
+use base64::{engine::general_purpose, Engine as _};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::HashMap;
 use std::time::Duration;
 use tauri::{command, AppHandle, State};
-use serde_json::Value;
-use base64::{Engine as _, engine::general_purpose};
 use url::Url;
 
 #[derive(Debug, Deserialize)]
@@ -135,13 +135,17 @@ pub async fn make_request(
                 headers,
                 body: data,
             };
-            
+
             // 直接返回序列化的 JSON 值
             serde_json::to_value(response).map_err(|e| e.to_string())
         }
         Err(e) => {
             if e.is_timeout() {
-                Err(format!("Request to {} timed out after {}ms", options.url, options.timeout.unwrap_or(30000)))
+                Err(format!(
+                    "Request to {} timed out after {}ms",
+                    options.url,
+                    options.timeout.unwrap_or(30000)
+                ))
             } else if e.is_connect() {
                 Err(format!("Network error: {}", e))
             } else {
@@ -162,7 +166,7 @@ pub async fn plugin_request(
         Ok(response_value) => {
             serde_json::from_value(response_value).map_err(|e| RequestError::from(e.to_string()))
         }
-        Err(e) => Err(RequestError::from(e))
+        Err(e) => Err(RequestError::from(e)),
     }
 }
 
@@ -186,7 +190,8 @@ async fn check_http_permission(
     let plugin = {
         let plugins = plugin_store.0.lock().unwrap();
         plugins.get(plugin_id).cloned()
-    }.ok_or_else(|| RequestError {
+    }
+    .ok_or_else(|| RequestError {
         name: "RequestError".to_string(),
         message: format!("Plugin '{}' not found", plugin_id),
         url: Some(url.to_string()),
@@ -209,7 +214,7 @@ async fn check_http_permission(
                     response: None,
                 });
             }
-            
+
             // 检查 URL 是否在允许列表中
             for allowed_url in &http_permission.allow_urls {
                 if is_url_allowed(&request_url, allowed_url) {

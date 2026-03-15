@@ -56,7 +56,7 @@
       class="h-full w-full overflow-hidden rounded-xl bg-neutral-100 p-3 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100"
       data-tauri-drag-region
     >
-    {@render children()}
+      {@render children()}
     </main>
   </div>
 {/if}

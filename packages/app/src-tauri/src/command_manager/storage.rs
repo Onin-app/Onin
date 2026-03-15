@@ -89,7 +89,11 @@ async fn merge_commands(app: &AppHandle, saved_commands: Vec<Command>) -> Vec<Co
     // 应用命令的图标已经在生成时通过透明度检测修复，无需每次加载都重新扫描
     let other_commands: Vec<Command> = saved_commands
         .iter()
-        .filter(|c| c.source != ItemSource::Plugin && c.source != ItemSource::Command && c.source != ItemSource::Extension)
+        .filter(|c| {
+            c.source != ItemSource::Plugin
+                && c.source != ItemSource::Command
+                && c.source != ItemSource::Extension
+        })
         .cloned()
         .collect();
 
@@ -109,7 +113,7 @@ async fn merge_commands(app: &AppHandle, saved_commands: Vec<Command>) -> Vec<Co
             merged.icon = system_command.icon.clone();
             merged.action = system_command.action.clone();
             // keywords 保持用户的配置（已保存的）
-            
+
             final_system_commands.push(merged);
         } else {
             // 新系统命令，添加

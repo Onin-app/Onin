@@ -38,7 +38,10 @@
       for (const field of schema.fields) {
         if (savedValues && savedValues[field.key] !== undefined) {
           merged[field.key] = savedValues[field.key];
-        } else if ("defaultValue" in field && field.defaultValue !== undefined) {
+        } else if (
+          "defaultValue" in field &&
+          field.defaultValue !== undefined
+        ) {
           merged[field.key] = field.defaultValue;
         }
       }
@@ -66,7 +69,7 @@
     if (saveTimeout !== null) {
       clearTimeout(saveTimeout);
     }
-    
+
     // 设置新的定时器（500ms 防抖）
     saveTimeout = setTimeout(async () => {
       try {
@@ -111,7 +114,9 @@
       </div>
     {:else if loadError}
       <div class="mx-auto max-w-2xl">
-        <div class="rounded-lg border border-red-200 bg-red-50 p-4 text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200">
+        <div
+          class="rounded-lg border border-red-200 bg-red-50 p-4 text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200"
+        >
           <p class="font-semibold">加载失败</p>
           <p class="mt-1 text-sm">{loadError}</p>
         </div>
@@ -119,7 +124,9 @@
     {:else}
       <div class="mx-auto max-w-2xl">
         {#if saveError}
-          <div class="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200">
+          <div
+            class="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200"
+          >
             {saveError}
           </div>
         {/if}

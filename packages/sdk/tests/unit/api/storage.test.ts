@@ -2,11 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock the dependencies using factory functions
 vi.mock('../../../src/core/ipc', () => ({
-  invoke: vi.fn()
+  invoke: vi.fn(),
 }));
 
 vi.mock('../../../src/core/dispatch', () => ({
-  dispatch: vi.fn()
+  dispatch: vi.fn(),
 }));
 
 // Import after mocking
@@ -22,7 +22,7 @@ import {
   createStorageError,
   isStorageError,
   type StorageError,
-  type StorageOptions
+  type StorageOptions,
 } from '../../../src/api/storage';
 import { invoke } from '../../../src/core/ipc';
 import { dispatch } from '../../../src/core/dispatch';
@@ -46,11 +46,11 @@ describe('Storage API', () => {
 
       expect(mockDispatch).toHaveBeenCalledWith({
         webview: expect.any(Function),
-        headless: expect.any(Function)
+        headless: expect.any(Function),
       });
       expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_set', {
         key: 'username',
-        value: 'john_doe'
+        value: 'john_doe',
       });
     });
 
@@ -61,7 +61,7 @@ describe('Storage API', () => {
 
       expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_set', {
         key: 'count',
-        value: 42
+        value: 42,
       });
     });
 
@@ -72,7 +72,7 @@ describe('Storage API', () => {
 
       expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_set', {
         key: 'isEnabled',
-        value: true
+        value: true,
       });
     });
 
@@ -82,8 +82,8 @@ describe('Storage API', () => {
         age: 30,
         preferences: {
           theme: 'dark',
-          language: 'en'
-        }
+          language: 'en',
+        },
       };
       mockInvoke.mockResolvedValue(undefined);
 
@@ -91,7 +91,7 @@ describe('Storage API', () => {
 
       expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_set', {
         key: 'user',
-        value: userData
+        value: userData,
       });
     });
 
@@ -103,7 +103,7 @@ describe('Storage API', () => {
 
       expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_set', {
         key: 'tags',
-        value: tags
+        value: tags,
       });
     });
 
@@ -114,7 +114,7 @@ describe('Storage API', () => {
 
       expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_set', {
         key: 'nullable',
-        value: null
+        value: null,
       });
     });
 
@@ -125,7 +125,7 @@ describe('Storage API', () => {
 
       expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_set', {
         key: 'undefined',
-        value: undefined
+        value: undefined,
       });
     });
 
@@ -136,7 +136,7 @@ describe('Storage API', () => {
 
       expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_set', {
         key: '',
-        value: 'empty key value'
+        value: 'empty key value',
       });
     });
 
@@ -147,7 +147,7 @@ describe('Storage API', () => {
 
       expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_set', {
         key: 'key-with.special_chars@123',
-        value: 'special value'
+        value: 'special value',
       });
     });
 
@@ -155,7 +155,9 @@ describe('Storage API', () => {
       const error = new Error('Storage quota exceeded');
       mockInvoke.mockRejectedValue(error);
 
-      await expect(setItem('large-data', 'x'.repeat(10000))).rejects.toThrow('Storage quota exceeded');
+      await expect(setItem('large-data', 'x'.repeat(10000))).rejects.toThrow(
+        'Storage quota exceeded',
+      );
     });
   });
 
@@ -166,7 +168,9 @@ describe('Storage API', () => {
       const result = await getItem('username');
 
       expect(result).toBe('john_doe');
-      expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_get', { key: 'username' });
+      expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_get', {
+        key: 'username',
+      });
     });
 
     it('should get existing number value', async () => {
@@ -191,7 +195,7 @@ describe('Storage API', () => {
       const userData = {
         name: 'John Doe',
         age: 30,
-        preferences: { theme: 'dark' }
+        preferences: { theme: 'dark' },
       };
       mockInvoke.mockResolvedValue(userData);
 
@@ -231,7 +235,9 @@ describe('Storage API', () => {
       const error = new Error('Storage access denied');
       mockInvoke.mockRejectedValue(error);
 
-      await expect(getItem('protected-key')).rejects.toThrow('Storage access denied');
+      await expect(getItem('protected-key')).rejects.toThrow(
+        'Storage access denied',
+      );
     });
   });
 
@@ -241,7 +247,9 @@ describe('Storage API', () => {
 
       await removeItem('username');
 
-      expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_remove', { key: 'username' });
+      expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_remove', {
+        key: 'username',
+      });
     });
 
     it('should handle removing non-existing item', async () => {
@@ -249,7 +257,9 @@ describe('Storage API', () => {
 
       await removeItem('nonexistent');
 
-      expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_remove', { key: 'nonexistent' });
+      expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_remove', {
+        key: 'nonexistent',
+      });
     });
 
     it('should handle special characters in key', async () => {
@@ -257,7 +267,9 @@ describe('Storage API', () => {
 
       await removeItem('key-with.special_chars@123');
 
-      expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_remove', { key: 'key-with.special_chars@123' });
+      expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_remove', {
+        key: 'key-with.special_chars@123',
+      });
     });
 
     it('should handle errors', async () => {
@@ -274,7 +286,10 @@ describe('Storage API', () => {
 
       await clear();
 
-      expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_clear', undefined);
+      expect(mockInvoke).toHaveBeenCalledWith(
+        'plugin_storage_clear',
+        undefined,
+      );
     });
 
     it('should handle errors', async () => {
@@ -307,7 +322,13 @@ describe('Storage API', () => {
     });
 
     it('should handle keys with special characters', async () => {
-      const specialKeys = ['key-1', 'key.2', 'key_3', 'key@4', 'key with spaces'];
+      const specialKeys = [
+        'key-1',
+        'key.2',
+        'key_3',
+        'key@4',
+        'key with spaces',
+      ];
       mockInvoke.mockResolvedValue(specialKeys);
 
       const result = await keys();
@@ -329,13 +350,15 @@ describe('Storage API', () => {
         username: 'john_doe',
         count: 42,
         isEnabled: true,
-        user: { name: 'John', age: 30 }
+        user: { name: 'John', age: 30 },
       };
       mockInvoke.mockResolvedValue(undefined);
 
       await setItems(items);
 
-      expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_set_items', { items });
+      expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_set_items', {
+        items,
+      });
     });
 
     it('should handle empty items object', async () => {
@@ -343,7 +366,9 @@ describe('Storage API', () => {
 
       await setItems({});
 
-      expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_set_items', { items: {} });
+      expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_set_items', {
+        items: {},
+      });
     });
 
     it('should handle items with various data types', async () => {
@@ -354,20 +379,24 @@ describe('Storage API', () => {
         array: [1, 2, 3],
         object: { nested: true },
         null: null,
-        undefined: undefined
+        undefined: undefined,
       };
       mockInvoke.mockResolvedValue(undefined);
 
       await setItems(items);
 
-      expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_set_items', { items });
+      expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_set_items', {
+        items,
+      });
     });
 
     it('should handle errors', async () => {
       const error = new Error('Batch set operation failed');
       mockInvoke.mockRejectedValue(error);
 
-      await expect(setItems({ key1: 'value1', key2: 'value2' })).rejects.toThrow('Batch set operation failed');
+      await expect(
+        setItems({ key1: 'value1', key2: 'value2' }),
+      ).rejects.toThrow('Batch set operation failed');
     });
   });
 
@@ -377,14 +406,16 @@ describe('Storage API', () => {
       const returnedItems = {
         username: 'john_doe',
         count: 42,
-        isEnabled: true
+        isEnabled: true,
       };
       mockInvoke.mockResolvedValue(returnedItems);
 
       const result = await getItems(requestedKeys);
 
       expect(result).toEqual(returnedItems);
-      expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_get_items', { keys: requestedKeys });
+      expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_get_items', {
+        keys: requestedKeys,
+      });
     });
 
     it('should handle empty keys array', async () => {
@@ -393,14 +424,16 @@ describe('Storage API', () => {
       const result = await getItems([]);
 
       expect(result).toEqual({});
-      expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_get_items', { keys: [] });
+      expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_get_items', {
+        keys: [],
+      });
     });
 
     it('should handle non-existing keys', async () => {
       const requestedKeys = ['existing', 'nonexistent'];
       const returnedItems = {
         existing: 'value',
-        nonexistent: null
+        nonexistent: null,
       };
       mockInvoke.mockResolvedValue(returnedItems);
 
@@ -418,7 +451,7 @@ describe('Storage API', () => {
         number: 123,
         boolean: false,
         array: [1, 2, 3],
-        object: { nested: true }
+        object: { nested: true },
       };
       mockInvoke.mockResolvedValue(returnedItems);
 
@@ -436,7 +469,9 @@ describe('Storage API', () => {
       const error = new Error('Batch get operation failed');
       mockInvoke.mockRejectedValue(error);
 
-      await expect(getItems(['key1', 'key2'])).rejects.toThrow('Batch get operation failed');
+      await expect(getItems(['key1', 'key2'])).rejects.toThrow(
+        'Batch get operation failed',
+      );
     });
   });
 
@@ -458,7 +493,7 @@ describe('Storage API', () => {
 
       expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_set', {
         key: 'namespace-test',
-        value: 'value'
+        value: 'value',
       });
     });
   });
@@ -517,7 +552,7 @@ describe('Storage API', () => {
         setItem('key1', 'value1'),
         getItem('key1'),
         removeItem('key2'),
-        keys()
+        keys(),
       ]);
 
       expect(getValue).toBe('value1');
@@ -527,14 +562,14 @@ describe('Storage API', () => {
 
     it('should handle mixed success and failure scenarios', async () => {
       const error = new Error('Operation failed');
-      
+
       mockInvoke
         .mockResolvedValueOnce(undefined) // success
         .mockRejectedValueOnce(error); // failure
 
       const results = await Promise.allSettled([
         setItem('success-key', 'value'),
-        getItem('failure-key')
+        getItem('failure-key'),
       ]);
 
       expect(results[0].status).toBe('fulfilled');
@@ -585,7 +620,7 @@ describe('Storage API', () => {
       const batchData = {
         user: { name: 'John', id: 1 },
         settings: { theme: 'dark', lang: 'en' },
-        cache: { lastUpdate: Date.now() }
+        cache: { lastUpdate: Date.now() },
       };
 
       const requestKeys = ['user', 'settings', 'cache'];
@@ -623,7 +658,7 @@ describe('Storage API', () => {
 
       expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_set', {
         key: longKey,
-        value: 'value'
+        value: 'value',
       });
     });
 
@@ -635,7 +670,7 @@ describe('Storage API', () => {
 
       expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_set', {
         key: 'large-data',
-        value: largeValue
+        value: largeValue,
       });
     });
 
@@ -648,7 +683,7 @@ describe('Storage API', () => {
 
       expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_set', {
         key: unicodeKey,
-        value: unicodeValue
+        value: unicodeValue,
       });
     });
 
@@ -663,7 +698,7 @@ describe('Storage API', () => {
 
       expect(mockInvoke).toHaveBeenCalledWith('plugin_storage_set', {
         key: 'circular',
-        value: circularObj
+        value: circularObj,
       });
     });
   });

@@ -49,14 +49,14 @@
     <!-- 搜索框 -->
     <div class="relative">
       <MagnifyingGlass
-        class="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
+        class="absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-neutral-400"
       />
       <input
         type="text"
         bind:value={searchQuery}
         oninput={(e) => onSearchChange(e.currentTarget.value)}
         placeholder="搜索插件..."
-        class="h-8 w-56 rounded border border-neutral-300 bg-white py-1.5 pl-9 pr-3 text-sm text-neutral-900 focus:border-neutral-500 focus:outline-none dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-100 dark:focus:border-neutral-400"
+        class="h-8 w-56 rounded border border-neutral-300 bg-white py-1.5 pr-3 pl-9 text-sm text-neutral-900 focus:border-neutral-500 focus:outline-none dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-100 dark:focus:border-neutral-400"
       />
     </div>
 

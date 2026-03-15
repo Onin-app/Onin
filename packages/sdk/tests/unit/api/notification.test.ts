@@ -2,15 +2,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock the dependencies using factory functions
 vi.mock('../../../src/core/ipc', () => ({
-  invoke: vi.fn()
+  invoke: vi.fn(),
 }));
 
 vi.mock('../../../src/core/dispatch', () => ({
-  dispatch: vi.fn()
+  dispatch: vi.fn(),
 }));
 
 // Import after mocking
-import { showNotification, show, notification } from '../../../src/api/notification';
+import {
+  showNotification,
+  show,
+  notification,
+} from '../../../src/api/notification';
 import type { NotificationOptions } from '../../../src/api/notification';
 import { invoke } from '../../../src/core/ipc';
 import { dispatch } from '../../../src/core/dispatch';
@@ -30,7 +34,7 @@ describe('Notification API', () => {
     it('should call dispatch with correct handlers', async () => {
       const options: NotificationOptions = {
         title: 'Test Title',
-        body: 'Test Body'
+        body: 'Test Body',
       };
 
       mockInvoke.mockResolvedValue(undefined);
@@ -39,14 +43,14 @@ describe('Notification API', () => {
 
       expect(mockDispatch).toHaveBeenCalledWith({
         webview: expect.any(Function),
-        headless: expect.any(Function)
+        headless: expect.any(Function),
       });
     });
 
     it('should call invoke with correct parameters in webview environment', async () => {
       const options: NotificationOptions = {
         title: 'Test Title',
-        body: 'Test Body'
+        body: 'Test Body',
       };
 
       mockInvoke.mockResolvedValue(undefined);
@@ -60,7 +64,7 @@ describe('Notification API', () => {
     it('should call invoke with correct parameters in headless environment', async () => {
       const options: NotificationOptions = {
         title: 'Test Title',
-        body: 'Test Body'
+        body: 'Test Body',
       };
 
       mockInvoke.mockResolvedValue(undefined);
@@ -74,7 +78,7 @@ describe('Notification API', () => {
     it('should handle successful notification display', async () => {
       const options: NotificationOptions = {
         title: 'Success',
-        body: 'Operation completed successfully'
+        body: 'Operation completed successfully',
       };
 
       mockInvoke.mockResolvedValue(undefined);
@@ -85,44 +89,50 @@ describe('Notification API', () => {
     it('should handle errors from invoke', async () => {
       const options: NotificationOptions = {
         title: 'Error Test',
-        body: 'This should fail'
+        body: 'This should fail',
       };
 
       const error = new Error('Permission denied');
       mockInvoke.mockRejectedValue(error);
 
-      await expect(showNotification(options)).rejects.toThrow('Permission denied');
+      await expect(showNotification(options)).rejects.toThrow(
+        'Permission denied',
+      );
     });
 
     it('should validate required title field', async () => {
       const invalidOptions = {
-        body: 'Missing title'
+        body: 'Missing title',
       } as NotificationOptions;
 
       // TypeScript should catch this, but let's test runtime behavior
       mockInvoke.mockResolvedValue(undefined);
 
       await showNotification(invalidOptions);
-      
-      expect(mockInvoke).toHaveBeenCalledWith('show_notification', { options: invalidOptions });
+
+      expect(mockInvoke).toHaveBeenCalledWith('show_notification', {
+        options: invalidOptions,
+      });
     });
 
     it('should validate required body field', async () => {
       const invalidOptions = {
-        title: 'Missing body'
+        title: 'Missing body',
       } as NotificationOptions;
 
       mockInvoke.mockResolvedValue(undefined);
 
       await showNotification(invalidOptions);
-      
-      expect(mockInvoke).toHaveBeenCalledWith('show_notification', { options: invalidOptions });
+
+      expect(mockInvoke).toHaveBeenCalledWith('show_notification', {
+        options: invalidOptions,
+      });
     });
 
     it('should handle empty strings', async () => {
       const options: NotificationOptions = {
         title: '',
-        body: ''
+        body: '',
       };
 
       mockInvoke.mockResolvedValue(undefined);
@@ -134,7 +144,7 @@ describe('Notification API', () => {
     it('should handle special characters in title and body', async () => {
       const options: NotificationOptions = {
         title: 'Test 🎉 Title with émojis & spëcial chars',
-        body: 'Body with\nnewlines and\ttabs'
+        body: 'Body with\nnewlines and\ttabs',
       };
 
       mockInvoke.mockResolvedValue(undefined);
@@ -152,7 +162,7 @@ describe('Notification API', () => {
     it('should work identically to showNotification', async () => {
       const options: NotificationOptions = {
         title: 'Alias Test',
-        body: 'Testing the show alias'
+        body: 'Testing the show alias',
       };
 
       mockInvoke.mockResolvedValue(undefined);
@@ -161,7 +171,7 @@ describe('Notification API', () => {
 
       expect(mockDispatch).toHaveBeenCalledWith({
         webview: expect.any(Function),
-        headless: expect.any(Function)
+        headless: expect.any(Function),
       });
     });
   });
@@ -174,7 +184,7 @@ describe('Notification API', () => {
     it('should work through notification.show', async () => {
       const options: NotificationOptions = {
         title: 'Object Test',
-        body: 'Testing the notification object'
+        body: 'Testing the notification object',
       };
 
       mockInvoke.mockResolvedValue(undefined);
@@ -183,7 +193,7 @@ describe('Notification API', () => {
 
       expect(mockDispatch).toHaveBeenCalledWith({
         webview: expect.any(Function),
-        headless: expect.any(Function)
+        headless: expect.any(Function),
       });
     });
   });
@@ -192,37 +202,43 @@ describe('Notification API', () => {
     it('should handle network errors', async () => {
       const options: NotificationOptions = {
         title: 'Network Error',
-        body: 'Testing network failure'
+        body: 'Testing network failure',
       };
 
       const networkError = new Error('Network unavailable');
       mockInvoke.mockRejectedValue(networkError);
 
-      await expect(showNotification(options)).rejects.toThrow('Network unavailable');
+      await expect(showNotification(options)).rejects.toThrow(
+        'Network unavailable',
+      );
     });
 
     it('should handle permission errors', async () => {
       const options: NotificationOptions = {
         title: 'Permission Error',
-        body: 'Testing permission denial'
+        body: 'Testing permission denial',
       };
 
       const permissionError = new Error('Notification permission denied');
       mockInvoke.mockRejectedValue(permissionError);
 
-      await expect(showNotification(options)).rejects.toThrow('Notification permission denied');
+      await expect(showNotification(options)).rejects.toThrow(
+        'Notification permission denied',
+      );
     });
 
     it('should handle timeout errors', async () => {
       const options: NotificationOptions = {
         title: 'Timeout Error',
-        body: 'Testing timeout'
+        body: 'Testing timeout',
       };
 
       const timeoutError = new Error('Request timeout');
       mockInvoke.mockRejectedValue(timeoutError);
 
-      await expect(showNotification(options)).rejects.toThrow('Request timeout');
+      await expect(showNotification(options)).rejects.toThrow(
+        'Request timeout',
+      );
     });
   });
 
@@ -231,12 +247,14 @@ describe('Notification API', () => {
       const notifications = [
         { title: 'Notification 1', body: 'First notification' },
         { title: 'Notification 2', body: 'Second notification' },
-        { title: 'Notification 3', body: 'Third notification' }
+        { title: 'Notification 3', body: 'Third notification' },
       ];
 
       mockInvoke.mockResolvedValue(undefined);
 
-      const promises = notifications.map(options => showNotification(options));
+      const promises = notifications.map((options) =>
+        showNotification(options),
+      );
       await Promise.all(promises);
 
       expect(mockInvoke).toHaveBeenCalledTimes(3);
@@ -244,8 +262,14 @@ describe('Notification API', () => {
     });
 
     it('should handle mixed success and failure scenarios', async () => {
-      const options1: NotificationOptions = { title: 'Success', body: 'This will succeed' };
-      const options2: NotificationOptions = { title: 'Failure', body: 'This will fail' };
+      const options1: NotificationOptions = {
+        title: 'Success',
+        body: 'This will succeed',
+      };
+      const options2: NotificationOptions = {
+        title: 'Failure',
+        body: 'This will fail',
+      };
 
       mockInvoke
         .mockResolvedValueOnce(undefined)
@@ -253,12 +277,14 @@ describe('Notification API', () => {
 
       const results = await Promise.allSettled([
         showNotification(options1),
-        showNotification(options2)
+        showNotification(options2),
       ]);
 
       expect(results[0].status).toBe('fulfilled');
       expect(results[1].status).toBe('rejected');
-      expect((results[1] as PromiseRejectedResult).reason.message).toBe('Failed');
+      expect((results[1] as PromiseRejectedResult).reason.message).toBe(
+        'Failed',
+      );
     });
   });
 });

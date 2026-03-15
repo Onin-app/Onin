@@ -2,21 +2,24 @@ import { describe, it, expect, vi } from 'vitest';
 
 // Mock the modules using factory functions
 vi.mock('../../../src/core/ipc', () => ({
-  invoke: vi.fn()
+  invoke: vi.fn(),
 }));
 
 vi.mock('../../../src/core/environment', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
-    getEnvironment: vi.fn()
+    getEnvironment: vi.fn(),
   };
 });
 
 // Import after mocking
 import { showNotification } from '../../../src/api/notification';
 import { invoke } from '../../../src/core/ipc';
-import { getEnvironment, RuntimeEnvironment } from '../../../src/core/environment';
+import {
+  getEnvironment,
+  RuntimeEnvironment,
+} from '../../../src/core/environment';
 
 // Get the mocked functions
 const mockInvoke = vi.mocked(invoke);
@@ -29,7 +32,7 @@ describe('Notification API Integration', () => {
 
     // Test webview environment
     mockGetEnvironment.mockReturnValue(RuntimeEnvironment.Webview);
-    
+
     const options = { title: 'Test', body: 'Integration test' };
     await showNotification(options);
 

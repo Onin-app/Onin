@@ -12,19 +12,11 @@
   import ShortcutInput from "./ShortcutInput.svelte";
 
   const themeList: { value: Theme; label: string }[] = [
-    {
-      value: Theme.SYSTEM,
-      label: "跟随系统",
-    },
-    {
-      value: Theme.LIGHT,
-      label: "明亮",
-    },
-    {
-      value: Theme.DARK,
-      label: "暗黑",
-    },
+    { value: Theme.SYSTEM, label: "跟随系统" },
+    { value: Theme.LIGHT, label: "明亮" },
+    { value: Theme.DARK, label: "暗黑" },
   ];
+
   let currentTheme = $state<Theme>(Theme.DARK);
   let autostartEnabled = $state<boolean>(false);
   let trayIconEnabled = $state<boolean>(false);
@@ -50,7 +42,6 @@
     { value: "default", label: "默认排序", description: "不使用频率数据" },
   ];
 
-  const getTheme = () => currentTheme;
   const setTheme = (value: Theme) => {
     currentTheme = value;
     toggleTheme(value);
@@ -58,19 +49,15 @@
 
   const handleAutostartToggle = async () => {
     try {
-      // `bind:checked` 会在 onchange 之前更新 autostartEnabled 的值。
-      // 所以，如果 autostartEnabled 为 true，意味着用户刚刚打开了开关，我们应该调用 enable。
       if (autostartEnabled) {
         await invoke("plugin:autostart|enable");
       } else {
         await invoke("plugin:autostart|disable");
       }
-      // 从后端重新获取状态以确保UI同步
       autostartEnabled = await invoke("plugin:autostart|is_enabled");
       toast.success(autostartEnabled ? "已启用开机自启" : "已禁用开机自启");
     } catch (error) {
       console.error("Failed to toggle autostart:", error);
-      // 如果设置失败，将UI状态回滚
       autostartEnabled = !autostartEnabled;
       toast.error("设置开机自启失败");
     }
@@ -78,14 +65,11 @@
 
   const handleTrayIconToggle = async () => {
     try {
-      // `bind:checked` 会提前更新 trayIconEnabled 的值
       await invoke("set_tray_visibility", { visible: trayIconEnabled });
-      // 从后端重新获取状态以确保UI同步
       trayIconEnabled = await invoke("is_tray_visible");
       toast.success(trayIconEnabled ? "已显示托盘图标" : "已隐藏托盘图标");
     } catch (error) {
       console.error("Failed to toggle tray icon visibility:", error);
-      // 如果设置失败，将UI状态回滚
       trayIconEnabled = !trayIconEnabled;
       toast.error("设置托盘图标失败");
     }
@@ -93,13 +77,6 @@
 
   const updateConfig = async () => {
     try {
-      console.log("Updating config with:", {
-        autoPasteTimeLimit,
-        autoClearTimeLimit,
-        sortMode,
-        enableUsageTracking,
-        marketplaceApiUrl,
-      });
       await invoke("update_app_config", {
         config: {
           auto_paste_time_limit: autoPasteTimeLimit,
@@ -109,7 +86,6 @@
           marketplace_api_url: marketplaceApiUrl || undefined,
         },
       });
-      console.log("Config updated successfully");
       toast.success("配置已保存");
     } catch (error) {
       console.error("Failed to update config:", error);
@@ -163,7 +139,6 @@
       sortMode = config.sort_mode;
       enableUsageTracking = config.enable_usage_tracking;
       marketplaceApiUrl = config.marketplace_api_url || "";
-      console.log("Loaded config:", config);
     } catch (e) {
       console.error("Failed to get app config:", e);
       toast.error("加载应用配置失败，请重启应用");
@@ -306,11 +281,10 @@
                 </Slider.Root>
                 <span
                   class="w-20 shrink-0 text-right text-xs text-neutral-600 dark:text-neutral-400"
-                >
-                  {autoPasteTimeLimit === 0
+                  >{autoPasteTimeLimit === 0
                     ? "不限制"
-                    : `${autoPasteTimeLimit}秒`}
-                </span>
+                    : `${autoPasteTimeLimit}秒`}</span
+                >
               </div>
             {/snippet}
           </SetItem>
@@ -344,11 +318,10 @@
                 </Slider.Root>
                 <span
                   class="w-20 shrink-0 text-right text-xs text-neutral-600 dark:text-neutral-400"
-                >
-                  {autoClearTimeLimit === 0
+                  >{autoClearTimeLimit === 0
                     ? "不自动清空"
-                    : `${autoClearTimeLimit}秒`}
-                </span>
+                    : `${autoClearTimeLimit}秒`}</span
+                >
               </div>
             {/snippet}
           </SetItem>
@@ -393,10 +366,10 @@
                     <option value={option.value}>{option.label}</option>
                   {/each}
                 </select>
-                <span class="text-[10px] text-neutral-400">
-                  {sortModeOptions.find((o) => o.value === sortMode)
-                    ?.description || ""}
-                </span>
+                <span class="text-[10px] text-neutral-400"
+                  >{sortModeOptions.find((o) => o.value === sortMode)
+                    ?.description || ""}</span
+                >
               </div>
             {/snippet}
           </SetItem>

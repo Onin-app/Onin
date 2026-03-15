@@ -2,22 +2,22 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock the dependencies using factory functions
 vi.mock('../../../src/core/ipc', () => ({
-  invoke: vi.fn()
+  invoke: vi.fn(),
 }));
 
 vi.mock('../../../src/core/dispatch', () => ({
-  dispatch: vi.fn()
+  dispatch: vi.fn(),
 }));
 
 vi.mock('../../../src/utils/error-parser', () => ({
-  parseClipboardError: vi.fn()
+  parseClipboardError: vi.fn(),
 }));
 
 vi.mock('../../../src/types/errors', () => ({
   createPluginError: vi.fn(),
   errorUtils: {
-    isPluginError: vi.fn()
-  }
+    isPluginError: vi.fn(),
+  },
 }));
 
 // Import after mocking
@@ -31,7 +31,7 @@ import {
   hasImage,
   copy,
   paste,
-  clipboard
+  clipboard,
 } from '../../../src/api/clipboard';
 import { invoke } from '../../../src/core/ipc';
 import { dispatch } from '../../../src/core/dispatch';
@@ -71,9 +71,12 @@ describe('Clipboard API', () => {
       expect(result).toBe(expectedText);
       expect(mockDispatch).toHaveBeenCalledWith({
         webview: expect.any(Function),
-        headless: expect.any(Function)
+        headless: expect.any(Function),
       });
-      expect(mockInvoke).toHaveBeenCalledWith('plugin_clipboard_read_text', undefined);
+      expect(mockInvoke).toHaveBeenCalledWith(
+        'plugin_clipboard_read_text',
+        undefined,
+      );
     });
 
     it('should return null when clipboard is empty', async () => {
@@ -86,15 +89,18 @@ describe('Clipboard API', () => {
 
     it('should handle errors and parse them', async () => {
       const originalError = new Error('Clipboard access denied');
-      const parsedError = createPluginError('CLIPBOARD_ACCESS_DENIED', 'Access denied');
-      
+      const parsedError = createPluginError(
+        'CLIPBOARD_ACCESS_DENIED',
+        'Access denied',
+      );
+
       mockInvoke.mockRejectedValue(originalError);
       mockParseClipboardError.mockReturnValue(parsedError);
 
       await expect(readText()).rejects.toThrow(parsedError);
       expect(mockParseClipboardError).toHaveBeenCalledWith(originalError, {
         method: 'plugin_clipboard_read_text',
-        args: undefined
+        args: undefined,
       });
     });
   });
@@ -106,7 +112,9 @@ describe('Clipboard API', () => {
 
       await writeText(text);
 
-      expect(mockInvoke).toHaveBeenCalledWith('plugin_clipboard_write_text', { text });
+      expect(mockInvoke).toHaveBeenCalledWith('plugin_clipboard_write_text', {
+        text,
+      });
     });
 
     it('should handle empty string', async () => {
@@ -114,7 +122,9 @@ describe('Clipboard API', () => {
 
       await writeText('');
 
-      expect(mockInvoke).toHaveBeenCalledWith('plugin_clipboard_write_text', { text: '' });
+      expect(mockInvoke).toHaveBeenCalledWith('plugin_clipboard_write_text', {
+        text: '',
+      });
     });
 
     it('should handle special characters', async () => {
@@ -123,13 +133,18 @@ describe('Clipboard API', () => {
 
       await writeText(specialText);
 
-      expect(mockInvoke).toHaveBeenCalledWith('plugin_clipboard_write_text', { text: specialText });
+      expect(mockInvoke).toHaveBeenCalledWith('plugin_clipboard_write_text', {
+        text: specialText,
+      });
     });
 
     it('should handle errors', async () => {
       const error = new Error('Write failed');
-      const parsedError = createPluginError('CLIPBOARD_WRITE_FAILED', 'Write failed');
-      
+      const parsedError = createPluginError(
+        'CLIPBOARD_WRITE_FAILED',
+        'Write failed',
+      );
+
       mockInvoke.mockRejectedValue(error);
       mockParseClipboardError.mockReturnValue(parsedError);
 
@@ -139,13 +154,17 @@ describe('Clipboard API', () => {
 
   describe('readImage', () => {
     it('should read image from clipboard successfully', async () => {
-      const base64Image = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
+      const base64Image =
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
       mockInvoke.mockResolvedValue(base64Image);
 
       const result = await readImage();
 
       expect(result).toBe(base64Image);
-      expect(mockInvoke).toHaveBeenCalledWith('plugin_clipboard_read_image', undefined);
+      expect(mockInvoke).toHaveBeenCalledWith(
+        'plugin_clipboard_read_image',
+        undefined,
+      );
     });
 
     it('should return null when no image in clipboard', async () => {
@@ -158,8 +177,11 @@ describe('Clipboard API', () => {
 
     it('should handle errors', async () => {
       const error = new Error('Image read failed');
-      const parsedError = createPluginError('CLIPBOARD_READ_FAILED', 'Read failed');
-      
+      const parsedError = createPluginError(
+        'CLIPBOARD_READ_FAILED',
+        'Read failed',
+      );
+
       mockInvoke.mockRejectedValue(error);
       mockParseClipboardError.mockReturnValue(parsedError);
 
@@ -174,8 +196,8 @@ describe('Clipboard API', () => {
 
       await writeImage(base64Image);
 
-      expect(mockInvoke).toHaveBeenCalledWith('plugin_clipboard_write_image', { 
-        imageData: base64Image 
+      expect(mockInvoke).toHaveBeenCalledWith('plugin_clipboard_write_image', {
+        imageData: base64Image,
       });
     });
 
@@ -185,15 +207,18 @@ describe('Clipboard API', () => {
 
       await writeImage(imageArray);
 
-      expect(mockInvoke).toHaveBeenCalledWith('plugin_clipboard_write_image', { 
-        imageData: [1, 2, 3, 4] 
+      expect(mockInvoke).toHaveBeenCalledWith('plugin_clipboard_write_image', {
+        imageData: [1, 2, 3, 4],
       });
     });
 
     it('should handle errors', async () => {
       const error = new Error('Image write failed');
-      const parsedError = createPluginError('CLIPBOARD_WRITE_FAILED', 'Write failed');
-      
+      const parsedError = createPluginError(
+        'CLIPBOARD_WRITE_FAILED',
+        'Write failed',
+      );
+
       mockInvoke.mockRejectedValue(error);
       mockParseClipboardError.mockReturnValue(parsedError);
 
@@ -207,13 +232,19 @@ describe('Clipboard API', () => {
 
       await clear();
 
-      expect(mockInvoke).toHaveBeenCalledWith('plugin_clipboard_clear', undefined);
+      expect(mockInvoke).toHaveBeenCalledWith(
+        'plugin_clipboard_clear',
+        undefined,
+      );
     });
 
     it('should handle errors', async () => {
       const error = new Error('Clear failed');
-      const parsedError = createPluginError('CLIPBOARD_CLEAR_FAILED', 'Clear failed');
-      
+      const parsedError = createPluginError(
+        'CLIPBOARD_CLEAR_FAILED',
+        'Clear failed',
+      );
+
       mockInvoke.mockRejectedValue(error);
       mockParseClipboardError.mockReturnValue(parsedError);
 
@@ -281,7 +312,9 @@ describe('Clipboard API', () => {
 
         await copy(text);
 
-        expect(mockInvoke).toHaveBeenCalledWith('plugin_clipboard_write_text', { text });
+        expect(mockInvoke).toHaveBeenCalledWith('plugin_clipboard_write_text', {
+          text,
+        });
       });
     });
 
@@ -293,7 +326,10 @@ describe('Clipboard API', () => {
         const result = await paste();
 
         expect(result).toBe(text);
-        expect(mockInvoke).toHaveBeenCalledWith('plugin_clipboard_read_text', undefined);
+        expect(mockInvoke).toHaveBeenCalledWith(
+          'plugin_clipboard_read_text',
+          undefined,
+        );
       });
     });
   });
@@ -318,13 +354,18 @@ describe('Clipboard API', () => {
 
       await clipboard.writeText(text);
 
-      expect(mockInvoke).toHaveBeenCalledWith('plugin_clipboard_write_text', { text });
+      expect(mockInvoke).toHaveBeenCalledWith('plugin_clipboard_write_text', {
+        text,
+      });
     });
   });
 
   describe('error handling', () => {
     it('should not re-parse PluginError instances', async () => {
-      const pluginError = mockCreatePluginError('CLIPBOARD_ACCESS_DENIED', 'Already parsed');
+      const pluginError = mockCreatePluginError(
+        'CLIPBOARD_ACCESS_DENIED',
+        'Already parsed',
+      );
       mockInvoke.mockRejectedValue(pluginError);
       // Mock isPluginError to return true for this specific error
       mockErrorUtils.isPluginError.mockReturnValue(true);
@@ -336,14 +377,14 @@ describe('Clipboard API', () => {
     it('should pass context to error parser', async () => {
       const error = new Error('Test error');
       const parsedError = createPluginError('CLIPBOARD_ERROR', 'Parsed error');
-      
+
       mockInvoke.mockRejectedValue(error);
       mockParseClipboardError.mockReturnValue(parsedError);
 
       await expect(writeText('test')).rejects.toThrow(parsedError);
       expect(mockParseClipboardError).toHaveBeenCalledWith(error, {
         method: 'plugin_clipboard_write_text',
-        args: { text: 'test' }
+        args: { text: 'test' },
       });
     });
   });
@@ -355,7 +396,11 @@ describe('Clipboard API', () => {
       const promises = [readText(), readText(), readText()];
       const results = await Promise.all(promises);
 
-      expect(results).toEqual(['concurrent text', 'concurrent text', 'concurrent text']);
+      expect(results).toEqual([
+        'concurrent text',
+        'concurrent text',
+        'concurrent text',
+      ]);
       expect(mockInvoke).toHaveBeenCalledTimes(3);
     });
 
@@ -368,7 +413,7 @@ describe('Clipboard API', () => {
       const [readResult, , imageResult] = await Promise.all([
         readText(),
         writeText('write text'),
-        readImage()
+        readImage(),
       ]);
 
       expect(readResult).toBe('read text');

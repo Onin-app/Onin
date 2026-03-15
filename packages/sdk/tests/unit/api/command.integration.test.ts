@@ -3,31 +3,34 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Mock the modules using factory functions
 vi.mock('../../../src/core/ipc', () => ({
   invoke: vi.fn(),
-  listen: vi.fn()
+  listen: vi.fn(),
 }));
 
 vi.mock('../../../src/core/dispatch', () => ({
-  dispatch: vi.fn()
+  dispatch: vi.fn(),
 }));
 
 vi.mock('../../../src/core/environment', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
-    getEnvironment: vi.fn()
+    getEnvironment: vi.fn(),
   };
 });
 
 // Import after mocking
-import { 
-  registerCommandHandler, 
+import {
+  registerCommandHandler,
   command,
   _resetRegistrationState,
-  type CommandHandler 
+  type CommandHandler,
 } from '../../../src/api/command';
 import { invoke, listen } from '../../../src/core/ipc';
 import { dispatch } from '../../../src/core/dispatch';
-import { getEnvironment, RuntimeEnvironment } from '../../../src/core/environment';
+import {
+  getEnvironment,
+  RuntimeEnvironment,
+} from '../../../src/core/environment';
 
 // Get the mocked functions
 const mockInvoke = vi.mocked(invoke);
@@ -49,9 +52,12 @@ describe('Command API Integration', () => {
     // Test webview environment
     mockGetEnvironment.mockReturnValue(RuntimeEnvironment.Webview);
     mockDispatch.mockImplementation(({ webview }) => webview());
-    
+
     await registerCommandHandler(handler);
-    expect(mockListen).toHaveBeenCalledWith('plugin_command_execute', expect.any(Function));
+    expect(mockListen).toHaveBeenCalledWith(
+      'plugin_command_execute',
+      expect.any(Function),
+    );
 
     // Reset for headless test
     vi.clearAllMocks();
@@ -62,47 +68,58 @@ describe('Command API Integration', () => {
 
     const headlessHandler: CommandHandler = vi.fn();
     await registerCommandHandler(headlessHandler);
-    expect(mockListen).toHaveBeenCalledWith('plugin_command_execute', headlessHandler);
+    expect(mockListen).toHaveBeenCalledWith(
+      'plugin_command_execute',
+      headlessHandler,
+    );
   });
 
   it('should handle complete plugin command workflow', async () => {
     mockGetEnvironment.mockReturnValue(RuntimeEnvironment.Webview);
-    
+
     // Simulate a complete plugin with state management
     const pluginState = {
       users: [] as Array<{ id: number; name: string; email: string }>,
-      settings: { theme: 'dark', version: '1.0.0' }
+      settings: { theme: 'dark', version: '1.0.0' },
     };
 
-    const handler: CommandHandler = vi.fn().mockImplementation(async (command, args) => {
-      switch (command) {
-        case 'plugin.getInfo':
-          return {
-            name: 'Test Plugin',
-            version: pluginState.settings.version,
-            userCount: pluginState.users.length
-          };
+    const handler: CommandHandler = vi
+      .fn()
+      .mockImplementation(async (command, args) => {
+        switch (command) {
+          case 'plugin.getInfo':
+            return {
+              name: 'Test Plugin',
+              version: pluginState.settings.version,
+              userCount: pluginState.users.length,
+            };
 
-        case 'user.create':
-          const newUser = {
-            id: pluginState.users.length + 1,
-            name: args.name,
-            email: args.email
-          };
-          pluginState.users.push(newUser);
-          return { success: true, user: newUser };
+          case 'user.create':
+            const newUser = {
+              id: pluginState.users.length + 1,
+              name: args.name,
+              email: args.email,
+            };
+            pluginState.users.push(newUser);
+            return { success: true, user: newUser };
 
-        case 'user.list':
-          return { users: pluginState.users, total: pluginState.users.length };
+          case 'user.list':
+            return {
+              users: pluginState.users,
+              total: pluginState.users.length,
+            };
 
-        case 'settings.update':
-          pluginState.settings = { ...pluginState.settings, ...args.settings };
-          return { success: true, settings: pluginState.settings };
+          case 'settings.update':
+            pluginState.settings = {
+              ...pluginState.settings,
+              ...args.settings,
+            };
+            return { success: true, settings: pluginState.settings };
 
-        default:
-          throw new Error(`Unknown command: ${command}`);
-      }
-    });
+          default:
+            throw new Error(`Unknown command: ${command}`);
+        }
+      });
 
     let capturedCallback: any;
     mockDispatch.mockImplementation(({ webview }) => webview());
@@ -115,7 +132,7 @@ describe('Command API Integration', () => {
 
     // Test plugin info
     await capturedCallback({
-      payload: { command: 'plugin.getInfo', args: {}, requestId: 'req-1' }
+      payload: { command: 'plugin.getInfo', args: {}, requestId: 'req-1' },
     });
 
     expect(mockInvoke).toHaveBeenCalledWith('plugin_command_result', {
@@ -124,8 +141,8 @@ describe('Command API Integration', () => {
       result: expect.objectContaining({
         name: 'Test Plugin',
         version: '1.0.0',
-        userCount: 0
-      })
+        userCount: 0,
+      }),
     });
 
     // Create user
@@ -133,8 +150,8 @@ describe('Command API Integration', () => {
       payload: {
         command: 'user.create',
         args: { name: 'John Doe', email: 'john@example.com' },
-        requestId: 'req-2'
-      }
+        requestId: 'req-2',
+      },
     });
 
     expect(mockInvoke).toHaveBeenCalledWith('plugin_command_result', {
@@ -142,13 +159,13 @@ describe('Command API Integration', () => {
       success: true,
       result: {
         success: true,
-        user: { id: 1, name: 'John Doe', email: 'john@example.com' }
-      }
+        user: { id: 1, name: 'John Doe', email: 'john@example.com' },
+      },
     });
 
     // List users
     await capturedCallback({
-      payload: { command: 'user.list', args: {}, requestId: 'req-3' }
+      payload: { command: 'user.list', args: {}, requestId: 'req-3' },
     });
 
     expect(mockInvoke).toHaveBeenCalledWith('plugin_command_result', {
@@ -156,8 +173,8 @@ describe('Command API Integration', () => {
       success: true,
       result: {
         users: [{ id: 1, name: 'John Doe', email: 'john@example.com' }],
-        total: 1
-      }
+        total: 1,
+      },
     });
 
     expect(mockInvoke).toHaveBeenCalledTimes(3);
@@ -168,16 +185,21 @@ describe('Command API Integration', () => {
     mockDispatch.mockImplementation(({ headless }) => headless());
 
     let failureCount = 0;
-    const handler: CommandHandler = vi.fn().mockImplementation((command, args) => {
-      if (command === 'unstable-command') {
-        failureCount++;
-        if (failureCount <= 2) {
-          throw new Error(`Temporary failure ${failureCount}`);
+    const handler: CommandHandler = vi
+      .fn()
+      .mockImplementation((command, args) => {
+        if (command === 'unstable-command') {
+          failureCount++;
+          if (failureCount <= 2) {
+            throw new Error(`Temporary failure ${failureCount}`);
+          }
+          return {
+            success: true,
+            message: 'Operation completed after retries',
+          };
         }
-        return { success: true, message: 'Operation completed after retries' };
-      }
-      return { command, success: true };
-    });
+        return { command, success: true };
+      });
 
     await registerCommandHandler(handler);
 
@@ -208,17 +230,19 @@ describe('Command API Integration', () => {
   it('should handle complex command arguments and responses', async () => {
     mockGetEnvironment.mockReturnValue(RuntimeEnvironment.Webview);
 
-    const handler: CommandHandler = vi.fn().mockImplementation((command, args) => {
-      return {
-        command,
-        receivedArgs: args,
-        timestamp: Date.now(),
-        metadata: {
-          processed: true,
-          environment: 'webview'
-        }
-      };
-    });
+    const handler: CommandHandler = vi
+      .fn()
+      .mockImplementation((command, args) => {
+        return {
+          command,
+          receivedArgs: args,
+          timestamp: Date.now(),
+          metadata: {
+            processed: true,
+            environment: 'webview',
+          },
+        };
+      });
 
     let capturedCallback: any;
     mockDispatch.mockImplementation(({ webview }) => webview());
@@ -237,17 +261,17 @@ describe('Command API Integration', () => {
       objectParam: {
         nested: {
           value: 'deep nested',
-          array: [{ id: 1 }, { id: 2 }]
-        }
-      }
+          array: [{ id: 1 }, { id: 2 }],
+        },
+      },
     };
 
     await capturedCallback({
       payload: {
         command: 'complex-command',
         args: complexArgs,
-        requestId: 'req-complex'
-      }
+        requestId: 'req-complex',
+      },
     });
 
     expect(handler).toHaveBeenCalledWith('complex-command', complexArgs);
@@ -259,9 +283,9 @@ describe('Command API Integration', () => {
         receivedArgs: complexArgs,
         metadata: expect.objectContaining({
           processed: true,
-          environment: 'webview'
-        })
-      })
+          environment: 'webview',
+        }),
+      }),
     });
   });
 });

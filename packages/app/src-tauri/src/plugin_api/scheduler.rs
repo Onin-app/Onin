@@ -56,10 +56,6 @@ impl SchedulerState {
             if let Ok(saved_tasks) =
                 serde_json::from_value::<Vec<ScheduleTask>>(tasks_value.clone())
             {
-                let mut success_count = 0;
-                let mut failed_count = 0;
-                let mut skipped_count = 0;
-
                 // 重新注册所有任务
                 for task in saved_tasks {
                     let task_key = format!("{}:{}", task.plugin_id, task.id);
@@ -76,39 +72,40 @@ impl SchedulerState {
 
                         // 已过期的 one-shot 任务直接丢弃，不触发
                         if execute_at <= now {
-                            println!(
-                                "[Scheduler] Skipping expired one-shot task {}: was scheduled for {}, now {}",
-                                task_key, execute_at, now
-                            );
                             // 从内存 map 中清除（store 在循环结束后统一保存）
-                            skipped_count += 1;
                             continue;
                         }
 
                         let delay_ms = execute_at - now;
-                        Job::new_one_shot_async(std::time::Duration::from_millis(delay_ms), move |_uuid, _l| {
-                            let app_handle = app_handle_clone.clone();
-                            let plugin_id = plugin_id.clone();
-                            let task_id = task_id.clone();
+                        Job::new_one_shot_async(
+                            std::time::Duration::from_millis(delay_ms),
+                            move |_uuid, _l| {
+                                let app_handle = app_handle_clone.clone();
+                                let plugin_id = plugin_id.clone();
+                                let task_id = task_id.clone();
 
-                            Box::pin(async move {
-                                if let Err(e) = app_handle.emit(
-                                    "scheduler:execute-task",
-                                    serde_json::json!({
-                                        "pluginId": plugin_id,
-                                        "taskId": task_id,
-                                    }),
-                                ) {
-                                    eprintln!("[Scheduler] Failed to emit task execution event: {}", e);
-                                }
-                                
-                                // Auto cleanup one-shot tasks
-                                let state = app_handle.state::<SchedulerState>();
-                                let task_key = format!("{}:{}", plugin_id, task_id);
-                                state.tasks.lock().await.remove(&task_key);
-                                let _ = state.save_to_store(&app_handle).await;
-                            })
-                        })
+                                Box::pin(async move {
+                                    if let Err(e) = app_handle.emit(
+                                        "scheduler:execute-task",
+                                        serde_json::json!({
+                                            "pluginId": plugin_id,
+                                            "taskId": task_id,
+                                        }),
+                                    ) {
+                                        eprintln!(
+                                            "[Scheduler] Failed to emit task execution event: {}",
+                                            e
+                                        );
+                                    }
+
+                                    // Auto cleanup one-shot tasks
+                                    let state = app_handle.state::<SchedulerState>();
+                                    let task_key = format!("{}:{}", plugin_id, task_id);
+                                    state.tasks.lock().await.remove(&task_key);
+                                    let _ = state.save_to_store(&app_handle).await;
+                                })
+                            },
+                        )
                     } else {
                         let six_field_cron = to_six_field_cron(&task.cron);
                         Job::new_async(six_field_cron.as_str(), move |_uuid, _l| {
@@ -124,7 +121,10 @@ impl SchedulerState {
                                         "taskId": task_id,
                                     }),
                                 ) {
-                                    eprintln!("[Scheduler] Failed to emit task execution event: {}", e);
+                                    eprintln!(
+                                        "[Scheduler] Failed to emit task execution event: {}",
+                                        e
+                                    );
                                 }
                             })
                         })
@@ -142,14 +142,12 @@ impl SchedulerState {
                                         .lock()
                                         .await
                                         .insert(task_key.clone(), restored_task);
-                                    success_count += 1;
                                 }
                                 Err(e) => {
                                     eprintln!(
                                         "[Scheduler] Failed to add task {} to scheduler: {}",
                                         task_key, e
                                     );
-                                    failed_count += 1;
                                 }
                             }
                         }
@@ -158,18 +156,9 @@ impl SchedulerState {
                                 "[Scheduler] Failed to create job for task {}: {}",
                                 task_key, e
                             );
-                            failed_count += 1;
                         }
                     }
                 }
-
-                println!(
-                    "[Scheduler] Loaded {} tasks from store ({} succeeded, {} failed, {} expired/skipped)",
-                    success_count + failed_count,
-                    success_count,
-                    failed_count,
-                    skipped_count
-                );
             }
         }
 
@@ -317,8 +306,8 @@ pub async fn schedule_task(
     app_handle: AppHandle,
     state: State<'_, SchedulerState>,
 ) -> Result<(), String> {
-    use crate::plugin::PluginStore;
     use crate::plugin::types::find_plugin_by_id;
+    use crate::plugin::PluginStore;
 
     // 验证 cron 表达式
     validate_cron(&options.cron)?;
@@ -440,8 +429,8 @@ pub async fn schedule_once(
     app_handle: AppHandle,
     state: State<'_, SchedulerState>,
 ) -> Result<(), String> {
-    use crate::plugin::PluginStore;
     use crate::plugin::types::find_plugin_by_id;
+    use crate::plugin::PluginStore;
 
     // 从插件 manifest 读取 maxTasks 配置
     let max_tasks = {
@@ -456,14 +445,23 @@ pub async fn schedule_once(
             if let Some(permissions) = &plugin.manifest.permissions {
                 if let Some(scheduler_perm) = &permissions.scheduler {
                     if !scheduler_perm.enable {
-                        return Err(format!("Plugin {} does not have scheduler permission", plugin_id));
+                        return Err(format!(
+                            "Plugin {} does not have scheduler permission",
+                            plugin_id
+                        ));
                     }
                     scheduler_perm.max_tasks.unwrap_or(10)
                 } else {
-                    return Err(format!("Plugin {} does not have scheduler permission configured", plugin_id));
+                    return Err(format!(
+                        "Plugin {} does not have scheduler permission configured",
+                        plugin_id
+                    ));
                 }
             } else {
-                return Err(format!("Plugin {} does not have permissions configured", plugin_id));
+                return Err(format!(
+                    "Plugin {} does not have permissions configured",
+                    plugin_id
+                ));
             }
         } else {
             return Err(format!("Plugin {} not found", plugin_id));
@@ -491,36 +489,49 @@ pub async fn schedule_once(
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as u64;
-    let delay_ms = if options.execute_at > now { options.execute_at - now } else { 0 };
+    let delay_ms = if options.execute_at > now {
+        options.execute_at - now
+    } else {
+        0
+    };
 
-    let job = Job::new_one_shot_async(std::time::Duration::from_millis(delay_ms), move |_uuid, _l| {
-        let app_handle = app_handle_for_job.clone();
-        let plugin_id = plugin_id_clone.clone();
-        let task_id = task_id.clone();
+    let job = Job::new_one_shot_async(
+        std::time::Duration::from_millis(delay_ms),
+        move |_uuid, _l| {
+            let app_handle = app_handle_for_job.clone();
+            let plugin_id = plugin_id_clone.clone();
+            let task_id = task_id.clone();
 
-        Box::pin(async move {
-            if let Err(e) = app_handle.emit(
-                "scheduler:execute-task",
-                serde_json::json!({
-                    "pluginId": plugin_id,
-                    "taskId": task_id,
-                }),
-            ) {
-                eprintln!("[Scheduler] Failed to emit task execution event: {}", e);
-            }
+            Box::pin(async move {
+                if let Err(e) = app_handle.emit(
+                    "scheduler:execute-task",
+                    serde_json::json!({
+                        "pluginId": plugin_id,
+                        "taskId": task_id,
+                    }),
+                ) {
+                    eprintln!("[Scheduler] Failed to emit task execution event: {}", e);
+                }
 
-            // Auto cleanup
-            let state = app_handle.state::<SchedulerState>();
-            let task_key_inner = format!("{}:{}", plugin_id, task_id);
-            state.tasks.lock().await.remove(&task_key_inner);
-            let _ = state.save_to_store(&app_handle).await;
-        })
-    })
+                // Auto cleanup
+                let state = app_handle.state::<SchedulerState>();
+                let task_key_inner = format!("{}:{}", plugin_id, task_id);
+                state.tasks.lock().await.remove(&task_key_inner);
+                let _ = state.save_to_store(&app_handle).await;
+            })
+        },
+    )
     .map_err(|e| format!("Failed to create job: {}", e))?;
 
     let job_id = job.guid();
 
-    state.scheduler.lock().await.add(job).await.map_err(|e| format!("Failed to add job to scheduler: {}", e))?;
+    state
+        .scheduler
+        .lock()
+        .await
+        .add(job)
+        .await
+        .map_err(|e| format!("Failed to add job to scheduler: {}", e))?;
 
     let task = ScheduleTask {
         id: options.id.clone(),
@@ -601,7 +612,5 @@ pub async fn init_scheduler(app_handle: &AppHandle) -> Result<(), String> {
 
     // 启动调度器
     state.start().await?;
-
-    println!("[Scheduler] Initialized successfully");
     Ok(())
 }

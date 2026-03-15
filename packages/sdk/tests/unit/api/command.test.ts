@@ -3,11 +3,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // Mock the dependencies using factory functions
 vi.mock('../../../src/core/ipc', () => ({
   invoke: vi.fn(),
-  listen: vi.fn()
+  listen: vi.fn(),
 }));
 
 vi.mock('../../../src/core/dispatch', () => ({
-  dispatch: vi.fn()
+  dispatch: vi.fn(),
 }));
 
 // Import after mocking
@@ -21,7 +21,7 @@ import {
   command,
   _resetRegistrationState,
   type CommandHandler,
-  type CommandDefinition
+  type CommandDefinition,
 } from '../../../src/api/command';
 import { invoke, listen } from '../../../src/core/ipc';
 import { dispatch } from '../../../src/core/dispatch';
@@ -35,7 +35,7 @@ describe('Command API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockInvoke.mockResolvedValue(undefined);
-    mockListen.mockResolvedValue(() => { });
+    mockListen.mockResolvedValue(() => {});
     _resetRegistrationState();
   });
 
@@ -48,9 +48,12 @@ describe('Command API', () => {
 
       expect(mockDispatch).toHaveBeenCalledWith({
         webview: expect.any(Function),
-        headless: expect.any(Function)
+        headless: expect.any(Function),
       });
-      expect(mockListen).toHaveBeenCalledWith('plugin_command_execute', expect.any(Function));
+      expect(mockListen).toHaveBeenCalledWith(
+        'plugin_command_execute',
+        expect.any(Function),
+      );
     });
 
     it('should handle webview environment correctly', async () => {
@@ -60,7 +63,7 @@ describe('Command API', () => {
       mockDispatch.mockImplementation(({ webview }) => webview());
       mockListen.mockImplementation((event, callback) => {
         capturedCallback = callback;
-        return Promise.resolve(() => { });
+        return Promise.resolve(() => {});
       });
 
       await handleCommand(handler);
@@ -70,8 +73,8 @@ describe('Command API', () => {
         payload: {
           command: 'test-command',
           args: { param: 'value' },
-          requestId: 'req-123'
-        }
+          requestId: 'req-123',
+        },
       };
 
       await capturedCallback(mockEvent);
@@ -80,7 +83,7 @@ describe('Command API', () => {
       expect(mockInvoke).toHaveBeenCalledWith('plugin_command_result', {
         requestId: 'req-123',
         success: true,
-        result: 'test result'
+        result: 'test result',
       });
     });
 
@@ -90,17 +93,22 @@ describe('Command API', () => {
 
       await handleCommand(handler);
 
-      expect(mockListen).toHaveBeenCalledWith('plugin_command_execute', handler);
+      expect(mockListen).toHaveBeenCalledWith(
+        'plugin_command_execute',
+        handler,
+      );
     });
 
     it('should handle command execution errors', async () => {
-      const handler: CommandHandler = vi.fn().mockRejectedValue(new Error('Command failed'));
+      const handler: CommandHandler = vi
+        .fn()
+        .mockRejectedValue(new Error('Command failed'));
       let capturedCallback: any;
 
       mockDispatch.mockImplementation(({ webview }) => webview());
       mockListen.mockImplementation((event, callback) => {
         capturedCallback = callback;
-        return Promise.resolve(() => { });
+        return Promise.resolve(() => {});
       });
 
       await handleCommand(handler);
@@ -109,8 +117,8 @@ describe('Command API', () => {
         payload: {
           command: 'failing-command',
           args: {},
-          requestId: 'req-456'
-        }
+          requestId: 'req-456',
+        },
       };
 
       await capturedCallback(mockEvent);
@@ -118,7 +126,7 @@ describe('Command API', () => {
       expect(mockInvoke).toHaveBeenCalledWith('plugin_command_result', {
         requestId: 'req-456',
         success: false,
-        error: 'Command failed'
+        error: 'Command failed',
       });
     });
 
@@ -129,7 +137,7 @@ describe('Command API', () => {
       mockDispatch.mockImplementation(({ webview }) => webview());
       mockListen.mockImplementation((event, callback) => {
         capturedCallback = callback;
-        return Promise.resolve(() => { });
+        return Promise.resolve(() => {});
       });
 
       await handleCommand(handler);
@@ -138,8 +146,8 @@ describe('Command API', () => {
         payload: {
           command: 'string-error-command',
           args: {},
-          requestId: 'req-789'
-        }
+          requestId: 'req-789',
+        },
       };
 
       await capturedCallback(mockEvent);
@@ -147,21 +155,23 @@ describe('Command API', () => {
       expect(mockInvoke).toHaveBeenCalledWith('plugin_command_result', {
         requestId: 'req-789',
         success: false,
-        error: 'String error'
+        error: 'String error',
       });
     });
 
     it('should handle async command handlers', async () => {
-      const handler: CommandHandler = vi.fn().mockImplementation(async (command, args) => {
-        await new Promise(resolve => setTimeout(resolve, 10));
-        return { command, processed: true, args };
-      });
+      const handler: CommandHandler = vi
+        .fn()
+        .mockImplementation(async (command, args) => {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+          return { command, processed: true, args };
+        });
 
       let capturedCallback: any;
       mockDispatch.mockImplementation(({ webview }) => webview());
       mockListen.mockImplementation((event, callback) => {
         capturedCallback = callback;
-        return Promise.resolve(() => { });
+        return Promise.resolve(() => {});
       });
 
       await handleCommand(handler);
@@ -170,8 +180,8 @@ describe('Command API', () => {
         payload: {
           command: 'async-command',
           args: { data: 'test' },
-          requestId: 'req-async'
-        }
+          requestId: 'req-async',
+        },
       });
 
       expect(handler).toHaveBeenCalledWith('async-command', { data: 'test' });
@@ -181,15 +191,15 @@ describe('Command API', () => {
         result: {
           command: 'async-command',
           processed: true,
-          args: { data: 'test' }
-        }
+          args: { data: 'test' },
+        },
       });
     });
 
     it('should prevent multiple handler registrations', async () => {
       const handler1: CommandHandler = vi.fn();
       const handler2: CommandHandler = vi.fn();
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => { });
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       mockDispatch.mockImplementation(({ webview }) => webview());
 
@@ -201,7 +211,7 @@ describe('Command API', () => {
       await handleCommand(handler2);
       expect(mockDispatch).toHaveBeenCalledTimes(1); // Still only called once
       expect(consoleSpy).toHaveBeenCalledWith(
-        "CommandHandler has already been registered. Ignoring subsequent calls."
+        'CommandHandler has already been registered. Ignoring subsequent calls.',
       );
 
       consoleSpy.mockRestore();
@@ -214,13 +224,13 @@ describe('Command API', () => {
         code: 'test-command',
         name: 'Test Command',
         description: 'A test command',
-        keywords: [{ name: 'test' }]
+        keywords: [{ name: 'test' }],
       };
 
       await registerCommand(definition);
 
       expect(mockInvoke).toHaveBeenCalledWith('register_dynamic_command', {
-        command: definition
+        command: definition,
       });
     });
 
@@ -229,15 +239,13 @@ describe('Command API', () => {
         code: 'url-handler',
         name: 'URL Handler',
         keywords: [{ name: 'url' }],
-        matches: [
-          { type: 'text', name: 'URL', regexp: '^https?://' }
-        ]
+        matches: [{ type: 'text', name: 'URL', regexp: '^https?://' }],
       };
 
       await registerCommand(definition);
 
       expect(mockInvoke).toHaveBeenCalledWith('register_dynamic_command', {
-        command: definition
+        command: definition,
       });
     });
 
@@ -246,7 +254,9 @@ describe('Command API', () => {
         name: 'No Code',
       } as CommandDefinition;
 
-      await expect(registerCommand(definition)).rejects.toThrow('Command code is required');
+      await expect(registerCommand(definition)).rejects.toThrow(
+        'Command code is required',
+      );
     });
 
     it('should throw error if name is missing', async () => {
@@ -254,7 +264,9 @@ describe('Command API', () => {
         code: 'no-name',
       } as CommandDefinition;
 
-      await expect(registerCommand(definition)).rejects.toThrow('Command name is required');
+      await expect(registerCommand(definition)).rejects.toThrow(
+        'Command name is required',
+      );
     });
   });
 
@@ -263,12 +275,14 @@ describe('Command API', () => {
       await removeCommand('test-command');
 
       expect(mockInvoke).toHaveBeenCalledWith('remove_dynamic_command', {
-        commandCode: 'test-command'
+        commandCode: 'test-command',
       });
     });
 
     it('should throw error if code is missing', async () => {
-      await expect(removeCommand('')).rejects.toThrow('Command code is required');
+      await expect(removeCommand('')).rejects.toThrow(
+        'Command code is required',
+      );
     });
   });
 
@@ -315,12 +329,14 @@ describe('Command API', () => {
       const handler: CommandHandler = vi.fn().mockResolvedValue('result');
       const invokeError = new Error('Invoke failed');
       let capturedCallback: any;
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+      const consoleSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
 
       mockDispatch.mockImplementation(({ webview }) => webview());
       mockListen.mockImplementation((event, callback) => {
         capturedCallback = callback;
-        return Promise.resolve(() => { });
+        return Promise.resolve(() => {});
       });
       mockInvoke.mockRejectedValue(invokeError);
 
@@ -331,17 +347,20 @@ describe('Command API', () => {
         payload: {
           command: 'test-command',
           args: {},
-          requestId: 'req-invoke-error'
-        }
+          requestId: 'req-invoke-error',
+        },
       });
 
       expect(handler).toHaveBeenCalled();
       expect(mockInvoke).toHaveBeenCalledWith('plugin_command_result', {
         requestId: 'req-invoke-error',
         success: true,
-        result: 'result'
+        result: 'result',
       });
-      expect(consoleSpy).toHaveBeenCalledWith('Failed to send command result:', invokeError);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Failed to send command result:',
+        invokeError,
+      );
 
       consoleSpy.mockRestore();
     });
@@ -349,17 +368,19 @@ describe('Command API', () => {
 
   describe('concurrent command handling', () => {
     it('should handle multiple simultaneous commands', async () => {
-      const handler: CommandHandler = vi.fn().mockImplementation(async (command, args) => {
-        const delay = command === 'slow-command' ? 50 : 10;
-        await new Promise(resolve => setTimeout(resolve, delay));
-        return { command, processed: true };
-      });
+      const handler: CommandHandler = vi
+        .fn()
+        .mockImplementation(async (command, args) => {
+          const delay = command === 'slow-command' ? 50 : 10;
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          return { command, processed: true };
+        });
 
       let capturedCallback: any;
       mockDispatch.mockImplementation(({ webview }) => webview());
       mockListen.mockImplementation((event, callback) => {
         capturedCallback = callback;
-        return Promise.resolve(() => { });
+        return Promise.resolve(() => {});
       });
 
       await handleCommand(handler);
@@ -367,11 +388,11 @@ describe('Command API', () => {
       const commands = [
         { command: 'fast-command', args: {}, requestId: 'req-1' },
         { command: 'slow-command', args: {}, requestId: 'req-2' },
-        { command: 'fast-command', args: {}, requestId: 'req-3' }
+        { command: 'fast-command', args: {}, requestId: 'req-3' },
       ];
 
       await Promise.all(
-        commands.map(payload => capturedCallback({ payload }))
+        commands.map((payload) => capturedCallback({ payload })),
       );
 
       expect(handler).toHaveBeenCalledTimes(3);

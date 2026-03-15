@@ -203,6 +203,3 @@ pub struct DynamicCommand {
     /// Timestamp when the command was created (milliseconds since epoch)
     pub created_at: u64,
 }
-
-
-

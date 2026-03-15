@@ -70,7 +70,7 @@
   <div class="relative min-w-0 flex-1">
     <!-- 来源标签（绝对定位固定右上角） -->
     <span
-      class="absolute right-0 top-0 rounded-md bg-neutral-200 px-1.5 py-0.5 text-xs text-neutral-700 dark:bg-neutral-700 dark:text-neutral-300"
+      class="absolute top-0 right-0 rounded-md bg-neutral-200 px-1.5 py-0.5 text-xs text-neutral-700 dark:bg-neutral-700 dark:text-neutral-300"
     >
       {app.source_display || app.source}
     </span>

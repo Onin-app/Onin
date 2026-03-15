@@ -12,6 +12,7 @@ mod commands;
 mod extension;
 mod extensions;
 mod file_command_manager;
+mod focus_manager;
 pub mod icon_utils;
 mod installed_apps;
 mod js_runtime;
@@ -43,8 +44,6 @@ fn create_shortcut_handler(
         if event.state() != ShortcutState::Pressed {
             return;
         }
-
-        println!("Shortcut event: {:?}, state: {:?}", shortcut, event.state());
 
         // 使用 catch_unwind 包装快捷键处理，防止崩溃
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {

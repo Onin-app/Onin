@@ -75,7 +75,7 @@
   >
     <input
       bind:this={inputElement}
-      class="h-[34px] min-w-0 flex-1 bg-transparent text-2xl focus:outline-none focus:ring-0 active:outline-none active:ring-0"
+      class="h-[34px] min-w-0 flex-1 bg-transparent text-2xl focus:ring-0 focus:outline-none active:ring-0 active:outline-none"
       type="text"
       {placeholder}
       {value}

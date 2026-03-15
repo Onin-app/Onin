@@ -103,4 +103,3 @@ export interface AppConfig {
   enable_usage_tracking: boolean;
   marketplace_api_url?: string;
 }
-

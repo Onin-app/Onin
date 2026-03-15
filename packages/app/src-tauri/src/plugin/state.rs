@@ -71,7 +71,6 @@ pub fn load_plugin_states(app: &tauri::AppHandle) -> HashMap<String, PluginState
                 match std::fs::read_to_string(&path) {
                     Ok(content) => match serde_json::from_str::<PluginStates>(&content) {
                         Ok(plugin_states) => {
-                            println!("[plugin/state] 已加载插件状态: {:?}", plugin_states.states);
                             return plugin_states.states;
                         }
                         Err(e) => {
@@ -180,8 +179,6 @@ pub fn save_plugin_window_state(
     };
     let content = serde_json::to_string_pretty(&window_states).map_err(|e| e.to_string())?;
     std::fs::write(path, content).map_err(|e| e.to_string())?;
-
-    println!("[plugin/state] 已保存插件 {} 的窗口状态", plugin_id);
     Ok(())
 }
 
@@ -207,11 +204,6 @@ pub fn load_plugin_settings(
 
     let settings: HashMap<String, JsonValue> =
         serde_json::from_str(&content).map_err(|e| format!("解析设置失败: {}", e))?;
-
-    println!(
-        "[plugin/state] 已加载插件 {} 的设置: {:?}",
-        plugin_id, settings
-    );
     Ok(settings)
 }
 
@@ -229,11 +221,6 @@ pub fn save_plugin_settings_to_file(
         serde_json::to_string_pretty(settings).map_err(|e| format!("序列化设置失败: {}", e))?;
 
     std::fs::write(&settings_path, content).map_err(|e| format!("写入设置文件失败: {}", e))?;
-
-    println!(
-        "[plugin/state] 已保存插件 {} 的设置: {:?}",
-        plugin_id, settings
-    );
     Ok(())
 }
 

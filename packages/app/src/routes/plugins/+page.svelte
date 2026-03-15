@@ -102,77 +102,77 @@
       class="flex h-full w-full flex-col overflow-hidden rounded-xl bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100"
       data-tauri-drag-region
     >
-    <!-- Header -->
-    <PluginsHeader
-      bind:searchQuery={pluginList.state.searchQuery}
-      onBack={handleBackToSettings}
-      onRefresh={pluginList.refreshPlugins}
-      onImport={pluginList.importPlugin}
-      onSearchChange={pluginList.setSearchQuery}
-    />
+      <!-- Header -->
+      <PluginsHeader
+        bind:searchQuery={pluginList.state.searchQuery}
+        onBack={handleBackToSettings}
+        onRefresh={pluginList.refreshPlugins}
+        onImport={pluginList.importPlugin}
+        onSearchChange={pluginList.setSearchQuery}
+      />
 
-    <!-- Tabs Content -->
-    <div class="flex-1 overflow-hidden px-4 py-3">
-      <Tabs.Root bind:value={activeTab} class="flex h-full flex-col">
-        <Tabs.List
-          class="mb-3 inline-flex items-center gap-1 border-b border-neutral-200 dark:border-neutral-700"
-        >
-          <Tabs.Trigger
-            value="installed"
-            class="inline-flex items-center justify-center border-b-2 border-transparent px-3 py-2 text-sm font-medium text-neutral-600 transition-colors hover:text-neutral-900 data-[state=active]:border-neutral-900 data-[state=active]:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 dark:data-[state=active]:border-neutral-100 dark:data-[state=active]:text-neutral-100"
+      <!-- Tabs Content -->
+      <div class="flex-1 overflow-hidden px-4 py-3">
+        <Tabs.Root bind:value={activeTab} class="flex h-full flex-col">
+          <Tabs.List
+            class="mb-3 inline-flex items-center gap-1 border-b border-neutral-200 dark:border-neutral-700"
           >
-            <CheckCircle class="mr-1.5 h-4 w-4" />
-            已安装
-          </Tabs.Trigger>
-          <Tabs.Trigger
-            value="market"
-            class="inline-flex items-center justify-center border-b-2 border-transparent px-3 py-2 text-sm font-medium text-neutral-600 transition-colors hover:text-neutral-900 data-[state=active]:border-neutral-900 data-[state=active]:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 dark:data-[state=active]:border-neutral-100 dark:data-[state=active]:text-neutral-100"
-          >
-            <Storefront class="mr-1.5 h-4 w-4" />
-            插件市场
-          </Tabs.Trigger>
-        </Tabs.List>
-
-        <Tabs.Content value="installed" class="flex-1 overflow-auto">
-          {#if pluginList.filteredPlugins.length > 0}
-            <div class="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
-              {#each pluginList.filteredPlugins as plugin (plugin.dir_name || plugin.id)}
-                <PluginCard
-                  {plugin}
-                  imageErrors={pluginList.state.imageErrors}
-                  onExecute={pluginList.executePlugin}
-                  onToggle={pluginList.togglePlugin}
-                  onSettings={openPluginSettings}
-                  onUninstall={pluginList.uninstallPlugin}
-                  onViewDetail={openPluginDetail}
-                  onImageError={pluginList.handleImageError}
-                />
-              {/each}
-            </div>
-          {:else}
-            <EmptyPluginState />
-          {/if}
-        </Tabs.Content>
-
-        <Tabs.Content value="market" class="flex-1 overflow-auto">
-          {#await import("$lib/components/marketplace/MarketplaceView.svelte")}
-            <div class="flex h-full items-center justify-center">
-              <div class="text-neutral-500">加载中...</div>
-            </div>
-          {:then { default: MarketplaceView }}
-            <MarketplaceView />
-          {:catch error}
-            <div
-              class="flex h-full flex-col items-center justify-center text-neutral-500"
+            <Tabs.Trigger
+              value="installed"
+              class="inline-flex items-center justify-center border-b-2 border-transparent px-3 py-2 text-sm font-medium text-neutral-600 transition-colors hover:text-neutral-900 data-[state=active]:border-neutral-900 data-[state=active]:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 dark:data-[state=active]:border-neutral-100 dark:data-[state=active]:text-neutral-100"
             >
-              <Storefront class="mb-4 h-12 w-12 opacity-50" />
-              <p class="text-lg">插件市场加载失败</p>
-              <p class="mt-2 text-sm">{error.message}</p>
-            </div>
-          {/await}
-        </Tabs.Content>
-      </Tabs.Root>
-    </div>
+              <CheckCircle class="mr-1.5 h-4 w-4" />
+              已安装
+            </Tabs.Trigger>
+            <Tabs.Trigger
+              value="market"
+              class="inline-flex items-center justify-center border-b-2 border-transparent px-3 py-2 text-sm font-medium text-neutral-600 transition-colors hover:text-neutral-900 data-[state=active]:border-neutral-900 data-[state=active]:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 dark:data-[state=active]:border-neutral-100 dark:data-[state=active]:text-neutral-100"
+            >
+              <Storefront class="mr-1.5 h-4 w-4" />
+              插件市场
+            </Tabs.Trigger>
+          </Tabs.List>
+
+          <Tabs.Content value="installed" class="flex-1 overflow-auto">
+            {#if pluginList.filteredPlugins.length > 0}
+              <div class="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                {#each pluginList.filteredPlugins as plugin (plugin.dir_name || plugin.id)}
+                  <PluginCard
+                    {plugin}
+                    imageErrors={pluginList.state.imageErrors}
+                    onExecute={pluginList.executePlugin}
+                    onToggle={pluginList.togglePlugin}
+                    onSettings={openPluginSettings}
+                    onUninstall={pluginList.uninstallPlugin}
+                    onViewDetail={openPluginDetail}
+                    onImageError={pluginList.handleImageError}
+                  />
+                {/each}
+              </div>
+            {:else}
+              <EmptyPluginState />
+            {/if}
+          </Tabs.Content>
+
+          <Tabs.Content value="market" class="flex-1 overflow-auto">
+            {#await import("$lib/components/marketplace/MarketplaceView.svelte")}
+              <div class="flex h-full items-center justify-center">
+                <div class="text-neutral-500">加载中...</div>
+              </div>
+            {:then { default: MarketplaceView }}
+              <MarketplaceView active={activeTab === "market"} />
+            {:catch error}
+              <div
+                class="flex h-full flex-col items-center justify-center text-neutral-500"
+              >
+                <Storefront class="mb-4 h-12 w-12 opacity-50" />
+                <p class="text-lg">插件市场加载失败</p>
+                <p class="mt-2 text-sm">{error.message}</p>
+              </div>
+            {/await}
+          </Tabs.Content>
+        </Tabs.Root>
+      </div>
     </main>
   </div>
 {/if}
