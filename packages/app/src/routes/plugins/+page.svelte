@@ -160,7 +160,7 @@
                 <div class="text-neutral-500">加载中...</div>
               </div>
             {:then { default: MarketplaceView }}
-              <MarketplaceView />
+              <MarketplaceView active={activeTab === "market"} />
             {:catch error}
               <div
                 class="flex h-full flex-col items-center justify-center text-neutral-500"

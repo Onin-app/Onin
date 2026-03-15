@@ -16,6 +16,12 @@
   import type { PluginManifest } from "$lib/composables/usePluginList.svelte";
   import { marked } from "marked";
 
+  interface Props {
+    active?: boolean;
+  }
+
+  let { active = false }: Props = $props();
+
   let plugins: MarketplacePlugin[] = $state([]);
   let installedPluginIds: Set<string> = $state(new Set());
   let loading = $state(true);
@@ -67,14 +73,15 @@
 
   async function loadInstalledPlugins() {
     try {
-      const installed =
-        await invoke<PluginManifest[]>("get_loaded_plugins");
+      const installed = await invoke<PluginManifest[]>("get_loaded_plugins");
       // 只有来源明确为“marketplace”的插件才在市场显示为“已安装”
       // 排除本地导入(@local)或其他非市场来源的版本
+      // 同时考虑 id 和 dir_name，因为市场 ID 可能对应后端的 dir_name
       installedPluginIds = new Set(
         installed
           .filter((p) => p.install_source === "marketplace")
-          .map((p) => p.id),
+          .map((p) => [p.id, p.dir_name].filter(Boolean) as string[])
+          .flat(),
       );
     } catch (e) {
       console.error("Failed to load installed plugins:", e);
@@ -147,10 +154,10 @@
   }
 
   async function handleInstall() {
-    // 安装成功后刷新已安装插件列表
+    // 安装成功后，我们不再在此处手动刷新已安装列表 (P3 优化)
+    // 因为后端成功后会发送 "plugin-installed" 事件，
+    // 我们在 onMount 中注册的监听器会自动触发 loadInstalledPlugins() 刷新 UI
     try {
-      await invoke("refresh_plugins");
-      await loadInstalledPlugins(); // 重新加载已安装列表
       await invoke("show_notification", {
         options: {
           title: "安装成功",
@@ -158,7 +165,7 @@
         },
       });
     } catch (e) {
-      console.error("Failed to refresh plugins:", e);
+      console.error("Failed to show notification:", e);
     }
     detailDialogOpen = false;
   }
@@ -198,6 +205,13 @@
     if (searchQuery !== undefined || selectedCategory !== undefined) {
       page = 1;
       loadPlugins();
+    }
+  });
+
+  // 当进入市场页时，强制刷新一次本地已安装列表，确保安装状态/按钮显示正确 (P2 修复)
+  $effect(() => {
+    if (active) {
+      loadInstalledPlugins();
     }
   });
 

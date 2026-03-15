@@ -274,9 +274,15 @@ pub async fn download_and_install_plugin(
     app: tauri::AppHandle,
     store: State<'_, PluginStore>,
     download_url: String,
-    _plugin_id: String,
+    plugin_id: String,
     icon_url: Option<String>,
 ) -> Result<LoadedPlugin, String> {
+    // P1 安全增强：验证插件 ID 格式，防止路径穿透或非法文件名
+    let id_regex = regex::Regex::new(r"^[a-z0-9][a-z0-9.-]*[a-z0-9]$").unwrap();
+    if !id_regex.is_match(&plugin_id) || plugin_id.contains("..") {
+        return Err(format!("插件 ID 无效: {}", plugin_id));
+    }
+
     // 1. 下载 ZIP 文件
     let temp_dir = tempfile::tempdir().map_err(|e| format!("创建临时目录失败: {}", e))?;
     let zip_path = temp_dir.path().join("plugin.zip");
@@ -316,6 +322,10 @@ pub async fn download_and_install_plugin(
     let mut manifest: PluginManifest =
         serde_json::from_str(&manifest_content).map_err(|e| format!("manifest 格式无效: {}", e))?;
 
+    // 关键修正：强制使用插件市场提供的 ID，覆盖 manifest 中的 ID
+    // 解决如市场 ID 为 byper.pomodoro.onin 而 manifest 内部是 com.pomodoro.timer 的 ID 不匹配问题
+    manifest.id = plugin_id.clone();
+
     // 强制禁用开发模式
     if manifest.dev_mode {
         manifest.dev_mode = false;
@@ -328,15 +338,16 @@ pub async fn download_and_install_plugin(
     }
 
     // 5. 复制到 plugins 目录
-    let dir_name = make_plugin_dir_name(&manifest.id, InstallSource::Marketplace);
+    // 使用市场提供的 plugin_id，确保 ID 一致性
+    let dir_name = make_plugin_dir_name(&plugin_id, InstallSource::Marketplace);
     let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let plugins_dir = data_dir.join("plugins");
     let target_dir = plugins_dir.join(&dir_name);
 
     if target_dir.exists() {
         return Err(format!(
-            "插件市场版本 '{}' 已存在。\n请先卸载现有版本，然后再安装。",
-            manifest.name
+            "插件 '{}' 已存在 (目录: {})。\n请先卸载现有版本，然后再安装。",
+            manifest.name, dir_name
         ));
     }
 
@@ -400,7 +411,8 @@ pub async fn download_and_install_plugin(
     // 7. 初始化生命周期
     initialize_plugin_lifecycle(&app, &target_dir, &manifest);
 
-    let _ = app.emit("plugin-installed", &manifest.id);
+    // 发送安装成功事件，使用市场 ID 以便前端匹配
+    let _ = app.emit("plugin-installed", &plugin_id);
 
     Ok(loaded_plugin)
 }
