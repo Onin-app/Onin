@@ -9,7 +9,7 @@
     Download,
     GithubLogo,
   } from "phosphor-svelte";
-  import { Button, Dialog } from "bits-ui";
+  import { Button, Dialog, ScrollArea } from "bits-ui";
   import PluginCard from "./PluginCard.svelte";
   import { fetchPlugins } from "$lib/api/marketplace";
   import type { MarketplacePlugin } from "$lib/types/marketplace";
@@ -246,83 +246,93 @@
   </div>
 
   <!-- 插件列表 -->
-  <div class="flex-1 overflow-auto">
-    {#if loading}
-      <div class="flex h-full items-center justify-center text-neutral-500">
-        <div class="text-center">
-          <div class="mb-2 text-lg">加载中...</div>
-          <div class="text-sm">正在获取插件列表</div>
-        </div>
-      </div>
-    {:else if error}
-      <div
-        class="flex h-full flex-col items-center justify-center text-neutral-500"
-      >
-        <Package class="mb-4 h-12 w-12 opacity-50" />
-        <p class="text-lg">加载失败</p>
-        <p class="mt-2 text-sm">{error}</p>
-        <Button.Root
-          class="mt-4 inline-flex h-8 items-center justify-center rounded bg-neutral-900 px-3 text-sm font-medium text-white hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200"
-          onclick={loadPlugins}
-        >
-          重试
-        </Button.Root>
-      </div>
-    {:else if plugins.length === 0}
-      <div
-        class="flex h-full flex-col items-center justify-center text-neutral-500"
-      >
-        <Package class="mb-4 h-12 w-12 opacity-50" />
-        <p class="text-lg">没有找到插件</p>
-        <p class="mt-2 text-sm">尝试调整搜索条件</p>
-      </div>
-    {:else}
-      <div class="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
-        {#each plugins as plugin (plugin.id)}
-          {@const isInstalled = installedPluginIds.has(plugin.id)}
-          {#if isInstalled}{/if}
-          <PluginCard
-            {plugin}
-            {isInstalled}
-            showStats={true}
-            onclick={() => handlePluginClick(plugin)}
-            oninstall={handleInstall}
-          />
-        {/each}
-      </div>
-
-      <!-- 分页 -->
-      {#if totalPages > 1}
-        <div class="mt-4 flex items-center justify-center gap-2">
-          <Button.Root
-            class="h-8 rounded border border-neutral-300 bg-white px-3 text-sm hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-600 dark:bg-neutral-900 dark:hover:bg-neutral-800"
-            disabled={page === 1}
-            onclick={() => {
-              page--;
-              loadPlugins();
-            }}
+  <ScrollArea.Root class="flex-1" type="hover">
+    <ScrollArea.Viewport class="h-full w-full overflow-x-hidden">
+      <div class="pr-2">
+        {#if loading}
+          <div class="flex h-full min-h-64 items-center justify-center text-neutral-500">
+            <div class="text-center">
+              <div class="mb-2 text-lg">加载中...</div>
+              <div class="text-sm">正在获取插件列表</div>
+            </div>
+          </div>
+        {:else if error}
+          <div
+            class="flex h-full min-h-64 flex-col items-center justify-center text-neutral-500"
           >
-            上一页
-          </Button.Root>
-
-          <span class="text-sm text-neutral-600 dark:text-neutral-400">
-            {page} / {totalPages}
-          </span>
-
-          <Button.Root
-            class="h-8 rounded border border-neutral-300 bg-white px-3 text-sm hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-600 dark:bg-neutral-900 dark:hover:bg-neutral-800"
-            disabled={page === totalPages}
-            onclick={() => {
-              page++;
-              loadPlugins();
-            }}
+            <Package class="mb-4 h-12 w-12 opacity-50" />
+            <p class="text-lg">加载失败</p>
+            <p class="mt-2 text-sm">{error}</p>
+            <Button.Root
+              class="mt-4 inline-flex h-8 items-center justify-center rounded bg-neutral-900 px-3 text-sm font-medium text-white hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200"
+              onclick={loadPlugins}
+            >
+              重试
+            </Button.Root>
+          </div>
+        {:else if plugins.length === 0}
+          <div
+            class="flex h-full min-h-64 flex-col items-center justify-center text-neutral-500"
           >
-            下一页
-          </Button.Root>
-        </div>
-      {/if}
-    {/if}
-  </div>
+            <Package class="mb-4 h-12 w-12 opacity-50" />
+            <p class="text-lg">没有找到插件</p>
+            <p class="mt-2 text-sm">尝试调整搜索条件</p>
+          </div>
+        {:else}
+          <div class="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+            {#each plugins as plugin (plugin.id)}
+              {@const isInstalled = installedPluginIds.has(plugin.id)}
+              {#if isInstalled}{/if}
+              <PluginCard
+                {plugin}
+                {isInstalled}
+                showStats={true}
+                onclick={() => handlePluginClick(plugin)}
+                oninstall={handleInstall}
+              />
+            {/each}
+          </div>
+
+          {#if totalPages > 1}
+            <div class="mt-4 flex items-center justify-center gap-2 pb-1">
+              <Button.Root
+                class="h-8 rounded border border-neutral-300 bg-white px-3 text-sm hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-600 dark:bg-neutral-900 dark:hover:bg-neutral-800"
+                disabled={page === 1}
+                onclick={() => {
+                  page--;
+                  loadPlugins();
+                }}
+              >
+                上一页
+              </Button.Root>
+
+              <span class="text-sm text-neutral-600 dark:text-neutral-400">
+                {page} / {totalPages}
+              </span>
+
+              <Button.Root
+                class="h-8 rounded border border-neutral-300 bg-white px-3 text-sm hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-600 dark:bg-neutral-900 dark:hover:bg-neutral-800"
+                disabled={page === totalPages}
+                onclick={() => {
+                  page++;
+                  loadPlugins();
+                }}
+              >
+                下一页
+              </Button.Root>
+            </div>
+          {/if}
+        {/if}
+      </div>
+    </ScrollArea.Viewport>
+    <ScrollArea.Scrollbar
+      orientation="vertical"
+      class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none rounded-full border-l border-l-transparent p-px transition-all duration-200 select-none hover:w-3"
+    >
+      <ScrollArea.Thumb class="bg-muted-foreground flex-1 rounded-full" />
+    </ScrollArea.Scrollbar>
+    <ScrollArea.Corner />
+  </ScrollArea.Root>
 </div>
 
 <!-- 插件详情弹窗 -->
@@ -336,7 +346,7 @@
         class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50"
       />
       <Dialog.Content
-        class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] fixed top-[50%] left-[50%] z-50 max-h-[80vh] w-full max-w-2xl translate-x-[-50%] translate-y-[-50%] overflow-auto rounded-lg bg-white p-6 shadow-xl dark:bg-neutral-900"
+        class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] fixed top-[50%] left-[50%] z-50 h-[80vh] w-full max-w-2xl translate-x-[-50%] translate-y-[-50%] overflow-hidden rounded-lg bg-white p-6 shadow-xl dark:bg-neutral-900"
       >
         <Dialog.Close
           class="absolute top-4 right-4 rounded p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800"
@@ -357,13 +367,15 @@
           </svg>
         </Dialog.Close>
 
-        {#if loadingDetail}
-          <div class="flex h-64 items-center justify-center">
-            <div class="text-neutral-500">加载中...</div>
-          </div>
-        {:else}
-          <!-- 插件头部 -->
-          <div class="mb-6 flex items-start gap-4">
+        <ScrollArea.Root class="h-full w-full" type="hover">
+          <ScrollArea.Viewport class="h-full w-full overflow-x-hidden pr-2">
+            {#if loadingDetail}
+              <div class="flex h-64 items-center justify-center">
+                <div class="text-neutral-500">加载中...</div>
+              </div>
+            {:else}
+              <!-- 插件头部 -->
+              <div class="mb-6 flex items-start gap-4">
             <div
               class="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-neutral-100 to-neutral-200 dark:from-neutral-800 dark:to-neutral-700"
             >
@@ -472,19 +484,28 @@
             </div>
           {/if}
 
-          <!-- 底部操作 -->
-          <div class="border-t border-neutral-200 pt-4 dark:border-neutral-700">
-            <a
-              href={selectedPlugin.repository}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="flex items-center gap-2 text-sm text-blue-600 hover:underline dark:text-blue-400"
-            >
-              <GithubLogo class="h-4 w-4" />
-              查看源码
-            </a>
-          </div>
-        {/if}
+              <!-- 底部操作 -->
+              <div class="border-t border-neutral-200 pt-4 dark:border-neutral-700">
+                <a
+                  href={selectedPlugin.repository}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="flex items-center gap-2 text-sm text-blue-600 hover:underline dark:text-blue-400"
+                >
+                  <GithubLogo class="h-4 w-4" />
+                  查看源码
+                </a>
+              </div>
+            {/if}
+          </ScrollArea.Viewport>
+          <ScrollArea.Scrollbar
+            orientation="vertical"
+            class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none rounded-full border-l border-l-transparent p-px transition-all duration-200 select-none hover:w-3"
+          >
+            <ScrollArea.Thumb class="bg-muted-foreground flex-1 rounded-full" />
+          </ScrollArea.Scrollbar>
+          <ScrollArea.Corner />
+        </ScrollArea.Root>
       </Dialog.Content>
     </Dialog.Portal>
   </Dialog.Root>
