@@ -1,13 +1,13 @@
 # SDK API 概览
 
-`onin-plugin-sdk` 是 Onin 插件的官方开发工具包，提供与 Onin 主程序交互的所有能力。
+`onin-sdk` 是 Onin 插件的官方开发工具包，提供与 Onin 主程序交互的所有能力。
 
 ## 安装
 
 ```bash
-npm install onin-plugin-sdk
+npm install onin-sdk
 # 或
-pnpm add onin-plugin-sdk
+pnpm add onin-sdk
 ```
 
 ## 快速导入
@@ -26,7 +26,7 @@ import {
   settings,
   pluginWindow,
   ai,
-} from 'onin-plugin-sdk';
+} from 'onin-sdk';
 ```
 
 ## API 模块总览
@@ -51,7 +51,7 @@ import {
 一个完整的插件通常按以下顺序初始化：
 
 ```typescript
-import { lifecycle, settings, command, notification } from 'onin-plugin-sdk';
+import { lifecycle, settings, command, notification } from 'onin-sdk';
 
 // 1. 在 onLoad 中完成所有初始化
 lifecycle.onLoad(async () => {

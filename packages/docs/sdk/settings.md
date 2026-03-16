@@ -5,7 +5,7 @@
 ## 导入
 
 ```typescript
-import { settings } from 'onin-plugin-sdk';
+import { settings } from 'onin-sdk';
 ```
 
 ## API
@@ -74,7 +74,7 @@ const apiKey = await settings.getField('apiKey');
 ## 完整示例
 
 ```typescript
-import { lifecycle, settings, command } from 'onin-plugin-sdk';
+import { lifecycle, settings, command } from 'onin-sdk';
 
 lifecycle.onLoad(async () => {
   // 注册设置

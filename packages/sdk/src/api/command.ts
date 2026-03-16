@@ -86,7 +86,7 @@ export function _resetRegistrationState() {
  * @throws {Error} When handler registration fails or when called multiple times
  * @example
  * ```typescript
- * import { command } from 'onin-plugin-sdk';
+ * import { command } from 'onin-sdk';
  *
  * // Define command handler with routing
  * await command.handle(async (code, args) => {
@@ -172,7 +172,7 @@ export async function handleCommand(handler: CommandHandler): Promise<void> {
  * @throws {Error} When command registration fails
  * @example
  * ```typescript
- * import { command } from 'onin-plugin-sdk';
+ * import { command } from 'onin-sdk';
  *
  * // Register a dynamic command
  * await command.register({
@@ -214,7 +214,7 @@ export async function registerCommand(
  * @throws {Error} When command removal fails or command doesn't exist
  * @example
  * ```typescript
- * import { command } from 'onin-plugin-sdk';
+ * import { command } from 'onin-sdk';
  *
  * // Remove a previously registered command
  * await command.remove('open-bookmark-1');
@@ -271,7 +271,7 @@ export const remove = removeCommand;
  * @group API
  * @example
  * ```typescript
- * import { command } from 'onin-plugin-sdk';
+ * import { command } from 'onin-sdk';
  *
  * // Register dynamic commands
  * await command.register({

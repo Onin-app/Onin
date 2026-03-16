@@ -11,6 +11,7 @@
   import { CheckCircle, Storefront } from "phosphor-svelte";
   import { goto } from "$app/navigation";
   import { escapeHandler } from "$lib/stores/escapeHandler";
+  import AppScrollArea from "$lib/components/AppScrollArea.svelte";
 
   // Composable
   import {
@@ -89,19 +90,19 @@
   />
 {/if}
 
-{#if currentSettingsPlugin && currentSettingsPlugin.settings}
-  <PluginSettings
-    pluginId={currentSettingsPlugin.id}
-    pluginName={currentSettingsPlugin.name}
-    schema={currentSettingsPlugin.settings}
-    onback={closePluginSettings}
-  />
-{:else}
-  <div class="h-[100vh] w-full bg-transparent p-1">
-    <main
-      class="flex h-full w-full flex-col overflow-hidden rounded-xl bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100"
-      data-tauri-drag-region
-    >
+<div class="h-[100vh] w-full bg-transparent p-1">
+  <main
+    class="flex h-full w-full flex-col overflow-hidden rounded-xl bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100"
+    data-tauri-drag-region
+  >
+    {#if currentSettingsPlugin && currentSettingsPlugin.settings}
+      <PluginSettings
+        pluginId={currentSettingsPlugin.id}
+        pluginName={currentSettingsPlugin.name}
+        schema={currentSettingsPlugin.settings}
+        onback={closePluginSettings}
+      />
+    {:else}
       <!-- Header -->
       <PluginsHeader
         bind:searchQuery={pluginList.state.searchQuery}
@@ -133,28 +134,33 @@
             </Tabs.Trigger>
           </Tabs.List>
 
-          <Tabs.Content value="installed" class="flex-1 overflow-auto">
-            {#if pluginList.filteredPlugins.length > 0}
-              <div class="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
-                {#each pluginList.filteredPlugins as plugin (plugin.dir_name || plugin.id)}
-                  <PluginCard
-                    {plugin}
-                    imageErrors={pluginList.state.imageErrors}
-                    onExecute={pluginList.executePlugin}
-                    onToggle={pluginList.togglePlugin}
-                    onSettings={openPluginSettings}
-                    onUninstall={pluginList.uninstallPlugin}
-                    onViewDetail={openPluginDetail}
-                    onImageError={pluginList.handleImageError}
-                  />
-                {/each}
-              </div>
-            {:else}
-              <EmptyPluginState />
-            {/if}
+          <Tabs.Content value="installed" class="flex-1 overflow-hidden">
+            <AppScrollArea
+              class="h-full w-full"
+              viewportClass="h-full w-full overflow-x-hidden pr-2"
+            >
+              {#if pluginList.filteredPlugins.length > 0}
+                <div class="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                  {#each pluginList.filteredPlugins as plugin (plugin.dir_name || plugin.id)}
+                    <PluginCard
+                      {plugin}
+                      imageErrors={pluginList.state.imageErrors}
+                      onExecute={pluginList.executePlugin}
+                      onToggle={pluginList.togglePlugin}
+                      onSettings={openPluginSettings}
+                      onUninstall={pluginList.uninstallPlugin}
+                      onViewDetail={openPluginDetail}
+                      onImageError={pluginList.handleImageError}
+                    />
+                  {/each}
+                </div>
+              {:else}
+                <EmptyPluginState />
+              {/if}
+            </AppScrollArea>
           </Tabs.Content>
 
-          <Tabs.Content value="market" class="flex-1 overflow-auto">
+          <Tabs.Content value="market" class="flex-1 overflow-hidden">
             {#await import("$lib/components/marketplace/MarketplaceView.svelte")}
               <div class="flex h-full items-center justify-center">
                 <div class="text-neutral-500">加载中...</div>
@@ -173,6 +179,6 @@
           </Tabs.Content>
         </Tabs.Root>
       </div>
-    </main>
-  </div>
-{/if}
+    {/if}
+  </main>
+</div>

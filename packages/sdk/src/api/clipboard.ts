@@ -380,7 +380,7 @@ export function getMetadata(): Promise<ClipboardMetadata> {
  * @see {@link parseClipboardError} - For error handling utilities
  * @example
  * ```typescript
- * import { clipboard } from 'onin-plugin-sdk';
+ * import { clipboard } from 'onin-sdk';
  *
  * // Read text from clipboard
  * const text = await clipboard.readText();

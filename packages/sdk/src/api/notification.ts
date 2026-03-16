@@ -26,7 +26,7 @@ export interface NotificationOptions {
  * @throws {PluginError} With code `COMMON_UNKNOWN` for other notification failures
  * @example
  * ```typescript
- * import { notification } from 'onin-plugin-sdk';
+ * import { notification } from 'onin-sdk';
  *
  * // Simple notification
  * await notification.show({
@@ -116,7 +116,7 @@ export const show = showNotification;
  * @group API
  * @example
  * ```typescript
- * import { notification } from 'onin-plugin-sdk';
+ * import { notification } from 'onin-sdk';
  *
  * // Basic usage
  * await notification.show({

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
-  import { Popover, Button, ScrollArea, Accordion } from "bits-ui";
+  import { Popover, Button, Accordion } from "bits-ui";
+  import AppScrollArea from "$lib/components/AppScrollArea.svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
   import type { LaunchableItem } from "$lib/type";
@@ -220,18 +221,18 @@
     </Accordion.Root>
   {/if}
 
-  <ScrollArea.Root
+  <AppScrollArea
     class="bg-background-alt shadow-card relative flex-1 overflow-hidden rounded-[10px] border border-2 border-dashed px-2 py-2 {isDraggingOver
       ? 'border-blue-500'
       : 'border-neutral-300 dark:border-neutral-600'}"
-    type="hover"
+    orientation="both"
+    viewportClass="h-full w-full"
   >
-    <ScrollArea.Viewport class="h-full w-full ">
-      <div
-        bind:this={listContainerEl}
-        class="list-container relative rounded-lg text-center transition-colors"
-        role="group"
-      >
+    <div
+      bind:this={listContainerEl}
+      class="list-container relative rounded-lg text-center transition-colors"
+      role="group"
+    >
         {#if isLoading}
           <p class="text-neutral-500">正在加载...</p>
         {:else if fileCommands.length === 0}
@@ -368,20 +369,6 @@
             <p class="text-lg text-white">正在处理...</p>
           </div>
         {/if}
-      </div>
-    </ScrollArea.Viewport>
-    <ScrollArea.Scrollbar
-      orientation="vertical"
-      class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none rounded-full border-l border-l-transparent p-px transition-all duration-200 select-none hover:w-3"
-    >
-      <ScrollArea.Thumb class="bg-muted-foreground flex-1 rounded-full" />
-    </ScrollArea.Scrollbar>
-    <ScrollArea.Scrollbar
-      orientation="horizontal"
-      class="bg-muted hover:bg-dark-10 flex h-1.5 touch-none rounded-full border-t border-t-transparent p-px transition-all duration-200 select-none hover:h-3"
-    >
-      <ScrollArea.Thumb class="bg-muted-foreground rounded-full" />
-    </ScrollArea.Scrollbar>
-    <ScrollArea.Corner />
-  </ScrollArea.Root>
+    </div>
+  </AppScrollArea>
 </main>

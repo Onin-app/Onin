@@ -12,6 +12,7 @@
     "build:app": "pnpm --filter app tauri:build",
     "build:sdk": "pnpm --filter onin-sdk build",
     "build:demo": "pnpm --filter plugin-demo build",
+    "create:plugin": "pnpm --filter create-onin-plugin start",
     "test": "pnpm -r test",
     "test:sdk": "pnpm --filter onin-sdk test",
     "check": "pnpm --filter app check",

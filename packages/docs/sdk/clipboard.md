@@ -5,7 +5,7 @@
 ## 导入
 
 ```typescript
-import { clipboard } from 'onin-plugin-sdk';
+import { clipboard } from 'onin-sdk';
 ```
 
 ## API
@@ -53,7 +53,7 @@ const meta = await clipboard.readMeta();
 ## 完整示例
 
 ```typescript
-import { clipboard, notification } from 'onin-plugin-sdk';
+import { clipboard, notification } from 'onin-sdk';
 
 // 处理任意类型的剪贴板内容
 async function processClipboard() {

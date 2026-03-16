@@ -5,7 +5,7 @@
 ## 导入
 
 ```typescript
-import { fs } from 'onin-plugin-sdk';
+import { fs } from 'onin-sdk';
 ```
 
 > ⚠️ **路径沙盒**：所有操作严格限制在插件的数据目录内，无法访问系统其他文件。
@@ -42,7 +42,7 @@ interface FileInfo {
 ## 示例
 
 ```typescript
-import { fs } from 'onin-plugin-sdk';
+import { fs } from 'onin-sdk';
 
 // 读写 JSON 配置文件
 const CONFIG_FILE = 'config.json';

@@ -6,7 +6,7 @@
    * 支持键盘导航和点击选择
    */
   import { onMount } from "svelte";
-  import { ScrollArea } from "bits-ui";
+  import AppScrollArea from "$lib/components/AppScrollArea.svelte";
   import type {
     EmojiGridData,
     EmojiItem,
@@ -254,58 +254,52 @@
 </script>
 
 <div class="h-full w-full" role="grid" tabindex="0" onkeydown={handleKeyDown}>
-  <ScrollArea.Root class="h-full w-full rounded-[10px] border" type="hover">
-    <ScrollArea.Viewport class="h-full w-full overflow-x-hidden">
-      <div class="space-y-5 p-3">
-        {#each data.groups as group, groupIndex}
-          <div>
-            <!-- 分类标题 -->
-            <div class="mb-3 flex items-center gap-2">
-              <span
-                class="text-sm font-medium text-neutral-600 dark:text-neutral-400"
-              >
-                {group.name}
-              </span>
-              <span
-                class="rounded-full bg-neutral-200 px-2 py-0.5 text-xs text-neutral-500 dark:bg-neutral-700 dark:text-neutral-400"
-              >
-                {group.emojis.length}
-              </span>
-            </div>
-
-            <!-- Emoji Grid -->
-            <div
-              bind:this={gridContainerRefs[groupIndex]}
-              class="grid gap-2"
-              style="grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));"
+  <AppScrollArea
+    class="h-full w-full rounded-[10px] border"
+    viewportClass="h-full w-full overflow-x-hidden"
+    verticalScrollbarClass="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-2 touch-none rounded-full border-l border-l-transparent p-px transition-all duration-200 select-none hover:w-3"
+    thumbClass="flex-1 rounded-full bg-neutral-300 dark:bg-neutral-600"
+  >
+    <div class="space-y-5 p-3">
+      {#each data.groups as group, groupIndex}
+        <div>
+          <!-- 分类标题 -->
+          <div class="mb-3 flex items-center gap-2">
+            <span
+              class="text-sm font-medium text-neutral-600 dark:text-neutral-400"
             >
-              {#each group.emojis as emoji, emojiIndex}
-                {@const flatIndex = getFlatIndex(groupIndex, emojiIndex)}
-                <button
-                  bind:this={buttonRefs[flatIndex]}
-                  class="flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg text-2xl transition-all duration-150
-                    {flatSelectedIndex === flatIndex
-                    ? 'scale-110 bg-blue-500/20 ring-2 ring-blue-500'
-                    : 'hover:scale-105 hover:bg-neutral-200 dark:hover:bg-neutral-700'}"
-                  onclick={() => handleClick(emoji, flatIndex)}
-                  title={emoji.name}
-                >
-                  {emoji.emoji}
-                </button>
-              {/each}
-            </div>
+              {group.name}
+            </span>
+            <span
+              class="rounded-full bg-neutral-200 px-2 py-0.5 text-xs text-neutral-500 dark:bg-neutral-700 dark:text-neutral-400"
+            >
+              {group.emojis.length}
+            </span>
           </div>
-        {/each}
-      </div>
-    </ScrollArea.Viewport>
-    <ScrollArea.Scrollbar
-      orientation="vertical"
-      class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-2 touch-none rounded-full border-l border-l-transparent p-px transition-all duration-200 select-none hover:w-3"
-    >
-      <ScrollArea.Thumb
-        class="flex-1 rounded-full bg-neutral-300 dark:bg-neutral-600"
-      />
-    </ScrollArea.Scrollbar>
-    <ScrollArea.Corner />
-  </ScrollArea.Root>
+
+          <!-- Emoji Grid -->
+          <div
+            bind:this={gridContainerRefs[groupIndex]}
+            class="grid gap-2"
+            style="grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));"
+          >
+            {#each group.emojis as emoji, emojiIndex}
+              {@const flatIndex = getFlatIndex(groupIndex, emojiIndex)}
+              <button
+                bind:this={buttonRefs[flatIndex]}
+                class="flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg text-2xl transition-all duration-150
+                    {flatSelectedIndex === flatIndex
+                  ? 'scale-110 bg-blue-500/20 ring-2 ring-blue-500'
+                  : 'hover:scale-105 hover:bg-neutral-200 dark:hover:bg-neutral-700'}"
+                onclick={() => handleClick(emoji, flatIndex)}
+                title={emoji.name}
+              >
+                {emoji.emoji}
+              </button>
+            {/each}
+          </div>
+        </div>
+      {/each}
+    </div>
+  </AppScrollArea>
 </div>

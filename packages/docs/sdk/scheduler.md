@@ -5,7 +5,7 @@
 ## 导入
 
 ```typescript
-import { scheduler } from 'onin-plugin-sdk';
+import { scheduler } from 'onin-sdk';
 ```
 
 > **所需权限**：`"scheduler": { "enable": true }`

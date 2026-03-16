@@ -5,7 +5,7 @@
 ## 导入
 
 ```typescript
-import { dialog } from 'onin-plugin-sdk';
+import { dialog } from 'onin-sdk';
 ```
 
 ## API
@@ -77,7 +77,7 @@ if (confirmed) {
 ## 完整示例
 
 ```typescript
-import { dialog, fs, notification } from 'onin-plugin-sdk';
+import { dialog, fs, notification } from 'onin-sdk';
 
 // 导入文件流程
 async function importFile() {

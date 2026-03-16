@@ -203,7 +203,7 @@ export function createRetryWrapper<T extends (...args: any[]) => Promise<any>>(
  * @group Utilities
  * @example
  * ```typescript
- * import { retry, http } from 'onin-plugin-sdk';
+ * import { retry, http } from 'onin-sdk';
  *
  * // Basic retry with default options
  * const data = await retry.withRetry(async () => {

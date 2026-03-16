@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { Button, Combobox, ScrollArea } from "bits-ui";
+  import { Button, Combobox } from "bits-ui";
+  import AppScrollArea from "$lib/components/AppScrollArea.svelte";
   import { onMount } from "svelte";
   import ShortcutInput from "./ShortcutInput.svelte";
   import { invoke } from "@tauri-apps/api/core";
@@ -102,8 +103,7 @@
   </div>
 
   <!-- 列表容器 -->
-  <ScrollArea.Root class="-mr-2 flex-1 overflow-hidden" type="hover">
-    <ScrollArea.Viewport class="h-full w-full pr-2">
+  <AppScrollArea class="-mr-2 flex-1 overflow-hidden" viewportClass="h-full w-full pr-2">
       <div
         class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
       >
@@ -249,15 +249,5 @@
           </div>
         {/if}
       </div>
-    </ScrollArea.Viewport>
-    <ScrollArea.Scrollbar
-      orientation="vertical"
-      class="flex w-1.5 touch-none rounded-full bg-transparent p-px transition-all select-none hover:w-2"
-    >
-      <ScrollArea.Thumb
-        class="flex-1 rounded-full bg-neutral-300 dark:bg-neutral-600"
-      />
-    </ScrollArea.Scrollbar>
-    <ScrollArea.Corner />
-  </ScrollArea.Root>
+  </AppScrollArea>
 </main>

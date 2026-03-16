@@ -262,7 +262,7 @@ export async function del<T>(
  * @see {@link createError.http} - For HTTP error creation functions
  * @example
  * ```typescript
- * import { http } from 'onin-plugin-sdk';
+ * import { http } from 'onin-sdk';
  *
  * // Simple GET request
  * const { body } = await http.get('https://api.example.com/posts/1');

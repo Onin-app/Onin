@@ -254,7 +254,7 @@
 ### index.js
 
 ```javascript
-import { command, notification } from 'onin-plugin-sdk';
+import { command, notification } from 'onin-sdk';
 
 // 处理命令执行
 command.handle((commandCode, args) => {
@@ -274,7 +274,7 @@ command.handle((commandCode, args) => {
 除了在 manifest.json 中静态声明命令，插件也可以通过 SDK 动态注册命令：
 
 ```javascript
-import { command } from 'onin-plugin-sdk';
+import { command } from 'onin-sdk';
 
 // 动态注册命令
 await command.register({

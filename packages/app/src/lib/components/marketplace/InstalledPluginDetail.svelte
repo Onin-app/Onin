@@ -2,6 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { Star, Download, Package, GithubLogo } from "phosphor-svelte";
   import { Dialog } from "bits-ui";
+  import AppScrollArea from "$lib/components/AppScrollArea.svelte";
   import { marked } from "marked";
 
   interface PluginDetail {
@@ -147,7 +148,7 @@
       class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50"
     />
     <Dialog.Content
-      class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] fixed top-[50%] left-[50%] z-50 max-h-[80vh] w-full max-w-2xl translate-x-[-50%] translate-y-[-50%] overflow-auto rounded-lg bg-white p-6 shadow-xl dark:bg-neutral-900"
+      class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] fixed top-[50%] left-[50%] z-50 h-[80vh] w-full max-w-2xl translate-x-[-50%] translate-y-[-50%] overflow-hidden rounded-lg bg-white p-6 shadow-xl dark:bg-neutral-900"
     >
       <Dialog.Close
         class="absolute top-4 right-4 rounded p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800"
@@ -168,18 +169,22 @@
         </svg>
       </Dialog.Close>
 
-      {#if loading}
-        <div class="flex h-64 items-center justify-center">
-          <div class="text-neutral-500">加载中...</div>
-        </div>
-      {:else if error}
-        <div class="flex h-64 flex-col items-center justify-center">
-          <p class="text-lg text-red-500">加载失败</p>
-          <p class="mt-2 text-sm text-neutral-500">{error}</p>
-        </div>
-      {:else if detail}
-        <!-- 插件头部 -->
-        <div class="mb-6 flex items-start gap-4">
+      <AppScrollArea
+        class="h-full w-full"
+        viewportClass="h-full w-full overflow-x-hidden pr-2"
+      >
+          {#if loading}
+            <div class="flex h-64 items-center justify-center">
+              <div class="text-neutral-500">加载中...</div>
+            </div>
+          {:else if error}
+            <div class="flex h-64 flex-col items-center justify-center">
+              <p class="text-lg text-red-500">加载失败</p>
+              <p class="mt-2 text-sm text-neutral-500">{error}</p>
+            </div>
+          {:else if detail}
+            <!-- 插件头部 -->
+            <div class="mb-6 flex items-start gap-4">
           <div
             class="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-neutral-100 to-neutral-200 dark:from-neutral-800 dark:to-neutral-700"
           >
@@ -276,21 +281,22 @@
           </div>
         {/if}
 
-        <!-- GitHub 链接（如果有） -->
-        {#if detail.repository}
-          <div class="border-t border-neutral-200 pt-4 dark:border-neutral-700">
-            <a
-              href={detail.repository}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="flex items-center gap-2 text-sm text-blue-600 hover:underline dark:text-blue-400"
-            >
-              <GithubLogo class="h-4 w-4" />
-              查看源码
-            </a>
-          </div>
-        {/if}
-      {/if}
+            <!-- GitHub 链接（如果有） -->
+            {#if detail.repository}
+              <div class="border-t border-neutral-200 pt-4 dark:border-neutral-700">
+                <a
+                  href={detail.repository}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="flex items-center gap-2 text-sm text-blue-600 hover:underline dark:text-blue-400"
+                >
+                  <GithubLogo class="h-4 w-4" />
+                  查看源码
+                </a>
+              </div>
+            {/if}
+          {/if}
+      </AppScrollArea>
     </Dialog.Content>
   </Dialog.Portal>
 </Dialog.Root>

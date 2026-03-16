@@ -2,12 +2,12 @@
 
 ## 什么是 Onin 插件？
 
-Onin 插件是一个独立的 Web 应用，通过 `manifest.json` 声明它提供的指令和权限，并使用 `onin-plugin-sdk` 与 Onin 主程序进行通信。
+Onin 插件是一个独立的 Web 应用，通过 `manifest.json` 声明它提供的指令和权限，并使用 `onin-sdk` 与 Onin 主程序进行通信。
 
 插件的本质就是一个你熟悉的前端项目——可以用 React、Vue、Svelte 或原生 HTML 开发，只需满足两个条件：
 
 1. 根目录有 `manifest.json` 文件
-2. 使用 `onin-plugin-sdk` 接入 Onin 能力
+2. 使用 `onin-sdk` 接入 Onin 能力
 
 ## 插件的两种类型
 
@@ -28,10 +28,10 @@ UI 插件支持两种显示方式：
 
 ## 插件通信
 
-插件通过 `onin-plugin-sdk` 提供的 API 与主程序通信：
+插件通过 `onin-sdk` 提供的 API 与主程序通信：
 
 ```typescript
-import { command, storage, notification } from 'onin-plugin-sdk';
+import { command, storage, notification } from 'onin-sdk';
 
 // 注册指令处理器
 await command.handle(async (code, args) => {
@@ -49,3 +49,24 @@ await command.handle(async (code, args) => {
 - **存储隔离**：每个插件有自己独立的存储空间
 - **权限控制**：插件只能使用 `manifest.json` 中声明过的权限
 - **网络限制**：HTTP 请求需要显式声明允许的域名
+
+## 推荐起手方式
+
+新项目优先使用 `create-onin-plugin`，不要手动从空目录搭建。
+
+```bash
+npx create-onin-plugin my-plugin
+```
+
+脚手架默认会生成：
+
+- `src/main.ts`
+- `src/lifecycle.ts`
+- `manifest.json`
+- `vite.lifecycle.config.ts`
+- `pnpm build`
+- `pnpm pack:plugin`
+
+这可以直接避开 UI 插件最常见的发布问题，例如 `lifecycle.js` 漏构建、`manifest.lifecycle` 路径不一致、zip 产物不完整。
+
+下一步建议直接看 [5 分钟快速开始](./quickstart)。
