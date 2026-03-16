@@ -7,10 +7,11 @@
    */
   import { onMount, onDestroy } from "svelte";
   import { get } from "svelte/store";
-  import { Tabs, ScrollArea } from "bits-ui";
+  import { Tabs } from "bits-ui";
   import { CheckCircle, Storefront } from "phosphor-svelte";
   import { goto } from "$app/navigation";
   import { escapeHandler } from "$lib/stores/escapeHandler";
+  import AppScrollArea from "$lib/components/AppScrollArea.svelte";
 
   // Composable
   import {
@@ -134,35 +135,29 @@
           </Tabs.List>
 
           <Tabs.Content value="installed" class="flex-1 overflow-hidden">
-            <ScrollArea.Root class="h-full w-full" type="hover">
-              <ScrollArea.Viewport class="h-full w-full overflow-x-hidden pr-2">
-                {#if pluginList.filteredPlugins.length > 0}
-                  <div class="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
-                    {#each pluginList.filteredPlugins as plugin (plugin.dir_name || plugin.id)}
-                      <PluginCard
-                        {plugin}
-                        imageErrors={pluginList.state.imageErrors}
-                        onExecute={pluginList.executePlugin}
-                        onToggle={pluginList.togglePlugin}
-                        onSettings={openPluginSettings}
-                        onUninstall={pluginList.uninstallPlugin}
-                        onViewDetail={openPluginDetail}
-                        onImageError={pluginList.handleImageError}
-                      />
-                    {/each}
-                  </div>
-                {:else}
-                  <EmptyPluginState />
-                {/if}
-              </ScrollArea.Viewport>
-              <ScrollArea.Scrollbar
-                orientation="vertical"
-                class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none rounded-full border-l border-l-transparent p-px transition-all duration-200 select-none hover:w-3"
-              >
-                <ScrollArea.Thumb class="bg-muted-foreground flex-1 rounded-full" />
-              </ScrollArea.Scrollbar>
-              <ScrollArea.Corner />
-            </ScrollArea.Root>
+            <AppScrollArea
+              class="h-full w-full"
+              viewportClass="h-full w-full overflow-x-hidden pr-2"
+            >
+              {#if pluginList.filteredPlugins.length > 0}
+                <div class="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                  {#each pluginList.filteredPlugins as plugin (plugin.dir_name || plugin.id)}
+                    <PluginCard
+                      {plugin}
+                      imageErrors={pluginList.state.imageErrors}
+                      onExecute={pluginList.executePlugin}
+                      onToggle={pluginList.togglePlugin}
+                      onSettings={openPluginSettings}
+                      onUninstall={pluginList.uninstallPlugin}
+                      onViewDetail={openPluginDetail}
+                      onImageError={pluginList.handleImageError}
+                    />
+                  {/each}
+                </div>
+              {:else}
+                <EmptyPluginState />
+              {/if}
+            </AppScrollArea>
           </Tabs.Content>
 
           <Tabs.Content value="market" class="flex-1 overflow-hidden">

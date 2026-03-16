@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import { Tabs, Switch, Button, ScrollArea, Slider } from "bits-ui";
+  import { Tabs, Switch, Button, Slider } from "bits-ui";
+  import AppScrollArea from "$lib/components/AppScrollArea.svelte";
   import { toast } from "svelte-sonner";
 
   import { theme, toggleTheme } from "$lib/utils/theme";
@@ -148,8 +149,7 @@
   onDestroy(unsubscribe);
 </script>
 
-<ScrollArea.Root class="h-full w-full" type="hover">
-  <ScrollArea.Viewport class="h-full w-full">
+<AppScrollArea class="h-full w-full" viewportClass="h-full w-full">
     <main class="h-full w-full pr-2 pb-8">
       <section class="mb-6">
         <h2
@@ -431,12 +431,4 @@
         </div>
       </section>
     </main>
-  </ScrollArea.Viewport>
-  <ScrollArea.Scrollbar
-    orientation="vertical"
-    class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none rounded-full border-l border-l-transparent p-px transition-all duration-200 select-none hover:w-3"
-  >
-    <ScrollArea.Thumb class="bg-muted-foreground flex-1 rounded-full" />
-  </ScrollArea.Scrollbar>
-  <ScrollArea.Corner />
-</ScrollArea.Root>
+</AppScrollArea>

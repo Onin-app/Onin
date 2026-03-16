@@ -9,7 +9,8 @@
     Download,
     GithubLogo,
   } from "phosphor-svelte";
-  import { Button, Dialog, ScrollArea } from "bits-ui";
+  import { Button, Dialog } from "bits-ui";
+  import AppScrollArea from "$lib/components/AppScrollArea.svelte";
   import PluginCard from "./PluginCard.svelte";
   import { fetchPlugins } from "$lib/api/marketplace";
   import type { MarketplacePlugin } from "$lib/types/marketplace";
@@ -246,9 +247,8 @@
   </div>
 
   <!-- 插件列表 -->
-  <ScrollArea.Root class="flex-1" type="hover">
-    <ScrollArea.Viewport class="h-full w-full overflow-x-hidden">
-      <div class="pr-2">
+  <AppScrollArea class="flex-1" viewportClass="h-full w-full overflow-x-hidden">
+    <div class="pr-2">
         {#if loading}
           <div class="flex h-full min-h-64 items-center justify-center text-neutral-500">
             <div class="text-center">
@@ -323,16 +323,8 @@
             </div>
           {/if}
         {/if}
-      </div>
-    </ScrollArea.Viewport>
-    <ScrollArea.Scrollbar
-      orientation="vertical"
-      class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none rounded-full border-l border-l-transparent p-px transition-all duration-200 select-none hover:w-3"
-    >
-      <ScrollArea.Thumb class="bg-muted-foreground flex-1 rounded-full" />
-    </ScrollArea.Scrollbar>
-    <ScrollArea.Corner />
-  </ScrollArea.Root>
+    </div>
+  </AppScrollArea>
 </div>
 
 <!-- 插件详情弹窗 -->
@@ -367,8 +359,10 @@
           </svg>
         </Dialog.Close>
 
-        <ScrollArea.Root class="h-full w-full" type="hover">
-          <ScrollArea.Viewport class="h-full w-full overflow-x-hidden pr-2">
+        <AppScrollArea
+          class="h-full w-full"
+          viewportClass="h-full w-full overflow-x-hidden pr-2"
+        >
             {#if loadingDetail}
               <div class="flex h-64 items-center justify-center">
                 <div class="text-neutral-500">加载中...</div>
@@ -497,15 +491,7 @@
                 </a>
               </div>
             {/if}
-          </ScrollArea.Viewport>
-          <ScrollArea.Scrollbar
-            orientation="vertical"
-            class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none rounded-full border-l border-l-transparent p-px transition-all duration-200 select-none hover:w-3"
-          >
-            <ScrollArea.Thumb class="bg-muted-foreground flex-1 rounded-full" />
-          </ScrollArea.Scrollbar>
-          <ScrollArea.Corner />
-        </ScrollArea.Root>
+        </AppScrollArea>
       </Dialog.Content>
     </Dialog.Portal>
   </Dialog.Root>

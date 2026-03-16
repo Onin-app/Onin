@@ -1,7 +1,8 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { Button, ScrollArea } from "bits-ui";
+  import { Button } from "bits-ui";
   import { ArrowLeft } from "phosphor-svelte";
+  import AppScrollArea from "$lib/components/AppScrollArea.svelte";
   import SettingField from "./SettingField.svelte";
   import type {
     PluginSettingsSchema,
@@ -107,8 +108,7 @@
   </div>
 
   <!-- Content -->
-  <ScrollArea.Root class="flex-1" type="hover">
-    <ScrollArea.Viewport class="h-full w-full overflow-x-hidden">
+  <AppScrollArea class="flex-1" viewportClass="h-full w-full overflow-x-hidden">
       <div class="p-6 pr-8">
         {#if loading}
           <div class="flex items-center justify-center py-12">
@@ -149,13 +149,5 @@
           </div>
         {/if}
       </div>
-    </ScrollArea.Viewport>
-    <ScrollArea.Scrollbar
-      orientation="vertical"
-      class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none rounded-full border-l border-l-transparent p-px transition-all duration-200 select-none hover:w-3"
-    >
-      <ScrollArea.Thumb class="bg-muted-foreground flex-1 rounded-full" />
-    </ScrollArea.Scrollbar>
-    <ScrollArea.Corner />
-  </ScrollArea.Root>
+  </AppScrollArea>
 </div>
