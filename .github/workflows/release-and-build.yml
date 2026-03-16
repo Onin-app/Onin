@@ -7,6 +7,7 @@ on:
     paths:
       - 'packages/app/**'
       - 'packages/sdk/**'
+      - 'packages/create-onin-plugin/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - '.github/workflows/release-and-build.yml'
@@ -125,6 +126,41 @@ jobs:
       - name: Publish SDK to npm
         run: |
           cd packages/sdk
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-create-onin-plugin:
+    needs: release
+    if: needs.release.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Bump create-onin-plugin version
+        run: |
+          cd packages/create-onin-plugin
+          npm version ${{ needs.release.outputs.version }} --no-git-tag-version
+
+      - name: Publish create-onin-plugin to npm
+        run: |
+          cd packages/create-onin-plugin
           npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
