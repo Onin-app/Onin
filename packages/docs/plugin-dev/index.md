@@ -49,3 +49,24 @@ await command.handle(async (code, args) => {
 - **存储隔离**：每个插件有自己独立的存储空间
 - **权限控制**：插件只能使用 `manifest.json` 中声明过的权限
 - **网络限制**：HTTP 请求需要显式声明允许的域名
+
+## 推荐起手方式
+
+新项目优先使用 `create-onin-plugin`，不要手动从空目录搭建。
+
+```bash
+npx create-onin-plugin my-plugin
+```
+
+脚手架默认会生成：
+
+- `src/main.ts`
+- `src/lifecycle.ts`
+- `manifest.json`
+- `vite.lifecycle.config.ts`
+- `pnpm build`
+- `pnpm pack:plugin`
+
+这可以直接避开 UI 插件最常见的发布问题，例如 `lifecycle.js` 漏构建、`manifest.lifecycle` 路径不一致、zip 产物不完整。
+
+下一步建议直接看 [5 分钟快速开始](./quickstart)。

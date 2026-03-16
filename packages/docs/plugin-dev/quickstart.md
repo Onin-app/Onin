@@ -9,7 +9,43 @@
 - Node.js >= 18
 - pnpm（推荐）或 npm
 
-## 1. 创建项目
+## 1. 用脚手架创建项目
+
+推荐直接使用 `create-onin-plugin`：
+
+```bash
+npx create-onin-plugin my-onin-plugin
+cd my-onin-plugin
+pnpm install
+```
+
+脚手架默认会生成一个可发布的 UI 插件模板，已经包含：
+
+- `src/main.ts`
+- `src/lifecycle.ts`
+- `manifest.json`
+- `vite.config.ts`
+- `vite.lifecycle.config.ts`
+- `pnpm build`
+- `pnpm pack:plugin`
+
+开发模式：
+
+```bash
+pnpm dev
+```
+
+发布产物：
+
+```bash
+pnpm pack:plugin
+```
+
+`pnpm pack:plugin` 会先构建插件，再生成一个适合插件市场上传的 `plugin.zip`。
+
+## 2. 手动创建项目（备选）
+
+如果你需要完全自定义项目结构，也可以手动搭建：
 
 ```bash
 mkdir my-onin-plugin
@@ -18,7 +54,7 @@ pnpm init
 pnpm add onin-plugin-sdk
 ```
 
-## 2. 创建 manifest.json
+## 3. 创建 manifest.json
 
 这是插件的身份证，必须放在项目根目录：
 
@@ -46,7 +82,7 @@ pnpm add onin-plugin-sdk
 }
 ```
 
-## 3. 创建入口文件
+## 4. 创建入口文件
 
 创建 `index.html`：
 
@@ -100,14 +136,14 @@ pnpm add onin-plugin-sdk
 </html>
 ```
 
-## 4. 加载到 Onin
+## 5. 加载到 Onin
 
 1. 打开 Onin，进入「设置」→「插件」
 2. 点击「从本地导入」
 3. 选择你的插件项目目录
 4. 安装完成后，在主搜索框输入 `hello` 即可触发指令
 
-## 5. 开发模式（热更新）
+## 6. 开发模式（热更新）
 
 开发时推荐启用 devMode，无需每次重新导入：
 
@@ -128,7 +164,7 @@ pnpm dev
 
 Onin 会直接加载开发服务器的内容，修改代码后自动刷新。
 
-## 6. 给 UI 插件补上 lifecycle 构建
+## 7. 给 UI 插件补上 lifecycle 构建
 
 如果你的 UI 插件要做以下任一事情，就不要只构建页面入口，还必须额外构建 `lifecycle.js`：
 
@@ -221,7 +257,7 @@ export default defineConfig({
 
 如果你把生命周期文件输出到 `dist/`，那就把 manifest 改成 `"lifecycle": "dist/lifecycle.js"`。两边只要有一边不一致，Onin 就不会执行生命周期脚本，设置按钮和指令注册都会失效。
 
-## 7. 发布前检查
+## 8. 发布前检查
 
 发布到插件市场前，先直接检查 zip 根目录或解压目录，至少应包含：
 
