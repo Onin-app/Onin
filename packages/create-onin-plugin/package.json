@@ -1,0 +1,16 @@
+{
+  "name": "create-onin-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "create-onin-plugin": "./src/cli.js"
+  },
+  "files": [
+    "src",
+    "templates"
+  ],
+  "scripts": {
+    "start": "node ./src/cli.js"
+  }
+}
