@@ -6,7 +6,7 @@
   import { goto } from "$app/navigation";
   import { invoke, convertFileSrc } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
-  import { ScrollArea } from "bits-ui";
+  import AppScrollArea from "$lib/components/AppScrollArea.svelte";
   import ExtensionHeader from "$lib/components/ExtensionHeader.svelte";
 
   type ClipboardItem = {
@@ -157,87 +157,78 @@
     <div
       class="flex w-1/3 flex-col border-r border-neutral-200 dark:border-neutral-700"
     >
-      <ScrollArea.Root class="h-full w-full" type="hover">
-        <ScrollArea.Viewport class="h-full w-full p-2">
-          {#if filteredItems.length === 0}
-            <div
-              class="flex h-full items-center justify-center text-sm text-neutral-500"
-            >
-              {#if searchQuery}
-                No matches
-              {:else}
-                Empty
-              {/if}
-            </div>
-          {:else}
-            <div class="flex flex-col gap-1">
-              {#each filteredItems as item, index (item.id)}
-                <button
-                  id="item-{index}"
-                  class="group flex w-full flex-row items-center gap-3 rounded-md border border-transparent px-3 py-2 text-left font-sans text-sm transition-colors
+      <AppScrollArea class="h-full w-full" viewportClass="h-full w-full p-2">
+        {#if filteredItems.length === 0}
+          <div
+            class="flex h-full items-center justify-center text-sm text-neutral-500"
+          >
+            {#if searchQuery}
+              No matches
+            {:else}
+              Empty
+            {/if}
+          </div>
+        {:else}
+          <div class="flex flex-col gap-1">
+            {#each filteredItems as item, index (item.id)}
+              <button
+                id="item-{index}"
+                class="group flex w-full flex-row items-center gap-3 rounded-md border border-transparent px-3 py-2 text-left font-sans text-sm transition-colors
                     {selectedIndex === index
-                    ? 'bg-neutral-200 dark:bg-neutral-700/50'
-                    : 'hover:bg-neutral-200/50 dark:hover:bg-neutral-800'}"
-                  onclick={() => (selectedIndex = index)}
-                  ondblclick={() => handleItemSelect(item)}
-                >
-                  <!-- Left: Thumbnail or Spacer -->
-                  {#if item.item_type === "Image" && item.thumbnail}
-                    <img
-                      src={item.thumbnail}
-                      alt="Thumbnail"
-                      class="h-10 w-10 flex-shrink-0 rounded border border-neutral-200 bg-neutral-100 object-cover dark:border-neutral-700 dark:bg-neutral-800"
-                    />
-                  {/if}
+                  ? 'bg-neutral-200 dark:bg-neutral-700/50'
+                  : 'hover:bg-neutral-200/50 dark:hover:bg-neutral-800'}"
+                onclick={() => (selectedIndex = index)}
+                ondblclick={() => handleItemSelect(item)}
+              >
+                <!-- Left: Thumbnail or Spacer -->
+                {#if item.item_type === "Image" && item.thumbnail}
+                  <img
+                    src={item.thumbnail}
+                    alt="Thumbnail"
+                    class="h-10 w-10 flex-shrink-0 rounded border border-neutral-200 bg-neutral-100 object-cover dark:border-neutral-700 dark:bg-neutral-800"
+                  />
+                {/if}
 
-                  <!-- Middle: Content -->
-                  <div class="flex min-w-0 flex-1 flex-col justify-center">
-                    {#if item.item_type === "File"}
-                      <div
-                        class="w-full truncate leading-tight font-medium text-neutral-900 dark:text-neutral-100"
-                        title={item.text}
-                      >
-                        {getDisplayName(item)}
-                      </div>
-                    {:else if item.item_type === "Image"}
-                      <span class="text-xs text-neutral-500 italic"
-                        >Image Bitmap</span
-                      >
-                    {:else}
-                      <div
-                        class="line-clamp-2 w-full leading-tight break-all text-neutral-600 dark:text-neutral-300"
-                      >
-                        {item.text}
-                      </div>
-                    {/if}
-                  </div>
-
-                  <!-- Right: Metadata -->
-                  <div
-                    class="flex flex-shrink-0 flex-col items-end gap-0.5 self-start pt-1"
-                  >
-                    <span
-                      class="text-[9px] font-semibold tracking-wider text-neutral-400/70 uppercase"
+                <!-- Middle: Content -->
+                <div class="flex min-w-0 flex-1 flex-col justify-center">
+                  {#if item.item_type === "File"}
+                    <div
+                      class="w-full truncate leading-tight font-medium text-neutral-900 dark:text-neutral-100"
+                      title={item.text}
                     >
-                      {item.item_type}
-                    </span>
-                    <span class="text-[10px] text-neutral-400 tabular-nums">
-                      {formatTime(item.timestamp)}
-                    </span>
-                  </div>
-                </button>
-              {/each}
-            </div>
-          {/if}
-        </ScrollArea.Viewport>
-        <ScrollArea.Scrollbar
-          orientation="vertical"
-          class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none rounded-full border-l border-l-transparent p-px transition-all duration-200 select-none hover:w-3"
-        >
-          <ScrollArea.Thumb class="bg-muted-foreground flex-1 rounded-full" />
-        </ScrollArea.Scrollbar>
-        <ScrollArea.Corner />
-      </ScrollArea.Root>
+                      {getDisplayName(item)}
+                    </div>
+                  {:else if item.item_type === "Image"}
+                    <span class="text-xs text-neutral-500 italic"
+                      >Image Bitmap</span
+                    >
+                  {:else}
+                    <div
+                      class="line-clamp-2 w-full leading-tight break-all text-neutral-600 dark:text-neutral-300"
+                    >
+                      {item.text}
+                    </div>
+                  {/if}
+                </div>
+
+                <!-- Right: Metadata -->
+                <div
+                  class="flex flex-shrink-0 flex-col items-end gap-0.5 self-start pt-1"
+                >
+                  <span
+                    class="text-[9px] font-semibold tracking-wider text-neutral-400/70 uppercase"
+                  >
+                    {item.item_type}
+                  </span>
+                  <span class="text-[10px] text-neutral-400 tabular-nums">
+                    {formatTime(item.timestamp)}
+                  </span>
+                </div>
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </AppScrollArea>
     </div>
 
     <!-- Right Preview Pane -->
@@ -278,57 +269,49 @@
 
           <!-- Preview Content -->
           <div class="relative flex-1 overflow-hidden">
-            <ScrollArea.Root class="h-full w-full" type="hover">
-              <ScrollArea.Viewport class="h-full w-full p-6">
-                {#if selectedItem.item_type === "Image" && selectedItem.thumbnail}
+            <AppScrollArea
+              class="h-full w-full"
+              viewportClass="h-full w-full p-6"
+            >
+              {#if selectedItem.item_type === "Image" && selectedItem.thumbnail}
+                <div
+                  class="flex min-h-full items-center justify-center bg-[url('/checker-board.svg')] bg-repeat"
+                >
+                  <img
+                    src={selectedItem.thumbnail}
+                    class="max-w-full rounded border border-neutral-200 shadow-lg dark:border-neutral-700"
+                    alt="Preview"
+                  />
+                </div>
+              {:else if selectedItem.item_type === "File"}
+                {#if isImageFile(selectedItem.text)}
                   <div
                     class="flex min-h-full items-center justify-center bg-[url('/checker-board.svg')] bg-repeat"
                   >
                     <img
-                      src={selectedItem.thumbnail}
-                      class="max-w-full rounded border border-neutral-200 shadow-lg dark:border-neutral-700"
+                      src={convertFileSrc(selectedItem.text)}
+                      class="max-h-[80vh] max-w-full rounded border border-neutral-200 shadow-lg dark:border-neutral-700"
                       alt="Preview"
                     />
                   </div>
-                {:else if selectedItem.item_type === "File"}
-                  {#if isImageFile(selectedItem.text)}
-                    <div
-                      class="flex min-h-full items-center justify-center bg-[url('/checker-board.svg')] bg-repeat"
-                    >
-                      <img
-                        src={convertFileSrc(selectedItem.text)}
-                        class="max-h-[80vh] max-w-full rounded border border-neutral-200 shadow-lg dark:border-neutral-700"
-                        alt="Preview"
-                      />
-                    </div>
-                  {:else}
-                    <!-- For non-image files, we might want to show icon or details -->
-                    <div
-                      class="flex h-full flex-col items-center justify-center gap-2 text-neutral-400"
-                    >
-                      <div class="i-lucide-file-text text-6xl opacity-20"></div>
-                      <span>File Preview</span>
-                    </div>
-                  {/if}
                 {:else}
-                  <!-- Text Content -->
+                  <!-- For non-image files, we might want to show icon or details -->
                   <div
-                    class="cursor-text font-mono text-sm leading-relaxed break-words whitespace-pre-wrap text-neutral-800 select-text dark:text-neutral-200"
+                    class="flex h-full flex-col items-center justify-center gap-2 text-neutral-400"
                   >
-                    {selectedItem.text}
+                    <div class="i-lucide-file-text text-6xl opacity-20"></div>
+                    <span>File Preview</span>
                   </div>
                 {/if}
-              </ScrollArea.Viewport>
-              <ScrollArea.Scrollbar
-                orientation="vertical"
-                class="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-1.5 touch-none rounded-full border-l border-l-transparent p-px transition-all duration-200 select-none hover:w-3"
-              >
-                <ScrollArea.Thumb
-                  class="bg-muted-foreground flex-1 rounded-full"
-                />
-              </ScrollArea.Scrollbar>
-              <ScrollArea.Corner />
-            </ScrollArea.Root>
+              {:else}
+                <!-- Text Content -->
+                <div
+                  class="cursor-text font-mono text-sm leading-relaxed break-words whitespace-pre-wrap text-neutral-800 select-text dark:text-neutral-200"
+                >
+                  {selectedItem.text}
+                </div>
+              {/if}
+            </AppScrollArea>
           </div>
 
           <!-- Footer Info -->
