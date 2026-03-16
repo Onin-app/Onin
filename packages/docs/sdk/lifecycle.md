@@ -91,3 +91,50 @@ Onin 会在启动时自动加载 `lifecycle` 指定的文件（默认为 `lifecy
   "lifecycle": "dist/lifecycle.js"
 }
 ```
+
+## 构建要求
+
+对于 UI 插件，`lifecycle.ts` 不会自动跟随页面入口一起变成发布产物。你需要显式把它单独构建成一个独立文件，并确保 `manifest.json` 中的 `lifecycle` 指向它。
+
+最小配置示例：
+
+```json
+{
+  "scripts": {
+    "build:index": "vite build",
+    "build:lifecycle": "vite build --config vite.lifecycle.config.ts",
+    "build": "npm run build:index && npm run build:lifecycle"
+  }
+}
+```
+
+```ts
+import { defineConfig } from 'vite';
+import { resolve } from 'path';
+
+export default defineConfig({
+  build: {
+    outDir: '.',
+    emptyOutDir: false,
+    lib: {
+      entry: resolve(__dirname, 'src/lifecycle.ts'),
+      formats: ['es'],
+      fileName: () => 'lifecycle.js',
+    },
+    rollupOptions: {
+      external: [],
+      output: {
+        inlineDynamicImports: true,
+      },
+    },
+  },
+});
+```
+
+发布前检查：
+
+- `manifest.lifecycle` 的路径和产物路径一致
+- zip 里确实包含该文件
+- 如果生命周期里注册了 settings 或 commands，本地解压后也能看到该文件
+
+如果缺少这个构建步骤，插件 UI 仍然可能正常打开，但 `onLoad` 不会执行，进而导致设置页、命令注册和启动初始化全部失效。

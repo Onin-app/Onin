@@ -45,6 +45,42 @@
 | `run_at_startup` | `boolean`              | `false`    | 是否随 Onin 主程序启动自动加载并运行插件                                              |
 | `lifecycle`    | `string`                 | `"lifecycle.js"` | 视图插件的初始化脚本路径。即便 UI 未打开，该脚本也会被执行（需 `run_at_startup` 支持） |
 
+### `lifecycle` 字段的关键约束
+
+`lifecycle` 不是声明了就会生效，Onin 只会执行插件目录里真实存在的文件。
+
+这意味着你必须同时满足：
+
+1. `manifest.json` 里的 `lifecycle` 路径写对
+2. 构建流程实际产出了这个文件
+3. 发布 zip 把这个文件带进去了
+
+例如：
+
+- `lifecycle: "lifecycle.js"` 对应插件根目录下的 `lifecycle.js`
+- `lifecycle: "dist/lifecycle.js"` 对应 `dist/lifecycle.js`
+
+如果文件缺失，常见表现是：
+
+- 插件设置按钮不显示
+- `settings.useSettingsSchema()` 没有生效
+- `command.handle()` 没有注册
+- `run_at_startup` 看起来“没反应”
+
+对于 UI 插件，推荐把生命周期构建作为单独步骤显式写进 `package.json`：
+
+```json
+{
+  "scripts": {
+    "build:index": "vite build",
+    "build:lifecycle": "vite build --config vite.lifecycle.config.ts",
+    "build": "npm run build:index && npm run build:lifecycle"
+  }
+}
+```
+
+发布前请直接解压 zip 检查 `manifest.lifecycle` 指向的目标文件是否存在。
+
 ## 开发模式
 
 | 字段        | 类型      | 说明                                        |

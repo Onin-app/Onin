@@ -128,6 +128,110 @@ pnpm dev
 
 Onin 会直接加载开发服务器的内容，修改代码后自动刷新。
 
+## 6. 给 UI 插件补上 lifecycle 构建
+
+如果你的 UI 插件要做以下任一事情，就不要只构建页面入口，还必须额外构建 `lifecycle.js`：
+
+- 注册插件设置页
+- 注册指令处理器
+- 做启动时初始化逻辑
+- 使用 `run_at_startup`
+
+推荐目录：
+
+```text
+my-onin-plugin/
+├─ src/
+│  ├─ main.ts
+│  └─ lifecycle.ts
+├─ index.html
+├─ manifest.json
+├─ vite.config.ts
+└─ vite.lifecycle.config.ts
+```
+
+`src/lifecycle.ts` 示例：
+
+```ts
+import { lifecycle, settings, command } from 'onin-plugin-sdk';
+
+lifecycle.onLoad(async () => {
+  await settings.useSettingsSchema([
+    {
+      key: 'apiKey',
+      label: 'API Key',
+      type: 'password',
+    },
+  ]);
+
+  await command.handle(async (code) => {
+    if (code === 'hello') {
+      return { ok: true };
+    }
+  });
+});
+```
+
+`vite.lifecycle.config.ts` 示例：
+
+```ts
+import { defineConfig } from 'vite';
+import { resolve } from 'path';
+
+export default defineConfig({
+  build: {
+    outDir: '.',
+    emptyOutDir: false,
+    lib: {
+      entry: resolve(__dirname, 'src/lifecycle.ts'),
+      formats: ['es'],
+      fileName: () => 'lifecycle.js',
+    },
+    rollupOptions: {
+      external: [],
+      output: {
+        inlineDynamicImports: true,
+      },
+    },
+  },
+});
+```
+
+`package.json` 至少要有：
+
+```json
+{
+  "scripts": {
+    "dev": "vite",
+    "build:index": "vite build",
+    "build:lifecycle": "vite build --config vite.lifecycle.config.ts",
+    "build": "npm run build:index && npm run build:lifecycle"
+  }
+}
+```
+
+`manifest.json` 要和产物路径保持一致：
+
+```json
+{
+  "entry": "dist/index.html",
+  "lifecycle": "lifecycle.js"
+}
+```
+
+如果你把生命周期文件输出到 `dist/`，那就把 manifest 改成 `"lifecycle": "dist/lifecycle.js"`。两边只要有一边不一致，Onin 就不会执行生命周期脚本，设置按钮和指令注册都会失效。
+
+## 7. 发布前检查
+
+发布到插件市场前，先直接检查 zip 根目录或解压目录，至少应包含：
+
+- `manifest.json`
+- `icon.png` 或其他图标文件
+- `dist/index.html` 及其静态资源
+- `lifecycle.js` 或 `manifest.lifecycle` 指向的实际文件
+
+最常见的问题是本地开发可用，但发布 zip 漏了 `lifecycle.js`。这会导致插件页面能打开，但设置 schema、指令处理器、启动初始化都不会注册。
+
 ## 下一步
 
 - 📖 了解 [manifest.json 所有字段](./manifest)
