@@ -230,7 +230,7 @@ export function moveFile(sourcePath: string, destPath: string): Promise<void> {
  * @see {@link parseFsError} - For file system error handling utilities
  * @example
  * ```typescript
- * import { fs } from 'onin-plugin-sdk';
+ * import { fs } from 'onin-sdk';
  *
  * // Basic file operations
  * await fs.writeFile('data.txt', 'Hello World');

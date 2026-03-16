@@ -47,7 +47,7 @@ if (typeof window !== 'undefined') {
  *   clipboard,
  *   command,
  *   settings
- * } from 'onin-plugin-sdk';
+ * } from 'onin-sdk';
  *
  * // HTTP requests
  * const response = await http.get('https://api.example.com/data');
@@ -115,7 +115,7 @@ import type * as Settings from './api/settings';
  * @group Types
  * @example
  * ```typescript
- * import { types } from 'onin-plugin-sdk';
+ * import { types } from 'onin-sdk';
  *
  * // Use error types
  * function handleError(error: types.Errors.PluginError) {

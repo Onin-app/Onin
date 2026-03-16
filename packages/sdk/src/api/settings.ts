@@ -189,7 +189,7 @@ let settingsSchema: SettingField[] = [];
  *
  * @example
  * ```typescript
- * import { settings } from 'onin-plugin-sdk';
+ * import { settings } from 'onin-sdk';
  *
  * const settingsSchema: SettingField[] = [
  *   {
@@ -281,7 +281,7 @@ function convertSchemaToInternal(schema: SettingField[]) {
  *
  * @example
  * ```typescript
- * import { settings } from 'onin-plugin-sdk';
+ * import { settings } from 'onin-sdk';
  *
  * const config = await settings.getAll();
  * console.log('API Key:', config.apiKey);
@@ -336,7 +336,7 @@ async function getAll<T extends SettingsValues = SettingsValues>(): Promise<T> {
  *
  * @example
  * ```typescript
- * import { settings } from 'onin-plugin-sdk';
+ * import { settings } from 'onin-sdk';
  *
  * const apiKey = await settings.get<string>('apiKey');
  * const timeout = await settings.get<number>('timeout', 30);

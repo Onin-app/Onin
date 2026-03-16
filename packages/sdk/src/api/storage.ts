@@ -393,7 +393,7 @@ export function setAll(data: Record<string, any>): Promise<void> {
  * @see {@link isStorageError} - For checking storage error types
  * @example
  * ```typescript
- * import { storage } from 'onin-plugin-sdk';
+ * import { storage } from 'onin-sdk';
  *
  * // Basic usage
  * await storage.setItem('username', 'john');

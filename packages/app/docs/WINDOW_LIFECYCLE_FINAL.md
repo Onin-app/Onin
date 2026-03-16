@@ -65,7 +65,7 @@ let builder = WebviewWindowBuilder::new(
 
 ```typescript
 // lifecycle.ts
-import { lifecycle } from "onin-plugin-sdk";
+import { lifecycle } from "onin-sdk";
 
 lifecycle.onWindowShow(() => {
   console.log("窗口显示了");

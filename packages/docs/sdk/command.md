@@ -5,7 +5,7 @@
 ## 导入
 
 ```typescript
-import { command } from 'onin-plugin-sdk';
+import { command } from 'onin-sdk';
 ```
 
 ## API
@@ -82,7 +82,7 @@ await command.remove('open-bookmark-1');
 ## 完整示例
 
 ```typescript
-import { lifecycle, command, storage } from 'onin-plugin-sdk';
+import { lifecycle, command, storage } from 'onin-sdk';
 
 lifecycle.onLoad(async () => {
   // 从存储读取书签列表，动态注册指令

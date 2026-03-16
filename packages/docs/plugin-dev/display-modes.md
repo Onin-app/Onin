@@ -21,7 +21,7 @@ Onin 插件支持两种显示方式，通过 `manifest.json` 中的 `display_mod
 **窗口事件：**
 
 ```typescript
-import { pluginWindow } from 'onin-plugin-sdk';
+import { pluginWindow } from 'onin-sdk';
 
 pluginWindow.onShow(() => {
   // 每次 Onin 弹出且展示此插件时触发
@@ -58,7 +58,7 @@ pluginWindow.onHide(() => {
 插件无需特殊处理，Onin 会自动处理切换逻辑，并通过 `pluginWindow` 的事件通知你当前模式。
 
 ```typescript
-import { pluginWindow } from 'onin-plugin-sdk';
+import { pluginWindow } from 'onin-sdk';
 
 // 获取当前运行模式
 const mode = pluginWindow.getMode(); // 'inline' | 'window' | 'unknown'

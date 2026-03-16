@@ -5,13 +5,13 @@ Onin 插件开发 SDK，提供完整的 API 支持。
 ## 安装
 
 ```bash
-npm install onin-plugin-sdk
+npm install onin-sdk
 ```
 
 ## 快速开始
 
 ```typescript
-import { command, notification, storage } from 'onin-plugin-sdk';
+import { command, notification, storage } from 'onin-sdk';
 
 // 注册动态命令
 await command.register({

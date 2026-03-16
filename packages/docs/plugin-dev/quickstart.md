@@ -51,7 +51,7 @@ pnpm pack:plugin
 mkdir my-onin-plugin
 cd my-onin-plugin
 pnpm init
-pnpm add onin-plugin-sdk
+pnpm add onin-sdk
 ```
 
 ## 3. 创建 manifest.json
@@ -115,7 +115,7 @@ pnpm add onin-plugin-sdk
     <button id="btn">发送通知</button>
 
     <script type="module">
-      import { notification, command } from 'onin-plugin-sdk';
+      import { notification, command } from 'onin-sdk';
 
       // 注册指令处理器
       await command.handle(async (code, args) => {
@@ -189,7 +189,7 @@ my-onin-plugin/
 `src/lifecycle.ts` 示例：
 
 ```ts
-import { lifecycle, settings, command } from 'onin-plugin-sdk';
+import { lifecycle, settings, command } from 'onin-sdk';
 
 lifecycle.onLoad(async () => {
   await settings.useSettingsSchema([

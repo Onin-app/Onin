@@ -5,7 +5,7 @@
 ## 导入
 
 ```typescript
-import { lifecycle } from 'onin-plugin-sdk';
+import { lifecycle } from 'onin-sdk';
 ```
 
 ## API

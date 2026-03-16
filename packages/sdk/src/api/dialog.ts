@@ -367,7 +367,7 @@ export function saveFile(
  * @see {@link parseDialogError} - For dialog error handling utilities
  * @example
  * ```typescript
- * import { dialog } from 'onin-plugin-sdk';
+ * import { dialog } from 'onin-sdk';
  *
  * // Show information message
  * await dialog.info('Operation completed successfully!');

@@ -5,7 +5,7 @@
 ## 导入
 
 ```typescript
-import { storage } from 'onin-plugin-sdk';
+import { storage } from 'onin-sdk';
 ```
 
 > **所需权限**：`"storage": { "enable": true }`
@@ -95,7 +95,7 @@ await storage.setAll({ version: '2.0', migrated: true });
 ## 完整示例
 
 ```typescript
-import { storage } from 'onin-plugin-sdk';
+import { storage } from 'onin-sdk';
 
 interface AppConfig {
   apiKey: string;

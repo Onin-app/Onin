@@ -5,7 +5,7 @@ HTTP 网络请求 API，支持 GET、POST、PUT、PATCH、DELETE 等标准方法
 ## 导入
 
 ```typescript
-import { http } from 'onin-plugin-sdk';
+import { http } from 'onin-sdk';
 ```
 
 > **所需权限**：`"http": { "enable": true, "allowUrls": ["https://api.example.com"] }`
@@ -87,7 +87,7 @@ interface Response<T> {
 ## 错误处理
 
 ```typescript
-import { http } from 'onin-plugin-sdk';
+import { http } from 'onin-sdk';
 
 try {
   const response = await http.get('https://api.example.com/data');

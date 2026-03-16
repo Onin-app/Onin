@@ -5,7 +5,7 @@
 ## 导入
 
 ```typescript
-import { notification } from 'onin-plugin-sdk';
+import { notification } from 'onin-sdk';
 ```
 
 > **所需权限**：`"notification": { "enable": true }`
@@ -34,7 +34,7 @@ await notification.show({
 ## 示例
 
 ```typescript
-import { notification, scheduler } from 'onin-plugin-sdk';
+import { notification, scheduler } from 'onin-sdk';
 
 // 基础通知
 await notification.show({

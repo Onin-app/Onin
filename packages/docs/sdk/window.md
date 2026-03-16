@@ -5,7 +5,7 @@
 ## 导入
 
 ```typescript
-import { pluginWindow } from 'onin-plugin-sdk';
+import { pluginWindow } from 'onin-sdk';
 ```
 
 ## API
@@ -51,7 +51,7 @@ const pluginId = pluginWindow.getPluginId(); // string
 ## 示例
 
 ```typescript
-import { pluginWindow, storage } from 'onin-plugin-sdk';
+import { pluginWindow, storage } from 'onin-sdk';
 
 let data: any[] = [];
 
