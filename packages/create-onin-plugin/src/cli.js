@@ -7,6 +7,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { copyFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 
 const TEMPLATE_NAME = "svelte-view";
+const SUPPORTED_TEMPLATES = [TEMPLATE_NAME];
 const CLI_DIR = dirname(fileURLToPath(import.meta.url));
 const TEMPLATE_DIR = resolve(
   CLI_DIR,
@@ -20,6 +21,7 @@ function parseArgs(argv) {
     pluginName: undefined,
     pluginId: undefined,
     withSettings: undefined,
+    yes: false,
     template: TEMPLATE_NAME,
   };
 
@@ -49,6 +51,11 @@ function parseArgs(argv) {
       continue;
     }
 
+    if (arg === "--yes") {
+      options.yes = true;
+      continue;
+    }
+
     if (arg === "--with-settings") {
       options.withSettings = true;
       continue;
@@ -61,6 +68,22 @@ function parseArgs(argv) {
   }
 
   return options;
+}
+
+function printHelp() {
+  console.log("create-onin-plugin");
+  console.log("");
+  console.log("Usage:");
+  console.log("  create-onin-plugin [target-dir] [options]");
+  console.log("");
+  console.log("Options:");
+  console.log("  --template <name>      Template to use (default: svelte-view)");
+  console.log("  --plugin-name <name>   Plugin display name");
+  console.log("  --plugin-id <id>       Plugin manifest id");
+  console.log("  --with-settings        Include settings schema example");
+  console.log("  --no-with-settings     Skip settings schema example");
+  console.log("  --yes                  Use defaults for missing answers");
+  console.log("  --help                 Show this help message");
 }
 
 function toTitleCase(value) {
@@ -97,11 +120,15 @@ async function ensureTargetDirectory(targetDir) {
   try {
     const targetStat = await stat(targetDir);
     if (!targetStat.isDirectory()) {
-      throw new Error(`Target path exists and is not a directory: ${targetDir}`);
+      throw new Error(
+        `Target path exists and is not a directory: ${targetDir}\nChoose a new directory name and try again.`,
+      );
     }
 
     if (!(await isDirectoryEmpty(targetDir))) {
-      throw new Error(`Target directory is not empty: ${targetDir}`);
+      throw new Error(
+        `Target directory is not empty: ${targetDir}\nUse an empty directory or choose a new project name.`,
+      );
     }
   } catch (error) {
     if (error && error.code === "ENOENT") {
@@ -169,6 +196,22 @@ function buildSettingsBlock(withSettings) {
 }
 
 async function promptForMissingOptions(initialOptions) {
+  if (initialOptions.yes) {
+    const targetDir = initialOptions.targetDir || "my-onin-plugin";
+    const packageName = slugify(basename(targetDir));
+    const pluginName =
+      initialOptions.pluginName || toTitleCase(packageName) || "My Onin Plugin";
+    const pluginId =
+      initialOptions.pluginId || `com.example.${packageName || "my-onin-plugin"}`;
+
+    return {
+      targetDir,
+      pluginName,
+      pluginId,
+      withSettings: initialOptions.withSettings ?? true,
+    };
+  }
+
   const rl = createInterface({ input, output });
 
   try {
@@ -221,13 +264,23 @@ function printNextSteps(targetDir) {
   console.log("To build release artifacts:");
   console.log("  pnpm build");
   console.log("  pnpm pack:plugin");
+  console.log("");
+  console.log("To load the plugin in Onin:");
+  console.log("  Open Settings -> Plugins -> Import Local Plugin");
 }
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
 
-  if (options.template !== TEMPLATE_NAME) {
-    console.error(`Unsupported template: ${options.template}`);
+  if (process.argv.includes("--help")) {
+    printHelp();
+    return;
+  }
+
+  if (!SUPPORTED_TEMPLATES.includes(options.template)) {
+    console.error(
+      `Unsupported template: ${options.template}\nSupported templates: ${SUPPORTED_TEMPLATES.join(", ")}`,
+    );
     process.exitCode = 1;
     return;
   }
@@ -237,14 +290,16 @@ async function main() {
   const packageName = slugify(basename(targetDir));
 
   if (!isValidPackageName(packageName)) {
-    console.error(`Invalid project directory name: ${packageName}`);
+    console.error(
+      `Invalid project directory name: ${packageName}\nUse lowercase letters, numbers, dots, or hyphens only.`,
+    );
     process.exitCode = 1;
     return;
   }
 
   if (!isValidPluginId(answers.pluginId)) {
     console.error(
-      "Invalid plugin ID. Use lowercase letters, numbers, dots, and hyphens only.",
+      `Invalid plugin ID: ${answers.pluginId}\nUse lowercase letters, numbers, dots, and hyphens only.`,
     );
     process.exitCode = 1;
     return;
