@@ -58,6 +58,12 @@ Create a React JavaScript starter instead:
 npx create-onin-plugin my-plugin --framework react --language js
 ```
 
+Create a Vue JavaScript starter instead:
+
+```bash
+npx create-onin-plugin my-plugin --framework vue --language js
+```
+
 Create a Solid starter instead:
 
 ```bash
@@ -77,7 +83,7 @@ The CLI currently supports:
 ## Languages
 
 - `ts` (default)
-- `js` for `vanilla` and `react`
+- `js` for `vanilla`, `react`, and `vue`
 
 ## Generated project
 

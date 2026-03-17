@@ -25,6 +25,7 @@ const adapterTemplateDirs: Record<Framework, Partial<Record<Language, string>>> 
   },
   vue: {
     ts: resolve(TEST_DIR, "../templates/adapters/vue/ts"),
+    js: resolve(TEST_DIR, "../templates/adapters/vue/js"),
   },
   vanilla: {
     ts: resolve(TEST_DIR, "../templates/adapters/vanilla/ts"),
@@ -123,6 +124,32 @@ test("scaffoldPlugin creates a react JavaScript project", async () => {
     assert.match(await readFile(join(targetDir, "src", "main.jsx"), "utf8"), /Smoke Plugin/);
     assert.match(await readFile(join(targetDir, "src", "main.jsx"), "utf8"), /ReactDOM\.createRoot/);
     assert.match(await readFile(join(targetDir, "vite.config.js"), "utf8"), /plugin-react/);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("scaffoldPlugin creates a vue JavaScript project", async () => {
+  const tempDir = await createTempDir("create-onin-plugin-scaffold-vue-js-");
+  const targetDir = join(tempDir, "vue-js-plugin");
+
+  try {
+    const result = await scaffoldPlugin(
+      createCliOptions(targetDir, "vue", "js"),
+      baseTemplateDirs,
+      adapterTemplateDirs,
+    );
+
+    assert.equal(result.targetDir, targetDir);
+    const packageJson = await readFile(join(targetDir, "package.json"), "utf8");
+    assert.match(packageJson, /"vue": "\^3\.5\.29"/);
+    assert.match(packageJson, /"@vitejs\/plugin-vue": "\^5\.2\.4"/);
+    assert.doesNotMatch(packageJson, /"typescript": "\^5\.5\.0"/);
+    assert.doesNotMatch(packageJson, /env\.d\.ts/);
+    assert.match(await readFile(join(targetDir, "src", "App.vue"), "utf8"), /pluginName/);
+    assert.match(await readFile(join(targetDir, "src", "main.js"), "utf8"), /Smoke Plugin/);
+    assert.match(await readFile(join(targetDir, "src", "main.js"), "utf8"), /createApp/);
+    assert.match(await readFile(join(targetDir, "vite.config.js"), "utf8"), /plugin-vue/);
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }

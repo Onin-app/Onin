@@ -25,6 +25,7 @@ const ADAPTER_TEMPLATE_DIRS: Record<Framework, Partial<Record<Language, string>>
   },
   vue: {
     ts: resolve(CLI_DIR, "../templates/adapters/vue/ts"),
+    js: resolve(CLI_DIR, "../templates/adapters/vue/js"),
   },
   vanilla: {
     ts: resolve(CLI_DIR, "../templates/adapters/vanilla/ts"),
