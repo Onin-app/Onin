@@ -6,10 +6,11 @@ import { dirname, resolve } from "node:path";
 import { scaffoldPlugin } from "./scaffold.js";
 import type { CliOptions } from "./types.js";
 
-const TEMPLATE_NAME = "svelte-view";
-const SUPPORTED_TEMPLATES = [TEMPLATE_NAME] as const;
+const DEFAULT_TEMPLATE = "svelte-view";
+const SUPPORTED_TEMPLATE_NAMES = [DEFAULT_TEMPLATE] as const;
 const CLI_DIR = dirname(fileURLToPath(import.meta.url));
-const TEMPLATE_DIR = resolve(CLI_DIR, "../templates", TEMPLATE_NAME);
+const BASE_TEMPLATE_DIR = resolve(CLI_DIR, "../templates/base");
+const SVELTE_ADAPTER_DIR = resolve(CLI_DIR, "../templates/adapters/svelte");
 
 function parseArgs(argv: string[]): CliOptions {
   const options: CliOptions = {
@@ -18,7 +19,7 @@ function parseArgs(argv: string[]): CliOptions {
     pluginId: undefined,
     withSettings: undefined,
     yes: false,
-    template: TEMPLATE_NAME,
+    template: DEFAULT_TEMPLATE,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -37,7 +38,7 @@ function parseArgs(argv: string[]): CliOptions {
     }
 
     if (arg === "--template") {
-      options.template = argv[i + 1] ?? TEMPLATE_NAME;
+      options.template = argv[i + 1] ?? DEFAULT_TEMPLATE;
       i += 1;
       continue;
     }
@@ -80,7 +81,7 @@ function printHelp(): void {
   console.log("  create-onin-plugin [target-dir] [options]");
   console.log("");
   console.log("Options:");
-  console.log("  --template <name>      Template to use (default: svelte-view)");
+  console.log(`  --template <name>      Template to use (default: ${DEFAULT_TEMPLATE})`);
   console.log("  --plugin-name <name>   Plugin display name");
   console.log("  --plugin-id <id>       Plugin manifest id");
   console.log("  --with-settings        Include settings schema example");
@@ -113,16 +114,20 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (!SUPPORTED_TEMPLATES.includes(options.template as (typeof SUPPORTED_TEMPLATES)[number])) {
+  if (
+    !SUPPORTED_TEMPLATE_NAMES.includes(
+      options.template as (typeof SUPPORTED_TEMPLATE_NAMES)[number],
+    )
+  ) {
     console.error(
-      `Unsupported template: ${options.template}\nSupported templates: ${SUPPORTED_TEMPLATES.join(", ")}`,
+      `Unsupported template: ${options.template}\nSupported templates: ${SUPPORTED_TEMPLATE_NAMES.join(", ")}`,
     );
     process.exitCode = 1;
     return;
   }
 
   try {
-    const result = await scaffoldPlugin(options, TEMPLATE_DIR);
+    const result = await scaffoldPlugin(options, BASE_TEMPLATE_DIR, SVELTE_ADAPTER_DIR);
     printNextSteps(result.targetDir);
   } catch (error: unknown) {
     console.error(error instanceof Error ? error.message : String(error));

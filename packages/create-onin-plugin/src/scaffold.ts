@@ -1,13 +1,19 @@
 import { basename, resolve } from "node:path";
 
 import { promptForMissingOptions } from "./prompts.js";
-import { buildSettingsBlock, copyTemplateDir, ensureTargetDirectory } from "./render.js";
+import {
+  buildSettingsBlock,
+  copyTemplateDir,
+  ensureTargetDirectory,
+  renderPackageJson,
+} from "./render.js";
 import type { CliOptions, TemplateContext } from "./types.js";
 import { isValidPackageName, isValidPluginId, slugify } from "./validators.js";
 
 export async function scaffoldPlugin(
   options: CliOptions,
-  templateDir: string,
+  baseTemplateDir: string,
+  adapterTemplateDir: string,
 ): Promise<{ targetDir: string }> {
   const answers = await promptForMissingOptions(options);
   const targetDir = resolve(process.cwd(), answers.targetDir);
@@ -40,7 +46,14 @@ export async function scaffoldPlugin(
       : "This template omits settings schema. Add it later in src/lifecycle.ts if needed.",
   };
 
-  await copyTemplateDir(templateDir, targetDir, context);
+  await copyTemplateDir(baseTemplateDir, targetDir, context, new Set(["package.json.tpl"]));
+  await copyTemplateDir(adapterTemplateDir, targetDir, context, new Set(["package.fragment.json"]));
+  await renderPackageJson(
+    resolve(baseTemplateDir, "package.json.tpl"),
+    resolve(adapterTemplateDir, "package.fragment.json"),
+    resolve(targetDir, "package.json"),
+    context,
+  );
 
   return { targetDir: answers.targetDir };
 }

@@ -1,7 +1,7 @@
 import { copyFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 
-import type { TemplateContext } from "./types.js";
+import type { PackageJsonField, PackageJsonShape, TemplateContext } from "./types.js";
 import { isNodeError } from "./validators.js";
 
 export async function ensureTargetDirectory(targetDir: string): Promise<void> {
@@ -45,17 +45,33 @@ export async function copyTemplateDir(
   sourceDir: string,
   targetDir: string,
   context: TemplateContext,
+  skipRelativePaths: Set<string> = new Set(),
+): Promise<void> {
+  await copyTemplateDirInternal(sourceDir, targetDir, sourceDir, context, skipRelativePaths);
+}
+
+async function copyTemplateDirInternal(
+  rootSourceDir: string,
+  sourceDir: string,
+  targetDir: string,
+  context: TemplateContext,
+  skipRelativePaths: Set<string>,
 ): Promise<void> {
   const entries = await readdir(sourceDir, { withFileTypes: true });
 
   for (const entry of entries) {
     const sourcePath = join(sourceDir, entry.name);
+    const relativePath = relative(rootSourceDir, sourcePath).replaceAll("\\", "/");
+    if (skipRelativePaths.has(relativePath)) {
+      continue;
+    }
+
     const outputName = entry.name.endsWith(".tpl") ? entry.name.slice(0, -4) : entry.name;
     const targetPath = join(targetDir, outputName);
 
     if (entry.isDirectory()) {
       await mkdir(targetPath, { recursive: true });
-      await copyTemplateDir(sourcePath, targetPath, context);
+      await copyTemplateDirInternal(rootSourceDir, sourcePath, targetPath, context, skipRelativePaths);
       continue;
     }
 
@@ -67,6 +83,58 @@ export async function copyTemplateDir(
 
     await copyFile(sourcePath, targetPath);
   }
+}
+
+function mergeOptionalRecordField(
+  basePkg: PackageJsonShape,
+  adapterPkg: PackageJsonShape,
+  field: PackageJsonField,
+): Record<string, string> | undefined {
+  const merged = {
+    ...(basePkg[field] ?? {}),
+    ...(adapterPkg[field] ?? {}),
+  };
+
+  return Object.keys(merged).length > 0 ? merged : undefined;
+}
+
+export async function renderPackageJson(
+  baseTemplatePath: string,
+  adapterFragmentPath: string,
+  targetPath: string,
+  context: TemplateContext,
+): Promise<void> {
+  const [baseTemplate, adapterFragment] = await Promise.all([
+    readFile(baseTemplatePath, "utf8"),
+    readFile(adapterFragmentPath, "utf8"),
+  ]);
+
+  const renderedBase = renderTemplate(baseTemplate, context);
+  const renderedAdapter = renderTemplate(adapterFragment, context);
+  const basePkg = JSON.parse(renderedBase) as PackageJsonShape;
+  const adapterPkg = JSON.parse(renderedAdapter) as PackageJsonShape;
+  const scripts = mergeOptionalRecordField(basePkg, adapterPkg, "scripts");
+  const dependencies = mergeOptionalRecordField(basePkg, adapterPkg, "dependencies");
+  const devDependencies = mergeOptionalRecordField(basePkg, adapterPkg, "devDependencies");
+
+  const mergedPkg: PackageJsonShape = {
+    ...basePkg,
+    ...adapterPkg,
+  };
+
+  if (scripts) {
+    mergedPkg.scripts = scripts;
+  }
+
+  if (dependencies) {
+    mergedPkg.dependencies = dependencies;
+  }
+
+  if (devDependencies) {
+    mergedPkg.devDependencies = devDependencies;
+  }
+
+  await writeFile(targetPath, `${JSON.stringify(mergedPkg, null, 2)}\n`, "utf8");
 }
 
 export function buildSettingsBlock(withSettings: boolean): string {

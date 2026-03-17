@@ -24,3 +24,15 @@ export interface TemplateContext {
   settingsBlock: string;
   settingsNote: string;
 }
+
+export interface PackageJsonShape {
+  name?: string;
+  version?: string;
+  private?: boolean;
+  type?: string;
+  scripts?: Record<string, string>;
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+}
+
+export type PackageJsonField = "scripts" | "dependencies" | "devDependencies";
