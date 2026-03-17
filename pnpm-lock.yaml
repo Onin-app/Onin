@@ -133,6 +133,15 @@ importers:
         specifier: npm:rolldown-vite@7.2.5
         version: rolldown-vite@7.2.5(@types/node@24.10.4)(esbuild@0.25.5)(jiti@2.6.1)(yaml@2.8.2)
 
+  packages/create-onin-plugin:
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.10.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.8.3
+
   packages/docs:
     devDependencies:
       vitepress:

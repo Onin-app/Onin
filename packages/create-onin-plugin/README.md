@@ -28,24 +28,36 @@ Interactive mode:
 npx create-onin-plugin
 ```
 
-## Current template
+Create a React starter instead:
 
-The first version ships a single `svelte-view` template with:
+```bash
+npx create-onin-plugin my-plugin --framework react
+```
 
-- `src/main.ts`
-- `src/lifecycle.ts`
-- `vite.lifecycle.config.ts`
-- `pnpm build`
-- `pnpm pack:plugin`
+Create a Vue starter instead:
+
+```bash
+npx create-onin-plugin my-plugin --framework vue
+```
+
+## Frameworks
+
+The CLI currently supports:
+
+- `svelte` (default)
+- `react`
+- `vue`
 
 ## Generated project
 
-The generated plugin includes:
+Every generated plugin includes:
 
-- `src/main.ts` for the UI entry
-- `src/lifecycle.ts` for settings, commands, and startup initialization
-- `manifest.json` wired to `dist/lifecycle.js`
-- `pnpm pack:plugin` to create `plugin.zip`
+- `src/lifecycle.ts`
+- `manifest.json`
+- `vite.lifecycle.config.ts`
+- `pnpm pack:plugin`
+
+Framework-specific starters add their own UI entry files such as `src/main.ts`, `src/main.tsx`, and framework app components.
 
 The release zip contains:
 
