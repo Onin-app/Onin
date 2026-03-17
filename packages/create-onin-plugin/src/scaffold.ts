@@ -7,21 +7,30 @@ import {
   ensureTargetDirectory,
   renderPackageJson,
 } from "./render.js";
-import type { CliOptions, TemplateContext } from "./types.js";
+import type { CliOptions, Framework, Language, TemplateContext } from "./types.js";
 import { isValidPackageName, isValidPluginId, slugify } from "./validators.js";
 
 export async function scaffoldPlugin(
   options: CliOptions,
-  baseTemplateDir: string,
-  adapterTemplateDirs: Record<string, string>,
+  baseTemplateDirs: Record<Language, string>,
+  adapterTemplateDirs: Record<Framework, Partial<Record<Language, string>>>,
 ): Promise<{ targetDir: string }> {
   const answers = await promptForMissingOptions(options);
   const targetDir = resolve(process.cwd(), answers.targetDir);
   const packageName = slugify(basename(targetDir));
-  const adapterTemplateDir = adapterTemplateDirs[options.framework];
+  const baseTemplateDir = baseTemplateDirs[options.language];
+  const frameworkTemplateDirs = adapterTemplateDirs[options.framework];
+  const adapterTemplateDir = frameworkTemplateDirs?.[options.language];
+
+  if (!baseTemplateDir) {
+    throw new Error(`Unsupported language: ${options.language}`);
+  }
 
   if (!adapterTemplateDir) {
-    throw new Error(`Unsupported framework: ${options.framework}`);
+    const supportedLanguages = frameworkTemplateDirs ? Object.keys(frameworkTemplateDirs) : [];
+    throw new Error(
+      `Unsupported language for framework: ${options.framework}/${options.language}\nSupported languages for ${options.framework}: ${supportedLanguages.join(", ") || "none"}`,
+    );
   }
 
   if (!isValidPackageName(packageName)) {

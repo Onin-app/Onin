@@ -46,6 +46,12 @@ Create a Vanilla TypeScript starter instead:
 npx create-onin-plugin my-plugin --framework vanilla
 ```
 
+Create a Vanilla JavaScript starter instead:
+
+```bash
+npx create-onin-plugin my-plugin --framework vanilla --language js
+```
+
 Create a Solid starter instead:
 
 ```bash
@@ -61,6 +67,11 @@ The CLI currently supports:
 - `vue`
 - `vanilla`
 - `solid`
+
+## Languages
+
+- `ts` (default)
+- `js` for `vanilla`
 
 ## Generated project
 

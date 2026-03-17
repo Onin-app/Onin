@@ -1,4 +1,5 @@
 export type Framework = "svelte" | "react" | "vue" | "vanilla" | "solid";
+export type Language = "ts" | "js";
 
 export interface CliOptions {
   targetDir: string | undefined;
@@ -7,6 +8,7 @@ export interface CliOptions {
   withSettings: boolean | undefined;
   yes: boolean;
   framework: Framework;
+  language: Language;
 }
 
 export interface Answers {
