@@ -18,7 +18,8 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "start": "pnpm run build && node ./dist/cli.js"
+    "start": "pnpm run build && node ./dist/cli.js",
+    "test": "pnpm run build && node --test dist/render.test.js"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
