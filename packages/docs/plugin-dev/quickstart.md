@@ -29,7 +29,7 @@ pnpm install
 
 脚手架默认会生成一个可发布的 UI 插件模板，已经包含：
 
-- `src/main.ts`
+- `src/main.ts` 或 `src/main.tsx`
 - `src/lifecycle.ts`
 - `manifest.json`
 - `vite.config.ts`

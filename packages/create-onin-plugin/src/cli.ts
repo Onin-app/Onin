@@ -7,11 +7,6 @@ import { scaffoldPlugin } from "./scaffold.js";
 import type { CliOptions, Framework } from "./types.js";
 
 const DEFAULT_FRAMEWORK: Framework = "svelte";
-const DEFAULT_TEMPLATE = "svelte-view";
-const TEMPLATE_TO_FRAMEWORK: Record<string, Framework> = {
-  "svelte-view": "svelte",
-};
-const SUPPORTED_TEMPLATE_NAMES = Object.keys(TEMPLATE_TO_FRAMEWORK);
 const SUPPORTED_FRAMEWORKS: Framework[] = ["svelte", "react"];
 const CLI_DIR = dirname(fileURLToPath(import.meta.url));
 const BASE_TEMPLATE_DIR = resolve(CLI_DIR, "../templates/base");
@@ -26,7 +21,6 @@ function parseArgs(argv: string[]): CliOptions {
     withSettings: undefined,
     yes: false,
     framework: DEFAULT_FRAMEWORK,
-    template: DEFAULT_TEMPLATE,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -41,12 +35,6 @@ function parseArgs(argv: string[]): CliOptions {
 
     if (!arg.startsWith("--") && !options.targetDir) {
       options.targetDir = arg;
-      continue;
-    }
-
-    if (arg === "--template") {
-      options.template = argv[i + 1] ?? DEFAULT_TEMPLATE;
-      i += 1;
       continue;
     }
 
@@ -90,6 +78,36 @@ function parseArgs(argv: string[]): CliOptions {
   return options;
 }
 
+function findUnsupportedOption(argv: string[]): string | undefined {
+  const knownFlags = new Set([
+    "--",
+    "--framework",
+    "--plugin-name",
+    "--plugin-id",
+    "--yes",
+    "--with-settings",
+    "--no-with-settings",
+    "--help",
+  ]);
+
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (!arg || !arg.startsWith("--")) {
+      continue;
+    }
+
+    if (!knownFlags.has(arg)) {
+      return arg;
+    }
+
+    if (arg === "--framework" || arg === "--plugin-name" || arg === "--plugin-id") {
+      i += 1;
+    }
+  }
+
+  return undefined;
+}
+
 function printHelp(): void {
   console.log("create-onin-plugin");
   console.log("");
@@ -98,7 +116,6 @@ function printHelp(): void {
   console.log("");
   console.log("Options:");
   console.log(`  --framework <name>     Framework to use (default: ${DEFAULT_FRAMEWORK})`);
-  console.log(`  --template <name>      Template to use (default: ${DEFAULT_TEMPLATE})`);
   console.log("  --plugin-name <name>   Plugin display name");
   console.log("  --plugin-id <id>       Plugin manifest id");
   console.log("  --with-settings        Include settings schema example");
@@ -124,24 +141,19 @@ function printNextSteps(targetDir: string): void {
 }
 
 async function main(): Promise<void> {
-  const options = parseArgs(process.argv.slice(2));
+  const argv = process.argv.slice(2);
+  const unsupportedOption = findUnsupportedOption(argv);
+  if (unsupportedOption) {
+    console.error(`Unsupported option: ${unsupportedOption}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const options = parseArgs(argv);
 
   if (process.argv.includes("--help")) {
     printHelp();
     return;
-  }
-
-  if (options.template !== DEFAULT_TEMPLATE) {
-    const mappedFramework = TEMPLATE_TO_FRAMEWORK[options.template];
-    if (!mappedFramework) {
-      console.error(
-        `Unsupported template: ${options.template}\nSupported templates: ${SUPPORTED_TEMPLATE_NAMES.join(", ")}`,
-      );
-      process.exitCode = 1;
-      return;
-    }
-
-    options.framework = mappedFramework;
   }
 
   if (!SUPPORTED_FRAMEWORKS.includes(options.framework)) {

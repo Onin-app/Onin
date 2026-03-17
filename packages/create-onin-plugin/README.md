@@ -41,8 +41,6 @@ The CLI currently supports:
 - `svelte` (default)
 - `react`
 
-Legacy `--template svelte-view` remains supported for compatibility.
-
 ## Generated project
 
 Every generated plugin includes:

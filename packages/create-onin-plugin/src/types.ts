@@ -7,7 +7,6 @@ export interface CliOptions {
   withSettings: boolean | undefined;
   yes: boolean;
   framework: Framework;
-  template: string;
 }
 
 export interface Answers {
