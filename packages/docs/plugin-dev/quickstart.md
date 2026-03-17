@@ -51,6 +51,14 @@ cd my-onin-plugin
 pnpm install
 ```
 
+如果你想直接创建 React JavaScript 插件项目：
+
+```bash
+npx create-onin-plugin my-onin-plugin --framework react --language js
+cd my-onin-plugin
+pnpm install
+```
+
 如果你想直接创建 Solid 插件项目：
 
 ```bash

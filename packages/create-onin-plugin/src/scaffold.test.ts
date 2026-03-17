@@ -21,6 +21,7 @@ const adapterTemplateDirs: Record<Framework, Partial<Record<Language, string>>> 
   },
   react: {
     ts: resolve(TEST_DIR, "../templates/adapters/react/ts"),
+    js: resolve(TEST_DIR, "../templates/adapters/react/js"),
   },
   vue: {
     ts: resolve(TEST_DIR, "../templates/adapters/vue/ts"),
@@ -100,13 +101,40 @@ test("scaffoldPlugin creates a vanilla JavaScript project", async () => {
   }
 });
 
+test("scaffoldPlugin creates a react JavaScript project", async () => {
+  const tempDir = await createTempDir("create-onin-plugin-scaffold-react-js-");
+  const targetDir = join(tempDir, "react-js-plugin");
+
+  try {
+    const result = await scaffoldPlugin(
+      createCliOptions(targetDir, "react", "js"),
+      baseTemplateDirs,
+      adapterTemplateDirs,
+    );
+
+    assert.equal(result.targetDir, targetDir);
+    const packageJson = await readFile(join(targetDir, "package.json"), "utf8");
+    assert.match(packageJson, /"react": "\^18\.3\.1"/);
+    assert.match(packageJson, /"react-dom": "\^18\.3\.1"/);
+    assert.match(packageJson, /"@vitejs\/plugin-react": "\^4\.3\.4"/);
+    assert.doesNotMatch(packageJson, /"typescript": "\^5\.5\.0"/);
+    assert.doesNotMatch(packageJson, /"@types\/react"/);
+    assert.match(await readFile(join(targetDir, "src", "App.jsx"), "utf8"), /pluginName/);
+    assert.match(await readFile(join(targetDir, "src", "main.jsx"), "utf8"), /Smoke Plugin/);
+    assert.match(await readFile(join(targetDir, "src", "main.jsx"), "utf8"), /ReactDOM\.createRoot/);
+    assert.match(await readFile(join(targetDir, "vite.config.js"), "utf8"), /plugin-react/);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("scaffoldPlugin rejects unsupported framework and language combinations", async () => {
   await assert.rejects(
     scaffoldPlugin(
-      createCliOptions("react-js-plugin", "react", "js"),
+      createCliOptions("solid-js-plugin", "solid", "js"),
       baseTemplateDirs,
       adapterTemplateDirs,
     ),
-    /Unsupported language for framework: react\/js/,
+    /Unsupported language for framework: solid\/js/,
   );
 });

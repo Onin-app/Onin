@@ -52,6 +52,12 @@ Create a Vanilla JavaScript starter instead:
 npx create-onin-plugin my-plugin --framework vanilla --language js
 ```
 
+Create a React JavaScript starter instead:
+
+```bash
+npx create-onin-plugin my-plugin --framework react --language js
+```
+
 Create a Solid starter instead:
 
 ```bash
@@ -71,7 +77,7 @@ The CLI currently supports:
 ## Languages
 
 - `ts` (default)
-- `js` for `vanilla`
+- `js` for `vanilla` and `react`
 
 ## Generated project
 
