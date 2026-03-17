@@ -158,6 +158,9 @@ jobs:
           cd packages/create-onin-plugin
           npm version ${{ needs.release.outputs.version }} --no-git-tag-version
 
+      - name: Build create-onin-plugin
+        run: pnpm --filter create-onin-plugin build
+
       - name: Publish create-onin-plugin to npm
         run: |
           cd packages/create-onin-plugin
