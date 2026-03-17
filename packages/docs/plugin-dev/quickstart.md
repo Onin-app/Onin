@@ -35,6 +35,62 @@ cd my-onin-plugin
 pnpm install
 ```
 
+如果你想直接创建 Vanilla TypeScript 插件项目：
+
+```bash
+npx create-onin-plugin my-onin-plugin --framework vanilla
+cd my-onin-plugin
+pnpm install
+```
+
+如果你想直接创建 Vanilla JavaScript 插件项目：
+
+```bash
+npx create-onin-plugin my-onin-plugin --framework vanilla --language js
+cd my-onin-plugin
+pnpm install
+```
+
+如果你想直接创建 React JavaScript 插件项目：
+
+```bash
+npx create-onin-plugin my-onin-plugin --framework react --language js
+cd my-onin-plugin
+pnpm install
+```
+
+如果你想直接创建 Vue JavaScript 插件项目：
+
+```bash
+npx create-onin-plugin my-onin-plugin --framework vue --language js
+cd my-onin-plugin
+pnpm install
+```
+
+如果你想直接创建 Svelte JavaScript 插件项目：
+
+```bash
+npx create-onin-plugin my-onin-plugin --framework svelte --language js
+cd my-onin-plugin
+pnpm install
+```
+
+如果你想直接创建 Solid JavaScript 插件项目：
+
+```bash
+npx create-onin-plugin my-onin-plugin --framework solid --language js
+cd my-onin-plugin
+pnpm install
+```
+
+如果你想直接创建 Solid 插件项目：
+
+```bash
+npx create-onin-plugin my-onin-plugin --framework solid
+cd my-onin-plugin
+pnpm install
+```
+
 脚手架默认会生成一个可发布的 UI 插件模板，已经包含：
 
 - `src/main.ts` 或 `src/main.tsx`

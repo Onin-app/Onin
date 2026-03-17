@@ -4,15 +4,39 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
 import { scaffoldPlugin } from "./scaffold.js";
-import type { CliOptions, Framework } from "./types.js";
+import type { CliOptions, Framework, Language } from "./types.js";
 
 const DEFAULT_FRAMEWORK: Framework = "svelte";
-const SUPPORTED_FRAMEWORKS: Framework[] = ["svelte", "react", "vue"];
+const DEFAULT_LANGUAGE: Language = "ts";
+const SUPPORTED_FRAMEWORKS: Framework[] = ["svelte", "react", "vue", "vanilla", "solid"];
+const SUPPORTED_LANGUAGES: Language[] = ["ts", "js"];
 const CLI_DIR = dirname(fileURLToPath(import.meta.url));
-const BASE_TEMPLATE_DIR = resolve(CLI_DIR, "../templates/base");
-const SVELTE_ADAPTER_DIR = resolve(CLI_DIR, "../templates/adapters/svelte");
-const REACT_ADAPTER_DIR = resolve(CLI_DIR, "../templates/adapters/react");
-const VUE_ADAPTER_DIR = resolve(CLI_DIR, "../templates/adapters/vue");
+const BASE_TEMPLATE_DIRS: Record<Language, string> = {
+  ts: resolve(CLI_DIR, "../templates/base/ts"),
+  js: resolve(CLI_DIR, "../templates/base/js"),
+};
+const ADAPTER_TEMPLATE_DIRS: Record<Framework, Partial<Record<Language, string>>> = {
+  svelte: {
+    ts: resolve(CLI_DIR, "../templates/adapters/svelte/ts"),
+    js: resolve(CLI_DIR, "../templates/adapters/svelte/js"),
+  },
+  react: {
+    ts: resolve(CLI_DIR, "../templates/adapters/react/ts"),
+    js: resolve(CLI_DIR, "../templates/adapters/react/js"),
+  },
+  vue: {
+    ts: resolve(CLI_DIR, "../templates/adapters/vue/ts"),
+    js: resolve(CLI_DIR, "../templates/adapters/vue/js"),
+  },
+  vanilla: {
+    ts: resolve(CLI_DIR, "../templates/adapters/vanilla/ts"),
+    js: resolve(CLI_DIR, "../templates/adapters/vanilla/js"),
+  },
+  solid: {
+    ts: resolve(CLI_DIR, "../templates/adapters/solid/ts"),
+    js: resolve(CLI_DIR, "../templates/adapters/solid/js"),
+  },
+};
 
 function parseArgs(argv: string[]): CliOptions {
   const options: CliOptions = {
@@ -21,7 +45,8 @@ function parseArgs(argv: string[]): CliOptions {
     pluginId: undefined,
     withSettings: undefined,
     yes: false,
-    framework: DEFAULT_FRAMEWORK,
+    framework: undefined,
+    language: undefined,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -41,8 +66,23 @@ function parseArgs(argv: string[]): CliOptions {
 
     if (arg === "--framework") {
       const value = argv[i + 1];
-      if (value === "svelte" || value === "react" || value === "vue") {
+      if (
+        value === "svelte" ||
+        value === "react" ||
+        value === "vue" ||
+        value === "vanilla" ||
+        value === "solid"
+      ) {
         options.framework = value;
+      }
+      i += 1;
+      continue;
+    }
+
+    if (arg === "--language") {
+      const value = argv[i + 1];
+      if (value === "ts" || value === "js") {
+        options.language = value;
       }
       i += 1;
       continue;
@@ -85,6 +125,7 @@ function findUnsupportedOption(argv: string[]): string | undefined {
     "--framework",
     "--plugin-name",
     "--plugin-id",
+    "--language",
     "--yes",
     "--with-settings",
     "--no-with-settings",
@@ -101,7 +142,12 @@ function findUnsupportedOption(argv: string[]): string | undefined {
       return arg;
     }
 
-    if (arg === "--framework" || arg === "--plugin-name" || arg === "--plugin-id") {
+    if (
+      arg === "--framework" ||
+      arg === "--language" ||
+      arg === "--plugin-name" ||
+      arg === "--plugin-id"
+    ) {
       i += 1;
     }
   }
@@ -117,6 +163,7 @@ function printHelp(): void {
   console.log("");
   console.log("Options:");
   console.log(`  --framework <name>     Framework to use (default: ${DEFAULT_FRAMEWORK})`);
+  console.log(`  --language <name>      Language to use (default: ${DEFAULT_LANGUAGE})`);
   console.log("  --plugin-name <name>   Plugin display name");
   console.log("  --plugin-id <id>       Plugin manifest id");
   console.log("  --with-settings        Include settings schema example");
@@ -157,7 +204,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (!SUPPORTED_FRAMEWORKS.includes(options.framework)) {
+  if (options.framework && !SUPPORTED_FRAMEWORKS.includes(options.framework)) {
     console.error(
       `Unsupported framework: ${options.framework}\nSupported frameworks: ${SUPPORTED_FRAMEWORKS.join(", ")}`,
     );
@@ -165,12 +212,16 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (options.language && !SUPPORTED_LANGUAGES.includes(options.language)) {
+    console.error(
+      `Unsupported language: ${options.language}\nSupported languages: ${SUPPORTED_LANGUAGES.join(", ")}`,
+    );
+    process.exitCode = 1;
+    return;
+  }
+
   try {
-    const result = await scaffoldPlugin(options, BASE_TEMPLATE_DIR, {
-      svelte: SVELTE_ADAPTER_DIR,
-      react: REACT_ADAPTER_DIR,
-      vue: VUE_ADAPTER_DIR,
-    });
+    const result = await scaffoldPlugin(options, BASE_TEMPLATE_DIRS, ADAPTER_TEMPLATE_DIRS);
     printNextSteps(result.targetDir);
   } catch (error: unknown) {
     console.error(error instanceof Error ? error.message : String(error));

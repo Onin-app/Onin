@@ -97,3 +97,104 @@ test("renderPackageJson renders adapter fragments and omits empty record fields"
     await rm(tempDir, { recursive: true, force: true });
   }
 });
+
+test("renderPackageJson merges vanilla starter scripts without framework runtime deps", async () => {
+  const tempDir = await createTempDir("create-onin-plugin-vanilla-package-");
+  const basePath = join(tempDir, "package.base.json");
+  const adapterPath = join(tempDir, "package.fragment.json");
+  const targetPath = join(tempDir, "package.json");
+
+  try {
+    await writeFile(
+      basePath,
+      JSON.stringify({
+        name: "__PACKAGE_NAME__",
+        scripts: {
+          build: "npm run build:index && npm run build:lifecycle",
+        },
+        dependencies: {
+          "onin-sdk": "^1.0.0",
+        },
+      }),
+      "utf8",
+    );
+    await writeFile(
+      adapterPath,
+      JSON.stringify({
+        scripts: {
+          dev: "vite",
+          "build:index": "vite build",
+        },
+        devDependencies: {
+          typescript: "^5.5.0",
+          vite: "^7.3.1",
+        },
+      }),
+      "utf8",
+    );
+
+    await renderPackageJson(basePath, adapterPath, targetPath, context);
+
+    const rendered = JSON.parse(await readFile(targetPath, "utf8")) as {
+      scripts?: Record<string, string>;
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+
+    assert.deepEqual(rendered.scripts, {
+      build: "npm run build:index && npm run build:lifecycle",
+      dev: "vite",
+      "build:index": "vite build",
+    });
+    assert.deepEqual(rendered.dependencies, {
+      "onin-sdk": "^1.0.0",
+    });
+    assert.deepEqual(rendered.devDependencies, {
+      typescript: "^5.5.0",
+      vite: "^7.3.1",
+    });
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("renderPackageJson removes empty record fields left by base or adapter fragments", async () => {
+  const tempDir = await createTempDir("create-onin-plugin-empty-records-");
+  const basePath = join(tempDir, "package.base.json");
+  const adapterPath = join(tempDir, "package.fragment.json");
+  const targetPath = join(tempDir, "package.json");
+
+  try {
+    await writeFile(
+      basePath,
+      JSON.stringify({
+        name: "__PACKAGE_NAME__",
+        scripts: {},
+        dependencies: {},
+      }),
+      "utf8",
+    );
+    await writeFile(
+      adapterPath,
+      JSON.stringify({
+        devDependencies: {},
+      }),
+      "utf8",
+    );
+
+    await renderPackageJson(basePath, adapterPath, targetPath, context);
+
+    const rendered = JSON.parse(await readFile(targetPath, "utf8")) as {
+      name: string;
+      scripts?: Record<string, string>;
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+
+    assert.deepEqual(rendered, {
+      name: "sample-plugin",
+    });
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});

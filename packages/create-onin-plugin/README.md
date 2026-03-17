@@ -40,6 +40,48 @@ Create a Vue starter instead:
 npx create-onin-plugin my-plugin --framework vue
 ```
 
+Create a Vanilla TypeScript starter instead:
+
+```bash
+npx create-onin-plugin my-plugin --framework vanilla
+```
+
+Create a Vanilla JavaScript starter instead:
+
+```bash
+npx create-onin-plugin my-plugin --framework vanilla --language js
+```
+
+Create a React JavaScript starter instead:
+
+```bash
+npx create-onin-plugin my-plugin --framework react --language js
+```
+
+Create a Vue JavaScript starter instead:
+
+```bash
+npx create-onin-plugin my-plugin --framework vue --language js
+```
+
+Create a Svelte JavaScript starter instead:
+
+```bash
+npx create-onin-plugin my-plugin --framework svelte --language js
+```
+
+Create a Solid JavaScript starter instead:
+
+```bash
+npx create-onin-plugin my-plugin --framework solid --language js
+```
+
+Create a Solid starter instead:
+
+```bash
+npx create-onin-plugin my-plugin --framework solid
+```
+
 ## Frameworks
 
 The CLI currently supports:
@@ -47,6 +89,13 @@ The CLI currently supports:
 - `svelte` (default)
 - `react`
 - `vue`
+- `vanilla`
+- `solid`
+
+## Languages
+
+- `ts` (default)
+- `js` for `vanilla`, `react`, `vue`, `svelte`, and `solid`
 
 ## Generated project
 

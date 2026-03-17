@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "dev": "vite",
+    "build:index": "vite build"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "vite": "^7.3.1"
+  }
+}
