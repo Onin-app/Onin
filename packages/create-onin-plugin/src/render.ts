@@ -47,7 +47,7 @@ export async function copyTemplateDir(
   context: TemplateContext,
   skipRelativePaths: Set<string> = new Set(),
 ): Promise<void> {
-  await copyTemplateDirInternal(sourceDir, targetDir, sourceDir, context, skipRelativePaths);
+  await copyTemplateDirInternal(sourceDir, sourceDir, targetDir, context, skipRelativePaths);
 }
 
 async function copyTemplateDirInternal(
