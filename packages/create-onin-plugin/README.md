@@ -46,6 +46,12 @@ Create a Vanilla TypeScript starter instead:
 npx create-onin-plugin my-plugin --framework vanilla
 ```
 
+Create a Solid starter instead:
+
+```bash
+npx create-onin-plugin my-plugin --framework solid
+```
+
 ## Frameworks
 
 The CLI currently supports:
@@ -54,6 +60,7 @@ The CLI currently supports:
 - `react`
 - `vue`
 - `vanilla`
+- `solid`
 
 ## Generated project
 

@@ -7,13 +7,14 @@ import { scaffoldPlugin } from "./scaffold.js";
 import type { CliOptions, Framework } from "./types.js";
 
 const DEFAULT_FRAMEWORK: Framework = "svelte";
-const SUPPORTED_FRAMEWORKS: Framework[] = ["svelte", "react", "vue", "vanilla"];
+const SUPPORTED_FRAMEWORKS: Framework[] = ["svelte", "react", "vue", "vanilla", "solid"];
 const CLI_DIR = dirname(fileURLToPath(import.meta.url));
 const BASE_TEMPLATE_DIR = resolve(CLI_DIR, "../templates/base");
 const SVELTE_ADAPTER_DIR = resolve(CLI_DIR, "../templates/adapters/svelte");
 const REACT_ADAPTER_DIR = resolve(CLI_DIR, "../templates/adapters/react");
 const VUE_ADAPTER_DIR = resolve(CLI_DIR, "../templates/adapters/vue");
 const VANILLA_ADAPTER_DIR = resolve(CLI_DIR, "../templates/adapters/vanilla");
+const SOLID_ADAPTER_DIR = resolve(CLI_DIR, "../templates/adapters/solid");
 
 function parseArgs(argv: string[]): CliOptions {
   const options: CliOptions = {
@@ -42,7 +43,13 @@ function parseArgs(argv: string[]): CliOptions {
 
     if (arg === "--framework") {
       const value = argv[i + 1];
-      if (value === "svelte" || value === "react" || value === "vue" || value === "vanilla") {
+      if (
+        value === "svelte" ||
+        value === "react" ||
+        value === "vue" ||
+        value === "vanilla" ||
+        value === "solid"
+      ) {
         options.framework = value;
       }
       i += 1;
@@ -172,6 +179,7 @@ async function main(): Promise<void> {
       react: REACT_ADAPTER_DIR,
       vue: VUE_ADAPTER_DIR,
       vanilla: VANILLA_ADAPTER_DIR,
+      solid: SOLID_ADAPTER_DIR,
     });
     printNextSteps(result.targetDir);
   } catch (error: unknown) {
