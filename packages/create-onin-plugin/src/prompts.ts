@@ -1,11 +1,18 @@
-import { stdin as input, stdout as output } from "node:process";
 import { basename } from "node:path";
-import { createInterface } from "node:readline/promises";
+
+import { cancel, confirm, intro, isCancel, outro, select, text } from "@clack/prompts";
 
 import type { Answers, CliOptions, Framework, Language } from "./types.js";
 import { slugify, toTitleCase } from "./validators.js";
 
-const FRAMEWORKS: Framework[] = ["svelte", "react", "vue", "vanilla", "solid"];
+const FRAMEWORKS: { value: Framework; label: string }[] = [
+  { value: "svelte", label: "Svelte" },
+  { value: "react", label: "React" },
+  { value: "vue", label: "Vue" },
+  { value: "vanilla", label: "Vanilla" },
+  { value: "solid", label: "Solid" },
+];
+
 const DEFAULT_FRAMEWORK: Framework = "svelte";
 const DEFAULT_LANGUAGE: Language = "ts";
 
@@ -21,42 +28,13 @@ function getSupportedLanguages(framework: Framework): Language[] {
   return FRAMEWORK_LANGUAGES[framework];
 }
 
-function isFramework(value: string): value is Framework {
-  return FRAMEWORKS.includes(value as Framework);
-}
-
-function isLanguage(value: string): value is Language {
-  return value === "ts" || value === "js";
-}
-
-async function promptSelect<T extends string>(
-  question: string,
-  options: readonly T[],
-  defaultValue: T,
-  ask: (prompt: string) => Promise<string>,
-): Promise<T> {
-  while (true) {
-    const optionsText = options.map((option, index) => `${index + 1}. ${option}`).join("\n");
-    const answer = (await ask(`${question}\n${optionsText}\nSelect (${defaultValue}): `))
-      .trim()
-      .toLowerCase();
-
-    if (!answer) {
-      return defaultValue;
-    }
-
-    const selectedIndex = Number.parseInt(answer, 10);
-    if (Number.isInteger(selectedIndex) && selectedIndex >= 1 && selectedIndex <= options.length) {
-      return options[selectedIndex - 1]!;
-    }
-
-    const selectedOption = options.find((option) => option === answer);
-    if (selectedOption) {
-      return selectedOption;
-    }
-
-    output.write(`Invalid selection: ${answer}\n`);
+function ensurePromptValue<T>(value: T | symbol): T {
+  if (isCancel(value)) {
+    cancel("Plugin creation cancelled.");
+    process.exit(1);
   }
+
+  return value;
 }
 
 export async function promptForMissingOptions(initialOptions: CliOptions): Promise<Answers> {
@@ -81,59 +59,89 @@ export async function promptForMissingOptions(initialOptions: CliOptions): Promi
     };
   }
 
-  const rl = createInterface({ input, output });
+  intro("create-onin-plugin");
 
-  try {
-    const targetDirInput =
-      initialOptions.targetDir || (await rl.question("Project directory name: ")).trim();
-    const targetDir = targetDirInput || "my-onin-plugin";
-    const packageName = slugify(basename(targetDir));
+  const targetDir =
+    initialOptions.targetDir ||
+    ensurePromptValue(
+      await text({
+        message: "Project directory name",
+        placeholder: "my-onin-plugin",
+        defaultValue: "my-onin-plugin",
+      }),
+    ).trim() ||
+      "my-onin-plugin";
 
-    const framework =
-      initialOptions.framework ??
-      (await promptSelect("Select a framework:", FRAMEWORKS, DEFAULT_FRAMEWORK, (prompt) =>
-        rl.question(prompt),
-      ));
+  const packageName = slugify(basename(targetDir));
+  const defaultPluginName = toTitleCase(packageName) || "My Onin Plugin";
+  const defaultPluginId = `com.example.${packageName || "my-onin-plugin"}`;
 
-    const supportedLanguages = getSupportedLanguages(framework);
-    const defaultLanguage = supportedLanguages.includes(initialLanguage)
-      ? initialLanguage
-      : supportedLanguages[0]!;
-    const language =
-      initialOptions.language ??
-      (await promptSelect("Select a language:", supportedLanguages, defaultLanguage, (prompt) =>
-        rl.question(prompt),
-      ));
+  const framework =
+    initialOptions.framework ??
+    ensurePromptValue(
+      await select<Framework>({
+        message: "Select a framework",
+        initialValue: initialFramework,
+        options: FRAMEWORKS,
+      }),
+    );
 
-    const pluginNameInput =
-      initialOptions.pluginName ||
-      (
-        await rl.question(`Plugin name (${toTitleCase(packageName) || "My Onin Plugin"}): `)
-      ).trim();
-    const pluginName = pluginNameInput || toTitleCase(packageName) || "My Onin Plugin";
+  const supportedLanguages = getSupportedLanguages(framework);
+  const languageDefault = supportedLanguages.includes(initialLanguage)
+    ? initialLanguage
+    : supportedLanguages[0]!;
+  const language =
+    initialOptions.language ??
+    ensurePromptValue(
+      await select<Language>({
+        message: "Select a language",
+        initialValue: languageDefault,
+        options: supportedLanguages.map((value) => ({
+          value,
+          label: value.toUpperCase(),
+        })),
+      }),
+    );
 
-    const defaultPluginId = `com.example.${packageName || "my-onin-plugin"}`;
-    const pluginIdInput =
-      initialOptions.pluginId || (await rl.question(`Plugin ID (${defaultPluginId}): `)).trim();
-    const pluginId = pluginIdInput || defaultPluginId;
+  const pluginName =
+    initialOptions.pluginName ||
+    ensurePromptValue(
+      await text({
+        message: "Plugin name",
+        placeholder: defaultPluginName,
+        defaultValue: defaultPluginName,
+      }),
+    ).trim() ||
+      defaultPluginName;
 
-    let withSettings = initialOptions.withSettings;
-    if (withSettings === undefined) {
-      const answer = (await rl.question("Include settings schema example? (Y/n): "))
-        .trim()
-        .toLowerCase();
-      withSettings = answer !== "n";
-    }
+  const pluginId =
+    initialOptions.pluginId ||
+    ensurePromptValue(
+      await text({
+        message: "Plugin ID",
+        placeholder: defaultPluginId,
+        defaultValue: defaultPluginId,
+      }),
+    ).trim() ||
+      defaultPluginId;
 
-    return {
-      targetDir,
-      pluginName,
-      pluginId,
-      withSettings,
-      framework,
-      language,
-    };
-  } finally {
-    rl.close();
-  }
+  const withSettings =
+    initialOptions.withSettings ??
+    ensurePromptValue(
+      await confirm({
+        message: "Include settings schema example?",
+        initialValue: true,
+      }),
+    );
+
+  outro("Project configuration captured.");
+
+  return {
+    targetDir,
+    pluginName,
+    pluginId,
+    withSettings,
+    framework,
+    language,
+  };
 }
