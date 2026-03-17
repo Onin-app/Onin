@@ -7,8 +7,8 @@ export interface CliOptions {
   pluginId: string | undefined;
   withSettings: boolean | undefined;
   yes: boolean;
-  framework: Framework;
-  language: Language;
+  framework: Framework | undefined;
+  language: Language | undefined;
 }
 
 export interface Answers {
@@ -16,6 +16,8 @@ export interface Answers {
   pluginName: string;
   pluginId: string;
   withSettings: boolean;
+  framework: Framework;
+  language: Language;
 }
 
 export interface TemplateContext {

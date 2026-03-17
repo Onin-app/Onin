@@ -18,18 +18,18 @@ export async function scaffoldPlugin(
   const answers = await promptForMissingOptions(options);
   const targetDir = resolve(process.cwd(), answers.targetDir);
   const packageName = slugify(basename(targetDir));
-  const baseTemplateDir = baseTemplateDirs[options.language];
-  const frameworkTemplateDirs = adapterTemplateDirs[options.framework];
-  const adapterTemplateDir = frameworkTemplateDirs?.[options.language];
+  const baseTemplateDir = baseTemplateDirs[answers.language];
+  const frameworkTemplateDirs = adapterTemplateDirs[answers.framework];
+  const adapterTemplateDir = frameworkTemplateDirs?.[answers.language];
 
   if (!baseTemplateDir) {
-    throw new Error(`Unsupported language: ${options.language}`);
+    throw new Error(`Unsupported language: ${answers.language}`);
   }
 
   if (!adapterTemplateDir) {
     const supportedLanguages = frameworkTemplateDirs ? Object.keys(frameworkTemplateDirs) : [];
     throw new Error(
-      `Unsupported language for framework: ${options.framework}/${options.language}\nSupported languages for ${options.framework}: ${supportedLanguages.join(", ") || "none"}`,
+      `Unsupported language for framework: ${answers.framework}/${answers.language}\nSupported languages for ${answers.framework}: ${supportedLanguages.join(", ") || "none"}`,
     );
   }
 

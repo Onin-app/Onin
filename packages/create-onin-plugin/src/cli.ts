@@ -45,8 +45,8 @@ function parseArgs(argv: string[]): CliOptions {
     pluginId: undefined,
     withSettings: undefined,
     yes: false,
-    framework: DEFAULT_FRAMEWORK,
-    language: DEFAULT_LANGUAGE,
+    framework: undefined,
+    language: undefined,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -204,7 +204,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (!SUPPORTED_FRAMEWORKS.includes(options.framework)) {
+  if (options.framework && !SUPPORTED_FRAMEWORKS.includes(options.framework)) {
     console.error(
       `Unsupported framework: ${options.framework}\nSupported frameworks: ${SUPPORTED_FRAMEWORKS.join(", ")}`,
     );
@@ -212,7 +212,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (!SUPPORTED_LANGUAGES.includes(options.language)) {
+  if (options.language && !SUPPORTED_LANGUAGES.includes(options.language)) {
     console.error(
       `Unsupported language: ${options.language}\nSupported languages: ${SUPPORTED_LANGUAGES.join(", ")}`,
     );
