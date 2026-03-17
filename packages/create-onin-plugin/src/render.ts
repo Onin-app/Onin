@@ -134,7 +134,18 @@ export async function renderPackageJson(
     mergedPkg.devDependencies = devDependencies;
   }
 
+  removeEmptyRecordField(mergedPkg, "scripts");
+  removeEmptyRecordField(mergedPkg, "dependencies");
+  removeEmptyRecordField(mergedPkg, "devDependencies");
+
   await writeFile(targetPath, `${JSON.stringify(mergedPkg, null, 2)}\n`, "utf8");
+}
+
+function removeEmptyRecordField(pkg: PackageJsonShape, field: PackageJsonField): void {
+  const record = pkg[field];
+  if (record && Object.keys(record).length === 0) {
+    delete pkg[field];
+  }
 }
 
 export function buildSettingsBlock(withSettings: boolean): string {

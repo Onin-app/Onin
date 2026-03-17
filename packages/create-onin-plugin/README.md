@@ -40,6 +40,12 @@ Create a Vue starter instead:
 npx create-onin-plugin my-plugin --framework vue
 ```
 
+Create a Vanilla TypeScript starter instead:
+
+```bash
+npx create-onin-plugin my-plugin --framework vanilla
+```
+
 ## Frameworks
 
 The CLI currently supports:
@@ -47,6 +53,7 @@ The CLI currently supports:
 - `svelte` (default)
 - `react`
 - `vue`
+- `vanilla`
 
 ## Generated project
 

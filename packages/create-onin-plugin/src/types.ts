@@ -1,4 +1,4 @@
-export type Framework = "svelte" | "react" | "vue";
+export type Framework = "svelte" | "react" | "vue" | "vanilla";
 
 export interface CliOptions {
   targetDir: string | undefined;
