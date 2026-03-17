@@ -18,6 +18,7 @@ const baseTemplateDirs: Record<Language, string> = {
 const adapterTemplateDirs: Record<Framework, Partial<Record<Language, string>>> = {
   svelte: {
     ts: resolve(TEST_DIR, "../templates/adapters/svelte/ts"),
+    js: resolve(TEST_DIR, "../templates/adapters/svelte/js"),
   },
   react: {
     ts: resolve(TEST_DIR, "../templates/adapters/react/ts"),
@@ -150,6 +151,31 @@ test("scaffoldPlugin creates a vue JavaScript project", async () => {
     assert.match(await readFile(join(targetDir, "src", "main.js"), "utf8"), /Smoke Plugin/);
     assert.match(await readFile(join(targetDir, "src", "main.js"), "utf8"), /createApp/);
     assert.match(await readFile(join(targetDir, "vite.config.js"), "utf8"), /plugin-vue/);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("scaffoldPlugin creates a svelte JavaScript project", async () => {
+  const tempDir = await createTempDir("create-onin-plugin-scaffold-svelte-js-");
+  const targetDir = join(tempDir, "svelte-js-plugin");
+
+  try {
+    const result = await scaffoldPlugin(
+      createCliOptions(targetDir, "svelte", "js"),
+      baseTemplateDirs,
+      adapterTemplateDirs,
+    );
+
+    assert.equal(result.targetDir, targetDir);
+    const packageJson = await readFile(join(targetDir, "package.json"), "utf8");
+    assert.match(packageJson, /"svelte": "\^5\.0\.0"/);
+    assert.match(packageJson, /"@sveltejs\/vite-plugin-svelte": "\^6\.2\.4"/);
+    assert.doesNotMatch(packageJson, /"typescript": "\^5\.5\.0"/);
+    assert.match(await readFile(join(targetDir, "src", "App.svelte"), "utf8"), /Smoke Plugin/);
+    assert.match(await readFile(join(targetDir, "src", "main.js"), "utf8"), /pluginName: "Smoke Plugin"/);
+    assert.match(await readFile(join(targetDir, "src", "main.js"), "utf8"), /mount\(App/);
+    assert.match(await readFile(join(targetDir, "vite.config.js"), "utf8"), /vite-plugin-svelte/);
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }

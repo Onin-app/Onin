@@ -18,6 +18,7 @@ const BASE_TEMPLATE_DIRS: Record<Language, string> = {
 const ADAPTER_TEMPLATE_DIRS: Record<Framework, Partial<Record<Language, string>>> = {
   svelte: {
     ts: resolve(CLI_DIR, "../templates/adapters/svelte/ts"),
+    js: resolve(CLI_DIR, "../templates/adapters/svelte/js"),
   },
   react: {
     ts: resolve(CLI_DIR, "../templates/adapters/react/ts"),
