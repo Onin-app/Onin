@@ -34,12 +34,19 @@ Create a React starter instead:
 npx create-onin-plugin my-plugin --framework react
 ```
 
+Create a Vue starter instead:
+
+```bash
+npx create-onin-plugin my-plugin --framework vue
+```
+
 ## Frameworks
 
 The CLI currently supports:
 
 - `svelte` (default)
 - `react`
+- `vue`
 
 ## Generated project
 

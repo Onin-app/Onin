@@ -7,11 +7,12 @@ import { scaffoldPlugin } from "./scaffold.js";
 import type { CliOptions, Framework } from "./types.js";
 
 const DEFAULT_FRAMEWORK: Framework = "svelte";
-const SUPPORTED_FRAMEWORKS: Framework[] = ["svelte", "react"];
+const SUPPORTED_FRAMEWORKS: Framework[] = ["svelte", "react", "vue"];
 const CLI_DIR = dirname(fileURLToPath(import.meta.url));
 const BASE_TEMPLATE_DIR = resolve(CLI_DIR, "../templates/base");
 const SVELTE_ADAPTER_DIR = resolve(CLI_DIR, "../templates/adapters/svelte");
 const REACT_ADAPTER_DIR = resolve(CLI_DIR, "../templates/adapters/react");
+const VUE_ADAPTER_DIR = resolve(CLI_DIR, "../templates/adapters/vue");
 
 function parseArgs(argv: string[]): CliOptions {
   const options: CliOptions = {
@@ -40,7 +41,7 @@ function parseArgs(argv: string[]): CliOptions {
 
     if (arg === "--framework") {
       const value = argv[i + 1];
-      if (value === "svelte" || value === "react") {
+      if (value === "svelte" || value === "react" || value === "vue") {
         options.framework = value;
       }
       i += 1;
@@ -168,6 +169,7 @@ async function main(): Promise<void> {
     const result = await scaffoldPlugin(options, BASE_TEMPLATE_DIR, {
       svelte: SVELTE_ADAPTER_DIR,
       react: REACT_ADAPTER_DIR,
+      vue: VUE_ADAPTER_DIR,
     });
     printNextSteps(result.targetDir);
   } catch (error: unknown) {
