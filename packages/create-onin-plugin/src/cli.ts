@@ -34,6 +34,7 @@ const ADAPTER_TEMPLATE_DIRS: Record<Framework, Partial<Record<Language, string>>
   },
   solid: {
     ts: resolve(CLI_DIR, "../templates/adapters/solid/ts"),
+    js: resolve(CLI_DIR, "../templates/adapters/solid/js"),
   },
 };
 

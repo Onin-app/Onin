@@ -34,6 +34,7 @@ const adapterTemplateDirs: Record<Framework, Partial<Record<Language, string>>> 
   },
   solid: {
     ts: resolve(TEST_DIR, "../templates/adapters/solid/ts"),
+    js: resolve(TEST_DIR, "../templates/adapters/solid/js"),
   },
 };
 
@@ -181,13 +182,27 @@ test("scaffoldPlugin creates a svelte JavaScript project", async () => {
   }
 });
 
-test("scaffoldPlugin rejects unsupported framework and language combinations", async () => {
-  await assert.rejects(
-    scaffoldPlugin(
-      createCliOptions("solid-js-plugin", "solid", "js"),
+test("scaffoldPlugin creates a solid JavaScript project", async () => {
+  const tempDir = await createTempDir("create-onin-plugin-scaffold-solid-js-");
+  const targetDir = join(tempDir, "solid-js-plugin");
+
+  try {
+    const result = await scaffoldPlugin(
+      createCliOptions(targetDir, "solid", "js"),
       baseTemplateDirs,
       adapterTemplateDirs,
-    ),
-    /Unsupported language for framework: solid\/js/,
-  );
+    );
+
+    assert.equal(result.targetDir, targetDir);
+    const packageJson = await readFile(join(targetDir, "package.json"), "utf8");
+    assert.match(packageJson, /"solid-js": "\^1\.9\.9"/);
+    assert.match(packageJson, /"vite-plugin-solid": "\^2\.11\.8"/);
+    assert.doesNotMatch(packageJson, /"typescript": "\^5\.5\.0"/);
+    assert.match(await readFile(join(targetDir, "src", "App.jsx"), "utf8"), /pluginName/);
+    assert.match(await readFile(join(targetDir, "src", "main.jsx"), "utf8"), /Smoke Plugin/);
+    assert.match(await readFile(join(targetDir, "src", "main.jsx"), "utf8"), /render\(/);
+    assert.match(await readFile(join(targetDir, "vite.config.js"), "utf8"), /vite-plugin-solid/);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
 });

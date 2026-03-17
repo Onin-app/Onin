@@ -70,6 +70,12 @@ Create a Svelte JavaScript starter instead:
 npx create-onin-plugin my-plugin --framework svelte --language js
 ```
 
+Create a Solid JavaScript starter instead:
+
+```bash
+npx create-onin-plugin my-plugin --framework solid --language js
+```
+
 Create a Solid starter instead:
 
 ```bash
@@ -89,7 +95,7 @@ The CLI currently supports:
 ## Languages
 
 - `ts` (default)
-- `js` for `vanilla`, `react`, `vue`, and `svelte`
+- `js` for `vanilla`, `react`, `vue`, `svelte`, and `solid`
 
 ## Generated project
 
