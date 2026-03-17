@@ -19,6 +19,14 @@ cd my-onin-plugin
 pnpm install
 ```
 
+如果你想直接创建 React 插件项目：
+
+```bash
+npx create-onin-plugin my-onin-plugin --framework react
+cd my-onin-plugin
+pnpm install
+```
+
 脚手架默认会生成一个可发布的 UI 插件模板，已经包含：
 
 - `src/main.ts`

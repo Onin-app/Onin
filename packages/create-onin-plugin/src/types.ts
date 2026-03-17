@@ -1,9 +1,12 @@
+export type Framework = "svelte" | "react";
+
 export interface CliOptions {
   targetDir: string | undefined;
   pluginName: string | undefined;
   pluginId: string | undefined;
   withSettings: boolean | undefined;
   yes: boolean;
+  framework: Framework;
   template: string;
 }
 

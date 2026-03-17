@@ -13,11 +13,16 @@ import { isValidPackageName, isValidPluginId, slugify } from "./validators.js";
 export async function scaffoldPlugin(
   options: CliOptions,
   baseTemplateDir: string,
-  adapterTemplateDir: string,
+  adapterTemplateDirs: Record<string, string>,
 ): Promise<{ targetDir: string }> {
   const answers = await promptForMissingOptions(options);
   const targetDir = resolve(process.cwd(), answers.targetDir);
   const packageName = slugify(basename(targetDir));
+  const adapterTemplateDir = adapterTemplateDirs[options.framework];
+
+  if (!adapterTemplateDir) {
+    throw new Error(`Unsupported framework: ${options.framework}`);
+  }
 
   if (!isValidPackageName(packageName)) {
     throw new Error(
