@@ -20,7 +20,7 @@
     "build": "tsc -p tsconfig.json",
     "prepack": "pnpm run build",
     "start": "pnpm run build && node ./dist/cli.js",
-    "test": "pnpm run build && node --test"
+    "test": "pnpm run build && node --test dist/**/*.test.js"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
