@@ -17,6 +17,7 @@ const loaded = configFile
   : null;
 
 const sharedConfig = loaded?.config ?? {};
+const outDir = sharedConfig.build?.outDir ?? "dist";
 
 await build(sharedConfig);
 
@@ -24,7 +25,8 @@ await build({
   ...sharedConfig,
   configFile: false,
   build: {
-    outDir: "dist",
+    ...sharedConfig.build,
+    outDir,
     emptyOutDir: false,
     lib: {
       entry: resolve(root, "src/background.__SCRIPT_EXT__"),
@@ -32,7 +34,9 @@ await build({
       fileName: () => "lifecycle.js",
     },
     rollupOptions: {
+      ...sharedConfig.build?.rollupOptions,
       output: {
+        ...sharedConfig.build?.rollupOptions?.output,
         inlineDynamicImports: true,
       },
     },
