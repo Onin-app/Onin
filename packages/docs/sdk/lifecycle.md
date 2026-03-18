@@ -1,6 +1,6 @@
 # lifecycle
 
-插件生命周期钩子，在插件加载和卸载时执行初始化与清理逻辑。
+插件加载/卸载钩子，在后台入口被宿主执行时完成初始化与清理逻辑。
 
 ## 导入
 
@@ -41,7 +41,7 @@ lifecycle.onLoad(async () => {
 });
 ```
 
-> 💡 可以多次调用 `onLoad`，所有回调会在同一个生命周期内按顺序执行。
+> 💡 可以多次调用 `onLoad`，所有回调会在同一次后台加载阶段按顺序执行。
 
 ### `lifecycle.onUnload(callback)`
 
@@ -68,7 +68,7 @@ lifecycle.onUnload(async () => {
 
 ## 与 pluginWindow 的区别
 
-`lifecycle` 处理的是插件的**安装级别**生命周期（加载/卸载），而 `pluginWindow` 处理的是**窗口级别**生命周期（显示/隐藏/焦点）。
+`lifecycle` 处理的是插件的**后台加载级别**生命周期（加载/卸载），而 `pluginWindow` 处理的是**窗口级别**生命周期（显示/隐藏/焦点）。
 
 | 事件          | 使用                            |
 | ------------- | ------------------------------- |
@@ -77,11 +77,11 @@ lifecycle.onUnload(async () => {
 | 窗口显示/隐藏 | `pluginWindow.onShow / onHide`  |
 | 窗口焦点变化  | `pluginWindow.onFocus / onBlur` |
 
-## 后台生命周期脚本 (lifecycle.js)
+## 后台入口脚本 (`manifest.lifecycle`)
 
 对于 UI 插件，如果你希望在不打开界面的情况下执行后台逻辑（如定时同步数据、监听系统消息），可以结合 `manifest.json` 中的 `run_at_startup: true` 使用。
 
-Onin 会在启动时自动加载 `lifecycle` 指定的文件（默认为 `lifecycle.js`），并由于该文件通常会导入 SDK 并注册 `onLoad`，你的初始化逻辑将在后台自动运行。
+Onin 会在启动时自动加载 `manifest.lifecycle` 指定的后台入口文件。字段名虽然叫 `lifecycle`，但实际语义就是 background entry。该文件通常会导入 SDK 并注册 `onLoad`，因此初始化逻辑会在后台自动运行。
 
 **manifest.json 示例：**
 
@@ -94,38 +94,45 @@ Onin 会在启动时自动加载 `lifecycle` 指定的文件（默认为 `lifecy
 
 ## 构建要求
 
-对于 UI 插件，`lifecycle.ts` 不会自动跟随页面入口一起变成发布产物。你需要显式把它单独构建成一个独立文件，并确保 `manifest.json` 中的 `lifecycle` 指向它。
+对于 UI 插件，宿主需要一个可直接执行的后台入口文件。推荐做法是不再手写 `lifecycle.ts + vite.lifecycle.config.ts`，而是采用单源码声明模式：
+
+- `src/plugin.ts` 导出 `background` 和 `ui`
+- `src/background.ts` 作为薄包装，只注册 `background`
+- `src/main.ts` 作为薄包装，只挂载 `ui`
+- `scripts/build.mjs` 一次构建出 `dist/index.html` 和 `dist/lifecycle.js`
 
 最小配置示例：
 
 ```json
 {
   "scripts": {
-    "build:index": "vite build",
-    "build:lifecycle": "vite build --config vite.lifecycle.config.ts",
-    "build": "npm run build:index && npm run build:lifecycle"
+    "build": "node ./scripts/build.mjs"
   }
 }
 ```
 
 ```ts
-import { defineConfig } from 'vite';
-import { resolve } from 'path';
+import { command, definePlugin, settings } from 'onin-sdk';
 
-export default defineConfig({
-  build: {
-    outDir: '.',
-    emptyOutDir: false,
-    lib: {
-      entry: resolve(__dirname, 'src/lifecycle.ts'),
-      formats: ['es'],
-      fileName: () => 'lifecycle.js',
-    },
-    rollupOptions: {
-      external: [],
-      output: {
-        inlineDynamicImports: true,
-      },
+export const background = async () => {
+  await settings.useSettingsSchema([
+    { key: 'apiKey', label: 'API 密钥', type: 'password', required: true },
+  ]);
+
+  await command.handle(async (code) => {
+    if (code === 'my-command') {
+      return { ok: true };
+    }
+    return null;
+  });
+};
+
+export default definePlugin({
+  background,
+  ui: {
+    mount: async ({ target }) => {
+      const { mountPluginUi } = await import('./ui');
+      return mountPluginUi({ target });
     },
   },
 });
@@ -135,6 +142,6 @@ export default defineConfig({
 
 - `manifest.lifecycle` 的路径和产物路径一致
 - zip 里确实包含该文件
-- 如果生命周期里注册了 settings 或 commands，本地解压后也能看到该文件
+- 如果后台入口里注册了 settings 或 commands，本地解压后也能看到该文件
 
-如果缺少这个构建步骤，插件 UI 仍然可能正常打开，但 `onLoad` 不会执行，进而导致设置页、命令注册和启动初始化全部失效。
+如果缺少这个后台入口产物，插件 UI 仍然可能正常打开，但后台初始化不会执行，进而导致设置页、命令注册和启动初始化全部失效。

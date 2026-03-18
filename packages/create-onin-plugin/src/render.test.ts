@@ -13,6 +13,7 @@ const context: TemplateContext = {
   pluginId: "com.example.sample-plugin",
   pluginDescription: "Sample Plugin plugin for Onin",
   keyword: "sample-plugin",
+  scriptExtension: "ts",
   settingsImport: ", settings",
   settingsBlock: "  await settings.useSettingsSchema([]);\n",
   settingsNote: "Settings enabled.",
@@ -110,7 +111,7 @@ test("renderPackageJson merges vanilla starter scripts without framework runtime
       JSON.stringify({
         name: "__PACKAGE_NAME__",
         scripts: {
-          build: "npm run build:index && npm run build:lifecycle",
+          build: "node ./scripts/build.mjs",
         },
         dependencies: {
           "onin-sdk": "^1.0.0",
@@ -123,7 +124,6 @@ test("renderPackageJson merges vanilla starter scripts without framework runtime
       JSON.stringify({
         scripts: {
           dev: "vite",
-          "build:index": "vite build",
         },
         devDependencies: {
           typescript: "^5.5.0",
@@ -142,9 +142,8 @@ test("renderPackageJson merges vanilla starter scripts without framework runtime
     };
 
     assert.deepEqual(rendered.scripts, {
-      build: "npm run build:index && npm run build:lifecycle",
+      build: "node ./scripts/build.mjs",
       dev: "vite",
-      "build:index": "vite build",
     });
     assert.deepEqual(rendered.dependencies, {
       "onin-sdk": "^1.0.0",

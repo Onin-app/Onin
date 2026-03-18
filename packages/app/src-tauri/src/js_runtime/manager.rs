@@ -18,6 +18,17 @@ pub struct PluginRuntimeManager {
 }
 
 impl PluginRuntimeManager {
+    const EXECUTE_UNLOAD_SCRIPT: &'static str = r#"
+        (async () => {
+            if (typeof globalThis.__ONIN_EXECUTE_UNLOAD_CALLBACKS__ === 'function') {
+                await globalThis.__ONIN_EXECUTE_UNLOAD_CALLBACKS__();
+            }
+        })().catch((error) => {
+            console.error('Plugin unload execution error:', error);
+            throw error;
+        });
+    "#;
+
     /// 创建新的运行时管理器
     ///
     /// 在专用线程中启动事件循环来处理所有插件任务
@@ -69,11 +80,11 @@ impl PluginRuntimeManager {
                             plugin_id,
                             response,
                         } => {
-                            let result = Self::handle_clear_plugin(&mut runtimes, &plugin_id);
+                            let result = Self::handle_clear_plugin(&mut runtimes, &plugin_id).await;
                             let _ = response.send(result);
                         }
                         PluginTask::ClearAllPlugins { response } => {
-                            let result = Self::handle_clear_all_plugins(&mut runtimes);
+                            let result = Self::handle_clear_all_plugins(&mut runtimes).await;
                             let _ = response.send(result);
                         }
                     }
@@ -96,8 +107,8 @@ impl PluginRuntimeManager {
         js_code: &str,
     ) -> Result<(), String> {
         // 如果插件已经存在，先清除它（支持热重载）
-        if runtimes.contains_key(plugin_id) {
-            runtimes.remove(plugin_id);
+        if let Some(existing_runtime) = runtimes.remove(plugin_id) {
+            Self::execute_unload(existing_runtime).await?;
         }
 
         let mut runtime = create_runtime_with_plugin_id(app_handle, plugin_id)?;
@@ -119,20 +130,36 @@ impl PluginRuntimeManager {
     }
 
     /// 处理清除单个插件
-    fn handle_clear_plugin(
+    async fn handle_clear_plugin(
         runtimes: &mut HashMap<String, JsRuntime>,
         plugin_id: &str,
     ) -> Result<(), String> {
-        if runtimes.remove(plugin_id).is_some() {
-        } else {
+        if let Some(runtime) = runtimes.remove(plugin_id) {
+            Self::execute_unload(runtime).await?;
         }
         Ok(())
     }
 
     /// 处理清除所有插件
-    fn handle_clear_all_plugins(runtimes: &mut HashMap<String, JsRuntime>) -> Result<(), String> {
-        runtimes.clear();
+    async fn handle_clear_all_plugins(
+        runtimes: &mut HashMap<String, JsRuntime>,
+    ) -> Result<(), String> {
+        let existing_runtimes = std::mem::take(runtimes);
+        for (_plugin_id, runtime) in existing_runtimes {
+            Self::execute_unload(runtime).await?;
+        }
         Ok(())
+    }
+
+    async fn execute_unload(mut runtime: JsRuntime) -> Result<(), String> {
+        runtime
+            .execute_script("<plugin_unload>", Self::EXECUTE_UNLOAD_SCRIPT.to_string())
+            .map_err(|e| e.to_string())?;
+
+        runtime
+            .run_event_loop(PollEventLoopOptions::default())
+            .await
+            .map_err(|e| e.to_string())
     }
 
     /// 处理命令执行

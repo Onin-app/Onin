@@ -9,7 +9,8 @@ vi.mock('../../core/ipc', () => ({
 }));
 
 vi.mock('../../core/environment', async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual =
+    (await importOriginal()) as typeof import('../../core/environment');
   return {
     ...actual,
     getEnvironment: vi.fn(),

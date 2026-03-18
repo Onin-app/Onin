@@ -38,6 +38,7 @@ export function renderTemplate(content: string, context: TemplateContext): strin
     .replaceAll("__SETTINGS_BLOCK__", context.settingsBlock)
     .replaceAll("__SETTINGS_IMPORT__", context.settingsImport)
     .replaceAll("__SETTINGS_NOTE__", context.settingsNote)
+    .replaceAll("__SCRIPT_EXT__", context.scriptExtension)
     .replaceAll("__KEYWORD__", context.keyword);
 }
 

@@ -26,6 +26,7 @@ export interface TemplateContext {
   pluginId: string;
   pluginDescription: string;
   keyword: string;
+  scriptExtension: string;
   settingsImport: string;
   settingsBlock: string;
   settingsNote: string;

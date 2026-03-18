@@ -14,7 +14,6 @@
     "src/**/*.ts",
     "src/**/*.d.ts",
     "src/**/*.vue",
-    "vite.config.ts",
-    "vite.lifecycle.config.ts"
+    "vite.config.ts"
   ]
 }

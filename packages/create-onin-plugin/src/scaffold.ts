@@ -53,11 +53,12 @@ export async function scaffoldPlugin(
     pluginId: answers.pluginId,
     pluginDescription: `${answers.pluginName} plugin for Onin`,
     keyword: packageName.split(".").pop() || packageName,
+    scriptExtension: answers.language,
     settingsImport: answers.withSettings ? ", settings" : "",
     settingsBlock: buildSettingsBlock(answers.withSettings),
     settingsNote: answers.withSettings
-      ? "This template includes a sample settings schema registered from lifecycle.ts."
-      : "This template omits settings schema. Add it later in src/lifecycle.ts if needed.",
+      ? "This template includes a sample settings schema registered from src/plugin.ts."
+      : "This template omits settings schema. Add it later in src/plugin.ts if needed.",
   };
 
   await copyTemplateDir(baseTemplateDir, targetDir, context, new Set(["package.json.tpl"]));
