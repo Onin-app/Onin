@@ -166,6 +166,11 @@ async function executeUnloadCallbacks(): Promise<void> {
   }
 }
 
+type LifecycleRuntimeGlobals = typeof globalThis & {
+  __ONIN_EXECUTE_UNLOAD_CALLBACKS__?: () => Promise<void>;
+  __ONIN_RESET_LIFECYCLE_CALLBACKS__?: () => void;
+};
+
 /**
  * 内部函数：重置所有生命周期回调
  * 用于测试和插件重新加载
@@ -176,6 +181,10 @@ function resetCallbacks(): void {
   unloadCallbacks = [];
   loadExecutionScheduled = false;
 }
+
+const lifecycleGlobals = globalThis as LifecycleRuntimeGlobals;
+lifecycleGlobals.__ONIN_EXECUTE_UNLOAD_CALLBACKS__ = executeUnloadCallbacks;
+lifecycleGlobals.__ONIN_RESET_LIFECYCLE_CALLBACKS__ = resetCallbacks;
 
 /**
  * 生命周期 API 命名空间
