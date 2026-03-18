@@ -239,7 +239,7 @@ Onin 会直接加载开发服务器的内容，修改代码后自动刷新。
 
 ## 7. 给 UI 插件准备后台入口
 
-如果你的 UI 插件要做以下任一事情，就不要只构建页面入口，还必须额外产出后台入口 `lifecycle.js`：
+如果你的 UI 插件要做以下任一事情，就不要只构建页面入口，还必须额外产出后台入口脚本：
 
 - 注册插件设置页
 - 注册指令处理器
@@ -293,7 +293,7 @@ export default definePlugin({
 });
 ```
 
-`scripts/build.mjs` 至少要完成两次构建：
+`scripts/build.mjs` 会统一完成 UI 和后台入口两次构建：
 
 ```json
 {
@@ -309,11 +309,11 @@ export default definePlugin({
 ```json
 {
   "entry": "dist/index.html",
-  "lifecycle": "lifecycle.js"
+  "lifecycle": "dist/lifecycle.js"
 }
 ```
 
-脚手架默认会把后台入口输出到 `dist/lifecycle.js`。只要 `manifest.lifecycle` 和真实产物路径不一致，Onin 就不会执行后台入口，设置按钮和指令注册都会失效。
+这里的 `lifecycle` 仍然是 manifest 字段名，但语义上表示后台入口。只要 `manifest.lifecycle` 和真实产物路径不一致，Onin 就不会执行后台入口，设置按钮和指令注册都会失效。
 
 ## 8. 发布前检查
 
@@ -322,9 +322,9 @@ export default definePlugin({
 - `manifest.json`
 - `icon.png` 或其他图标文件
 - `dist/index.html` 及其静态资源
-- `dist/lifecycle.js` 或 `manifest.lifecycle` 指向的实际文件
+- `dist/lifecycle.js` 或 `manifest.lifecycle` 指向的实际后台入口文件
 
-最常见的问题是本地开发可用，但发布 zip 漏了 `lifecycle.js`。这会导致插件页面能打开，但设置 schema、指令处理器、启动初始化都不会注册。
+最常见的问题是本地开发可用，但发布 zip 漏了后台入口文件。这样插件页面仍然能打开，但设置 schema、指令处理器、启动初始化都不会注册。
 
 ## 下一步
 
