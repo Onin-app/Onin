@@ -10,7 +10,7 @@ export default function App({ pluginName, pluginId }: AppProps) {
         <p className="eyebrow">Onin Plugin</p>
         <h1>{pluginName}</h1>
         <p className="lede">
-          This starter includes a dedicated lifecycle build, release pack command,
+          This starter includes a single plugin declaration, unified background entry build,
           and a manifest wired for marketplace-safe output.
         </p>
       </section>
@@ -22,12 +22,12 @@ export default function App({ pluginName, pluginId }: AppProps) {
             Vite app build to <code>dist/</code>
           </li>
           <li>
-            Standalone <code>lifecycle.js</code> build
+            Generated <code>dist/lifecycle.js</code> background entry
           </li>
           <li>
             <code>pnpm pack</code> for release zip creation
           </li>
-          <li>Manifest and lifecycle path already aligned</li>
+          <li>Manifest background entry path already aligned</li>
         </ul>
       </section>
 

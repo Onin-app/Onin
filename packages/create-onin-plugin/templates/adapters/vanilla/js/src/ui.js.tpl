@@ -6,7 +6,7 @@ export function mountPluginUi({ target, pluginName, pluginId }) {
         <h1>${pluginName}</h1>
         <p class="lede">
           This starter uses a single plugin declaration and emits both UI and
-          background lifecycle artifacts from one build command.
+          background entry artifacts from one build command.
         </p>
       </section>
 
