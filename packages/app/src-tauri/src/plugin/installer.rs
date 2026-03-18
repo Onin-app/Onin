@@ -148,7 +148,7 @@ pub fn import_plugin(
     }
 
     // 8. 初始化插件后台入口
-    initialize_plugin_lifecycle(&app, &source, &manifest);
+    initialize_plugin_background_entry(&app, &source, &manifest);
     Ok(loaded_plugin)
 }
 
@@ -409,7 +409,7 @@ pub async fn download_and_install_plugin(
     }
 
     // 7. 初始化后台入口
-    initialize_plugin_lifecycle(&app, &target_dir, &manifest);
+    initialize_plugin_background_entry(&app, &target_dir, &manifest);
 
     // 发送安装成功事件，使用市场 ID 以便前端匹配
     let _ = app.emit("plugin-installed", &plugin_id);
@@ -423,7 +423,8 @@ pub async fn download_and_install_plugin(
 
 /// 移除插件符号链接
 fn remove_plugin_link(path: &Path) -> Result<(), String> {
-    let metadata = std::fs::symlink_metadata(path).map_err(|e| format!("获取符号链接元数据失败: {}", e))?;
+    let metadata =
+        std::fs::symlink_metadata(path).map_err(|e| format!("获取符号链接元数据失败: {}", e))?;
 
     #[cfg(windows)]
     {
@@ -480,7 +481,8 @@ fn create_symlink(source: &Path, target: &Path) -> Result<(), String> {
 
 /// 移除插件目录
 fn remove_plugin_directory(path: &Path) -> Result<(), String> {
-    let metadata = std::fs::symlink_metadata(path).map_err(|e| format!("获取符号链接元数据失败: {}", e))?;
+    let metadata =
+        std::fs::symlink_metadata(path).map_err(|e| format!("获取符号链接元数据失败: {}", e))?;
     let is_symlink = metadata.file_type().is_symlink();
 
     if is_symlink {
@@ -504,7 +506,6 @@ fn remove_plugin_directory(path: &Path) -> Result<(), String> {
         std::fs::remove_file(path).map_err(|e| format!("删除插件文件失败: {}", e))
     }
 }
-
 
 /// 解压 ZIP 文件
 fn extract_zip(zip_path: &Path, extract_dir: &Path) -> Result<(), String> {
@@ -583,7 +584,7 @@ pub fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), String> {
 }
 
 /// 初始化插件后台入口
-fn initialize_plugin_lifecycle(
+fn initialize_plugin_background_entry(
     app: &tauri::AppHandle,
     plugin_dir: &Path,
     manifest: &PluginManifest,
@@ -600,15 +601,15 @@ fn initialize_plugin_lifecycle(
     let background_entry_path = match extension {
         Some("js") => Some(entry_path.clone()),
         Some("html") => {
-            let lifecycle_file = manifest
+            let background_entry_file = manifest
                 .lifecycle
                 .as_ref()
                 .map(|s| s.as_str())
                 .unwrap_or("lifecycle.js");
-            let lc_path = plugin_dir.join(lifecycle_file);
+            let background_entry_path = plugin_dir.join(background_entry_file);
 
-            if lc_path.is_file() {
-                Some(lc_path)
+            if background_entry_path.is_file() {
+                Some(background_entry_path)
             } else {
                 None
             }
@@ -616,7 +617,7 @@ fn initialize_plugin_lifecycle(
         _ => None,
     };
 
-    if let Some(lc_path) = background_entry_path {
+    if let Some(background_entry_path) = background_entry_path {
         let app_clone = app.clone();
         let plugin_id = manifest.id.clone();
         let plugin_name = manifest.name.clone();
@@ -628,7 +629,7 @@ fn initialize_plugin_lifecycle(
                 .unwrap();
 
             rt.block_on(async {
-                match std::fs::read_to_string(&lc_path) {
+                match std::fs::read_to_string(&background_entry_path) {
                     Ok(js_code) => {
                         match js_runtime::execute_js(&app_clone, &js_code, Some(&plugin_id)).await {
                             Ok(_) => {

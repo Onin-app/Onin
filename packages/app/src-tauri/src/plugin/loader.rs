@@ -116,17 +116,17 @@ pub fn load_plugins_internal(
                     }
                     "html" => {
                         // View 插件：查找并执行后台入口脚本
-                        let lifecycle_file = manifest
+                        let background_entry_file = manifest
                             .lifecycle
                             .as_ref()
                             .map(|s| s.as_str())
                             .unwrap_or("lifecycle.js");
-                        let lifecycle_path = path.join(lifecycle_file);
+                        let background_entry_path = path.join(background_entry_file);
 
-                        if lifecycle_path.is_file() {
+                        if background_entry_path.is_file() {
                             plugins_to_init.push((
                                 manifest.id.clone(),
-                                lifecycle_path,
+                                background_entry_path,
                                 dir_name.clone(),
                             ));
                         }
