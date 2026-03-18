@@ -147,7 +147,7 @@ pub fn import_plugin(
         store_lock.insert(dir_name.clone(), loaded_plugin.clone());
     }
 
-    // 8. 初始化插件生命周期
+    // 8. 初始化插件后台入口
     initialize_plugin_lifecycle(&app, &source, &manifest);
     Ok(loaded_plugin)
 }
@@ -408,7 +408,7 @@ pub async fn download_and_install_plugin(
         store_lock.insert(dir_name.clone(), loaded_plugin.clone());
     }
 
-    // 7. 初始化生命周期
+    // 7. 初始化后台入口
     initialize_plugin_lifecycle(&app, &target_dir, &manifest);
 
     // 发送安装成功事件，使用市场 ID 以便前端匹配
@@ -582,7 +582,7 @@ pub fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// 初始化插件生命周期
+/// 初始化插件后台入口
 fn initialize_plugin_lifecycle(
     app: &tauri::AppHandle,
     plugin_dir: &Path,
@@ -597,7 +597,7 @@ fn initialize_plugin_lifecycle(
         .extension()
         .and_then(|s| s.to_str());
 
-    let lifecycle_path = match extension {
+    let background_entry_path = match extension {
         Some("js") => Some(entry_path.clone()),
         Some("html") => {
             let lifecycle_file = manifest
@@ -616,7 +616,7 @@ fn initialize_plugin_lifecycle(
         _ => None,
     };
 
-    if let Some(lc_path) = lifecycle_path {
+    if let Some(lc_path) = background_entry_path {
         let app_clone = app.clone();
         let plugin_id = manifest.id.clone();
         let plugin_name = manifest.name.clone();
@@ -657,7 +657,7 @@ fn initialize_plugin_lifecycle(
                         }
                     }
                     Err(e) => {
-                        eprintln!("[plugin/installer] 读取生命周期文件失败: {}", e);
+                        eprintln!("[plugin/installer] 读取后台入口文件失败: {}", e);
                     }
                 }
             });

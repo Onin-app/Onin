@@ -1,7 +1,6 @@
 {
   "scripts": {
-    "dev": "vite",
-    "build:index": "vite build"
+    "dev": "vite"
   },
   "dependencies": {
     "svelte": "^5.0.0"

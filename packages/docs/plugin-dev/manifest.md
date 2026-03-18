@@ -43,7 +43,7 @@
 | `auto_detach`  | `boolean`                | `false`    | UI 插件是否始终在独立窗口中打开                                                       |
 | `terminate_on_bg` | `boolean`             | `false`    | 应用隐藏到后台时是否立即结束插件运行。对于节省资源的工具类插件建议开启 |
 | `run_at_startup` | `boolean`              | `false`    | 是否随 Onin 主程序启动自动加载并运行插件                                              |
-| `lifecycle`    | `string`                 | `"lifecycle.js"` | 视图插件的初始化脚本路径。即便 UI 未打开，该脚本也会被执行（需 `run_at_startup` 支持） |
+| `lifecycle`    | `string`                 | `"lifecycle.js"` | 视图插件的后台入口脚本路径。即便 UI 未打开，该脚本也会被执行（需 `run_at_startup` 支持） |
 
 ### `lifecycle` 字段的关键约束
 
@@ -67,14 +67,12 @@
 - `command.handle()` 没有注册
 - `run_at_startup` 看起来“没反应”
 
-对于 UI 插件，推荐把生命周期构建作为单独步骤显式写进 `package.json`：
+对于 UI 插件，推荐把后台入口构建收敛到一个脚本里，由它同时产出页面和 `lifecycle.js`：
 
 ```json
 {
   "scripts": {
-    "build:index": "vite build",
-    "build:lifecycle": "vite build --config vite.lifecycle.config.ts",
-    "build": "npm run build:index && npm run build:lifecycle"
+    "build": "node ./scripts/build.mjs"
   }
 }
 ```
