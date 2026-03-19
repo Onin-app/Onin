@@ -601,12 +601,7 @@ fn initialize_plugin_background_entry(
     let background_entry_path = match extension {
         Some("js") => Some(entry_path.clone()),
         Some("html") => {
-            let background_entry_file = manifest
-                .lifecycle
-                .as_ref()
-                .map(|s| s.as_str())
-                .unwrap_or("lifecycle.js");
-            let background_entry_path = plugin_dir.join(background_entry_file);
+            let background_entry_path = plugin_dir.join("dist/background.js");
 
             if background_entry_path.is_file() {
                 Some(background_entry_path)

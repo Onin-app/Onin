@@ -102,16 +102,16 @@ The CLI currently supports:
 Every generated plugin includes:
 
 - `src/plugin.ts` or `src/plugin.js`
-- `src/background.ts` or `src/background.js`
+- `src/main.ts` or `src/main.js`
 - `manifest.json`
 - `scripts/build.mjs`
 - `pnpm pack:plugin`
 
-Framework-specific starters add their own UI mount helpers and app components, while `src/main.*` stays as a thin shared wrapper.
+Framework-specific starters add their own UI mount helpers and app components, while `src/main.*` stays as a thin shared wrapper around `mountPlugin(plugin, target)`.
 
 The release zip contains:
 
 - `manifest.json`
 - `icon.svg`
 - `dist/index.html`
-- `dist/lifecycle.js`
+- `dist/background.js`

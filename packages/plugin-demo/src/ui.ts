@@ -394,4 +394,11 @@ export function mountPluginUi({ target }: { target: HTMLElement }) {
   moduleTitleEl.textContent = `${modules[0].icon} ${modules[0].name}`;
   renderActions(actionGridEl);
   renderLogs();
+
+  return () => {
+    target.replaceChildren();
+    actionCountEl = null;
+    logCountEl = null;
+    logContainerEl = null;
+  };
 }

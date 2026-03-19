@@ -1,37 +1,94 @@
 import { lifecycle } from "./api/lifecycle";
 
+export interface PluginSetupContext {}
+
 export interface PluginUiMountContext {
   target: HTMLElement;
 }
 
-export interface PluginUiDefinition {
-  mount: (context: PluginUiMountContext) => unknown | Promise<unknown>;
-}
+export type PluginCleanup = () => void | Promise<void>;
+export type PluginMountResult = void | PluginCleanup;
+type PluginRuntimeEvent = "show" | "hide" | "focus" | "blur" | "cleanup";
 
 export interface OninPluginDefinition {
-  background?: () => void | Promise<void>;
-  ui?: PluginUiDefinition;
+  setup?: (context: PluginSetupContext) => void | Promise<void>;
+  mount?: (
+    context: PluginUiMountContext,
+  ) => PluginMountResult | Promise<PluginMountResult>;
 }
 
 export function definePlugin<T extends OninPluginDefinition>(plugin: T): T {
   return plugin;
 }
 
-export function registerPluginBackground(
-  background?: OninPluginDefinition["background"],
+export function setupPlugin(
+  plugin: OninPluginDefinition,
+  context: PluginSetupContext = {},
 ): void {
-  if (background) {
-    lifecycle.onLoad(background);
+  if (plugin.setup) {
+    lifecycle.onLoad(() => plugin.setup?.(context));
   }
 }
 
-export async function mountPluginUi(
-  ui: OninPluginDefinition["ui"],
+export async function mountPlugin(
+  plugin: OninPluginDefinition,
   target: HTMLElement,
-): Promise<unknown> {
-  if (!ui?.mount) {
-    throw new Error("Plugin UI mount is not defined.");
+): Promise<PluginCleanup | undefined> {
+  if (!plugin.mount) {
+    throw new Error("Plugin mount is not defined.");
   }
 
-  return ui.mount({ target });
+  const result = await plugin.mount({ target });
+  if (typeof result !== "function") {
+    return undefined;
+  }
+
+  let settled = false;
+  let removeListeners = () => {};
+
+  const cleanupOnce: PluginCleanup = async () => {
+    if (settled) {
+      return;
+    }
+
+    settled = true;
+    removeListeners();
+    await result();
+  };
+
+  if (typeof window !== "undefined") {
+    const onRuntimeMessage = (event: MessageEvent) => {
+      const data = event.data;
+      if (
+        !data ||
+        typeof data !== "object" ||
+        data.type !== "plugin-lifecycle-event"
+      ) {
+        return;
+      }
+
+      const runtimeEvent = data.event as PluginRuntimeEvent;
+      if (runtimeEvent === "cleanup") {
+        void cleanupOnce();
+      }
+    };
+    const onPageHide = () => {
+      void cleanupOnce();
+    };
+    const onBeforeUnload = () => {
+      void cleanupOnce();
+    };
+
+    window.addEventListener("message", onRuntimeMessage);
+    window.addEventListener("pagehide", onPageHide, { once: true });
+    window.addEventListener("beforeunload", onBeforeUnload, { once: true });
+
+    removeListeners = () => {
+      window.removeEventListener("message", onRuntimeMessage);
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("beforeunload", onBeforeUnload);
+    };
+  }
+
+  return cleanupOnce;
 }

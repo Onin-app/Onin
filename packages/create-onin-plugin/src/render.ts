@@ -160,7 +160,7 @@ export function buildSettingsBlock(withSettings: boolean): string {
       label: "Accent Color",
       type: "color",
       defaultValue: "#111827",
-      description: "Example plugin setting registered during lifecycle onLoad.",
+      description: "Example plugin setting registered during plugin setup.",
     },
   ]);
 `;

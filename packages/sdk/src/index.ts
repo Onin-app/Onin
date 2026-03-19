@@ -88,8 +88,8 @@ import { pluginWindow } from './api/window';
 import { ai } from './api/ai';
 import {
   definePlugin,
-  mountPluginUi,
-  registerPluginBackground,
+  mountPlugin,
+  setupPlugin,
 } from './plugin';
 
 import { invoke, listen } from './core/ipc';
@@ -162,8 +162,8 @@ export {
   pluginWindow,
   ai,
   definePlugin,
-  mountPluginUi,
-  registerPluginBackground,
+  mountPlugin,
+  setupPlugin,
   invoke,
   listen,
   debug,
@@ -212,7 +212,9 @@ export type {
 
 export type {
   OninPluginDefinition,
-  PluginUiDefinition,
+  PluginCleanup,
+  PluginMountResult,
+  PluginSetupContext,
   PluginUiMountContext,
 } from './plugin';
 

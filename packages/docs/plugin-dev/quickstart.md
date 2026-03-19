@@ -94,7 +94,6 @@ pnpm install
 脚手架默认会生成一个可发布的 UI 插件模板，已经包含：
 
 - `src/plugin.ts` 或 `src/plugin.js`
-- `src/background.ts` 或 `src/background.js`
 - `src/main.ts` 或 `src/main.js`
 - `manifest.json`
 - `vite.config.ts`
@@ -252,7 +251,6 @@ Onin 会直接加载开发服务器的内容，修改代码后自动刷新。
 my-onin-plugin/
 ├─ src/
 │  ├─ plugin.ts
-│  ├─ background.ts
 │  ├─ main.ts
 │  └─ ui.ts
 ├─ index.html
@@ -266,7 +264,7 @@ my-onin-plugin/
 ```ts
 import { command, definePlugin, settings } from 'onin-sdk';
 
-export const background = async () => {
+export const setup = async () => {
   await settings.useSettingsSchema([
     {
       key: 'apiKey',
@@ -280,15 +278,13 @@ export const background = async () => {
       return { ok: true };
     }
   });
-});
+};
 
 export default definePlugin({
-  background,
-  ui: {
-    mount: async ({ target }) => {
-      const { mountPluginUi } = await import('./ui');
-      return mountPluginUi({ target });
-    },
+  setup,
+  mount: async ({ target }) => {
+    const { mountPluginUi } = await import('./ui');
+    return mountPluginUi({ target });
   },
 });
 ```
@@ -304,16 +300,7 @@ export default definePlugin({
 }
 ```
 
-`manifest.json` 要和产物路径保持一致：
-
-```json
-{
-  "entry": "dist/index.html",
-  "lifecycle": "dist/lifecycle.js"
-}
-```
-
-这里的 `lifecycle` 仍然是 manifest 字段名，但语义上表示后台入口。只要 `manifest.lifecycle` 和真实产物路径不一致，Onin 就不会执行后台入口，设置按钮和指令注册都会失效。
+对 HTML UI 插件，Onin 会按固定约定查找 `dist/background.js`。只要这个文件存在，`setup` 里的设置、指令和启动初始化就会执行。
 
 ## 8. 发布前检查
 
@@ -322,9 +309,9 @@ export default definePlugin({
 - `manifest.json`
 - `icon.png` 或其他图标文件
 - `dist/index.html` 及其静态资源
-- `dist/lifecycle.js` 或 `manifest.lifecycle` 指向的实际后台入口文件
+- `dist/background.js`
 
-最常见的问题是本地开发可用，但发布 zip 漏了后台入口文件。这样插件页面仍然能打开，但设置 schema、指令处理器、启动初始化都不会注册。
+最常见的问题是本地开发可用，但发布 zip 漏了后台入口文件。这样插件页面仍然能打开，但 `setup` 里的设置 schema、指令处理器、启动初始化都不会注册。
 
 ## 下一步
 

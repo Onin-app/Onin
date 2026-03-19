@@ -2,7 +2,7 @@
 //!
 //! 负责插件的加载和刷新，包括：
 //! - 从文件系统扫描和加载插件
-//! - 执行插件的初始化脚本
+//! - 执行插件的 background entry
 //! - 刷新插件列表
 
 use std::path::Path;
@@ -11,6 +11,8 @@ use tauri::{Manager, State};
 use super::state::load_plugin_states;
 use super::types::{parse_plugin_dir_name, LoadedPlugin, PluginManifest, PluginStore};
 use crate::js_runtime;
+
+const HTML_PLUGIN_BACKGROUND_ENTRY: &str = "dist/background.js";
 
 // ============================================================================
 // 内部加载函数
@@ -101,7 +103,7 @@ pub fn load_plugins_internal(
 
         // 自动执行后台初始化入口
         // Headless 插件：执行 index.js (entry)
-        // View 插件：执行 manifest.lifecycle 指向的后台入口（默认 lifecycle.js）
+        // View 插件：执行固定约定的 background entry
         let entry_path = path.join(&manifest.entry);
 
         if entry_path.is_file() {
@@ -115,13 +117,8 @@ pub fn load_plugins_internal(
                         plugins_to_init.push((manifest.id.clone(), entry_path, dir_name.clone()));
                     }
                     "html" => {
-                        // View 插件：查找并执行后台入口脚本
-                        let background_entry_file = manifest
-                            .lifecycle
-                            .as_ref()
-                            .map(|s| s.as_str())
-                            .unwrap_or("lifecycle.js");
-                        let background_entry_path = path.join(background_entry_file);
+                        // View 插件：查找并执行固定约定的后台入口脚本
+                        let background_entry_path = path.join(HTML_PLUGIN_BACKGROUND_ENTRY);
 
                         if background_entry_path.is_file() {
                             plugins_to_init.push((

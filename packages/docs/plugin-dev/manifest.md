@@ -15,7 +15,6 @@
   "type": "ui",
   "display_mode": "inline",
   "auto_detach": false,
-  "lifecycle": "dist/lifecycle.js",
   "devMode": false,
   "devServer": "http://localhost:5173",
   "commands": [...],
@@ -43,31 +42,19 @@
 | `auto_detach`  | `boolean`                | `false`    | UI 插件是否始终在独立窗口中打开                                                       |
 | `terminate_on_bg` | `boolean`             | `false`    | 应用隐藏到后台时是否立即结束插件运行。对于节省资源的工具类插件建议开启 |
 | `run_at_startup` | `boolean`              | `false`    | 是否随 Onin 主程序启动自动加载并运行插件                                              |
-| `lifecycle`    | `string`                 | `"lifecycle.js"` | 视图插件的后台入口脚本路径。字段名沿用 `lifecycle`，但语义上它就是 background entry |
 
-### `lifecycle` 字段的关键约束
+### HTML UI 插件的后台入口约定
 
-`lifecycle` 字段名虽然保留了旧名称，但它指向的其实是插件的后台入口文件。Onin 只会执行插件目录里真实存在的文件。
+对于 HTML UI 插件，Onin 会固定查找 `dist/background.js` 作为后台入口脚本。这个文件通常由 `scripts/build.mjs` 从 `src/plugin.ts` 自动生成。
 
-这意味着你必须同时满足：
-
-1. `manifest.json` 里的 `lifecycle` 路径写对
-2. 构建流程实际产出了这个文件
-3. 发布 zip 把这个文件带进去了
-
-例如：
-
-- `lifecycle: "lifecycle.js"` 对应插件根目录下的 `lifecycle.js`
-- `lifecycle: "dist/lifecycle.js"` 对应 `dist/lifecycle.js`
-
-如果文件缺失，常见表现是：
+如果该文件缺失，常见表现是：
 
 - 插件设置按钮不显示
-- `settings.useSettingsSchema()` 没有生效
+- `setup()` 没有执行
 - `command.handle()` 没有注册
 - `run_at_startup` 看起来“没反应”
 
-对于 UI 插件，推荐采用单源码声明、双产物输出：一次构建同时产出页面和后台入口脚本：
+推荐采用单源码声明、双产物输出：一次构建同时产出页面和后台入口脚本：
 
 ```json
 {
@@ -77,7 +64,7 @@
 }
 ```
 
-发布前请直接解压 zip 检查 `manifest.lifecycle` 指向的目标文件是否存在。
+发布前请直接解压 zip 检查 `dist/background.js` 是否存在。
 
 ## 开发模式
 
