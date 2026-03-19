@@ -37,7 +37,9 @@
   },
   "pnpm": {
     "overrides": {
-      "vite": "npm:rolldown-vite@7.2.5"
+      "app>vite": "npm:rolldown-vite@7.2.5",
+      "plugin-demo>vite": "npm:rolldown-vite@7.2.5",
+      "onin-docs>vite": "npm:rolldown-vite@7.2.5"
     }
   }
 }
