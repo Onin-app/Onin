@@ -70,8 +70,9 @@ test("scaffoldPlugin creates a vanilla TypeScript project", async () => {
     assert.match(await readFile(join(targetDir, "src", "plugin.ts"), "utf8"), /definePlugin/);
     assert.match(
       await readFile(join(targetDir, "scripts", "build.mjs"), "utf8"),
-      /src\/plugin\.ts/,
+      /fileName: \(\) => "background\.js"/,
     );
+    assert.match(await readFile(join(targetDir, "README.md"), "utf8"), /dist\/background\.js/);
     assert.match(await readFile(join(targetDir, "src", "main.ts"), "utf8"), /mountPlugin\(plugin, target\)/);
   } finally {
     await rm(tempDir, { recursive: true, force: true });
@@ -98,8 +99,9 @@ test("scaffoldPlugin creates a vanilla JavaScript project", async () => {
     assert.match(await readFile(join(targetDir, "src", "plugin.js"), "utf8"), /definePlugin/);
     assert.match(
       await readFile(join(targetDir, "scripts", "build.mjs"), "utf8"),
-      /src\/plugin\.js/,
+      /fileName: \(\) => "background\.js"/,
     );
+    assert.match(await readFile(join(targetDir, "README.md"), "utf8"), /dist\/background\.js/);
     assert.match(await readFile(join(targetDir, "src", "main.js"), "utf8"), /mountPlugin\(plugin, target\)/);
   } finally {
     await rm(tempDir, { recursive: true, force: true });

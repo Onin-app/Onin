@@ -12,8 +12,6 @@ use super::state::load_plugin_states;
 use super::types::{parse_plugin_dir_name, LoadedPlugin, PluginManifest, PluginStore};
 use crate::js_runtime;
 
-const HTML_PLUGIN_BACKGROUND_ENTRY: &str = "dist/background.js";
-
 // ============================================================================
 // 内部加载函数
 // ============================================================================
@@ -118,7 +116,8 @@ pub fn load_plugins_internal(
                     }
                     "html" => {
                         // View 插件：查找并执行固定约定的后台入口脚本
-                        let background_entry_path = path.join(HTML_PLUGIN_BACKGROUND_ENTRY);
+                        let background_entry_path =
+                            path.join(super::HTML_PLUGIN_BACKGROUND_ENTRY);
 
                         if background_entry_path.is_file() {
                             plugins_to_init.push((
@@ -126,6 +125,15 @@ pub fn load_plugins_internal(
                                 background_entry_path,
                                 dir_name.clone(),
                             ));
+                        } else {
+                            eprintln!(
+                                "[plugin/loader] HTML 插件缺少后台入口: plugin='{}' id='{}' expected='{}' run_at_startup={} terminate_on_bg={}. 该插件页面仍可打开，但 setup/命令注册/启动初始化不会执行。",
+                                manifest.name,
+                                manifest.id,
+                                background_entry_path.display(),
+                                manifest_with_state.run_at_startup,
+                                manifest_with_state.terminate_on_bg,
+                            );
                         }
                     }
                     _ => {}

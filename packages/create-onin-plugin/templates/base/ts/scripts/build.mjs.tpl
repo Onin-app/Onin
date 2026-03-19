@@ -46,7 +46,7 @@ setupPlugin(plugin);
       lib: {
         entry: backgroundEntrySource,
         formats: ["es"],
-        fileName: () => "background.js",
+        fileName: () => "__BACKGROUND_ENTRY_FILE__",
       },
       rollupOptions: {
         ...sharedConfig.build?.rollupOptions,

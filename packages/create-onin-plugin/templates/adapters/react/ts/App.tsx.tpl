@@ -22,7 +22,7 @@ export default function App({ pluginName, pluginId }: AppProps) {
             Vite app build to <code>dist/</code>
           </li>
           <li>
-            Generated <code>dist/background.js</code> background entry
+            Generated <code>__BACKGROUND_ENTRY_PATH__</code> background entry
           </li>
           <li>
             <code>pnpm pack</code> for release zip creation

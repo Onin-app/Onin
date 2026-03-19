@@ -17,7 +17,7 @@
     <h2>What is ready</h2>
     <ul>
       <li>Vite app build to <code>dist/</code></li>
-      <li>Generated <code>dist/background.js</code> background entry</li>
+    <li>Generated <code>__BACKGROUND_ENTRY_PATH__</code> background entry</li>
       <li><code>pnpm pack</code> for release zip creation</li>
       <li>Background entry convention already aligned</li>
     </ul>

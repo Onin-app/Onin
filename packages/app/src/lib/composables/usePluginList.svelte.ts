@@ -6,6 +6,7 @@
  */
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { toast } from "svelte-sonner";
 import type { PluginSettingsSchema } from "$lib/types/plugin-settings";
 
 export interface PluginManifest {
@@ -298,14 +299,73 @@ export function usePluginList(): PluginListReturn {
   const executePlugin = async (pluginId: string) => {
     try {
       await invoke("execute_plugin_entry", { pluginId });
-    } catch (e) {
-      console.error(`Failed to execute plugin with ID ${pluginId}:`, e);
+    } catch (error) {
+      const plugin = state.plugins.find(
+        (p) => (p.dir_name || p.id) === pluginId || p.id === pluginId,
+      );
+      const formatted = formatPluginExecutionError(plugin, error);
+
+      console.error(`Failed to execute plugin with ID ${pluginId}:`, error);
+
+      toast.error(formatted.title, {
+        id: `plugin-execute-error:${pluginId}`,
+        description: formatted.body,
+      });
+
+      await invoke("show_notification", {
+        options: {
+          title: formatted.title,
+          body: formatted.body,
+        },
+      });
     }
   };
 
   const handleImageError = (pluginId: string) => {
     state.imageErrors.add(pluginId);
     state.imageErrors = state.imageErrors; // 触发响应式更新
+  };
+
+  const formatPluginExecutionError = (
+    plugin: PluginManifest | undefined,
+    error: unknown,
+  ) => {
+    const pluginName = plugin?.name || plugin?.id || "插件";
+    const rawMessage =
+      error instanceof Error
+        ? error.message
+        : typeof error === "string"
+          ? error
+          : String(error);
+
+    if (rawMessage.includes("插件入口文件未找到")) {
+      return {
+        title: "插件入口缺失",
+        body: `${pluginName} 的入口文件不存在，请检查插件包是否完整。`,
+      };
+    }
+
+    if (
+      rawMessage.includes("background.js") ||
+      rawMessage.includes("后台入口")
+    ) {
+      return {
+        title: "插件后台入口缺失",
+        body: `${pluginName} 缺少 dist/background.js，设置、命令注册和启动初始化可能不会生效。`,
+      };
+    }
+
+    if (rawMessage.includes("devMode=true 但未指定 devServer")) {
+      return {
+        title: "开发模式配置不完整",
+        body: `${pluginName} 启用了 devMode，但没有可用的 devServer。`,
+      };
+    }
+
+    return {
+      title: "打开插件失败",
+      body: `${pluginName}: ${rawMessage}`,
+    };
   };
 
   const setSearchQuery = (query: string) => {
@@ -350,8 +410,13 @@ export function usePluginList(): PluginListReturn {
       plugin_name: string;
       error: string;
     }>("plugin-init-error", async (event) => {
-      const { plugin_name, error } = event.payload;
+      const { plugin_id, plugin_name, error } = event.payload;
       console.error("[Plugins Page] Plugin init error:", event.payload);
+
+      toast.error("插件初始化失败", {
+        id: `plugin-init-error:${plugin_id}`,
+        description: `${plugin_name}: ${error}`,
+      });
 
       await invoke("show_notification", {
         options: {

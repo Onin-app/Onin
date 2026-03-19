@@ -12,6 +12,8 @@ pub mod state;
 pub mod types;
 pub mod window;
 
+pub const HTML_PLUGIN_BACKGROUND_ENTRY: &str = "dist/background.js";
+
 // 应用其他模块直接依赖的类型重导出
 pub use inline::InlinePluginState;
 pub use types::{

@@ -77,7 +77,7 @@ lifecycle.onUnload(async () => {
 | 窗口显示/隐藏 | `pluginWindow.onShow / onHide`  |
 | 窗口焦点变化  | `pluginWindow.onFocus / onBlur` |
 
-## 后台入口脚本 (`manifest.lifecycle`)
+## 后台入口脚本
 
 对于 UI 插件，如果你希望在不打开界面的情况下执行后台逻辑（如定时同步数据、监听系统消息），可以结合 `manifest.json` 中的 `run_at_startup: true` 使用。
 
@@ -136,8 +136,7 @@ export default definePlugin({
 
 发布前检查：
 
-- `manifest.lifecycle` 的路径和产物路径一致
-- zip 里确实包含该文件
+- zip 中确实包含 `dist/background.js`
 - 如果后台入口里注册了 settings 或 commands，本地解压后也能看到该文件
 
 如果缺少这个后台入口产物，插件 UI 仍然可能正常打开，但后台初始化不会执行，进而导致设置页、命令注册和启动初始化全部失效。
