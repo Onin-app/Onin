@@ -2,7 +2,7 @@
   "name": "create-onin-plugin",
   "version": "0.1.0",
   "private": false,
-  "description": "CLI for scaffolding Onin plugins with lifecycle and release packaging built in.",
+  "description": "CLI for scaffolding Onin plugins with single-entry authoring and release packaging built in.",
   "license": "GPL-3.0",
   "publishConfig": {
     "access": "public"

@@ -15,7 +15,7 @@ export function mountPluginUi({ target, pluginName, pluginId }) {
         <ul>
           <li>Single <code>src/plugin.js</code> declaration</li>
           <li>UI build to <code>dist/</code></li>
-          <li>Generated <code>dist/lifecycle.js</code> background entry</li>
+    <li>Generated <code>__BACKGROUND_ENTRY_PATH__</code> background entry</li>
           <li><code>pnpm pack:plugin</code> for release zip creation</li>
         </ul>
       </section>
@@ -29,7 +29,9 @@ export function mountPluginUi({ target, pluginName, pluginId }) {
 
   const styleId = "onin-plugin-template-style";
   if (document.getElementById(styleId)) {
-    return;
+    return () => {
+      target.replaceChildren();
+    };
   }
 
   const style = document.createElement("style");
@@ -116,4 +118,8 @@ export function mountPluginUi({ target, pluginName, pluginId }) {
   `;
 
   document.head.append(style);
+
+  return () => {
+    target.replaceChildren();
+  };
 }

@@ -7,7 +7,6 @@
   "icon": "icon.svg",
   "type": "webview",
   "display_mode": "inline",
-  "lifecycle": "dist/lifecycle.js",
   "commands": [
     {
       "code": "open",

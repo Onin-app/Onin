@@ -114,4 +114,4 @@ await clipboard.writeText('Hello');
 
 ## 更多文档
 
-查看 [完整 API 文档](./docs) 获取更多信息。
+查看 [完整 API 文档](https://onin-app.github.io/Onin/sdk/) 获取更多信息。

@@ -601,16 +601,17 @@ fn initialize_plugin_background_entry(
     let background_entry_path = match extension {
         Some("js") => Some(entry_path.clone()),
         Some("html") => {
-            let background_entry_file = manifest
-                .lifecycle
-                .as_ref()
-                .map(|s| s.as_str())
-                .unwrap_or("lifecycle.js");
-            let background_entry_path = plugin_dir.join(background_entry_file);
+            let background_entry_path = plugin_dir.join(super::HTML_PLUGIN_BACKGROUND_ENTRY);
 
             if background_entry_path.is_file() {
                 Some(background_entry_path)
             } else {
+                eprintln!(
+                    "[plugin/installer] HTML 插件缺少后台入口: plugin='{}' id='{}' expected='{}'. 该插件页面仍可打开，但 setup/命令注册/启动初始化不会执行。",
+                    manifest.name,
+                    manifest.id,
+                    background_entry_path.display(),
+                );
                 None
             }
         }
@@ -637,8 +638,11 @@ fn initialize_plugin_background_entry(
                             }
                             Err(e) => {
                                 eprintln!(
-                                    "[plugin/installer] 初始化插件 {} 失败: {}",
-                                    plugin_id, e
+                                    "[plugin/installer] 初始化插件失败: plugin='{}' id='{}' background='{}' error={}",
+                                    plugin_name,
+                                    plugin_id,
+                                    background_entry_path.display(),
+                                    e
                                 );
                                 #[derive(serde::Serialize, Clone)]
                                 struct PluginInitError {

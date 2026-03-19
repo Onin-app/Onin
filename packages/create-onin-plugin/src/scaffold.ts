@@ -10,6 +10,8 @@ import {
 import type { CliOptions, Framework, Language, TemplateContext } from "./types.js";
 import { isValidPackageName, isValidPluginId, slugify } from "./validators.js";
 
+const HTML_PLUGIN_BACKGROUND_ENTRY = "dist/background.js";
+
 export async function scaffoldPlugin(
   options: CliOptions,
   baseTemplateDirs: Record<Language, string>,
@@ -54,6 +56,8 @@ export async function scaffoldPlugin(
     pluginDescription: `${answers.pluginName} plugin for Onin`,
     keyword: packageName.split(".").pop() || packageName,
     scriptExtension: answers.language,
+    backgroundEntryFile: HTML_PLUGIN_BACKGROUND_ENTRY.split("/").pop() ?? "background.js",
+    backgroundEntryPath: HTML_PLUGIN_BACKGROUND_ENTRY,
     settingsImport: answers.withSettings ? ", settings" : "",
     settingsBlock: buildSettingsBlock(answers.withSettings),
     settingsNote: answers.withSettings

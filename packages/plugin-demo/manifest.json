@@ -8,7 +8,6 @@
   "devServer": "http://localhost:5174",
   "type": "webview",
   "display_mode": "inline",
-  "lifecycle": "dist/lifecycle.js",
   "auto_detach": false,
   "terminate_on_bg": true,
   "run_at_startup": false,

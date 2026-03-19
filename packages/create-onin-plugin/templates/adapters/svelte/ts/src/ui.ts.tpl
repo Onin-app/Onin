@@ -1,4 +1,4 @@
-import { mount } from "svelte";
+import { mount, unmount } from "svelte";
 import App from "./App.svelte";
 
 interface MountPluginUiOptions {
@@ -12,11 +12,15 @@ export function mountPluginUi({
   pluginName,
   pluginId,
 }: MountPluginUiOptions) {
-  return mount(App, {
+  const app = mount(App, {
     target,
     props: {
       pluginName,
       pluginId,
     },
   });
+
+  return () => {
+    unmount(app);
+  };
 }

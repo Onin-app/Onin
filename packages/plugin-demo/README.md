@@ -6,7 +6,7 @@
 
 本项目覆盖一组代表性的 SDK 能力：
 
-- Lifecycle / background entry
+- Setup / background entry
 - Window events
 - Command registration and handling
 - Storage and settings
@@ -32,10 +32,9 @@ pnpm build:demo
 
 `plugin-demo` 现在采用和脚手架一致的单源码声明、双产物输出模型：
 
-- `src/plugin.ts` 声明后台入口和 UI 挂载
-- `src/background.ts` 注册后台入口
-- `src/main.ts` 挂载 UI
-- `scripts/build.mjs` 一次产出 `dist/index.html` 和 `dist/lifecycle.js`
+- `src/plugin.ts` 声明 `setup` 和 `mount`
+- `src/main.ts` 通过 `mountPlugin` 托管 UI 生命周期
+- `scripts/build.mjs` 从单主入口自动产出 `dist/index.html` 和 `dist/background.js`
 
 ## 目录结构
 
@@ -50,7 +49,6 @@ packages/plugin-demo/
 ├── tsconfig.json        # TypeScript 配置
 ├── vite.config.ts       # Vite 配置
 └── src/
-    ├── background.ts    # 后台入口薄包装
     ├── main.ts          # UI 入口薄包装
     ├── plugin.ts        # 插件声明
     ├── style.css        # 样式
