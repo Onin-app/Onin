@@ -138,14 +138,6 @@ pnpm add onin-sdk
   "description": "一个简单的示例插件",
   "entry": "index.html",
   "type": "ui",
-  "commands": [
-    {
-      "code": "hello",
-      "name": "打个招呼",
-      "description": "显示一个问好消息",
-      "keywords": [{ "name": "hello" }, { "name": "你好" }]
-    }
-  ],
   "permissions": {
     "notification": {
       "enable": true
@@ -187,14 +179,7 @@ pnpm add onin-sdk
     <button id="btn">发送通知</button>
 
     <script type="module">
-      import { notification, command } from 'onin-sdk';
-
-      // 注册指令处理器
-      await command.handle(async (code, args) => {
-        if (code === 'hello') {
-          return { message: '你好，世界！' };
-        }
-      });
+      import { notification } from 'onin-sdk';
 
       // 按钮点击发送通知
       document.getElementById('btn').addEventListener('click', async () => {
@@ -213,7 +198,8 @@ pnpm add onin-sdk
 1. 打开 Onin，进入「设置」→「插件」
 2. 点击「从本地导入」
 3. 选择你的插件项目目录
-4. 安装完成后，在主搜索框输入 `hello` 即可触发指令
+4. 安装完成后，打开插件列表并启动这个插件
+5. 点击页面中的“发送通知”按钮，确认 UI 已成功加载
 
 ## 6. 开发模式（热更新）
 
@@ -301,6 +287,11 @@ export default definePlugin({
 ```
 
 对 HTML UI 插件，Onin 会按固定约定查找 `dist/background.js`。只要这个文件存在，`setup` 里的设置、指令和启动初始化就会执行。
+
+也就是说：
+
+- 直接写在 `index.html` 或 `src/main.ts` 里的页面逻辑，只会在 UI 真正打开后运行。
+- `command.handle()`、`settings.useSettingsSchema()`、启动初始化等后台逻辑，应放在 `src/plugin.ts` 的 `setup` 中，并通过 `dist/background.js` 交给宿主加载。
 
 ## 8. 发布前检查
 
