@@ -101,13 +101,12 @@ The CLI currently supports:
 
 Every generated plugin includes:
 
-- `src/plugin.ts` or `src/plugin.js`
-- `src/background.ts` or `src/background.js`
+- `src/lifecycle.ts`
 - `manifest.json`
-- `scripts/build.mjs`
+- `vite.lifecycle.config.ts`
 - `pnpm pack:plugin`
 
-Framework-specific starters add their own UI mount helpers and app components, while `src/main.*` stays as a thin shared wrapper.
+Framework-specific starters add their own UI entry files such as `src/main.ts`, `src/main.tsx`, and framework app components.
 
 The release zip contains:
 

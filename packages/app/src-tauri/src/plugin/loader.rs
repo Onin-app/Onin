@@ -99,9 +99,9 @@ pub fn load_plugins_internal(
         manifest_with_state.terminate_on_bg = terminate_on_bg;
         manifest_with_state.run_at_startup = run_at_startup;
 
-        // 自动执行后台初始化入口
+        // 自动执行生命周期文件进行初始化
         // Headless 插件：执行 index.js (entry)
-        // View 插件：执行 manifest.lifecycle 指向的后台入口（默认 lifecycle.js）
+        // View 插件：执行 lifecycle.js（如果存在）
         let entry_path = path.join(&manifest.entry);
 
         if entry_path.is_file() {
@@ -115,18 +115,18 @@ pub fn load_plugins_internal(
                         plugins_to_init.push((manifest.id.clone(), entry_path, dir_name.clone()));
                     }
                     "html" => {
-                        // View 插件：查找并执行后台入口脚本
-                        let background_entry_file = manifest
+                        // View 插件：查找并执行 lifecycle.js
+                        let lifecycle_file = manifest
                             .lifecycle
                             .as_ref()
                             .map(|s| s.as_str())
                             .unwrap_or("lifecycle.js");
-                        let background_entry_path = path.join(background_entry_file);
+                        let lifecycle_path = path.join(lifecycle_file);
 
-                        if background_entry_path.is_file() {
+                        if lifecycle_path.is_file() {
                             plugins_to_init.push((
                                 manifest.id.clone(),
-                                background_entry_path,
+                                lifecycle_path,
                                 dir_name.clone(),
                             ));
                         }
@@ -151,7 +151,7 @@ pub fn load_plugins_internal(
     let plugins = store_lock.values().cloned().collect();
     drop(store_lock);
 
-    // 执行所有插件的后台初始化入口
+    // 执行所有插件的初始化脚本
     if !plugins_to_init.is_empty() {
         let app_clone = app.clone();
         std::thread::spawn(move || {

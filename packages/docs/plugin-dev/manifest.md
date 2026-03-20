@@ -15,7 +15,7 @@
   "type": "ui",
   "display_mode": "inline",
   "auto_detach": false,
-  "lifecycle": "dist/lifecycle.js",
+  "lifecycle": "lifecycle.js",
   "devMode": false,
   "devServer": "http://localhost:5173",
   "commands": [...],
@@ -43,11 +43,11 @@
 | `auto_detach`  | `boolean`                | `false`    | UI 插件是否始终在独立窗口中打开                                                       |
 | `terminate_on_bg` | `boolean`             | `false`    | 应用隐藏到后台时是否立即结束插件运行。对于节省资源的工具类插件建议开启 |
 | `run_at_startup` | `boolean`              | `false`    | 是否随 Onin 主程序启动自动加载并运行插件                                              |
-| `lifecycle`    | `string`                 | `"lifecycle.js"` | 视图插件的后台入口脚本路径。字段名沿用 `lifecycle`，但语义上它就是 background entry |
+| `lifecycle`    | `string`                 | `"lifecycle.js"` | 视图插件的初始化脚本路径。即便 UI 未打开，该脚本也会被执行（需 `run_at_startup` 支持） |
 
 ### `lifecycle` 字段的关键约束
 
-`lifecycle` 字段名虽然保留了旧名称，但它指向的其实是插件的后台入口文件。Onin 只会执行插件目录里真实存在的文件。
+`lifecycle` 不是声明了就会生效，Onin 只会执行插件目录里真实存在的文件。
 
 这意味着你必须同时满足：
 
@@ -67,12 +67,14 @@
 - `command.handle()` 没有注册
 - `run_at_startup` 看起来“没反应”
 
-对于 UI 插件，推荐采用单源码声明、双产物输出：一次构建同时产出页面和后台入口脚本：
+对于 UI 插件，推荐把生命周期构建作为单独步骤显式写进 `package.json`：
 
 ```json
 {
   "scripts": {
-    "build": "node ./scripts/build.mjs"
+    "build:index": "vite build",
+    "build:lifecycle": "vite build --config vite.lifecycle.config.ts",
+    "build": "npm run build:index && npm run build:lifecycle"
   }
 }
 ```

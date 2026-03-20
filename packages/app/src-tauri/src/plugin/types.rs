@@ -248,9 +248,9 @@ pub struct PluginManifest {
     /// 跟随主程序同时启动运行
     #[serde(default)]
     pub run_at_startup: bool,
-    /// 后台入口脚本路径（可选，manifest 字段名沿用 lifecycle）
-    /// 对于视图插件（HTML 入口），此文件会在加载时执行
-    /// 用于注册后台初始化逻辑、设置和命令
+    /// 生命周期文件路径（可选）
+    /// 对于视图插件（HTML 入口），此文件将在加载时执行
+    /// 用于注册生命周期钩子、设置和命令
     /// 默认值："lifecycle.js"
     #[serde(skip_serializing_if = "Option::is_none")]
     pub lifecycle: Option<String>,

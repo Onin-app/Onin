@@ -11,5 +11,5 @@
     "skipLibCheck": true,
     "types": ["svelte"]
   },
-  "include": ["src/**/*.ts", "src/**/*.svelte", "vite.config.ts"]
+  "include": ["src/**/*.ts", "src/**/*.svelte", "vite.config.ts", "vite.lifecycle.config.ts"]
 }

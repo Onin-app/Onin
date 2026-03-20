@@ -182,7 +182,7 @@ pub fn toggle_plugin_run_at_startup(
 
 /// 注册插件设置模式
 ///
-/// 由插件后台入口脚本调用，注册可配置的设置项
+/// 由插件生命周期脚本调用，注册可配置的设置项
 #[tauri::command]
 pub fn register_plugin_settings_schema(
     app: tauri::AppHandle,

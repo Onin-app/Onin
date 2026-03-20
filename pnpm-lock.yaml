@@ -105,9 +105,6 @@ importers:
       '@types/pinyin':
         specifier: ^2.10.2
         version: 2.10.2
-      conventional-changelog-conventionalcommits:
-        specifier: ^8.0.0
-        version: 8.0.0
       phosphor-svelte:
         specifier: ^3.0.1
         version: 3.0.1(rolldown-vite@7.2.5(@types/node@24.10.4)(esbuild@0.25.5)(jiti@2.6.1)(yaml@2.8.2))(svelte@5.34.7)
@@ -164,6 +161,15 @@ importers:
         specifier: workspace:*
         version: link:../sdk
     devDependencies:
+      '@sveltejs/vite-plugin-svelte':
+        specifier: ^6.2.1
+        version: 6.2.4(rolldown-vite@7.2.5(@types/node@24.10.4)(esbuild@0.25.5)(jiti@2.6.1)(yaml@2.8.2))(svelte@5.46.1)
+      svelte:
+        specifier: ^5.43.8
+        version: 5.46.1
+      svelte-check:
+        specifier: ^4.3.4
+        version: 4.3.5(picomatch@4.0.3)(svelte@5.46.1)(typescript@5.8.3)
       typescript:
         specifier: ~5.8.3
         version: 5.8.3
@@ -1720,10 +1726,6 @@ packages:
     resolution: {integrity: sha512-CLf+zr6St0wIxos4bmaKHRXWAcsCXrJU6F4VdNDrGRK3B8LDLKoX3zuMV5GhtbGkVR/LohZ6MT6im43vZLSjmA==}
     engines: {node: '>=18'}
 
-  conventional-changelog-conventionalcommits@8.0.0:
-    resolution: {integrity: sha512-eOvlTO6OcySPyyyk8pKz2dP4jjElYunj9hn9/s0OB+gapTO8zwS9UQWrZ1pmF2hFs3vw1xhonOLGcGjy/zgsuA==}
-    engines: {node: '>=18'}
-
   conventional-changelog-writer@8.2.0:
     resolution: {integrity: sha512-Y2aW4596l9AEvFJRwFGJGiQjt2sBYTjPD18DdvxX9Vpz0Z7HQ+g1Z+6iYDAm1vR3QOJrDBkRHixHK/+FhkR6Pw==}
     engines: {node: '>=18'}
@@ -1812,6 +1814,9 @@ packages:
   detect-libc@2.0.4:
     resolution: {integrity: sha512-3UDv+G9CsCKO1WKMGw9fwq/SWJYbI0c5Y7LU1AXYoDdbhE2AHQ6N6Nb34sG8Fj7T5APy8qXDCKuuIHd1BR0tVA==}
     engines: {node: '>=8'}
+
+  devalue@5.6.1:
+    resolution: {integrity: sha512-jDwizj+IlEZBunHcOuuFVBnIMPAEHvTsJj0BcIp94xYguLRVBcXO853px/MyIJvbVzWdsGvrRweIUWJw8hBP7A==}
 
   devalue@5.6.3:
     resolution: {integrity: sha512-nc7XjUU/2Lb+SvEFVGcWLiKkzfw8+qHI7zn8WYXKkLMgfGSHbgCEaR6bJpev8Cm6Rmrb19Gfd/tZvGqx9is3wg==}
@@ -3445,6 +3450,14 @@ packages:
       svelte: ^4.0.0 || ^5.0.0-next.0
       typescript: '>=5.0.0'
 
+  svelte-check@4.3.5:
+    resolution: {integrity: sha512-e4VWZETyXaKGhpkxOXP+B/d0Fp/zKViZoJmneZWe/05Y2aqSKj3YN2nLfYPJBQ87WEiY4BQCQ9hWGu9mPT1a1Q==}
+    engines: {node: '>= 18.0.0'}
+    hasBin: true
+    peerDependencies:
+      svelte: ^4.0.0 || ^5.0.0-next.0
+      typescript: '>=5.0.0'
+
   svelte-sonner@1.0.7:
     resolution: {integrity: sha512-1EUFYmd7q/xfs2qCHwJzGPh9n5VJ3X6QjBN10fof2vxgy8fYE7kVfZ7uGnd7i6fQaWIr5KvXcwYXE/cmTEjk5A==}
     peerDependencies:
@@ -4662,6 +4675,13 @@ snapshots:
       svelte: 5.34.7
       vite: rolldown-vite@7.2.5(@types/node@24.10.4)(esbuild@0.25.5)(jiti@2.6.1)(yaml@2.8.2)
 
+  '@sveltejs/vite-plugin-svelte-inspector@5.0.2(@sveltejs/vite-plugin-svelte@6.2.4(rolldown-vite@7.2.5(@types/node@24.10.4)(esbuild@0.25.5)(jiti@2.6.1)(yaml@2.8.2))(svelte@5.46.1))(rolldown-vite@7.2.5(@types/node@24.10.4)(esbuild@0.25.5)(jiti@2.6.1)(yaml@2.8.2))(svelte@5.46.1)':
+    dependencies:
+      '@sveltejs/vite-plugin-svelte': 6.2.4(rolldown-vite@7.2.5(@types/node@24.10.4)(esbuild@0.25.5)(jiti@2.6.1)(yaml@2.8.2))(svelte@5.46.1)
+      obug: 2.1.1
+      svelte: 5.46.1
+      vite: rolldown-vite@7.2.5(@types/node@24.10.4)(esbuild@0.25.5)(jiti@2.6.1)(yaml@2.8.2)
+
   '@sveltejs/vite-plugin-svelte@6.2.4(rolldown-vite@7.2.5(@types/node@24.10.4)(esbuild@0.25.5)(jiti@2.6.1)(yaml@2.8.2))(svelte@5.34.7)':
     dependencies:
       '@sveltejs/vite-plugin-svelte-inspector': 5.0.2(@sveltejs/vite-plugin-svelte@6.2.4(rolldown-vite@7.2.5(@types/node@24.10.4)(esbuild@0.25.5)(jiti@2.6.1)(yaml@2.8.2))(svelte@5.34.7))(rolldown-vite@7.2.5(@types/node@24.10.4)(esbuild@0.25.5)(jiti@2.6.1)(yaml@2.8.2))(svelte@5.34.7)
@@ -4669,6 +4689,16 @@ snapshots:
       magic-string: 0.30.21
       obug: 2.1.1
       svelte: 5.34.7
+      vite: rolldown-vite@7.2.5(@types/node@24.10.4)(esbuild@0.25.5)(jiti@2.6.1)(yaml@2.8.2)
+      vitefu: 1.1.1(rolldown-vite@7.2.5(@types/node@24.10.4)(esbuild@0.25.5)(jiti@2.6.1)(yaml@2.8.2))
+
+  '@sveltejs/vite-plugin-svelte@6.2.4(rolldown-vite@7.2.5(@types/node@24.10.4)(esbuild@0.25.5)(jiti@2.6.1)(yaml@2.8.2))(svelte@5.46.1)':
+    dependencies:
+      '@sveltejs/vite-plugin-svelte-inspector': 5.0.2(@sveltejs/vite-plugin-svelte@6.2.4(rolldown-vite@7.2.5(@types/node@24.10.4)(esbuild@0.25.5)(jiti@2.6.1)(yaml@2.8.2))(svelte@5.46.1))(rolldown-vite@7.2.5(@types/node@24.10.4)(esbuild@0.25.5)(jiti@2.6.1)(yaml@2.8.2))(svelte@5.46.1)
+      deepmerge: 4.3.1
+      magic-string: 0.30.21
+      obug: 2.1.1
+      svelte: 5.46.1
       vite: rolldown-vite@7.2.5(@types/node@24.10.4)(esbuild@0.25.5)(jiti@2.6.1)(yaml@2.8.2)
       vitefu: 1.1.1(rolldown-vite@7.2.5(@types/node@24.10.4)(esbuild@0.25.5)(jiti@2.6.1)(yaml@2.8.2))
 
@@ -5353,10 +5383,6 @@ snapshots:
     dependencies:
       compare-func: 2.0.0
 
-  conventional-changelog-conventionalcommits@8.0.0:
-    dependencies:
-      compare-func: 2.0.0
-
   conventional-changelog-writer@8.2.0:
     dependencies:
       conventional-commits-filter: 5.0.0
@@ -5421,6 +5447,8 @@ snapshots:
   dequal@2.0.3: {}
 
   detect-libc@2.0.4: {}
+
+  devalue@5.6.1: {}
 
   devalue@5.6.3: {}
 
@@ -6933,6 +6961,18 @@ snapshots:
     transitivePeerDependencies:
       - picomatch
 
+  svelte-check@4.3.5(picomatch@4.0.3)(svelte@5.46.1)(typescript@5.8.3):
+    dependencies:
+      '@jridgewell/trace-mapping': 0.3.25
+      chokidar: 4.0.3
+      fdir: 6.4.6(picomatch@4.0.3)
+      picocolors: 1.1.1
+      sade: 1.8.1
+      svelte: 5.46.1
+      typescript: 5.8.3
+    transitivePeerDependencies:
+      - picomatch
+
   svelte-sonner@1.0.7(svelte@5.34.7):
     dependencies:
       runed: 0.28.0(svelte@5.34.7)
@@ -6965,19 +7005,19 @@ snapshots:
   svelte@5.46.1:
     dependencies:
       '@jridgewell/remapping': 2.3.5
-      '@jridgewell/sourcemap-codec': 1.5.5
+      '@jridgewell/sourcemap-codec': 1.5.0
       '@sveltejs/acorn-typescript': 1.0.5(acorn@8.15.0)
       '@types/estree': 1.0.8
       acorn: 8.15.0
       aria-query: 5.3.2
       axobject-query: 4.1.0
       clsx: 2.1.1
-      devalue: 5.6.3
+      devalue: 5.6.1
       esm-env: 1.2.2
       esrap: 2.2.1
       is-reference: 3.0.3
       locate-character: 3.0.0
-      magic-string: 0.30.21
+      magic-string: 0.30.17
       zimmerframe: 1.1.2
 
   tabbable@6.2.0: {}

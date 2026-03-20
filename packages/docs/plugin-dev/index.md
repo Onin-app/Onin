@@ -60,14 +60,13 @@ npx create-onin-plugin my-plugin
 
 脚手架默认会生成：
 
-- `src/plugin.ts`
-- `src/background.ts`
 - `src/main.ts`
+- `src/lifecycle.ts`
 - `manifest.json`
-- `scripts/build.mjs`
+- `vite.lifecycle.config.ts`
 - `pnpm build`
 - `pnpm pack:plugin`
 
-这可以直接避开 UI 插件最常见的发布问题，例如后台入口文件漏构建、`manifest.lifecycle` 路径不一致、zip 产物不完整，同时避免作者自己维护两套入口源码。
+这可以直接避开 UI 插件最常见的发布问题，例如 `lifecycle.js` 漏构建、`manifest.lifecycle` 路径不一致、zip 产物不完整。
 
 下一步建议直接看 [5 分钟快速开始](./quickstart)。

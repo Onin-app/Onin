@@ -5,8 +5,8 @@ export default function App(props) {
         <p class="eyebrow">Onin Plugin</p>
         <h1>{props.pluginName}</h1>
         <p class="lede">
-          This starter uses a single plugin declaration and emits both UI and
-          background artifacts from one build command.
+          This starter includes a dedicated lifecycle build, release pack command,
+          and a manifest wired for marketplace-safe output.
         </p>
       </section>
 
@@ -17,14 +17,12 @@ export default function App(props) {
             Vite app build to <code>dist/</code>
           </li>
           <li>
-            Single <code>src/plugin.js</code> declaration
+            Standalone <code>lifecycle.js</code> build
           </li>
           <li>
-            Generated <code>dist/lifecycle.js</code> background entry
+            <code>pnpm pack</code> for release zip creation
           </li>
-          <li>
-            <code>pnpm pack:plugin</code> for release zip creation
-          </li>
+          <li>Manifest and lifecycle path already aligned</li>
         </ul>
       </section>
 

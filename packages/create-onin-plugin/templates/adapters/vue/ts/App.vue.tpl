@@ -11,7 +11,7 @@ defineProps<{
       <p class="eyebrow">Onin Plugin</p>
       <h1>{{ pluginName }}</h1>
       <p class="lede">
-        This starter includes a single plugin declaration, unified background entry build,
+        This starter includes a dedicated lifecycle build, release pack command,
         and a manifest wired for marketplace-safe output.
       </p>
     </section>
@@ -20,9 +20,9 @@ defineProps<{
       <h2>What is ready</h2>
       <ul>
         <li>Vite app build to <code>dist/</code></li>
-        <li>Generated <code>dist/lifecycle.js</code> background entry</li>
+        <li>Standalone <code>lifecycle.js</code> build</li>
         <li><code>pnpm pack</code> for release zip creation</li>
-        <li>Manifest background entry path already aligned</li>
+        <li>Manifest and lifecycle path already aligned</li>
       </ul>
     </section>
 
