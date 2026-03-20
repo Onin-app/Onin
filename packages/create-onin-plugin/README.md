@@ -101,9 +101,9 @@ The CLI currently supports:
 
 Every generated plugin includes:
 
-- `src/lifecycle.ts`
+- `src/background.ts`
 - `manifest.json`
-- `vite.lifecycle.config.ts`
+- `vite.background.config.ts`
 - `pnpm pack:plugin`
 
 Framework-specific starters add their own UI entry files such as `src/main.ts`, `src/main.tsx`, and framework app components.
@@ -113,4 +113,4 @@ The release zip contains:
 - `manifest.json`
 - `icon.svg`
 - `dist/index.html`
-- `dist/lifecycle.js`
+- `dist/background.js`

@@ -6,9 +6,9 @@ export default defineConfig({
     outDir: "dist",
     emptyOutDir: false,
     lib: {
-      entry: resolve(__dirname, "src/lifecycle.ts"),
+      entry: resolve(__dirname, "src/background.js"),
       formats: ["es"],
-      fileName: () => "lifecycle.js",
+      fileName: () => "background.js",
     },
     rollupOptions: {
       external: [],

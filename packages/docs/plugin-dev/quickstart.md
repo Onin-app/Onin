@@ -94,10 +94,10 @@ pnpm install
 脚手架默认会生成一个可发布的 UI 插件模板，已经包含：
 
 - `src/main.ts` 或 `src/main.tsx`
-- `src/lifecycle.ts`
+- `src/background.ts`
 - `manifest.json`
 - `vite.config.ts`
-- `vite.lifecycle.config.ts`
+- `vite.background.config.ts`
 - `pnpm build`
 - `pnpm pack:plugin`
 
@@ -236,9 +236,9 @@ pnpm dev
 
 Onin 会直接加载开发服务器的内容，修改代码后自动刷新。
 
-## 7. 给 UI 插件补上 lifecycle 构建
+## 7. 给 UI 插件补上 background 构建
 
-如果你的 UI 插件要做以下任一事情，就不要只构建页面入口，还必须额外构建 `lifecycle.js`：
+如果你的 UI 插件要做以下任一事情，就不要只构建页面入口，还必须额外构建 `background.js`：
 
 - 注册插件设置页
 - 注册指令处理器
@@ -251,14 +251,14 @@ Onin 会直接加载开发服务器的内容，修改代码后自动刷新。
 my-onin-plugin/
 ├─ src/
 │  ├─ main.ts
-│  └─ lifecycle.ts
+│  └─ background.ts
 ├─ index.html
 ├─ manifest.json
 ├─ vite.config.ts
-└─ vite.lifecycle.config.ts
+└─ vite.background.config.ts
 ```
 
-`src/lifecycle.ts` 示例：
+`src/background.ts` 示例：
 
 ```ts
 import { lifecycle, settings, command } from 'onin-sdk';
@@ -280,7 +280,7 @@ lifecycle.onLoad(async () => {
 });
 ```
 
-`vite.lifecycle.config.ts` 示例：
+`vite.background.config.ts` 示例：
 
 ```ts
 import { defineConfig } from 'vite';
@@ -291,9 +291,9 @@ export default defineConfig({
     outDir: '.',
     emptyOutDir: false,
     lib: {
-      entry: resolve(__dirname, 'src/lifecycle.ts'),
+      entry: resolve(__dirname, 'src/background.ts'),
       formats: ['es'],
-      fileName: () => 'lifecycle.js',
+      fileName: () => 'background.js',
     },
     rollupOptions: {
       external: [],
@@ -312,8 +312,8 @@ export default defineConfig({
   "scripts": {
     "dev": "vite",
     "build:index": "vite build",
-    "build:lifecycle": "vite build --config vite.lifecycle.config.ts",
-    "build": "npm run build:index && npm run build:lifecycle"
+    "build:background": "vite build --config vite.background.config.ts",
+    "build": "npm run build:index && npm run build:background"
   }
 }
 ```
@@ -323,11 +323,11 @@ export default defineConfig({
 ```json
 {
   "entry": "dist/index.html",
-  "lifecycle": "lifecycle.js"
+  "background": "dist/background.js"
 }
 ```
 
-如果你把生命周期文件输出到 `dist/`，那就把 manifest 改成 `"lifecycle": "dist/lifecycle.js"`。两边只要有一边不一致，Onin 就不会执行生命周期脚本，设置按钮和指令注册都会失效。
+如果你把后台文件输出到 `dist/`，那就把 manifest 改成 `"background": "dist/background.js"`。两边只要有一边不一致，Onin 就不会执行后台脚本，设置按钮和指令注册都会失效。
 
 ## 8. 发布前检查
 
@@ -336,9 +336,9 @@ export default defineConfig({
 - `manifest.json`
 - `icon.png` 或其他图标文件
 - `dist/index.html` 及其静态资源
-- `lifecycle.js` 或 `manifest.lifecycle` 指向的实际文件
+- `background.js` 或 `manifest.background` 指向的实际文件
 
-最常见的问题是本地开发可用，但发布 zip 漏了 `lifecycle.js`。这会导致插件页面能打开，但设置 schema、指令处理器、启动初始化都不会注册。
+最常见的问题是本地开发可用，但发布 zip 漏了 `background.js`。这会导致插件页面能打开，但设置 schema、指令处理器、启动初始化都不会注册。
 
 ## 下一步
 

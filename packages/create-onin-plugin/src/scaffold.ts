@@ -56,8 +56,8 @@ export async function scaffoldPlugin(
     settingsImport: answers.withSettings ? ", settings" : "",
     settingsBlock: buildSettingsBlock(answers.withSettings),
     settingsNote: answers.withSettings
-      ? "This template includes a sample settings schema registered from lifecycle.ts."
-      : "This template omits settings schema. Add it later in src/lifecycle.ts if needed.",
+      ? "This template includes a sample settings schema registered from background.ts."
+      : "This template omits settings schema. Add it later in src/background.ts if needed.",
   };
 
   await copyTemplateDir(baseTemplateDir, targetDir, context, new Set(["package.json.tpl"]));

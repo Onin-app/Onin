@@ -15,7 +15,7 @@
   "type": "ui",
   "display_mode": "inline",
   "auto_detach": false,
-  "lifecycle": "lifecycle.js",
+  "background": "dist/background.js",
   "devMode": false,
   "devServer": "http://localhost:5173",
   "commands": [...],
@@ -39,26 +39,26 @@
 
 | 字段           | 类型                     | 默认值     | 说明                            |
 | -------------- | ------------------------ | ---------- | ------------------------------- |
-| `display_mode` | `"inline"` \| `"window"` | `"inline"` | 插件默认显示方式                                                                       |
-| `auto_detach`  | `boolean`                | `false`    | UI 插件是否始终在独立窗口中打开                                                       |
-| `terminate_on_bg` | `boolean`             | `false`    | 应用隐藏到后台时是否立即结束插件运行。对于节省资源的工具类插件建议开启 |
-| `run_at_startup` | `boolean`              | `false`    | 是否随 Onin 主程序启动自动加载并运行插件                                              |
-| `lifecycle`    | `string`                 | `"lifecycle.js"` | 视图插件的初始化脚本路径。即便 UI 未打开，该脚本也会被执行（需 `run_at_startup` 支持） |
+| `display_mode` | `"inline"` \| `"window"` | `"inline"`             | 插件默认显示方式                                                |
+| `auto_detach`  | `boolean`                | `false`                | UI 插件是否始终在独立窗口中打开                                  |
+| `terminate_on_bg` | `boolean`             | `false`                | 应用隐藏到后台时是否立即结束插件运行。对于节省资源的工具类插件建议开启 |
+| `run_at_startup` | `boolean`              | `false`                | 是否随 Onin 主程序启动自动加载并运行插件                         |
+| `background`  | `string`                 | `"dist/background.js"` | 视图插件的后台初始化脚本路径。即便 UI 未打开，该脚本也会被执行（需 `run_at_startup` 支持） |
 
-### `lifecycle` 字段的关键约束
+### `background` 字段的关键约束
 
-`lifecycle` 不是声明了就会生效，Onin 只会执行插件目录里真实存在的文件。
+`background` 不是声明了就会生效，Onin 只会执行插件目录里真实存在的文件。
 
 这意味着你必须同时满足：
 
-1. `manifest.json` 里的 `lifecycle` 路径写对
+1. `manifest.json` 里的 `background` 路径写对
 2. 构建流程实际产出了这个文件
 3. 发布 zip 把这个文件带进去了
 
 例如：
 
-- `lifecycle: "lifecycle.js"` 对应插件根目录下的 `lifecycle.js`
-- `lifecycle: "dist/lifecycle.js"` 对应 `dist/lifecycle.js`
+- `background: "background.js"` 对应插件根目录下的 `background.js`
+- `background: "dist/background.js"` 对应 `dist/background.js`
 
 如果文件缺失，常见表现是：
 
@@ -67,19 +67,19 @@
 - `command.handle()` 没有注册
 - `run_at_startup` 看起来“没反应”
 
-对于 UI 插件，推荐把生命周期构建作为单独步骤显式写进 `package.json`：
+对于 UI 插件，推荐把后台构建作为单独步骤显式写进 `package.json`：
 
 ```json
 {
   "scripts": {
     "build:index": "vite build",
-    "build:lifecycle": "vite build --config vite.lifecycle.config.ts",
-    "build": "npm run build:index && npm run build:lifecycle"
+    "build:background": "vite build --config vite.background.config.ts",
+    "build": "npm run build:index && npm run build:background"
   }
 }
 ```
 
-发布前请直接解压 zip 检查 `manifest.lifecycle` 指向的目标文件是否存在。
+发布前请直接解压 zip 检查 `manifest.background` 指向的目标文件是否存在。
 
 ## 开发模式
 

@@ -99,9 +99,9 @@ pub fn load_plugins_internal(
         manifest_with_state.terminate_on_bg = terminate_on_bg;
         manifest_with_state.run_at_startup = run_at_startup;
 
-        // 自动执行生命周期文件进行初始化
+        // 自动执行后台脚本进行初始化
         // Headless 插件：执行 index.js (entry)
-        // View 插件：执行 lifecycle.js（如果存在）
+        // View 插件：执行 background.js（如果存在）
         let entry_path = path.join(&manifest.entry);
 
         if entry_path.is_file() {
@@ -115,18 +115,17 @@ pub fn load_plugins_internal(
                         plugins_to_init.push((manifest.id.clone(), entry_path, dir_name.clone()));
                     }
                     "html" => {
-                        // View 插件：查找并执行 lifecycle.js
-                        let lifecycle_file = manifest
-                            .lifecycle
-                            .as_ref()
-                            .map(|s| s.as_str())
-                            .unwrap_or("lifecycle.js");
-                        let lifecycle_path = path.join(lifecycle_file);
+                        // View 插件：执行 background.js
+                        let background_file = manifest
+                            .background
+                            .as_deref()
+                            .unwrap_or(PluginManifest::default_background_entry());
+                        let background_path = path.join(background_file);
 
-                        if lifecycle_path.is_file() {
+                        if background_path.is_file() {
                             plugins_to_init.push((
                                 manifest.id.clone(),
-                                lifecycle_path,
+                                background_path,
                                 dir_name.clone(),
                             ));
                         }

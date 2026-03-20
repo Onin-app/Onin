@@ -1,4 +1,5 @@
 use super::*;
+use serde_json::json;
 
 #[test]
 fn test_parse_plugin_dir_name() {
@@ -31,4 +32,20 @@ fn test_make_plugin_dir_name() {
         make_plugin_dir_name("plugin-demo", InstallSource::Local),
         "plugin-demo@local".to_string()
     );
+}
+
+#[test]
+fn test_manifest_background_field_is_parsed() {
+    let manifest: PluginManifest = serde_json::from_value(json!({
+        "id": "com.example.demo",
+        "name": "Demo",
+        "version": "0.1.0",
+        "description": "demo",
+        "entry": "dist/index.html",
+        "background": "dist/background.js",
+        "commands": []
+    }))
+    .unwrap();
+
+    assert_eq!(manifest.background.as_deref(), Some("dist/background.js"));
 }
