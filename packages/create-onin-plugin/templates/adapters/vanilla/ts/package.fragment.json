@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "dev": "vite"
+    "dev": "vite",
+    "build:index": "vite build"
   },
   "devDependencies": {
     "typescript": "^5.5.0",

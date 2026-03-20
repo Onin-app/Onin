@@ -27,9 +27,7 @@ export interface PluginManagerReturn {
   toggleRunAtStartup: (checked: boolean) => Promise<void>;
   openDevTools: () => Promise<void>;
   uninstallPlugin: () => Promise<void>;
-  sendLifecycleEvent: (
-    event: "show" | "hide" | "focus" | "blur" | "cleanup",
-  ) => void;
+  sendLifecycleEvent: (event: "show" | "hide" | "focus" | "blur") => void;
   // Lifecycle
   setupListeners: () => Promise<UnlistenFn>;
 }
@@ -70,10 +68,6 @@ export function usePluginManager(): PluginManagerReturn {
     state.currentPluginTerminateOnBg = false;
     state.currentPluginRunAtStartup = false;
 
-    if (shouldTerminate) {
-      sendLifecycleEvent("cleanup");
-    }
-
     // 未勾选 terminate_on_bg 时，仅隐藏并保活；勾选时才销毁
     invoke(
       shouldTerminate ? "close_inline_plugin" : "hide_inline_plugin",
@@ -96,7 +90,6 @@ export function usePluginManager(): PluginManagerReturn {
       // 步骤 1：先发送 blur/hide 生命周期事件，并更新 UI 状态
       sendLifecycleEvent("blur");
       sendLifecycleEvent("hide");
-      sendLifecycleEvent("cleanup");
       state.showPluginInline = false;
       state.currentPluginUrl = "";
       state.currentPluginId = "";
@@ -154,9 +147,7 @@ export function usePluginManager(): PluginManagerReturn {
   /**
    * 发送生命周期事件给插件
    */
-  const sendLifecycleEvent = (
-    event: "show" | "hide" | "focus" | "blur" | "cleanup",
-  ) => {
+  const sendLifecycleEvent = (event: "show" | "hide" | "focus" | "blur") => {
     invoke("post_inline_plugin_message", {
       message: {
         type: "plugin-lifecycle-event",

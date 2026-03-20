@@ -8,7 +8,6 @@
   import { onMount, onDestroy } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { listen, type UnlistenFn } from "@tauri-apps/api/event"; // [Fix] Import UnlistenFn
-  import { toast } from "svelte-sonner";
 
   interface Props {
     url: string;
@@ -22,21 +21,6 @@
   let resizeObserver: ResizeObserver | null = null;
   let isMounted = false;
   let unlistenLoaded: UnlistenFn | null = null; // [Fix] Declare at top level
-
-  function formatInlinePluginError(error: unknown): string {
-    const rawMessage =
-      error instanceof Error ? error.message : typeof error === "string" ? error : String(error);
-
-    if (rawMessage.includes("插件入口文件未找到")) {
-      return "插件入口文件缺失，请检查插件包是否完整。";
-    }
-
-    if (rawMessage.includes("background.js") || rawMessage.includes("后台入口")) {
-      return "插件后台入口缺失，设置、命令注册和启动初始化可能不会生效。";
-    }
-
-    return rawMessage;
-  }
 
   /**
    * 计算带有 mode 和 plugin_id 参数的 URL
@@ -127,10 +111,6 @@
       // onLoad?.();
     } catch (error) {
       console.error("[PluginInlineView] Failed to show webview:", error);
-      toast.error("插件视图加载失败", {
-        id: `plugin-inline-load-error:${pluginId || "unknown"}`,
-        description: formatInlinePluginError(error),
-      });
     }
   }
 

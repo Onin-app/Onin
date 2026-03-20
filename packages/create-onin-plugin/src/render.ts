@@ -38,9 +38,6 @@ export function renderTemplate(content: string, context: TemplateContext): strin
     .replaceAll("__SETTINGS_BLOCK__", context.settingsBlock)
     .replaceAll("__SETTINGS_IMPORT__", context.settingsImport)
     .replaceAll("__SETTINGS_NOTE__", context.settingsNote)
-    .replaceAll("__SCRIPT_EXT__", context.scriptExtension)
-    .replaceAll("__BACKGROUND_ENTRY_FILE__", context.backgroundEntryFile)
-    .replaceAll("__BACKGROUND_ENTRY_PATH__", context.backgroundEntryPath)
     .replaceAll("__KEYWORD__", context.keyword);
 }
 
@@ -162,7 +159,7 @@ export function buildSettingsBlock(withSettings: boolean): string {
       label: "Accent Color",
       type: "color",
       defaultValue: "#111827",
-      description: "Example plugin setting registered during plugin setup.",
+      description: "Example plugin setting registered during lifecycle onLoad.",
     },
   ]);
 `;

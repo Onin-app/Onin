@@ -248,6 +248,12 @@ pub struct PluginManifest {
     /// 跟随主程序同时启动运行
     #[serde(default)]
     pub run_at_startup: bool,
+    /// 生命周期文件路径（可选）
+    /// 对于视图插件（HTML 入口），此文件将在加载时执行
+    /// 用于注册生命周期钩子、设置和命令
+    /// 默认值："lifecycle.js"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lifecycle: Option<String>,
     /// 开发模式标志
     /// 如果为 true，插件将从 devServer 加载而非本地文件
     #[serde(default, rename = "devMode")]

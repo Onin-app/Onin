@@ -7,7 +7,7 @@
  *
  * 消息格式：
  * - plugin-runtime-init: { type, runtime: { mode, pluginId, ... } }
- * - plugin-lifecycle-event: { type, event: 'show'|'hide'|'focus'|'blur'|'cleanup' }
+ * - plugin-lifecycle-event: { type, event: 'show'|'hide'|'focus'|'blur' }
  */
 
 import { BaseAdapter } from './base';
@@ -158,13 +158,9 @@ export class LifecycleMessageAdapter extends BaseAdapter {
    * 处理生命周期事件
    */
   private handleLifecycleEvent(
-    event: 'show' | 'hide' | 'focus' | 'blur' | 'cleanup',
+    event: 'show' | 'hide' | 'focus' | 'blur',
   ): void {
     console.log('[LifecycleMessageAdapter] Lifecycle event:', event);
-
-    if (event === 'cleanup') {
-      return;
-    }
 
     // 如果状态未知，设置正确的初始状态
     if ((this as any)._stateUnknown) {

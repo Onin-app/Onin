@@ -93,11 +93,11 @@ pnpm install
 
 脚手架默认会生成一个可发布的 UI 插件模板，已经包含：
 
-- `src/plugin.ts` 或 `src/plugin.js`
-- `src/main.ts` 或 `src/main.js`
+- `src/main.ts` 或 `src/main.tsx`
+- `src/lifecycle.ts`
 - `manifest.json`
 - `vite.config.ts`
-- `scripts/build.mjs`
+- `vite.lifecycle.config.ts`
 - `pnpm build`
 - `pnpm pack:plugin`
 
@@ -138,6 +138,14 @@ pnpm add onin-sdk
   "description": "一个简单的示例插件",
   "entry": "index.html",
   "type": "ui",
+  "commands": [
+    {
+      "code": "hello",
+      "name": "打个招呼",
+      "description": "显示一个问好消息",
+      "keywords": [{ "name": "hello" }, { "name": "你好" }]
+    }
+  ],
   "permissions": {
     "notification": {
       "enable": true
@@ -179,7 +187,14 @@ pnpm add onin-sdk
     <button id="btn">发送通知</button>
 
     <script type="module">
-      import { notification } from 'onin-sdk';
+      import { notification, command } from 'onin-sdk';
+
+      // 注册指令处理器
+      await command.handle(async (code, args) => {
+        if (code === 'hello') {
+          return { message: '你好，世界！' };
+        }
+      });
 
       // 按钮点击发送通知
       document.getElementById('btn').addEventListener('click', async () => {
@@ -198,8 +213,7 @@ pnpm add onin-sdk
 1. 打开 Onin，进入「设置」→「插件」
 2. 点击「从本地导入」
 3. 选择你的插件项目目录
-4. 安装完成后，打开插件列表并启动这个插件
-5. 点击页面中的“发送通知”按钮，确认 UI 已成功加载
+4. 安装完成后，在主搜索框输入 `hello` 即可触发指令
 
 ## 6. 开发模式（热更新）
 
@@ -222,9 +236,9 @@ pnpm dev
 
 Onin 会直接加载开发服务器的内容，修改代码后自动刷新。
 
-## 7. 给 UI 插件准备后台入口
+## 7. 给 UI 插件补上 lifecycle 构建
 
-如果你的 UI 插件要做以下任一事情，就不要只构建页面入口，还必须额外产出后台入口脚本：
+如果你的 UI 插件要做以下任一事情，就不要只构建页面入口，还必须额外构建 `lifecycle.js`：
 
 - 注册插件设置页
 - 注册指令处理器
@@ -236,21 +250,20 @@ Onin 会直接加载开发服务器的内容，修改代码后自动刷新。
 ```text
 my-onin-plugin/
 ├─ src/
-│  ├─ plugin.ts
 │  ├─ main.ts
-│  └─ ui.ts
+│  └─ lifecycle.ts
 ├─ index.html
 ├─ manifest.json
 ├─ vite.config.ts
-└─ scripts/build.mjs
+└─ vite.lifecycle.config.ts
 ```
 
-`src/plugin.ts` 示例：
+`src/lifecycle.ts` 示例：
 
 ```ts
-import { command, definePlugin, settings } from 'onin-sdk';
+import { lifecycle, settings, command } from 'onin-sdk';
 
-export const setup = async () => {
+lifecycle.onLoad(async () => {
   await settings.useSettingsSchema([
     {
       key: 'apiKey',
@@ -264,34 +277,57 @@ export const setup = async () => {
       return { ok: true };
     }
   });
-};
+});
+```
 
-export default definePlugin({
-  setup,
-  mount: async ({ target }) => {
-    const { mountPluginUi } = await import('./ui');
-    return mountPluginUi({ target });
+`vite.lifecycle.config.ts` 示例：
+
+```ts
+import { defineConfig } from 'vite';
+import { resolve } from 'path';
+
+export default defineConfig({
+  build: {
+    outDir: '.',
+    emptyOutDir: false,
+    lib: {
+      entry: resolve(__dirname, 'src/lifecycle.ts'),
+      formats: ['es'],
+      fileName: () => 'lifecycle.js',
+    },
+    rollupOptions: {
+      external: [],
+      output: {
+        inlineDynamicImports: true,
+      },
+    },
   },
 });
 ```
 
-`scripts/build.mjs` 会统一完成 UI 和后台入口两次构建：
+`package.json` 至少要有：
 
 ```json
 {
   "scripts": {
     "dev": "vite",
-    "build": "node ./scripts/build.mjs"
+    "build:index": "vite build",
+    "build:lifecycle": "vite build --config vite.lifecycle.config.ts",
+    "build": "npm run build:index && npm run build:lifecycle"
   }
 }
 ```
 
-对 HTML UI 插件，Onin 会按固定约定查找 `dist/background.js`。只要这个文件存在，`setup` 里的设置、指令和启动初始化就会执行。
+`manifest.json` 要和产物路径保持一致：
 
-也就是说：
+```json
+{
+  "entry": "dist/index.html",
+  "lifecycle": "lifecycle.js"
+}
+```
 
-- 直接写在 `index.html` 或 `src/main.ts` 里的页面逻辑，只会在 UI 真正打开后运行。
-- `command.handle()`、`settings.useSettingsSchema()`、启动初始化等后台逻辑，应放在 `src/plugin.ts` 的 `setup` 中，并通过 `dist/background.js` 交给宿主加载。
+如果你把生命周期文件输出到 `dist/`，那就把 manifest 改成 `"lifecycle": "dist/lifecycle.js"`。两边只要有一边不一致，Onin 就不会执行生命周期脚本，设置按钮和指令注册都会失效。
 
 ## 8. 发布前检查
 
@@ -300,9 +336,9 @@ export default definePlugin({
 - `manifest.json`
 - `icon.png` 或其他图标文件
 - `dist/index.html` 及其静态资源
-- `dist/background.js`
+- `lifecycle.js` 或 `manifest.lifecycle` 指向的实际文件
 
-最常见的问题是本地开发可用，但发布 zip 漏了后台入口文件。这样插件页面仍然能打开，但 `setup` 里的设置 schema、指令处理器、启动初始化都不会注册。
+最常见的问题是本地开发可用，但发布 zip 漏了 `lifecycle.js`。这会导致插件页面能打开，但设置 schema、指令处理器、启动初始化都不会注册。
 
 ## 下一步
 

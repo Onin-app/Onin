@@ -86,11 +86,6 @@ import { lifecycle } from './api/lifecycle';
 import { scheduler } from './api/scheduler';
 import { pluginWindow } from './api/window';
 import { ai } from './api/ai';
-import {
-  definePlugin,
-  mountPlugin,
-  setupPlugin,
-} from './plugin';
 
 import { invoke, listen } from './core/ipc';
 import { debug } from './utils/debug';
@@ -161,9 +156,6 @@ export {
   scheduler,
   pluginWindow,
   ai,
-  definePlugin,
-  mountPlugin,
-  setupPlugin,
   invoke,
   listen,
   debug,
@@ -209,14 +201,6 @@ export type {
   OpenDialogOptions,
   SaveDialogOptions,
 } from './api/dialog';
-
-export type {
-  OninPluginDefinition,
-  PluginCleanup,
-  PluginMountResult,
-  PluginSetupContext,
-  PluginUiMountContext,
-} from './plugin';
 
 // Clipboard types
 export type {

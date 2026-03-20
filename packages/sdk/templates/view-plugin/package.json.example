@@ -4,13 +4,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node ./scripts/build.mjs"
+    "build": "npm run build:lifecycle && npm run build:main",
+    "build:lifecycle": "vite build --config vite.lifecycle.config.ts",
+    "build:main": "vite build"
   },
   "devDependencies": {
     "vite": "^5.0.0",
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "onin-sdk": "^0.0.3"
+    "onin-sdk": "^0.0.1"
   }
 }
