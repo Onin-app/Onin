@@ -14,8 +14,6 @@ const context: TemplateContext = {
   pluginDescription: "Sample Plugin plugin for Onin",
   keyword: "sample-plugin",
   scriptExtension: "ts",
-  backgroundEntryFile: "background.js",
-  backgroundEntryPath: "dist/background.js",
   settingsImport: ", settings",
   settingsBlock: "  await settings.useSettingsSchema([]);\n",
   settingsNote: "Settings enabled.",

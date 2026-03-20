@@ -77,27 +77,29 @@ lifecycle.onUnload(async () => {
 | 窗口显示/隐藏 | `pluginWindow.onShow / onHide`  |
 | 窗口焦点变化  | `pluginWindow.onFocus / onBlur` |
 
-## 后台入口脚本
+## 后台入口脚本 (`manifest.lifecycle`)
 
 对于 UI 插件，如果你希望在不打开界面的情况下执行后台逻辑（如定时同步数据、监听系统消息），可以结合 `manifest.json` 中的 `run_at_startup: true` 使用。
 
-Onin 会在启动时自动查找 HTML 插件的固定后台入口 `dist/background.js`。该文件通常由构建脚本从 `src/plugin.ts` 自动生成，并通过 `setupPlugin(plugin)` 绑定到现有 lifecycle runtime，因此初始化逻辑会在后台自动运行。
+Onin 会在启动时自动加载 `manifest.lifecycle` 指定的后台入口文件。字段名虽然叫 `lifecycle`，但实际语义就是 background entry。该文件通常会导入 SDK 并注册 `onLoad`，因此初始化逻辑会在后台自动运行。
 
 **manifest.json 示例：**
 
 ```json
 {
-  "run_at_startup": true
+  "run_at_startup": true,
+  "lifecycle": "dist/lifecycle.js"
 }
 ```
 
 ## 构建要求
 
-对于 UI 插件，宿主需要一个可直接执行的后台入口文件。推荐做法是不再手写第二入口，而是采用单源码声明模式：
+对于 UI 插件，宿主需要一个可直接执行的后台入口文件。推荐做法是不再手写 `lifecycle.ts + vite.lifecycle.config.ts`，而是采用单源码声明模式：
 
-- `src/plugin.ts` 导出 `setup` 和 `mount`
-- `src/main.ts` 作为薄包装，通过 `mountPlugin(plugin, target)` 挂载 UI
-- `scripts/build.mjs` 一次构建出 `dist/index.html` 和 `dist/background.js`
+- `src/plugin.ts` 导出 `background` 和 `ui`
+- `src/background.ts` 作为薄包装，只注册 `background`
+- `src/main.ts` 作为薄包装，只挂载 `ui`
+- `scripts/build.mjs` 一次构建出 `dist/index.html` 和 `dist/lifecycle.js`
 
 最小配置示例：
 
@@ -112,7 +114,7 @@ Onin 会在启动时自动查找 HTML 插件的固定后台入口 `dist/backgrou
 ```ts
 import { command, definePlugin, settings } from 'onin-sdk';
 
-export const setup = async () => {
+export const background = async () => {
   await settings.useSettingsSchema([
     { key: 'apiKey', label: 'API 密钥', type: 'password', required: true },
   ]);
@@ -126,17 +128,20 @@ export const setup = async () => {
 };
 
 export default definePlugin({
-  setup,
-  mount: async ({ target }) => {
-    const { mountPluginUi } = await import('./ui');
-    return mountPluginUi({ target });
+  background,
+  ui: {
+    mount: async ({ target }) => {
+      const { mountPluginUi } = await import('./ui');
+      return mountPluginUi({ target });
+    },
   },
 });
 ```
 
 发布前检查：
 
-- zip 中确实包含 `dist/background.js`
+- `manifest.lifecycle` 的路径和产物路径一致
+- zip 里确实包含该文件
 - 如果后台入口里注册了 settings 或 commands，本地解压后也能看到该文件
 
 如果缺少这个后台入口产物，插件 UI 仍然可能正常打开，但后台初始化不会执行，进而导致设置页、命令注册和启动初始化全部失效。

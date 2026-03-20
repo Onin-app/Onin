@@ -14,7 +14,5 @@ export function mountPluginUi({
 }: MountPluginUiOptions) {
   const app = createApp(App, { pluginName, pluginId });
   app.mount(target);
-  return () => {
-    app.unmount();
-  };
+  return app;
 }

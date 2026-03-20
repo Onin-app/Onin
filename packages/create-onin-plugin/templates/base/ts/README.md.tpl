@@ -26,6 +26,5 @@ pnpm pack:plugin
 - `manifest.json`
 - `icon.svg`
 - `dist/`
-- `__BACKGROUND_ENTRY_PATH__`
 
 __SETTINGS_NOTE__

@@ -12,7 +12,7 @@ export function mountPluginUi({
   target,
   pluginName,
   pluginId,
-}: MountPluginUiOptions) {
+}: MountPluginUiOptions): ReactDOM.Root {
   const root = ReactDOM.createRoot(target);
   root.render(
     <React.StrictMode>
@@ -20,7 +20,5 @@ export function mountPluginUi({
     </React.StrictMode>,
   );
 
-  return () => {
-    root.unmount();
-  };
+  return root;
 }

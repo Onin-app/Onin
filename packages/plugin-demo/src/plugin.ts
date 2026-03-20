@@ -1,27 +1,29 @@
 import { definePlugin, notification } from 'onin-sdk';
 
-export const setup = async () => {
+export const background = async () => {
   const startedAt = new Date().toLocaleString();
-  const startupMessage = `plugin-demo setup 已执行（${startedAt}）`;
+  const startupMessage = `plugin-demo 后台入口已执行（${startedAt}）`;
 
-  console.log(`[plugin-demo/setup] ${startupMessage}`);
+  console.log(`[plugin-demo/background] ${startupMessage}`);
 
   try {
     await notification.show({
-      title: 'Plugin Demo setup 已执行',
+      title: 'Plugin Demo 已启动',
       body: startupMessage,
     });
   } catch (err) {
-    console.error('[plugin-demo/setup] 启动通知发送失败:', err);
+    console.error('[plugin-demo/background] 启动通知发送失败:', err);
   }
 };
 
-export const mount = async ({ target }: { target: HTMLElement }) => {
-  const { mountPluginUi } = await import('./ui');
-  return mountPluginUi({ target });
+export const ui = {
+  mount: async ({ target }: { target: HTMLElement }) => {
+    const { mountPluginUi } = await import('./ui');
+    return mountPluginUi({ target });
+  },
 };
 
 export default definePlugin({
-  setup,
-  mount,
+  background,
+  ui,
 });

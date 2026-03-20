@@ -10,7 +10,5 @@ export function mountPluginUi({ target, pluginName, pluginId }) {
     </React.StrictMode>,
   );
 
-  return () => {
-    root.unmount();
-  };
+  return root;
 }

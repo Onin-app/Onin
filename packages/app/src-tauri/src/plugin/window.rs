@@ -289,24 +289,15 @@ pub async fn create_or_show_plugin_window(
     }
 
     // 如果窗口已存在，切换显示状态
-    // 语义要求：
-    // - focus != visibility：可见窗口失焦时，重新激活只应触发 focus，不应额外触发 show
-    // - show/hide 只在真实可见性变化时触发
+    // 核心逻辑：最小化/隐藏的窗口必然没有焦点，所以只需检查 is_focused
     if let Some(window) = app.get_webview_window(&window_label) {
-        let is_visible = window.is_visible().unwrap_or(true);
-        let is_minimized = window.is_minimized().unwrap_or(false);
         let is_focused = window.is_focused().unwrap_or(false);
 
-        if !is_visible || is_minimized {
+        if !is_focused {
             crate::focus_manager::capture_previous_foreground(&app);
-            let _ = window.show();
-            let _ = window.unminimize();
             crate::focus_manager::focus_webview_window(&window);
 
             trigger_window_visibility_event(&window, true);
-        } else if !is_focused {
-            crate::focus_manager::capture_previous_foreground(&app);
-            crate::focus_manager::focus_webview_window(&window);
         } else {
             crate::focus_manager::restore_previous_foreground(&app);
 
