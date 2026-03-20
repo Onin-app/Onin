@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build:lifecycle": "vite build --config vite.lifecycle.config.js",
-    "build": "npm run build:index && npm run build:lifecycle",
+    "build:background": "vite build --config vite.background.config.js",
+    "build": "npm run build:index && npm run build:background",
     "pack:plugin": "npm run build && bestzip plugin.zip manifest.json icon.svg dist"
   },
   "dependencies": {

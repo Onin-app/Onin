@@ -22,6 +22,7 @@ export interface PluginManifest {
   auto_detach?: boolean;
   terminate_on_bg?: boolean;
   run_at_startup?: boolean;
+  background?: string;
   settings?: PluginSettingsSchema;
   dir_name?: string;
   install_source?: "local" | "marketplace";

@@ -77,24 +77,24 @@ lifecycle.onUnload(async () => {
 | 窗口显示/隐藏 | `pluginWindow.onShow / onHide`  |
 | 窗口焦点变化  | `pluginWindow.onFocus / onBlur` |
 
-## 后台生命周期脚本 (lifecycle.js)
+## 后台脚本 (background.js)
 
 对于 UI 插件，如果你希望在不打开界面的情况下执行后台逻辑（如定时同步数据、监听系统消息），可以结合 `manifest.json` 中的 `run_at_startup: true` 使用。
 
-Onin 会在启动时自动加载 `lifecycle` 指定的文件（默认为 `lifecycle.js`），并由于该文件通常会导入 SDK 并注册 `onLoad`，你的初始化逻辑将在后台自动运行。
+Onin 会在启动时自动加载 `background` 指定的文件（默认推荐为 `dist/background.js`），并由于该文件通常会导入 SDK 并注册 `onLoad`，你的初始化逻辑将在后台自动运行。
 
 **manifest.json 示例：**
 
 ```json
 {
   "run_at_startup": true,
-  "lifecycle": "dist/lifecycle.js"
+  "background": "dist/background.js"
 }
 ```
 
 ## 构建要求
 
-对于 UI 插件，`lifecycle.ts` 不会自动跟随页面入口一起变成发布产物。你需要显式把它单独构建成一个独立文件，并确保 `manifest.json` 中的 `lifecycle` 指向它。
+对于 UI 插件，`background.ts` 不会自动跟随页面入口一起变成发布产物。你需要显式把它单独构建成一个独立文件，并确保 `manifest.json` 中的 `background` 指向它。
 
 最小配置示例：
 
@@ -102,8 +102,8 @@ Onin 会在启动时自动加载 `lifecycle` 指定的文件（默认为 `lifecy
 {
   "scripts": {
     "build:index": "vite build",
-    "build:lifecycle": "vite build --config vite.lifecycle.config.ts",
-    "build": "npm run build:index && npm run build:lifecycle"
+    "build:background": "vite build --config vite.background.config.ts",
+    "build": "npm run build:index && npm run build:background"
   }
 }
 ```
@@ -117,9 +117,9 @@ export default defineConfig({
     outDir: '.',
     emptyOutDir: false,
     lib: {
-      entry: resolve(__dirname, 'src/lifecycle.ts'),
+      entry: resolve(__dirname, 'src/background.ts'),
       formats: ['es'],
-      fileName: () => 'lifecycle.js',
+      fileName: () => 'background.js',
     },
     rollupOptions: {
       external: [],
@@ -133,7 +133,7 @@ export default defineConfig({
 
 发布前检查：
 
-- `manifest.lifecycle` 的路径和产物路径一致
+- `manifest.background` 的路径和产物路径一致
 - zip 里确实包含该文件
 - 如果生命周期里注册了 settings 或 commands，本地解压后也能看到该文件
 

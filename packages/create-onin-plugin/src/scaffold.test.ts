@@ -69,8 +69,8 @@ test("scaffoldPlugin creates a vanilla TypeScript project", async () => {
     assert.match(await readFile(join(targetDir, "package.json"), "utf8"), /"typescript": "\^5\.5\.0"/);
     assert.match(await readFile(join(targetDir, "src", "main.ts"), "utf8"), /Smoke Plugin/);
     assert.match(
-      await readFile(join(targetDir, "vite.lifecycle.config.ts"), "utf8"),
-      /src\/lifecycle\.ts/,
+      await readFile(join(targetDir, "vite.background.config.ts"), "utf8"),
+      /src\/background\.ts/,
     );
   } finally {
     await rm(tempDir, { recursive: true, force: true });
@@ -96,8 +96,8 @@ test("scaffoldPlugin creates a vanilla JavaScript project", async () => {
     );
     assert.match(await readFile(join(targetDir, "src", "main.js"), "utf8"), /Smoke Plugin/);
     assert.match(
-      await readFile(join(targetDir, "vite.lifecycle.config.js"), "utf8"),
-      /src\/lifecycle\.js/,
+      await readFile(join(targetDir, "vite.background.config.js"), "utf8"),
+      /src\/background\.js/,
     );
   } finally {
     await rm(tempDir, { recursive: true, force: true });

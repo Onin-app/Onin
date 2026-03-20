@@ -110,7 +110,7 @@ test("renderPackageJson merges vanilla starter scripts without framework runtime
       JSON.stringify({
         name: "__PACKAGE_NAME__",
         scripts: {
-          build: "npm run build:index && npm run build:lifecycle",
+          build: "npm run build:index && npm run build:background",
         },
         dependencies: {
           "onin-sdk": "^1.0.0",
@@ -142,7 +142,7 @@ test("renderPackageJson merges vanilla starter scripts without framework runtime
     };
 
     assert.deepEqual(rendered.scripts, {
-      build: "npm run build:index && npm run build:lifecycle",
+      build: "npm run build:index && npm run build:background",
       dev: "vite",
       "build:index": "vite build",
     });
