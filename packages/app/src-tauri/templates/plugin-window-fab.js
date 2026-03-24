@@ -345,9 +345,24 @@
     // ── 1. 切回内联模式 ───────────────────────────────────────────
     document
       .getElementById("onin-btn-inline")
-      .addEventListener("click", function (e) {
+      .addEventListener("click", async function (e) {
         e.preventDefault();
         e.stopPropagation();
+        var shouldSwitch = false;
+        try {
+          shouldSwitch = await invoke("plugin_dialog_confirm", {
+            options: {
+              title: "切换显示方式",
+              message:
+                "切换显示方式会重新打开插件，当前页面状态可能丢失。确定继续吗？",
+              kind: "warning",
+            },
+          });
+        } catch (err) {
+          console.error("[FAB] 切换确认弹窗失败:", err);
+          return;
+        }
+        if (!shouldSwitch) return;
         invoke("return_to_inline_from_window", { pluginId: pluginId }).catch(
           console.error,
         );

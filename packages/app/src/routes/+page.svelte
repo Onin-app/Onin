@@ -69,7 +69,7 @@
   let confirmDialogOpen = $state(false);
   let confirmDialogTitle = $state("");
   let confirmDialogDescription = $state("");
-  let pendingAction = $state<(() => void) | null>(null);
+  let pendingAction = $state<(() => void | Promise<void>) | null>(null);
 
   // AutoAnimate action
   const animate: Action<HTMLElement> = (node) => {
@@ -415,6 +415,23 @@
     goto("/settings");
   };
 
+  const confirmPluginModeSwitch = async (): Promise<boolean> => {
+    const { confirm } = await import("@tauri-apps/plugin-dialog");
+    await invoke("acquire_window_close_lock");
+
+    try {
+      return await confirm(
+        "切换显示方式会重新打开插件，当前页面状态可能丢失。确定继续吗？",
+        {
+          title: "切换显示方式",
+          kind: "warning",
+        },
+      );
+    } finally {
+      await invoke("release_window_close_lock").catch(console.error);
+    }
+  };
+
   // ===== Lifecycle =====
   const unsubscribeTheme = theme.subscribe((value) => {
     currentTheme = value;
@@ -422,6 +439,7 @@
 
   onMount(async () => {
     escapeHandler.set(handleEsc);
+    plugin.setModeSwitchConfirmHandler(confirmPluginModeSwitch);
 
     // 加载配置
     await appListManager.loadConfig();
@@ -494,6 +512,8 @@
     if (unlisten) {
       unlisten();
     }
+
+    plugin.setModeSwitchConfirmHandler(null);
   });
 </script>
 

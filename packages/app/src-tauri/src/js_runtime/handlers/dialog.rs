@@ -26,7 +26,9 @@ pub async fn handle_dialog_confirm(app_handle: AppHandle, arg: serde_json::Value
         serde_json::from_value::<plugin_api::dialog::ConfirmDialogOptions>(arg.clone());
 
     match options_result {
-        Ok(options) => match plugin_api::dialog::plugin_dialog_confirm(app_handle, options).await {
+        Ok(options) => match plugin_api::dialog::plugin_dialog_confirm_for_app(app_handle, options)
+            .await
+        {
             Ok(result) => super::ok_value(serde_json::json!(result)),
             Err(e) => super::err_fmt("Dialog", e),
         },

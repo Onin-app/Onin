@@ -22,6 +22,9 @@ export interface PluginManagerReturn {
   // Methods
   closePlugin: () => void;
   detachPlugin: () => Promise<void>;
+  setModeSwitchConfirmHandler: (
+    handler: ((direction: "inline-to-window") => Promise<boolean>) | null,
+  ) => void;
   toggleAutoDetach: (checked: boolean) => Promise<void>;
   toggleTerminateOnBg: (checked: boolean) => Promise<void>;
   toggleRunAtStartup: (checked: boolean) => Promise<void>;
@@ -47,6 +50,9 @@ export function usePluginManager(): PluginManagerReturn {
     currentPluginTerminateOnBg: false,
     currentPluginRunAtStartup: false,
   });
+  let confirmModeSwitchHandler: ((
+    direction: "inline-to-window",
+  ) => Promise<boolean>) | null = null;
 
   // ===== Methods =====
 
@@ -86,6 +92,11 @@ export function usePluginManager(): PluginManagerReturn {
     // 保存 pluginId，因为 closePlugin() 会清空 state.currentPluginId
     const pluginId = state.currentPluginId;
 
+    if (confirmModeSwitchHandler) {
+      const confirmed = await confirmModeSwitchHandler("inline-to-window");
+      if (!confirmed) return;
+    }
+
     try {
       // 步骤 1：先发送 blur/hide 生命周期事件，并更新 UI 状态
       sendLifecycleEvent("blur");
@@ -105,6 +116,12 @@ export function usePluginManager(): PluginManagerReturn {
     } catch (error) {
       console.error("Failed to detach plugin:", error);
     }
+  };
+
+  const setModeSwitchConfirmHandler = (
+    handler: ((direction: "inline-to-window") => Promise<boolean>) | null,
+  ) => {
+    confirmModeSwitchHandler = handler;
   };
 
   /**
@@ -293,6 +310,7 @@ export function usePluginManager(): PluginManagerReturn {
     },
     closePlugin,
     detachPlugin,
+    setModeSwitchConfirmHandler,
     toggleAutoDetach,
     toggleTerminateOnBg,
     toggleRunAtStartup,
