@@ -5,11 +5,10 @@
 //! - 执行插件的初始化脚本
 //! - 刷新插件列表
 
-use std::path::Path;
 use tauri::{Manager, State};
 
 use super::state::load_plugin_states;
-use super::types::{parse_plugin_dir_name, LoadedPlugin, PluginManifest, PluginStore};
+use super::types::{LoadedPlugin, PluginManifest, PluginStore, parse_plugin_dir_name};
 use crate::js_runtime;
 
 // ============================================================================
@@ -99,40 +98,10 @@ pub fn load_plugins_internal(
         manifest_with_state.terminate_on_bg = terminate_on_bg;
         manifest_with_state.run_at_startup = run_at_startup;
 
-        // 自动执行后台脚本进行初始化
-        // Headless 插件：执行 index.js (entry)
-        // View 插件：执行 background.js（如果存在）
-        let entry_path = path.join(&manifest.entry);
-
-        if entry_path.is_file() {
-            if let Some(extension) = Path::new(&manifest.entry)
-                .extension()
-                .and_then(|s| s.to_str())
-            {
-                match extension {
-                    "js" => {
-                        // Headless 插件：直接执行 index.js
-                        plugins_to_init.push((manifest.id.clone(), entry_path, dir_name.clone()));
-                    }
-                    "html" => {
-                        // View 插件：执行 background.js
-                        let background_file = manifest
-                            .background
-                            .as_deref()
-                            .unwrap_or(PluginManifest::default_background_entry());
-                        let background_path = path.join(background_file);
-
-                        if background_path.is_file() {
-                            plugins_to_init.push((
-                                manifest.id.clone(),
-                                background_path,
-                                dir_name.clone(),
-                            ));
-                        }
-                    }
-                    _ => {}
-                }
-            }
+        if let Some(lifecycle_path) =
+            super::lifecycle::resolve_lifecycle_script_path(&path, &manifest, install_source.clone())
+        {
+            plugins_to_init.push((manifest.id.clone(), lifecycle_path, dir_name.clone()));
         }
 
         let loaded_plugin = LoadedPlugin {
