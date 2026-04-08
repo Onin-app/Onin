@@ -139,6 +139,13 @@
       "刷新界面" +
       "</span>" +
       "</button>" +
+      // 重启插件
+      '<button class="onin-fab-item" id="onin-btn-restart">' +
+      '<span class="onin-icon-text">' +
+      '<svg fill="currentColor" viewBox="0 0 256 256"><path d="M224,128a96,96,0,0,1-94.58,95.88l-2.45,0c-11.41,0-23.11-2.4-33.84-7.14a8,8,0,0,1,6.4-14.72c8.89,3.87,18.79,5.86,28.44,5.86,50.7,0,92-41.3,92-92s-41.3-92-92-92c-29.3,0-57,14-74.15,37.52L46.8,80H72a8,8,0,0,1,0,16H24a8,8,0,0,1-8-8V40a8,8,0,0,1,16,0V62.48l9.4-12.83C62.84,20,95,8,128,8A104,104,0,0,1,232,112Z"></path><path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Z" opacity="0.2"></path></svg>' +
+      "重启插件" +
+      "</span>" +
+      "</button>" +
       // 开发者工具
       '<button class="onin-fab-item" id="onin-btn-devtools">' +
       '<span class="onin-icon-text">' +
@@ -456,6 +463,11 @@
     document.getElementById("onin-btn-reload").addEventListener("click", function (e) {
       e.preventDefault(); e.stopPropagation();
       window.location.reload();
+    });
+
+    document.getElementById("onin-btn-restart").addEventListener("click", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      invoke("plugin_restart_window", { pluginId: pluginId }).catch(console.error);
     });
 
     document.getElementById("onin-btn-devtools").addEventListener("click", function (e) {

@@ -212,6 +212,26 @@ pub fn return_to_inline_from_window(
     super::executor::show_plugin_inline(&app, &plugin, plugin_url)
 }
 
+/// 重启插件窗口
+#[tauri::command]
+pub async fn plugin_restart_window(
+    app: tauri::AppHandle,
+    store: State<'_, PluginStore>,
+    plugin_id: String,
+) -> Result<(), String> {
+    let label = crate::plugin::context::make_label_from_plugin_id(&plugin_id);
+
+    // 1. 关闭现有窗口
+    if let Some(window) = app.get_webview_window(&label) {
+        window.close().map_err(|e| e.to_string())?;
+        // 等待窗口彻底销毁，并避开 100ms 的防抖
+        std::thread::sleep(std::time::Duration::from_millis(200));
+    }
+
+    // 2. 重新打开插件
+    open_plugin_in_window(app, store, plugin_id)
+}
+
 /// 切换插件窗口置顶状态
 #[tauri::command]
 pub fn plugin_toggle_window_pin(

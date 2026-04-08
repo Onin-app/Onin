@@ -15,6 +15,8 @@ pub struct Rect {
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::State;
 
+use super::types::PluginStore;
+
 pub struct InlinePluginState {
     pub is_visible: AtomicBool,
     pub current_plugin_id: std::sync::Mutex<Option<String>>,
@@ -199,6 +201,57 @@ pub fn reload_inline_plugin<R: Runtime>(app: AppHandle<R>) -> Result<(), String>
         webview
             .eval("window.location.reload()")
             .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn restart_inline_plugin<R: Runtime>(
+    app: AppHandle<R>,
+    store: State<'_, PluginStore>,
+    state: State<'_, InlinePluginState>,
+) -> Result<(), String> {
+    let (plugin_id, url, rect) = {
+        let id_lock = state.current_plugin_id.lock().unwrap();
+        if let Some(id) = id_lock.as_ref() {
+            if let Some(webview) = app.get_webview("plugin-inline") {
+                let r = webview.bounds().map_err(|e| e.to_string())?;
+                let (x, y) = match r.position {
+                    tauri::Position::Physical(p) => (p.x as f64, p.y as f64),
+                    tauri::Position::Logical(l) => (l.x, l.y),
+                };
+                let (width, height) = match r.size {
+                    tauri::Size::Physical(s) => (s.width as f64, s.height as f64),
+                    tauri::Size::Logical(l) => (l.width, l.height),
+                };
+                let u = webview.url().map_err(|e| e.to_string())?.to_string();
+                (
+                    Some(id.clone()),
+                    u,
+                    Rect {
+                        x,
+                        y,
+                        width,
+                        height,
+                    },
+                )
+            } else {
+                return Err("内联插件未运行".to_string());
+            }
+        } else {
+            return Err("未找到当前运行的插件 ID".to_string());
+        }
+    };
+
+    if let Some(id) = plugin_id {
+        // 1. 关闭现有内联插件
+        close_inline_plugin(app.clone(), state.clone())?;
+
+        // 2. 等待清理完成
+        std::thread::sleep(std::time::Duration::from_millis(200));
+
+        // 3. 重新打开
+        show_inline_plugin(app, state, url, id, rect).await?;
     }
     Ok(())
 }

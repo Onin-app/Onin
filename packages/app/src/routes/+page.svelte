@@ -157,11 +157,11 @@
     inputValue = value;
     appListManager.handleInput(value);
     updateMatchedCommands();
-    await updateExtensionPreview();
+    await updateExtensionManagerPreview();
   };
 
   // 更新 Extension 预览（计算器等）
-  const updateExtensionPreview = async () => {
+  const updateExtensionManagerPreview = async () => {
     // 优先使用粘贴的文本，其次使用输入框的值
     const effectiveText = clipboard.state.attachedText || inputValue;
     await extensionManager.getPreview(effectiveText);
@@ -178,7 +178,7 @@
   const handlePaste = async (e: ClipboardEvent) => {
     await clipboard.handlePaste(e);
     updateMatchedCommands();
-    await updateExtensionPreview();
+    await updateExtensionManagerPreview();
   };
 
   const handleDrop = (e: DragEvent) => {
@@ -459,7 +459,7 @@
         if (event.payload) {
           await clipboard.autoPasteClipboard();
           updateMatchedCommands();
-          await updateExtensionPreview(); // 更新 Extension 预览（如计算器）
+          await updateExtensionManagerPreview(); // 更新 Extension 预览（如计算器）
           requestInputFocusWithRetry();
         }
 
@@ -567,6 +567,7 @@
               onToggleTerminateOnBg={plugin.toggleTerminateOnBg}
               onToggleRunAtStartup={plugin.toggleRunAtStartup}
               onRefresh={plugin.reloadPlugin}
+              onRestart={plugin.restartPlugin}
               onOpenDevTools={plugin.openDevTools}
               onUninstall={plugin.uninstallPlugin}
             />

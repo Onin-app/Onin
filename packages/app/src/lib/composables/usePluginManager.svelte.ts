@@ -29,6 +29,7 @@ export interface PluginManagerReturn {
   toggleTerminateOnBg: (checked: boolean) => Promise<void>;
   toggleRunAtStartup: (checked: boolean) => Promise<void>;
   reloadPlugin: () => Promise<void>;
+  restartPlugin: () => Promise<void>;
   openDevTools: () => Promise<void>;
   uninstallPlugin: () => Promise<void>;
   sendLifecycleEvent: (event: "show" | "hide" | "focus" | "blur") => void;
@@ -239,6 +240,19 @@ export function usePluginManager(): PluginManagerReturn {
   };
 
   /**
+   * 重启当前插件
+   */
+  const restartPlugin = async () => {
+    try {
+      if (state.showPluginInline) {
+        await invoke("restart_inline_plugin");
+      }
+    } catch (error) {
+      console.error("Failed to restart plugin:", error);
+    }
+  };
+
+  /**
    * 打开开发者工具
    */
   const openDevTools = async () => {
@@ -329,6 +343,7 @@ export function usePluginManager(): PluginManagerReturn {
     toggleTerminateOnBg,
     toggleRunAtStartup,
     reloadPlugin,
+    restartPlugin,
     openDevTools,
     uninstallPlugin,
     sendLifecycleEvent,

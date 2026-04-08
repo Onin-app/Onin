@@ -58,6 +58,7 @@ pub fn get_invoke_handler(
         plugin::window::plugin_open_devtools,
         plugin::window::return_to_inline_from_window,
         plugin::window::plugin_toggle_window_pin,
+        plugin::window::plugin_restart_window,
         // Plugin Inline
         plugin::inline::show_inline_plugin,
         plugin::inline::update_inline_plugin_bounds,
@@ -66,6 +67,7 @@ pub fn get_invoke_handler(
         plugin::inline::reload_inline_plugin,
         plugin::inline::post_inline_plugin_message,
         plugin::inline::open_inline_plugin_devtools,
+        plugin::inline::restart_inline_plugin,
         // Plugin executor
         plugin::executor::execute_plugin_entry,
         // Plugin settings
