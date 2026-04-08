@@ -90,7 +90,7 @@
       '<div class="onin-zoom-controls">' +
       '<span class="onin-icon-text">' +
       '<svg fill="currentColor" viewBox="0 0 256 256">' +
-      '<path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,160H40V56H216V200ZM176,128a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h80A8,8,0,0,1,176,128Z"></path>' +
+      '<path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,160H40V56H216V200ZM176,128a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h88a8,8,0,0,1,0,16Z"></path>' +
       "</svg>" +
       "缩放视图" +
       "</span>" +
@@ -132,6 +132,13 @@
       "</div>" +
       "</button>" +
       '<div class="onin-fab-divider"></div>' +
+      // 刷新界面
+      '<button class="onin-fab-item" id="onin-btn-reload">' +
+      '<span class="onin-icon-text">' +
+      '<svg fill="currentColor" viewBox="0 0 256 256"><path d="M224,128a96,96,0,0,1-94.58,95.88l-2.45,0c-11.41,0-23.11-2.4-33.84-7.14a8,8,0,0,1,6.4-14.72c8.89,3.87,18.79,5.86,28.44,5.86,50.7,0,92-41.3,92-92s-41.3-92-92-92c-29.3,0-57,14-74.15,37.52L46.8,80H72a8,8,0,0,1,0,16H24a8,8,0,0,1-8-8V40a8,8,0,0,1,16,0V62.48l9.4-12.83C62.84,20,95,8,128,8A104,104,0,0,1,232,112Z"></path></svg>' +
+      "刷新界面" +
+      "</span>" +
+      "</button>" +
       // 开发者工具
       '<button class="onin-fab-item" id="onin-btn-devtools">' +
       '<span class="onin-icon-text">' +
@@ -444,6 +451,11 @@
     document.getElementById("onin-btn-run-startup").addEventListener("click", function (e) {
       e.preventDefault(); e.stopPropagation();
       toggleSetting("run_at_startup", "run-startup");
+    });
+
+    document.getElementById("onin-btn-reload").addEventListener("click", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      window.location.reload();
     });
 
     document.getElementById("onin-btn-devtools").addEventListener("click", function (e) {

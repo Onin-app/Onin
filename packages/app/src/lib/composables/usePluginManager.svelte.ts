@@ -28,6 +28,7 @@ export interface PluginManagerReturn {
   toggleAutoDetach: (checked: boolean) => Promise<void>;
   toggleTerminateOnBg: (checked: boolean) => Promise<void>;
   toggleRunAtStartup: (checked: boolean) => Promise<void>;
+  reloadPlugin: () => Promise<void>;
   openDevTools: () => Promise<void>;
   uninstallPlugin: () => Promise<void>;
   sendLifecycleEvent: (event: "show" | "hide" | "focus" | "blur") => void;
@@ -225,6 +226,19 @@ export function usePluginManager(): PluginManagerReturn {
   };
 
   /**
+   * 刷新当前插件界面
+   */
+  const reloadPlugin = async () => {
+    try {
+      if (state.showPluginInline) {
+        await invoke("reload_inline_plugin");
+      }
+    } catch (error) {
+      console.error("Failed to reload plugin:", error);
+    }
+  };
+
+  /**
    * 打开开发者工具
    */
   const openDevTools = async () => {
@@ -314,6 +328,7 @@ export function usePluginManager(): PluginManagerReturn {
     toggleAutoDetach,
     toggleTerminateOnBg,
     toggleRunAtStartup,
+    reloadPlugin,
     openDevTools,
     uninstallPlugin,
     sendLifecycleEvent,

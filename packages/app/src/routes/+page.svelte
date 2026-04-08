@@ -566,6 +566,7 @@
               onToggleAutoDetach={plugin.toggleAutoDetach}
               onToggleTerminateOnBg={plugin.toggleTerminateOnBg}
               onToggleRunAtStartup={plugin.toggleRunAtStartup}
+              onRefresh={plugin.reloadPlugin}
               onOpenDevTools={plugin.openDevTools}
               onUninstall={plugin.uninstallPlugin}
             />

@@ -63,6 +63,7 @@ pub fn get_invoke_handler(
         plugin::inline::update_inline_plugin_bounds,
         plugin::inline::hide_inline_plugin,
         plugin::inline::close_inline_plugin,
+        plugin::inline::reload_inline_plugin,
         plugin::inline::post_inline_plugin_message,
         plugin::inline::open_inline_plugin_devtools,
         // Plugin executor

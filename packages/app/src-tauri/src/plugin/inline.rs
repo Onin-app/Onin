@@ -193,3 +193,12 @@ pub fn open_inline_plugin_devtools<R: Runtime>(app: AppHandle<R>) -> Result<(), 
         Err("插件视图未找到".to_string())
     }
 }
+#[tauri::command]
+pub fn reload_inline_plugin<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+    if let Some(webview) = app.get_webview("plugin-inline") {
+        webview
+            .eval("window.location.reload()")
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}

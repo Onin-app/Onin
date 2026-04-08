@@ -24,6 +24,7 @@
     onToggleAutoDetach: (checked: boolean) => void;
     onToggleTerminateOnBg: (checked: boolean) => void;
     onToggleRunAtStartup: (checked: boolean) => void;
+    onRefresh: () => void;
     onOpenDevTools: () => void;
     onUninstall: () => void;
   }
@@ -38,6 +39,7 @@
     onToggleAutoDetach,
     onToggleTerminateOnBg,
     onToggleRunAtStartup,
+    onRefresh,
     onOpenDevTools,
     onUninstall,
   }: Props = $props();
@@ -52,6 +54,11 @@
       const closeItem = await MenuItem.new({
         text: "关闭插件 (ESC)",
         action: () => onClose(),
+      });
+
+      const refreshItem = await MenuItem.new({
+        text: "刷新界面",
+        action: () => onRefresh(),
       });
 
       const autoDetachItem = await CheckMenuItem.new({
@@ -89,6 +96,7 @@
         items: [
           detachItem,
           closeItem,
+          refreshItem,
           separator1,
           autoDetachItem,
           terminateOnBgItem,
