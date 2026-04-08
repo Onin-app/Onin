@@ -34,17 +34,27 @@
  */
 
 import { LifecycleMessageAdapter } from '../core/adapters/lifecycle-message';
-import type { EventCallback } from '../core/adapters/base';
+import { WindowModeAdapter } from '../core/adapters/window';
+import type { WindowAdapter, EventCallback } from '../core/adapters/base';
 
 // 使用统一的生命周期消息适配器
-let adapter: LifecycleMessageAdapter | null = null;
+let adapter: WindowAdapter | null = null;
 
-function getAdapter(): LifecycleMessageAdapter {
+function getAdapter(): WindowAdapter {
   if (!adapter) {
-    console.log('[pluginWindow] Creating LifecycleMessageAdapter');
-    adapter = new LifecycleMessageAdapter();
+    // 探测运行模式
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get('mode');
+    
+    if (mode === 'window') {
+      console.log('[pluginWindow] Creating WindowModeAdapter');
+      adapter = new WindowModeAdapter();
+    } else {
+      console.log('[pluginWindow] Creating LifecycleMessageAdapter');
+      adapter = new LifecycleMessageAdapter();
+    }
   }
-  return adapter;
+  return adapter!;
 }
 
 /**

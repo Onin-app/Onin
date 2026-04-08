@@ -301,11 +301,17 @@ pub async fn create_or_show_plugin_window(
         } else {
             crate::focus_manager::restore_previous_foreground(&app);
 
-            if let Err(e) = window.minimize() {
-                eprintln!("最小化插件窗口失败: {}", e);
+            if plugin.manifest.terminate_on_bg {
+                if let Err(e) = window.close() {
+                    eprintln!("关闭插件窗口失败: {}", e);
+                }
+                // 窗口关闭后无需触发 visibility 事件，因为 JS 环境即将销毁
+            } else {
+                if let Err(e) = window.minimize() {
+                    eprintln!("最小化插件窗口失败: {}", e);
+                }
+                trigger_window_visibility_event(&window, false);
             }
-
-            trigger_window_visibility_event(&window, false);
         }
         return Ok(());
     }

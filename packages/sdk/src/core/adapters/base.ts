@@ -9,6 +9,16 @@
 export type EventCallback = () => void | Promise<void>;
 
 /**
+ * 运行时信息
+ */
+export interface RuntimeInfo {
+  mode: 'inline' | 'window';
+  pluginId: string;
+  version: string;
+  mainWindowLabel: string;
+}
+
+/**
  * 窗口适配器接口
  *
  * 定义了窗口事件监听的统一 API，不同运行模式有不同的实现：
@@ -16,6 +26,16 @@ export type EventCallback = () => void | Promise<void>;
  * - Window lifecycle adapter: 使用 Tauri 事件系统
  */
 export interface WindowAdapter {
+  /**
+   * 获取运行时信息 (同步)
+   */
+  getRuntimeSync(): RuntimeInfo | null;
+
+  /**
+   * 获取运行时信息 (异步)
+   */
+  getRuntime(): Promise<RuntimeInfo>;
+
   /**
    * 监听窗口显示事件
    */
@@ -109,6 +129,16 @@ export abstract class BaseAdapter implements WindowAdapter {
     }
     this.ensureInitialized();
   }
+
+  /**
+   * 获取运行时信息 (同步)
+   */
+  abstract getRuntimeSync(): RuntimeInfo | null;
+
+  /**
+   * 获取运行时信息 (异步)
+   */
+  abstract getRuntime(): Promise<RuntimeInfo>;
 
   protected ensureInitialized(): void {
     if (!this.initialized) {

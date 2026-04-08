@@ -10,17 +10,7 @@
  * - plugin-lifecycle-event: { type, event: 'show'|'hide'|'focus'|'blur' }
  */
 
-import { BaseAdapter } from './base';
-
-/**
- * 运行时信息
- */
-interface RuntimeInfo {
-  mode: 'inline' | 'window';
-  pluginId: string;
-  version: string;
-  mainWindowLabel: string;
-}
+import { BaseAdapter, type RuntimeInfo } from './base';
 
 /**
  * 生命周期消息适配器
