@@ -4,6 +4,8 @@ if (typeof window !== 'undefined') {
   const urlParams = new URLSearchParams(window.location.search);
   const pluginIdFromUrl = urlParams.get('plugin_id');
 
+  // Only set if we found a valid ID in the URL.
+  // This prevents overwriting an ID injected via initialization_script with null.
   if (pluginIdFromUrl) {
     (window as any).__PLUGIN_ID__ = pluginIdFromUrl;
     (globalThis as any).__PLUGIN_ID__ = pluginIdFromUrl;

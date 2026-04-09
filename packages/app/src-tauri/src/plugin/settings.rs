@@ -220,6 +220,7 @@ pub fn get_plugin_settings(
     app: tauri::AppHandle,
     plugin_id: String,
 ) -> Result<HashMap<String, JsonValue>, String> {
+    println!("[plugin/settings] get_plugin_settings: plugin_id = {}", plugin_id);
     load_plugin_settings(&app, &plugin_id)
 }
 
@@ -232,6 +233,7 @@ pub fn save_plugin_settings(
     plugin_id: String,
     settings: HashMap<String, JsonValue>,
 ) -> Result<(), String> {
+    println!("[plugin/settings] save_plugin_settings: plugin_id = {}", plugin_id);
     save_plugin_settings_to_file(&app, &plugin_id, &settings)?;
     
     // 通知插件设置已更改

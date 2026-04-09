@@ -92,6 +92,17 @@ pub fn get_current_plugin_id<R: Runtime>(
         }
     }
 
+    // 5. 尝试从记录的活跃窗口获取 (处理失焦瞬间触发的命令)
+    if let Some(active_window_state) = app.try_state::<crate::plugin::types::ActivePluginWindow>() {
+        if let Ok(active_lock) = active_window_state.0.lock() {
+            if let Some(label) = active_lock.as_ref() {
+                if let Some(id) = parse_plugin_id_from_label(label) {
+                    return Ok(id);
+                }
+            }
+        }
+    }
+
     Err("Could not determine plugin ID from context".to_string())
 }
 
