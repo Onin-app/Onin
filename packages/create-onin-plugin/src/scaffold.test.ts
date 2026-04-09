@@ -42,12 +42,18 @@ async function createTempDir(prefix: string): Promise<string> {
   return mkdtemp(join(tmpdir(), prefix));
 }
 
-function createCliOptions(targetDir: string, framework: Framework, language: Language): CliOptions {
+function createCliOptions(
+  targetDir: string,
+  framework: Framework,
+  language: Language,
+  withRelease: boolean = false,
+): CliOptions {
   return {
     targetDir,
     pluginName: "Smoke Plugin",
     pluginId: "com.example.smoke-plugin",
     withSettings: true,
+    withRelease,
     yes: true,
     framework,
     language,
@@ -72,6 +78,27 @@ test("scaffoldPlugin creates a vanilla TypeScript project", async () => {
       await readFile(join(targetDir, "vite.background.config.ts"), "utf8"),
       /src\/background\.ts/,
     );
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("scaffoldPlugin includes release configuration when requested", async () => {
+  const tempDir = await createTempDir("create-onin-plugin-scaffold-release-");
+  const targetDir = join(tempDir, "release-plugin");
+
+  try {
+    await scaffoldPlugin(
+      createCliOptions(targetDir, "vanilla", "ts", true),
+      baseTemplateDirs,
+      adapterTemplateDirs,
+    );
+
+    assert.ok(readFile(join(targetDir, "release.config.cjs"), "utf8"));
+    assert.ok(readFile(join(targetDir, ".github", "workflows", "release.yml"), "utf8"));
+    const packageJson = await readFile(join(targetDir, "package.json"), "utf8");
+    assert.match(packageJson, /"release": "semantic-release"/);
+    assert.match(packageJson, /"semantic-release": "\^25\.0\.3"/);
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }

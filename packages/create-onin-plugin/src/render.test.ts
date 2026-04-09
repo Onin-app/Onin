@@ -16,6 +16,7 @@ const context: TemplateContext = {
   settingsImport: ", settings",
   settingsBlock: "  await settings.useSettingsSchema([]);\n",
   settingsNote: "Settings enabled.",
+  withRelease: false,
 };
 
 async function createTempDir(prefix: string): Promise<string> {
@@ -194,6 +195,43 @@ test("renderPackageJson removes empty record fields left by base or adapter frag
     assert.deepEqual(rendered, {
       name: "sample-plugin",
     });
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("renderPackageJson injects release configuration when withRelease is true", async () => {
+  const tempDir = await createTempDir("create-onin-plugin-release-inject-");
+  const basePath = join(tempDir, "package.base.json");
+  const adapterPath = join(tempDir, "package.fragment.json");
+  const targetPath = join(tempDir, "package.json");
+
+  const releaseContext = { ...context, withRelease: true };
+
+  try {
+    await writeFile(
+      basePath,
+      JSON.stringify({
+        name: "__PACKAGE_NAME__",
+      }),
+      "utf8",
+    );
+    await writeFile(
+      adapterPath,
+      JSON.stringify({}),
+      "utf8",
+    );
+
+    await renderPackageJson(basePath, adapterPath, targetPath, releaseContext);
+
+    const rendered = JSON.parse(await readFile(targetPath, "utf8")) as {
+      scripts?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+
+    assert.equal(rendered.scripts?.["release"], "semantic-release");
+    assert.ok(rendered.devDependencies?.["semantic-release"]);
+    assert.ok(rendered.devDependencies?.["@semantic-release/github"]);
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }

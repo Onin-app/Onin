@@ -6,6 +6,7 @@ export interface CliOptions {
   pluginName: string | undefined;
   pluginId: string | undefined;
   withSettings: boolean | undefined;
+  withRelease: boolean | undefined;
   yes: boolean;
   framework: Framework | undefined;
   language: Language | undefined;
@@ -16,6 +17,7 @@ export interface Answers {
   pluginName: string;
   pluginId: string;
   withSettings: boolean;
+  withRelease: boolean;
   framework: Framework;
   language: Language;
 }
@@ -29,6 +31,7 @@ export interface TemplateContext {
   settingsImport: string;
   settingsBlock: string;
   settingsNote: string;
+  withRelease: boolean;
 }
 
 export interface PackageJsonShape {

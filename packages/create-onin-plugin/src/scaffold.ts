@@ -58,9 +58,16 @@ export async function scaffoldPlugin(
     settingsNote: answers.withSettings
       ? "This template includes a sample settings schema registered from background.ts."
       : "This template omits settings schema. Add it later in src/background.ts if needed.",
+    withRelease: answers.withRelease,
   };
 
-  await copyTemplateDir(baseTemplateDir, targetDir, context, new Set(["package.json.tpl"]));
+  const skipRelativePaths = new Set(["package.json.tpl"]);
+  if (!answers.withRelease) {
+    skipRelativePaths.add("release.config.cjs.tpl");
+    skipRelativePaths.add(".github/workflows/release.yml.tpl");
+  }
+
+  await copyTemplateDir(baseTemplateDir, targetDir, context, skipRelativePaths);
   await copyTemplateDir(adapterTemplateDir, targetDir, context, new Set(["package.fragment.json"]));
   await renderPackageJson(
     resolve(baseTemplateDir, "package.json.tpl"),

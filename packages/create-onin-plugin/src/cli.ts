@@ -44,6 +44,7 @@ function parseArgs(argv: string[]): CliOptions {
     pluginName: undefined,
     pluginId: undefined,
     withSettings: undefined,
+    withRelease: undefined,
     yes: false,
     framework: undefined,
     language: undefined,
@@ -110,8 +111,13 @@ function parseArgs(argv: string[]): CliOptions {
       continue;
     }
 
-    if (arg === "--no-with-settings") {
-      options.withSettings = false;
+    if (arg === "--with-release") {
+      options.withRelease = true;
+      continue;
+    }
+
+    if (arg === "--no-with-release") {
+      options.withRelease = false;
       continue;
     }
   }
@@ -129,6 +135,8 @@ function findUnsupportedOption(argv: string[]): string | undefined {
     "--yes",
     "--with-settings",
     "--no-with-settings",
+    "--with-release",
+    "--no-with-release",
     "--help",
   ]);
 
@@ -168,6 +176,8 @@ function printHelp(): void {
   console.log("  --plugin-id <id>       Plugin manifest id");
   console.log("  --with-settings        Include settings schema example");
   console.log("  --no-with-settings     Skip settings schema example");
+  console.log("  --with-release         Include release configuration (semantic-release)");
+  console.log("  --no-with-release      Skip release configuration");
   console.log("  --yes                  Use defaults for missing answers");
   console.log("  --help                 Show this help message");
 }

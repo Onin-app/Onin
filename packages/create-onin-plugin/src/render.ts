@@ -138,6 +138,25 @@ export async function renderPackageJson(
   removeEmptyRecordField(mergedPkg, "dependencies");
   removeEmptyRecordField(mergedPkg, "devDependencies");
 
+  if (context.withRelease) {
+    if (!mergedPkg.devDependencies) {
+      mergedPkg.devDependencies = {};
+    }
+    mergedPkg.devDependencies["@semantic-release/changelog"] = "^6.0.3";
+    mergedPkg.devDependencies["@semantic-release/commit-analyzer"] = "^13.0.1";
+    mergedPkg.devDependencies["@semantic-release/exec"] = "^7.1.0";
+    mergedPkg.devDependencies["@semantic-release/git"] = "^10.0.1";
+    mergedPkg.devDependencies["@semantic-release/github"] = "^12.0.6";
+    mergedPkg.devDependencies["@semantic-release/npm"] = "^13.1.5";
+    mergedPkg.devDependencies["@semantic-release/release-notes-generator"] = "^14.1.0";
+    mergedPkg.devDependencies["semantic-release"] = "^25.0.3";
+
+    if (!mergedPkg.scripts) {
+      mergedPkg.scripts = {};
+    }
+    mergedPkg.scripts["release"] = "semantic-release";
+  }
+
   await writeFile(targetPath, `${JSON.stringify(mergedPkg, null, 2)}\n`, "utf8");
 }
 
