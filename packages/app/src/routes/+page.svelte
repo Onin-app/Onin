@@ -69,7 +69,7 @@
   let confirmDialogOpen = $state(false);
   let confirmDialogTitle = $state("");
   let confirmDialogDescription = $state("");
-  let pendingAction = $state<(() => void) | null>(null);
+  let pendingAction = $state<(() => void | Promise<void>) | null>(null);
 
   // AutoAnimate action
   const animate: Action<HTMLElement> = (node) => {
@@ -157,11 +157,11 @@
     inputValue = value;
     appListManager.handleInput(value);
     updateMatchedCommands();
-    await updateExtensionPreview();
+    await updateExtensionManagerPreview();
   };
 
   // 更新 Extension 预览（计算器等）
-  const updateExtensionPreview = async () => {
+  const updateExtensionManagerPreview = async () => {
     // 优先使用粘贴的文本，其次使用输入框的值
     const effectiveText = clipboard.state.attachedText || inputValue;
     await extensionManager.getPreview(effectiveText);
@@ -178,7 +178,7 @@
   const handlePaste = async (e: ClipboardEvent) => {
     await clipboard.handlePaste(e);
     updateMatchedCommands();
-    await updateExtensionPreview();
+    await updateExtensionManagerPreview();
   };
 
   const handleDrop = (e: DragEvent) => {
@@ -415,6 +415,23 @@
     goto("/settings");
   };
 
+  const confirmPluginModeSwitch = async (): Promise<boolean> => {
+    const { confirm } = await import("@tauri-apps/plugin-dialog");
+    await invoke("acquire_window_close_lock");
+
+    try {
+      return await confirm(
+        "切换显示方式会重新打开插件，当前页面状态可能丢失。确定继续吗？",
+        {
+          title: "切换显示方式",
+          kind: "warning",
+        },
+      );
+    } finally {
+      await invoke("release_window_close_lock").catch(console.error);
+    }
+  };
+
   // ===== Lifecycle =====
   const unsubscribeTheme = theme.subscribe((value) => {
     currentTheme = value;
@@ -422,6 +439,7 @@
 
   onMount(async () => {
     escapeHandler.set(handleEsc);
+    plugin.setModeSwitchConfirmHandler(confirmPluginModeSwitch);
 
     // 加载配置
     await appListManager.loadConfig();
@@ -441,7 +459,7 @@
         if (event.payload) {
           await clipboard.autoPasteClipboard();
           updateMatchedCommands();
-          await updateExtensionPreview(); // 更新 Extension 预览（如计算器）
+          await updateExtensionManagerPreview(); // 更新 Extension 预览（如计算器）
           requestInputFocusWithRetry();
         }
 
@@ -494,6 +512,8 @@
     if (unlisten) {
       unlisten();
     }
+
+    plugin.setModeSwitchConfirmHandler(null);
   });
 </script>
 
@@ -546,6 +566,8 @@
               onToggleAutoDetach={plugin.toggleAutoDetach}
               onToggleTerminateOnBg={plugin.toggleTerminateOnBg}
               onToggleRunAtStartup={plugin.toggleRunAtStartup}
+              onRefresh={plugin.reloadPlugin}
+              onRestart={plugin.restartPlugin}
               onOpenDevTools={plugin.openDevTools}
               onUninstall={plugin.uninstallPlugin}
             />

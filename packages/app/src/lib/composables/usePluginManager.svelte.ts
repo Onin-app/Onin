@@ -22,9 +22,14 @@ export interface PluginManagerReturn {
   // Methods
   closePlugin: () => void;
   detachPlugin: () => Promise<void>;
+  setModeSwitchConfirmHandler: (
+    handler: ((direction: "inline-to-window") => Promise<boolean>) | null,
+  ) => void;
   toggleAutoDetach: (checked: boolean) => Promise<void>;
   toggleTerminateOnBg: (checked: boolean) => Promise<void>;
   toggleRunAtStartup: (checked: boolean) => Promise<void>;
+  reloadPlugin: () => Promise<void>;
+  restartPlugin: () => Promise<void>;
   openDevTools: () => Promise<void>;
   uninstallPlugin: () => Promise<void>;
   sendLifecycleEvent: (event: "show" | "hide" | "focus" | "blur") => void;
@@ -47,6 +52,9 @@ export function usePluginManager(): PluginManagerReturn {
     currentPluginTerminateOnBg: false,
     currentPluginRunAtStartup: false,
   });
+  let confirmModeSwitchHandler: ((
+    direction: "inline-to-window",
+  ) => Promise<boolean>) | null = null;
 
   // ===== Methods =====
 
@@ -86,6 +94,11 @@ export function usePluginManager(): PluginManagerReturn {
     // 保存 pluginId，因为 closePlugin() 会清空 state.currentPluginId
     const pluginId = state.currentPluginId;
 
+    if (confirmModeSwitchHandler) {
+      const confirmed = await confirmModeSwitchHandler("inline-to-window");
+      if (!confirmed) return;
+    }
+
     try {
       // 步骤 1：先发送 blur/hide 生命周期事件，并更新 UI 状态
       sendLifecycleEvent("blur");
@@ -105,6 +118,12 @@ export function usePluginManager(): PluginManagerReturn {
     } catch (error) {
       console.error("Failed to detach plugin:", error);
     }
+  };
+
+  const setModeSwitchConfirmHandler = (
+    handler: ((direction: "inline-to-window") => Promise<boolean>) | null,
+  ) => {
+    confirmModeSwitchHandler = handler;
   };
 
   /**
@@ -208,6 +227,32 @@ export function usePluginManager(): PluginManagerReturn {
   };
 
   /**
+   * 刷新当前插件界面
+   */
+  const reloadPlugin = async () => {
+    try {
+      if (state.showPluginInline) {
+        await invoke("reload_inline_plugin");
+      }
+    } catch (error) {
+      console.error("Failed to reload plugin:", error);
+    }
+  };
+
+  /**
+   * 重启当前插件
+   */
+  const restartPlugin = async () => {
+    try {
+      if (state.showPluginInline) {
+        await invoke("restart_inline_plugin");
+      }
+    } catch (error) {
+      console.error("Failed to restart plugin:", error);
+    }
+  };
+
+  /**
    * 打开开发者工具
    */
   const openDevTools = async () => {
@@ -293,9 +338,12 @@ export function usePluginManager(): PluginManagerReturn {
     },
     closePlugin,
     detachPlugin,
+    setModeSwitchConfirmHandler,
     toggleAutoDetach,
     toggleTerminateOnBg,
     toggleRunAtStartup,
+    reloadPlugin,
+    restartPlugin,
     openDevTools,
     uninstallPlugin,
     sendLifecycleEvent,

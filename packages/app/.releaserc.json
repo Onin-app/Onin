@@ -24,8 +24,37 @@
         }
       }
     ],
-    "@semantic-release/npm",
-    "@semantic-release/github",
-    "@semantic-release/git"
+    [
+      "@semantic-release/exec",
+      {
+        "prepareCmd": "node -e \"const fs = require('fs'); const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')); const nextVersion = '${nextRelease.version}'; const tauriPath = 'src-tauri/tauri.conf.json'; const cargoPath = 'src-tauri/Cargo.toml'; const tauri = JSON.parse(fs.readFileSync(tauriPath, 'utf8')); tauri.version = nextVersion; fs.writeFileSync(tauriPath, JSON.stringify(tauri, null, 2) + '\\n'); const cargo = fs.readFileSync(cargoPath, 'utf8').replace(/^version\\s*=\\s*\\\".*\\\"/m, 'version = \\\"' + nextVersion + '\\\"'); fs.writeFileSync(cargoPath, cargo); console.log('Synced release version to Tauri config:', nextVersion);\""
+      }
+    ],
+    [
+      "@semantic-release/npm",
+      {
+        "npmPublish": false
+      }
+    ],
+    [
+      "@semantic-release/github",
+      {
+        "successComment": false,
+        "failComment": false,
+        "releasedLabels": false,
+        "addReleases": "bottom"
+      }
+    ],
+    [
+      "@semantic-release/git",
+      {
+        "assets": [
+          "package.json",
+          "src-tauri/Cargo.toml",
+          "src-tauri/tauri.conf.json"
+        ],
+        "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+      }
+    ]
   ]
 }

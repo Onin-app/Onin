@@ -7,22 +7,35 @@
  * @module core/adapters/window
  */
 
-import { BaseAdapter } from './base';
+import { BaseAdapter, type RuntimeInfo } from './base';
 
 /**
  * 窗口模式适配器
- * 使用 Tauri 事件系统监听窗口事件
  */
 export class WindowModeAdapter extends BaseAdapter {
+  private _runtime: RuntimeInfo | null = null;
+  private runtimeResolve: ((runtime: RuntimeInfo) => void) | null = null;
+  private runtimePromise: Promise<RuntimeInfo>;
   private unlistenVisibility: (() => void) | null = null;
   private unlistenFocus: (() => void) | null = null;
   private unlistenBlur: (() => void) | null = null;
   private tauriEventsActive = false;
 
+  constructor() {
+    super();
+    // 创建运行时 Promise
+    this.runtimePromise = new Promise((resolve) => {
+      this.runtimeResolve = resolve;
+    });
+  }
+
   initialize(): void {
     if (typeof window === 'undefined') {
       return;
     }
+
+    // 尝试从全局变量或 URL 获取运行时信息
+    this.tryInitializeRuntime();
 
     // 初始化状态：假设窗口刚创建时是聚焦的
     // 但我们不知道实际状态，所以设置为 null 表示未知
@@ -156,6 +169,53 @@ export class WindowModeAdapter extends BaseAdapter {
       (this as any)._stateUnknown = false;
     }
     this.executeHideCallbacks().catch(console.error);
+  }
+
+  /**
+   * 尝试初始化运行时信息
+   */
+  private tryInitializeRuntime(): void {
+    // 优先从全局变量获取（由宿主注入）
+    const runtime = (window as any).__ONIN_RUNTIME__;
+    if (runtime) {
+      this.log('Runtime info found in __ONIN_RUNTIME__');
+      this._runtime = runtime;
+      if (this.runtimeResolve) {
+        this.runtimeResolve(runtime);
+        this.runtimeResolve = null;
+      }
+      return;
+    }
+
+    // Fallback: 从 URL 参数获取
+    this.log('Attempting to read runtime from URL params');
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get('mode') as 'inline' | 'window';
+    const pluginId = params.get('plugin_id');
+
+    if (mode && pluginId) {
+      this._runtime = {
+        mode,
+        pluginId,
+        version: '0.1.0',
+        mainWindowLabel: 'main',
+      };
+      if (this.runtimeResolve) {
+        this.runtimeResolve(this._runtime);
+        this.runtimeResolve = null;
+      }
+    }
+  }
+
+  getRuntimeSync(): RuntimeInfo | null {
+    return this._runtime;
+  }
+
+  async getRuntime(): Promise<RuntimeInfo> {
+    if (this._runtime) {
+      return this._runtime;
+    }
+    return this.runtimePromise;
   }
 
   destroy(): void {

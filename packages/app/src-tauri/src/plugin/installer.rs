@@ -148,7 +148,7 @@ pub fn import_plugin(
     }
 
     // 8. 初始化插件后台脚本
-    initialize_plugin_lifecycle(&app, &source, &manifest);
+    initialize_plugin_lifecycle(&app, &source, &manifest, InstallSource::Local);
     Ok(loaded_plugin)
 }
 
@@ -409,7 +409,7 @@ pub async fn download_and_install_plugin(
     }
 
     // 7. 初始化后台脚本
-    initialize_plugin_lifecycle(&app, &target_dir, &manifest);
+    initialize_plugin_lifecycle(&app, &target_dir, &manifest, InstallSource::Marketplace);
 
     // 发送安装成功事件，使用市场 ID 以便前端匹配
     let _ = app.emit("plugin-installed", &plugin_id);
@@ -588,33 +588,10 @@ fn initialize_plugin_lifecycle(
     app: &tauri::AppHandle,
     plugin_dir: &Path,
     manifest: &PluginManifest,
+    install_source: InstallSource,
 ) {
-    let entry_path = plugin_dir.join(&manifest.entry);
-    if !entry_path.is_file() {
-        return;
-    }
-
-    let extension = std::path::Path::new(&manifest.entry)
-        .extension()
-        .and_then(|s| s.to_str());
-
-    let background_path = match extension {
-        Some("js") => Some(entry_path.clone()),
-        Some("html") => {
-            let background_file = manifest
-                .background
-                .as_deref()
-                .unwrap_or(PluginManifest::default_background_entry());
-            let bg_path = plugin_dir.join(background_file);
-
-            if bg_path.is_file() {
-                Some(bg_path)
-            } else {
-                None
-            }
-        }
-        _ => None,
-    };
+    let background_path =
+        super::lifecycle::resolve_lifecycle_script_path(plugin_dir, manifest, install_source);
 
     if let Some(bg_path) = background_path {
         let app_clone = app.clone();

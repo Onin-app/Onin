@@ -68,6 +68,10 @@
       ".onin-icon-text { display: flex; align-items: center; gap: 8px; white-space: nowrap;",
       "  flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; line-height: 1; }",
       ".onin-icon-text svg { width: 15px; height: 15px; opacity: 0.7; display: block; flex-shrink: 0; }",
+      "#onin-fab-backdrop { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 2147483646;",
+      "  background: rgba(0,0,0,0.4); opacity: 0; visibility: hidden;",
+      "  transition: all 0.2s cubic-bezier(0.16,1,0.3,1); }",
+      "#onin-fab-backdrop.open { opacity: 1; visibility: visible; }",
     ].join("\n");
     document.head.appendChild(style);
 
@@ -90,7 +94,7 @@
       '<div class="onin-zoom-controls">' +
       '<span class="onin-icon-text">' +
       '<svg fill="currentColor" viewBox="0 0 256 256">' +
-      '<path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,160H40V56H216V200ZM176,128a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h80A8,8,0,0,1,176,128Z"></path>' +
+      '<path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,160H40V56H216V200ZM176,128a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h88a8,8,0,0,1,0,16Z"></path>' +
       "</svg>" +
       "缩放视图" +
       "</span>" +
@@ -132,6 +136,20 @@
       "</div>" +
       "</button>" +
       '<div class="onin-fab-divider"></div>' +
+      // 刷新界面
+      '<button class="onin-fab-item" id="onin-btn-reload">' +
+      '<span class="onin-icon-text">' +
+      '<svg fill="currentColor" viewBox="0 0 256 256"><path d="M224,128a96,96,0,0,1-94.58,95.88l-2.45,0c-11.41,0-23.11-2.4-33.84-7.14a8,8,0,0,1,6.4-14.72c8.89,3.87,18.79,5.86,28.44,5.86,50.7,0,92-41.3,92-92s-41.3-92-92-92c-29.3,0-57,14-74.15,37.52L46.8,80H72a8,8,0,0,1,0,16H24a8,8,0,0,1-8-8V40a8,8,0,0,1,16,0V62.48l9.4-12.83C62.84,20,95,8,128,8A104,104,0,0,1,232,112Z"></path></svg>' +
+      "刷新界面" +
+      "</span>" +
+      "</button>" +
+      // 重启插件
+      '<button class="onin-fab-item" id="onin-btn-restart">' +
+      '<span class="onin-icon-text">' +
+      '<svg fill="currentColor" viewBox="0 0 256 256"><path d="M224,128a96,96,0,0,1-94.58,95.88l-2.45,0c-11.41,0-23.11-2.4-33.84-7.14a8,8,0,0,1,6.4-14.72c8.89,3.87,18.79,5.86,28.44,5.86,50.7,0,92-41.3,92-92s-41.3-92-92-92c-29.3,0-57,14-74.15,37.52L46.8,80H72a8,8,0,0,1,0,16H24a8,8,0,0,1-8-8V40a8,8,0,0,1,16,0V62.48l9.4-12.83C62.84,20,95,8,128,8A104,104,0,0,1,232,112Z"></path><path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Z" opacity="0.2"></path></svg>' +
+      "重启插件" +
+      "</span>" +
+      "</button>" +
       // 开发者工具
       '<button class="onin-fab-item" id="onin-btn-devtools">' +
       '<span class="onin-icon-text">' +
@@ -163,6 +181,10 @@
       "</button>";
     document.body.appendChild(btnContainer);
 
+    var backdropEl = document.createElement("div");
+    backdropEl.id = "onin-fab-backdrop";
+    document.body.appendChild(backdropEl);
+
     // ── 运行时变量（由 window.rs 中的短 format! 注入） ───────────
     var pluginId =
       (window.__ONIN_RUNTIME__ && window.__ONIN_RUNTIME__.pluginId) ||
@@ -183,6 +205,7 @@
     // 从持久化存储恢复 pin 状态，避免窗口重建后开关与真实状态不一致
     var isPinned = localStorage.getItem(KEY_PINNED) === "true";
     var isDragging = false;
+    var isReadyToDrag = false;
     var startY = 0;
     var initialBottom = 24;
 
@@ -266,17 +289,25 @@
         run_at_startup: "toggle_plugin_run_at_startup"
       };
 
-      // 乐观更新
+      // 映射为 Rust 端预期的 camelCase 参数名
+      var argMap = {
+        auto_detach: "autoDetach",
+        terminate_on_bg: "terminateOnBg",
+        run_at_startup: "runAtStartup"
+      };
+
+      // 乐观更新 UI
       updateSwitchUI(elementId, next);
 
       var args = { pluginId: pluginId };
-      args[key] = next;
+      args[argMap[key]] = next;
 
       invoke(commandMap[key], args).then(function () {
         settings[key] = next;
       }).catch(function (err) {
-        console.error("[FAB] Toggle failed:", err);
-        updateSwitchUI(elementId, settings[key]); // 回滚
+        console.error("[FAB] Toggle failed (" + key + "):", err);
+        // 失败时回滚 UI
+        updateSwitchUI(elementId, settings[key]);
       });
     }
 
@@ -292,6 +323,7 @@
 
     // ── 拖拽逻辑 ──────────────────────────────────────────────────
     fabBtn.addEventListener("mousedown", function (e) {
+      isReadyToDrag = true;
       isDragging = false;
       startY = e.clientY;
       var cs = window.getComputedStyle(btnContainer);
@@ -299,11 +331,10 @@
     });
 
     document.addEventListener("mousemove", function (e) {
-      if (e.buttons === 1 && Math.abs(e.clientY - startY) > 3) {
+      if (isReadyToDrag && e.buttons === 1 && Math.abs(e.clientY - startY) > 3) {
         isDragging = true;
         if (isMenuOpen) {
-          isMenuOpen = false;
-          menuEl.classList.remove("open");
+          toggleMenu(false);
         }
         fabBtn.style.transition = "none";
         var deltaY = startY - e.clientY;
@@ -316,6 +347,7 @@
     });
 
     document.addEventListener("mouseup", function () {
+      isReadyToDrag = false;
       if (isDragging) {
         fabBtn.style.transition = "";
         var finalBottom = parseInt(btnContainer.style.bottom, 10);
@@ -327,27 +359,49 @@
     });
 
     // ── FAB 按钮开关菜单 ──────────────────────────────────────────
+    function toggleMenu(show) {
+      isMenuOpen = (typeof show === "boolean") ? show : !isMenuOpen;
+      menuEl.classList.toggle("open", isMenuOpen);
+      backdropEl.classList.toggle("open", isMenuOpen);
+    }
+
     fabBtn.addEventListener("click", function (e) {
       if (isDragging) return;
       e.preventDefault();
       e.stopPropagation();
-      isMenuOpen = !isMenuOpen;
-      menuEl.classList.toggle("open", isMenuOpen);
+      toggleMenu();
+    });
+
+    backdropEl.addEventListener("click", function (e) {
+      toggleMenu(false);
     });
 
     document.addEventListener("click", function (e) {
-      if (isMenuOpen && !btnContainer.contains(e.target)) {
-        isMenuOpen = false;
-        menuEl.classList.remove("open");
+      if (isMenuOpen && !btnContainer.contains(e.target) && !backdropEl.contains(e.target)) {
+        toggleMenu(false);
       }
     });
 
     // ── 1. 切回内联模式 ───────────────────────────────────────────
     document
       .getElementById("onin-btn-inline")
-      .addEventListener("click", function (e) {
+      .addEventListener("click", async function (e) {
         e.preventDefault();
         e.stopPropagation();
+        var shouldSwitch = false;
+        try {
+          shouldSwitch = await invoke("plugin_dialog_confirm", {
+            options: {
+              title: "切换显示方式",
+              message: "切换显示方式会重新打开插件，当前页面状态可能丢失。确定继续吗？",
+              kind: "warning",
+            },
+          });
+        } catch (err) {
+          console.error("[FAB] 切换确认弹窗失败:", err);
+          return;
+        }
+        if (!shouldSwitch) return;
         invoke("return_to_inline_from_window", { pluginId: pluginId }).catch(
           console.error,
         );
@@ -431,14 +485,28 @@
       toggleSetting("run_at_startup", "run-startup");
     });
 
+    document.getElementById("onin-btn-reload").addEventListener("click", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      toggleMenu(false);
+      window.location.reload();
+    });
+
+    document.getElementById("onin-btn-restart").addEventListener("click", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      toggleMenu(false);
+      invoke("plugin_restart_window", { pluginId: pluginId }).catch(console.error);
+    });
+
     document.getElementById("onin-btn-devtools").addEventListener("click", function (e) {
       e.preventDefault(); e.stopPropagation();
+      toggleMenu(false);
       invoke("plugin_open_devtools").catch(console.error);
     });
 
     document.getElementById("onin-btn-uninstall").addEventListener("click", function (e) {
       e.preventDefault(); e.stopPropagation();
       if (confirm("确定要卸载此插件吗？此操作无法撤销。")) {
+        toggleMenu(false);
         invoke("uninstall_plugin", { pluginId: pluginId }).then(function () {
           // 卸载后关闭窗口
           invoke("plugin_close_window", { label: "plugin_" + pluginId.replace(/\./g, "_") });

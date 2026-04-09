@@ -8,7 +8,8 @@
  * @module api/settings
  */
 
-import { invoke } from '../core/ipc';
+import { invoke, listen } from '../core/ipc';
+import type { UnlistenFn } from '@tauri-apps/api/event';
 import { createError } from '../types/errors';
 
 /**
@@ -375,6 +376,54 @@ function getSchema(): SettingField[] {
 }
 
 /**
+ * Listen for settings changes
+ * 
+ * @param callback - Function to call when settings change
+ * @returns Promise resolving to an unlisten function
+ * 
+ * @example
+ * ```typescript
+ * import { settings } from 'onin-sdk';
+ * 
+ * const unlisten = await settings.onChange((newSettings) => {
+ *   console.log('Settings changed:', newSettings);
+ * });
+ * 
+ * // Clean up listener when done
+ * unlisten();
+ * ```
+ */
+async function onChange(
+  callback: (newSettings: SettingsValues) => void
+): Promise<UnlistenFn> {
+  const pluginId = (globalThis as { __PLUGIN_ID__?: string }).__PLUGIN_ID__;
+  if (!pluginId) {
+    throw createError.common.unknown('Plugin ID not found in global context');
+  }
+
+  return await listen<{ pluginId: string; settings: SettingsValues }>(
+    'plugin-settings-changed',
+    (event) => {
+      // Only trigger callback if the event is for this plugin
+      if (event.payload.pluginId === pluginId) {
+        // Merge with default values from schema
+        const merged: SettingsValues = { ...event.payload.settings };
+        for (const field of settingsSchema) {
+          if (
+            merged[field.key] === undefined &&
+            'defaultValue' in field &&
+            field.defaultValue !== undefined
+          ) {
+            merged[field.key] = field.defaultValue;
+          }
+        }
+        callback(merged);
+      }
+    }
+  );
+}
+
+/**
  * Settings API namespace
  */
 export const settings = {
@@ -382,4 +431,5 @@ export const settings = {
   getAll,
   get,
   getSchema,
+  onChange,
 };

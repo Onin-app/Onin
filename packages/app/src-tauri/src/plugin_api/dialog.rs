@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use tauri::AppHandle;
+use tauri::{AppHandle, Runtime, Window};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use tokio::sync::oneshot;
 
@@ -44,10 +44,6 @@ pub struct ConfirmDialogOptions {
     pub title: Option<String>,
     pub message: String,
     pub kind: Option<String>,
-    #[serde(rename = "okLabel")]
-    pub ok_label: Option<String>,
-    #[serde(rename = "cancelLabel")]
-    pub cancel_label: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -111,7 +107,21 @@ pub async fn plugin_dialog_message(
 
 #[tauri::command]
 pub async fn plugin_dialog_confirm(
+    window: Window,
+    options: ConfirmDialogOptions,
+) -> Result<bool, DialogError> {
+    show_confirm_dialog(&window, options).await
+}
+
+pub async fn plugin_dialog_confirm_for_app(
     app: AppHandle,
+    options: ConfirmDialogOptions,
+) -> Result<bool, DialogError> {
+    show_confirm_dialog(&app, options).await
+}
+
+async fn show_confirm_dialog<Rt: Runtime, H: DialogExt<Rt>>(
+    dialog_host: &H,
     options: ConfirmDialogOptions,
 ) -> Result<bool, DialogError> {
     let kind = parse_message_kind(options.kind);
@@ -120,7 +130,8 @@ pub async fn plugin_dialog_confirm(
     // 使用异步 API 来创建确认对话框，明确设置为确认/取消按钮
     let (tx, rx) = oneshot::channel();
 
-    app.dialog()
+    dialog_host
+        .dialog()
         .message(&options.message)
         .title(&title)
         .kind(kind)

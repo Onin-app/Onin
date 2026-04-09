@@ -6,6 +6,7 @@ pub mod context;
 pub mod executor;
 pub mod inline;
 pub mod installer;
+pub mod lifecycle;
 pub mod loader;
 pub mod settings;
 pub mod state;

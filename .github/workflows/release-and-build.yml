@@ -99,6 +99,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.tag }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
