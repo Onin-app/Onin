@@ -280,17 +280,25 @@
         run_at_startup: "toggle_plugin_run_at_startup"
       };
 
-      // 乐观更新
+      // 映射为 Rust 端预期的 camelCase 参数名
+      var argMap = {
+        auto_detach: "autoDetach",
+        terminate_on_bg: "terminateOnBg",
+        run_at_startup: "runAtStartup"
+      };
+
+      // 乐观更新 UI
       updateSwitchUI(elementId, next);
 
       var args = { pluginId: pluginId };
-      args[key] = next;
+      args[argMap[key]] = next;
 
       invoke(commandMap[key], args).then(function () {
         settings[key] = next;
       }).catch(function (err) {
-        console.error("[FAB] Toggle failed:", err);
-        updateSwitchUI(elementId, settings[key]); // 回滚
+        console.error("[FAB] Toggle failed (" + key + "):", err);
+        // 失败时回滚 UI
+        updateSwitchUI(elementId, settings[key]);
       });
     }
 
@@ -367,8 +375,7 @@
           shouldSwitch = await invoke("plugin_dialog_confirm", {
             options: {
               title: "切换显示方式",
-              message:
-                "切换显示方式会重新打开插件，当前页面状态可能丢失。确定继续吗？",
+              message: "切换显示方式会重新打开插件，当前页面状态可能丢失。确定继续吗？",
               kind: "warning",
             },
           });
