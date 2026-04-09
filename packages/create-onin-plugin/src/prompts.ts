@@ -54,6 +54,7 @@ export async function promptForMissingOptions(initialOptions: CliOptions): Promi
       pluginName,
       pluginId,
       withSettings: initialOptions.withSettings ?? true,
+      withRelease: initialOptions.withRelease ?? true,
       framework: initialFramework,
       language: initialLanguage,
     };
@@ -134,6 +135,15 @@ export async function promptForMissingOptions(initialOptions: CliOptions): Promi
       }),
     );
 
+  const withRelease =
+    initialOptions.withRelease ??
+    ensurePromptValue(
+      await confirm({
+        message: "Include release configuration (semantic-release)?",
+        initialValue: true,
+      }),
+    );
+
   outro("Project configuration captured.");
 
   return {
@@ -141,6 +151,7 @@ export async function promptForMissingOptions(initialOptions: CliOptions): Promi
     pluginName,
     pluginId,
     withSettings,
+    withRelease,
     framework,
     language,
   };
