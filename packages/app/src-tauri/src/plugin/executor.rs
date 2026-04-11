@@ -56,7 +56,11 @@ pub fn execute_plugin_entry(
     let entry_path = plugin_dir.join(&plugin.manifest.entry);
 
     if !entry_path.is_file() {
-        return Err(format!("插件入口文件未找到: {:?}", entry_path));
+        let mut msg = format!("插件入口文件未找到: {:?}", entry_path);
+        if plugin.install_source == super::types::InstallSource::Local {
+            msg.push_str("\n提示：如果你正在开发该插件，请确保已运行构建（生成 dist 目录）或者在 manifest.json 中开启 devMode 并配置 devServer。");
+        }
+        return Err(msg);
     }
 
     // 根据文件扩展名决定执行方式
