@@ -6,3 +6,4 @@ pub mod notification;
 pub mod request;
 pub mod scheduler;
 pub mod storage;
+pub mod toast;

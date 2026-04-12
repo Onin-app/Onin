@@ -88,6 +88,7 @@ import { lifecycle } from './api/lifecycle';
 import { scheduler } from './api/scheduler';
 import { pluginWindow } from './api/window';
 import { ai } from './api/ai';
+import { toast } from './api/toast';
 
 import { invoke, listen } from './core/ipc';
 import { debug } from './utils/debug';
@@ -158,6 +159,7 @@ export {
   scheduler,
   pluginWindow,
   ai,
+  toast,
   invoke,
   listen,
   debug,

@@ -8,11 +8,17 @@
   import { invoke } from "@tauri-apps/api/core";
   import { page } from "$app/state";
   import { setupPluginConsoleListener } from "$lib/plugin-console";
-  import { Toaster } from "svelte-sonner";
+  import { Toaster, toast } from "svelte-sonner";
   import WindowResizer from "$lib/components/WindowResizer.svelte";
 
   // Setup plugin console listener to forward plugin console output to webview devtools
   setupPluginConsoleListener();
+
+  interface ToastPayload {
+    message: string;
+    kind: "default" | "success" | "error" | "warning" | "info";
+    duration?: number;
+  }
 
   // Subscribe to shortcuts store to trigger auto-loading
   // The subscription itself triggers the load in the store's start function
@@ -66,16 +72,45 @@
         },
       );
 
-      return { unlisten, unlistenVisibility, unlistenCommand };
+      const unlistenToast = await listen<ToastPayload>("plugin-toast", (event) => {
+        const { message, kind, duration } = event.payload;
+        const options = duration ? { duration } : {};
+
+        switch (kind) {
+          case "success":
+            toast.success(message, options);
+            break;
+          case "error":
+            toast.error(message, options);
+            break;
+          case "warning":
+            toast.warning(message, options);
+            break;
+          case "info":
+            toast.info(message, options);
+            break;
+          default:
+            toast(message, options);
+            break;
+        }
+      });
+
+      return {
+        unlisten,
+        unlistenVisibility,
+        unlistenCommand,
+        unlistenToast,
+      };
     })();
 
     // The returned cleanup function will only run if the entire layout is destroyed.
     return () => {
       listenersPromise.then(
-        ({ unlisten, unlistenVisibility, unlistenCommand }) => {
+        ({ unlisten, unlistenVisibility, unlistenCommand, unlistenToast }) => {
           unlisten();
           unlistenVisibility();
           unlistenCommand();
+          unlistenToast();
         },
       );
     };
