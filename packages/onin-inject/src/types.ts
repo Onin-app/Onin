@@ -19,6 +19,10 @@ export interface OninBridge {
   version: string;
   postMessage: (message: any) => void;
   showToast: (payload: ToastPayload) => void;
+  onShow: (callback: () => void) => void;
+  onHide: (callback: () => void) => void;
+  onFocus: (callback: () => void) => void;
+  onBlur: (callback: () => void) => void;
 }
 
 declare global {

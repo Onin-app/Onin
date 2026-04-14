@@ -261,21 +261,18 @@ pub fn plugin_toggle_window_pin(
 pub fn trigger_window_visibility_event(window: &tauri::WebviewWindow, is_visible: bool) {
     use tauri::Emitter;
 
-    // 发送具体的 show/hide 事件
-    if is_visible {
-        if let Err(e) = window.emit("window_show", ()) {
-            eprintln!("[plugin/window] 发送 window_show 事件失败: {}", e);
-        }
-    } else {
-        if let Err(e) = window.emit("window_hide", ()) {
-            eprintln!("[plugin/window] 发送 window_hide 事件失败: {}", e);
-        }
-    }
+    let event_name = if is_visible { "show" } else { "hide" };
 
-    // 同时发送通用的 visibility 事件（带 payload）
-    if let Err(e) = window.emit("window_visibility", is_visible) {
-        eprintln!("[plugin/window] 发送 window_visibility 事件失败: {}", e);
-    }
+    // 发送传统的 Tauri 事件 (供宿主 UI 或旧插件使用)
+    let _ = window.emit(&format!("window_{}", event_name), ());
+    let _ = window.emit("window_visibility", is_visible);
+
+    // 发送统一协议的 postMessage (供 onin-inject SDK 使用)
+    let js = format!(
+        r#"window.postMessage({{ "type": "plugin-lifecycle-event", "event": "{}" }}, "*")"#,
+        event_name
+    );
+    let _ = window.eval(&js);
 }
 
 /// 创建或显示插件窗口
@@ -395,6 +392,9 @@ pub async fn create_or_show_plugin_window(
     let window_states = load_plugin_window_states(&app);
     let saved_bounds = window_states.get(&plugin.manifest.id).cloned();
 
+    // 从 manifest 中获取配置
+    let window_config = plugin.manifest.window.clone();
+
     // 创建窗口构建器
     let mut builder = WebviewWindowBuilder::new(
         &app,
@@ -406,10 +406,18 @@ pub async fn create_or_show_plugin_window(
         ),
     )
     .title(plugin.manifest.name.clone())
-    .resizable(true)
-    .decorations(true) // 使用系统原生装饰
-    .transparent(false) // 确保窗口不透明
+    .decorations(window_config.as_ref().and_then(|c| c.decorations).unwrap_or(true))
+    .transparent(window_config.as_ref().and_then(|c| c.transparent).unwrap_or(false))
+    .always_on_top(window_config.as_ref().and_then(|c| c.always_on_top).unwrap_or(false))
+    .resizable(window_config.as_ref().and_then(|c| c.resizable).unwrap_or(true))
     .initialization_script(&runtime_script);
+
+    // 设置最小尺寸
+    if let Some(config) = &window_config {
+        if let (Some(mw), Some(mh)) = (config.min_width, config.min_height) {
+            builder = builder.min_inner_size(mw as f64, mh as f64);
+        }
+    }
 
     // 应用保存的窗口位置和大小
     if let Some(ref bounds) = saved_bounds {
@@ -425,13 +433,17 @@ pub async fn create_or_show_plugin_window(
             builder = builder
                 .position(bounds.x as f64, bounds.y as f64)
                 .inner_size(bounds.width as f64, bounds.height as f64);
-        } else if bounds.is_maximized {
-            builder = builder.inner_size(800.0, 600.0);
         } else {
-            builder = builder.inner_size(800.0, 600.0);
+            // 如果保存的状态无效，优先使用 manifest 中的默认尺寸
+            let w = window_config.as_ref().and_then(|c| c.width).unwrap_or(800) as f64;
+            let h = window_config.as_ref().and_then(|c| c.height).unwrap_or(600) as f64;
+            builder = builder.inner_size(w, h);
         }
     } else {
-        builder = builder.inner_size(800.0, 600.0);
+        // 没有保存的状态，使用 manifest 中的默认尺寸
+        let w = window_config.as_ref().and_then(|c| c.width).unwrap_or(800) as f64;
+        let h = window_config.as_ref().and_then(|c| c.height).unwrap_or(600) as f64;
+        builder = builder.inner_size(w, h);
     }
 
     // 标记窗口正在创建
@@ -524,9 +536,12 @@ fn setup_window_events(app: &tauri::AppHandle, window: &tauri::WebviewWindow, pl
 
                 // 只发送焦点事件，不发送可见性事件
                 // 焦点变化不等于可见性变化：窗口可以失去焦点但仍然可见
-                if let Err(e) = window_for_event.emit("window_focus", ()) {
-                    eprintln!("[plugin/window] 发送 window_focus 事件失败: {}", e);
-                }
+                let _ = window_for_event.emit("window_focus", ());
+
+                // 统一协议：发送 postMessage
+                let _ = window_for_event.eval(
+                    r#"window.postMessage({ "type": "plugin-lifecycle-event", "event": "focus" }, "*")"#,
+                );
 
                 // 重新注册 ESC 快捷键
                 let _ = app_for_window_event
@@ -553,9 +568,12 @@ fn setup_window_events(app: &tauri::AppHandle, window: &tauri::WebviewWindow, pl
 
                 // 只发送失焦事件，不发送可见性事件
                 // 焦点变化不等于可见性变化：窗口可以失去焦点但仍然可见
-                if let Err(e) = window_for_event.emit("window_blur", ()) {
-                    eprintln!("[plugin/window] 发送 window_blur 事件失败: {}", e);
-                }
+                let _ = window_for_event.emit("window_blur", ());
+
+                // 统一协议：发送 postMessage
+                let _ = window_for_event.eval(
+                    r#"window.postMessage({ "type": "plugin-lifecycle-event", "event": "blur" }, "*")"#,
+                );
 
                 // 注销 ESC 快捷键
                 if let Err(e) = app_for_window_event

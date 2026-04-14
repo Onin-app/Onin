@@ -47,13 +47,41 @@ function init() {
 
   window.__ONIN_SHOW_TOAST__ = showToast;
 
-  // 3. 暴露现代 Bridge API
+  // 3. 事件注册中心
+  const listeners: Record<string, Array<() => void>> = {
+    show: [],
+    hide: [],
+    focus: [],
+    blur: [],
+  };
+
+  window.addEventListener("message", (event) => {
+    const data = event.data;
+    if (data?.type === "plugin-lifecycle-event" && data.event) {
+      const callbacks = listeners[data.event];
+      if (callbacks) {
+        callbacks.forEach((cb) => {
+          try {
+            cb();
+          } catch (e) {
+            console.error(`[Onin SDK] Error in ${data.event} listener:`, e);
+          }
+        });
+      }
+    }
+  });
+
+  // 4. 暴露现代 Bridge API
   window.__ONIN_BRIDGE__ = {
     version: "0.1.0",
     showToast,
     postMessage: (message: any) => {
       window.postMessage(message, "*");
     },
+    onShow: (cb) => listeners.show.push(cb),
+    onHide: (cb) => listeners.hide.push(cb),
+    onFocus: (cb) => listeners.focus.push(cb),
+    onBlur: (cb) => listeners.blur.push(cb),
   };
 
   if (document.readyState === "loading") {
