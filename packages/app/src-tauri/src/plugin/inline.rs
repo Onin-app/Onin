@@ -17,6 +17,10 @@ use tauri::State;
 
 use super::types::PluginStore;
 
+/// 编译期嵌入的插件运行时注入层（Toast + Bridge API）
+/// 由 packages/onin-inject 编译产出
+const PLUGIN_INJECT_SCRIPT: &str = include_str!("../../templates/onin-inject.js");
+
 pub struct InlinePluginState {
     pub is_visible: AtomicBool,
     pub current_plugin_id: std::sync::Mutex<Option<String>>,
@@ -50,7 +54,7 @@ pub async fn show_inline_plugin<R: Runtime>(
     state.is_visible.store(true, Ordering::Relaxed);
     {
         let mut id_lock = state.current_plugin_id.lock().unwrap();
-        *id_lock = Some(plugin_id);
+        *id_lock = Some(plugin_id.clone());
     }
 
     let window = resolve_host_window(&app)?;
@@ -86,8 +90,25 @@ pub async fn show_inline_plugin<R: Runtime>(
             WebviewUrl::App(url.into())
         };
 
+        // 注入运行时信息和 Toast/Bridge 脚本
+        let runtime_script = format!(
+            r#"
+            window.__ONIN_RUNTIME__ = {{
+                mode: "inline",
+                pluginId: "{id}",
+                version: "0.1.0",
+                mainWindowLabel: "main"
+            }};
+            window.__PLUGIN_ID__ = "{id}";
+            {inject}
+            "#,
+            id = plugin_id,
+            inject = PLUGIN_INJECT_SCRIPT,
+        );
+
         let webview_builder = WebviewBuilder::new("plugin-inline", webview_url)
             .devtools(true)
+            .initialization_script(&runtime_script)
             .on_page_load(|webview, _payload| {
                 use tauri::Emitter;
                 if let Err(e) = webview.window().emit("plugin-inline-loaded", ()) {
@@ -208,7 +229,7 @@ pub fn reload_inline_plugin<R: Runtime>(app: AppHandle<R>) -> Result<(), String>
 #[tauri::command]
 pub async fn restart_inline_plugin<R: Runtime>(
     app: AppHandle<R>,
-    store: State<'_, PluginStore>,
+    _store: State<'_, PluginStore>,
     state: State<'_, InlinePluginState>,
 ) -> Result<(), String> {
     let (plugin_id, url, rect) = {

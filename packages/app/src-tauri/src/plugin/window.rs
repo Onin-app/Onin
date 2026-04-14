@@ -20,6 +20,10 @@ use super::types::{
 /// 源文件：src-tauri/templates/plugin-window-fab.js
 const PLUGIN_WINDOW_FAB_SCRIPT: &str = include_str!("../../templates/plugin-window-fab.js");
 
+/// 编译期嵌入的插件运行时注入层（Toast + Bridge API）
+/// 由 packages/onin-inject 编译产出，详见 onin-inject/vite.config.ts
+const PLUGIN_INJECT_SCRIPT: &str = include_str!("../../templates/onin-inject.js");
+
 // ============================================================================
 // 窗口基本控制命令
 // ============================================================================
@@ -367,8 +371,9 @@ pub async fn create_or_show_plugin_window(
         url
     };
 
-    // 注入运行时信息及 FAB 悬浮菜单
-    // FAB 脚本从外部模板文件编译期嵌入，详见 templates/plugin-window-fab.js
+    // 注入运行时信息、FAB 悬浮菜单和 Toast/Bridge
+    // FAB: templates/plugin-window-fab.js (手写，待迁移)
+    // Toast+Bridge: templates/onin-inject.js (Svelte 编译产物)
     let runtime_script = format!(
         r#"
         window.__ONIN_RUNTIME__ = {{
@@ -377,11 +382,14 @@ pub async fn create_or_show_plugin_window(
             version: "{ver}",
             mainWindowLabel: "main"
         }};
-        window.__PLUGIN_ID__ = "{id}";        {fab}
+        window.__PLUGIN_ID__ = "{id}";
+        {fab}
+        {inject}
         "#,
         id = plugin.manifest.id,
         ver = plugin.manifest.version,
         fab = PLUGIN_WINDOW_FAB_SCRIPT,
+        inject = PLUGIN_INJECT_SCRIPT,
     );
 
     // 加载保存的窗口状态

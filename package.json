@@ -6,10 +6,11 @@
   "license": "GPL-3.0",
   "type": "module",
   "scripts": {
-    "dev": "pnpm --filter app tauri:dev",
+    "dev": "pnpm --filter onin-inject build && pnpm --filter app tauri:dev",
     "dev:demo": "pnpm --filter plugin-demo dev",
     "build": "pnpm -r build",
-    "build:app": "pnpm --filter app tauri:build",
+    "build:inject": "pnpm --filter onin-inject build",
+    "build:app": "pnpm --filter onin-inject build && pnpm --filter app tauri:build",
     "build:sdk": "pnpm --filter onin-sdk build",
     "build:demo": "pnpm --filter plugin-demo build",
     "create:plugin": "pnpm --filter create-onin-plugin start",
