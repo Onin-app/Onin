@@ -238,7 +238,7 @@ pub fn reload_inline_plugin<R: Runtime>(app: AppHandle<R>) -> Result<(), String>
 #[tauri::command]
 pub async fn restart_inline_plugin<R: Runtime>(
     app: AppHandle<R>,
-    _store: State<'_, PluginStore>,
+    store: State<'_, PluginStore>,
     state: State<'_, InlinePluginState>,
 ) -> Result<(), String> {
     let (plugin_id, url, rect) = {
@@ -278,10 +278,10 @@ pub async fn restart_inline_plugin<R: Runtime>(
         close_inline_plugin(app.clone(), state.clone())?;
 
         // 2. 等待清理完成
-        std::thread::sleep(std::time::Duration::from_millis(200));
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
         // 3. 重新打开
-        show_inline_plugin(app, state, url, id, rect).await?;
+        show_inline_plugin(app, state, store, url, id, rect).await?;
     }
     Ok(())
 }
