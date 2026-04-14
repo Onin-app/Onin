@@ -196,12 +196,14 @@ pub fn show_plugin_inline(
     struct PluginInlinePayload {
         plugin_id: String,
         plugin_name: String,
+        plugin_version: String,
         plugin_url: String,
     }
 
     let payload = PluginInlinePayload {
         plugin_id: plugin.manifest.id.clone(),
         plugin_name: plugin.manifest.name.clone(),
+        plugin_version: plugin.manifest.version.clone(),
         plugin_url,
     };
 

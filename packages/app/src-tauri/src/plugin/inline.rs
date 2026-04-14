@@ -47,6 +47,7 @@ fn resolve_host_window<R: Runtime>(app: &AppHandle<R>) -> Result<tauri::Window<R
 pub async fn show_inline_plugin<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, InlinePluginState>,
+    store: State<'_, PluginStore>,
     url: String,
     plugin_id: String,
     rect: Rect,
@@ -56,6 +57,14 @@ pub async fn show_inline_plugin<R: Runtime>(
         let mut id_lock = state.current_plugin_id.lock().unwrap();
         *id_lock = Some(plugin_id.clone());
     }
+
+    // 获取版本号以进行注入
+    let version = {
+        let store_lock = store.0.lock().unwrap();
+        super::types::find_plugin_by_id(&store_lock, &plugin_id)
+            .map(|p| p.manifest.version.clone())
+            .unwrap_or_else(|| "0.1.0".to_string())
+    };
 
     let window = resolve_host_window(&app)?;
 
@@ -96,12 +105,13 @@ pub async fn show_inline_plugin<R: Runtime>(
             window.__ONIN_RUNTIME__ = {{
                 mode: "inline",
                 pluginId: "{id}",
-                version: "0.1.0",
+                version: "{version}",
                 mainWindowLabel: "main"
             }};
             {inject}
             "#,
             id = plugin_id,
+            version = version,
             inject = PLUGIN_INJECT_SCRIPT,
         );
 

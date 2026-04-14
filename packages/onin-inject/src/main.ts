@@ -93,7 +93,7 @@ function initRuntime() {
     window.__ONIN_RUNTIME__ = {
       mode: (urlParams.get("mode") as any) || "inline",
       pluginId: window.__PLUGIN_ID__ || "unknown",
-      version: "0.1.0",
+      version: "dev-fallback",
       mainWindowLabel: "main",
     };
   }
