@@ -16,6 +16,10 @@ if (!window.__ONIN_TOAST_INJECTED__) {
 }
 
 function init() {
+  // 1. 基础环境初始化
+  resolvePluginId();
+  initRuntime();
+
   let toastInstance: ReturnType<typeof mountToast> | null = null;
 
   function mountToast() {
@@ -31,17 +35,66 @@ function init() {
     }
   }
 
-  // 暴露全局 API，供 Rust eval() 调用
-  window.__ONIN_SHOW_TOAST__ = function (payload: ToastPayload) {
+  // 2. 暴露全局 Toast API (兼容旧版)
+  const showToast = function (payload: ToastPayload) {
     ensureMounted();
     if (toastInstance) {
-      (toastInstance as unknown as { show: (p: ToastPayload) => void }).show(payload);
+      (toastInstance as unknown as { show: (p: ToastPayload) => void }).show(
+        payload,
+      );
     }
+  };
+
+  window.__ONIN_SHOW_TOAST__ = showToast;
+
+  // 3. 暴露现代 Bridge API
+  window.__ONIN_BRIDGE__ = {
+    version: "0.1.0",
+    showToast,
+    postMessage: (message: any) => {
+      window.postMessage(message, "*");
+    },
   };
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => ensureMounted());
   } else {
     ensureMounted();
+  }
+}
+
+/**
+ * 解析插件 ID
+ * 优先级: 1. URL 参数 2. Rust 预设的全局变量 3. 默认值
+ */
+function resolvePluginId() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const pluginIdFromUrl = urlParams.get("plugin_id");
+
+  if (pluginIdFromUrl) {
+    window.__PLUGIN_ID__ = pluginIdFromUrl;
+  }
+
+  if (!window.__PLUGIN_ID__) {
+    // 兜底值，不应出现
+    window.__PLUGIN_ID__ = "unknown";
+  }
+
+  // 确保 globalThis 也有映射
+  (globalThis as any).__PLUGIN_ID__ = window.__PLUGIN_ID__;
+}
+
+/**
+ * 初始化运行时元数据
+ */
+function initRuntime() {
+  if (!window.__ONIN_RUNTIME__) {
+    const urlParams = new URLSearchParams(window.location.search);
+    window.__ONIN_RUNTIME__ = {
+      mode: (urlParams.get("mode") as any) || "inline",
+      pluginId: window.__PLUGIN_ID__ || "unknown",
+      version: "0.1.0",
+      mainWindowLabel: "main",
+    };
   }
 }

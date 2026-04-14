@@ -382,7 +382,6 @@ pub async fn create_or_show_plugin_window(
             version: "{ver}",
             mainWindowLabel: "main"
         }};
-        window.__PLUGIN_ID__ = "{id}";
         {fab}
         {inject}
         "#,

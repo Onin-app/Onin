@@ -167,11 +167,9 @@ fn get_content_type(extension: Option<&str>) -> &'static str {
 // HTML 处理
 // ============================================================================
 
-/// 处理 HTML 内容：修复路径并注入 Tauri 桥接
-fn process_html_content(content: Vec<u8>, plugin_id: &str) -> Vec<u8> {
+fn process_html_content(content: Vec<u8>, _plugin_id: &str) -> Vec<u8> {
     if let Ok(html) = String::from_utf8(content.clone()) {
-        let fixed_html = fix_asset_paths(&html);
-        inject_tauri_bridge(&fixed_html, plugin_id).into_bytes()
+        fix_asset_paths(&html).into_bytes()
     } else {
         content
     }
@@ -184,33 +182,3 @@ fn fix_asset_paths(html: &str) -> String {
     html.replace("=\"/", "=\"./").replace("='/", "='./")
 }
 
-// ============================================================================
-// Tauri 桥接注入
-// ============================================================================
-
-/// Runtime initialization script template
-const TAURI_BRIDGE_SCRIPT: &str = r#"
-<script>
-(function() {
-  const pluginIdFromInjection = '__PLUGIN_ID__';
-  const urlParams = new URLSearchParams(window.location.search);
-  const pluginIdFromUrl = urlParams.get('plugin_id');
-
-  window.__PLUGIN_ID__ = pluginIdFromUrl || pluginIdFromInjection;
-  globalThis.__PLUGIN_ID__ = window.__PLUGIN_ID__;
-})();
-</script>
-"#;
-
-/// 注入运行时初始化脚本到 HTML
-fn inject_tauri_bridge(html: &str, plugin_id: &str) -> String {
-    let bridge_script = TAURI_BRIDGE_SCRIPT.replace("__PLUGIN_ID__", plugin_id);
-
-    if html.contains("<head>") {
-        html.replace("<head>", &format!("<head>{}", bridge_script))
-    } else if html.contains("<html>") {
-        html.replace("<html>", &format!("<html><head>{}</head>", bridge_script))
-    } else {
-        format!("{}{}", bridge_script, html)
-    }
-}

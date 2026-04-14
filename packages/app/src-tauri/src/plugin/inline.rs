@@ -99,7 +99,6 @@ pub async fn show_inline_plugin<R: Runtime>(
                 version: "0.1.0",
                 mainWindowLabel: "main"
             }};
-            window.__PLUGIN_ID__ = "{id}";
             {inject}
             "#,
             id = plugin_id,
