@@ -36,6 +36,6 @@
   expand={false}
   toastOptions={{
     style: "font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);",
-    className: "onin-toast",
+    class: "onin-toast",
   }}
 />
