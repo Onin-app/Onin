@@ -26,6 +26,7 @@ import {
   settings,
   pluginWindow,
   ai,
+  toast,
 } from 'onin-sdk';
 ```
 
@@ -45,6 +46,7 @@ import {
 | [`settings`](./settings)         | 插件设置页面配置                | —              |
 | [`pluginWindow`](./window)       | 窗口事件监听（show/hide/focus） | —              |
 | [`ai`](./ai)                     | 调用用户配置的 AI 能力          | —              |
+| [`toast`](./toast)               | 窗口内提示信息（Success/Error） | —              |
 
 ## 典型用法模式
 

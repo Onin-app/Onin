@@ -11,6 +11,7 @@ export interface PluginState {
   showPluginInline: boolean;
   currentPluginUrl: string;
   currentPluginId: string;
+  currentPluginVersion: string;
   currentPluginAutoDetach: boolean;
   currentPluginTerminateOnBg: boolean;
   currentPluginRunAtStartup: boolean;
@@ -48,6 +49,7 @@ export function usePluginManager(): PluginManagerReturn {
     showPluginInline: false,
     currentPluginUrl: "",
     currentPluginId: "",
+    currentPluginVersion: "",
     currentPluginAutoDetach: false,
     currentPluginTerminateOnBg: false,
     currentPluginRunAtStartup: false,
@@ -287,11 +289,13 @@ export function usePluginManager(): PluginManagerReturn {
     const unlistenPluginInline = await listen<{
       plugin_id: string;
       plugin_name: string;
+      plugin_version: string;
       plugin_url: string;
     }>("show_plugin_inline", async (event) => {
       state.showPluginInline = true;
       state.currentPluginUrl = event.payload.plugin_url;
       state.currentPluginId = event.payload.plugin_id;
+      state.currentPluginVersion = event.payload.plugin_version;
 
       // 获取插件的 auto_detach 状态
       try {

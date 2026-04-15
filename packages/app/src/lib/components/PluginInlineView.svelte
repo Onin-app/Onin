@@ -12,10 +12,11 @@
   interface Props {
     url: string;
     pluginId?: string;
+    version?: string;
     onLoad?: () => void;
   }
 
-  let { url, pluginId = "", onLoad }: Props = $props();
+  let { url, pluginId = "", version = "0.1.0", onLoad }: Props = $props();
 
   let containerElement = $state<HTMLDivElement | null>(null);
   let resizeObserver: ResizeObserver | null = null;
@@ -217,7 +218,7 @@
       runtime: {
         mode: "inline" as const,
         pluginId: pluginId || "unknown",
-        version: "0.1.0",
+        version: version,
         mainWindowLabel: "main",
       },
     };

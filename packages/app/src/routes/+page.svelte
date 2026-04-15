@@ -585,6 +585,7 @@
             bind:this={pluginInlineViewRef}
             url={plugin.state.currentPluginUrl}
             pluginId={plugin.state.currentPluginId}
+            version={plugin.state.currentPluginVersion}
             onLoad={() => {
               // No-op for now, logic potentially moved to component or manager
             }}

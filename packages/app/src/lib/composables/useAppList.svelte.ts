@@ -8,6 +8,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { LaunchableItem, CommandUsageStats, AppConfig } from "$lib/type";
 import { fuzzyMatch } from "$lib/utils/fuzzyMatch";
+import { toast } from "svelte-sonner";
 
 export interface AppListState {
   originAppList: LaunchableItem[];
@@ -119,6 +120,10 @@ export function useAppList(): AppListManagerReturn {
       onSuccess();
     } catch (error) {
       console.error("Failed to open app:", error);
+      toast.error("运行失败", {
+        description: String(error),
+        duration: 6000,
+      });
     }
   };
 

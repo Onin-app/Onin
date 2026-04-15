@@ -17,6 +17,10 @@ use tauri::State;
 
 use super::types::PluginStore;
 
+/// 编译期嵌入的插件运行时注入层（Toast + Bridge API）
+/// 由 packages/onin-inject 编译产出
+const PLUGIN_INJECT_SCRIPT: &str = include_str!("../../templates/onin-inject.js");
+
 pub struct InlinePluginState {
     pub is_visible: AtomicBool,
     pub current_plugin_id: std::sync::Mutex<Option<String>>,
@@ -43,6 +47,7 @@ fn resolve_host_window<R: Runtime>(app: &AppHandle<R>) -> Result<tauri::Window<R
 pub async fn show_inline_plugin<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, InlinePluginState>,
+    store: State<'_, PluginStore>,
     url: String,
     plugin_id: String,
     rect: Rect,
@@ -50,8 +55,16 @@ pub async fn show_inline_plugin<R: Runtime>(
     state.is_visible.store(true, Ordering::Relaxed);
     {
         let mut id_lock = state.current_plugin_id.lock().unwrap();
-        *id_lock = Some(plugin_id);
+        *id_lock = Some(plugin_id.clone());
     }
+
+    // 获取版本号以进行注入
+    let version = {
+        let store_lock = store.0.lock().unwrap();
+        super::types::find_plugin_by_id(&store_lock, &plugin_id)
+            .map(|p| p.manifest.version.clone())
+            .unwrap_or_else(|| "0.1.0".to_string())
+    };
 
     let window = resolve_host_window(&app)?;
 
@@ -86,8 +99,25 @@ pub async fn show_inline_plugin<R: Runtime>(
             WebviewUrl::App(url.into())
         };
 
+        // 注入运行时信息和 Toast/Bridge 脚本
+        let runtime_script = format!(
+            r#"
+            window.__ONIN_RUNTIME__ = {{
+                mode: "inline",
+                pluginId: "{id}",
+                version: "{version}",
+                mainWindowLabel: "main"
+            }};
+            {inject}
+            "#,
+            id = plugin_id,
+            version = version,
+            inject = PLUGIN_INJECT_SCRIPT,
+        );
+
         let webview_builder = WebviewBuilder::new("plugin-inline", webview_url)
             .devtools(true)
+            .initialization_script(&runtime_script)
             .on_page_load(|webview, _payload| {
                 use tauri::Emitter;
                 if let Err(e) = webview.window().emit("plugin-inline-loaded", ()) {
@@ -248,10 +278,10 @@ pub async fn restart_inline_plugin<R: Runtime>(
         close_inline_plugin(app.clone(), state.clone())?;
 
         // 2. 等待清理完成
-        std::thread::sleep(std::time::Duration::from_millis(200));
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
         // 3. 重新打开
-        show_inline_plugin(app, state, url, id, rect).await?;
+        show_inline_plugin(app, state, store, url, id, rect).await?;
     }
     Ok(())
 }

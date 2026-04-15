@@ -207,6 +207,27 @@ pub struct PluginPermissions {
 // 插件清单相关类型
 // ============================================================================
 
+/// 插件窗口配置
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PluginWindowConfig {
+    /// 默认宽度
+    pub width: Option<u32>,
+    /// 默认高度
+    pub height: Option<u32>,
+    /// 最小宽度
+    pub min_width: Option<u32>,
+    /// 最小高度
+    pub min_height: Option<u32>,
+    /// 是否可调整大小
+    pub resizable: Option<bool>,
+    /// 是否置顶
+    pub always_on_top: Option<bool>,
+    /// 是否无边框
+    pub decorations: Option<bool>,
+    /// 是否透明
+    pub transparent: Option<bool>,
+}
+
 /// 插件清单
 ///
 /// 对应 manifest.json 文件的结构
@@ -238,6 +259,8 @@ pub struct PluginManifest {
     /// - "window": 在新的 webview 窗口中打开
     #[serde(default = "default_display_mode")]
     pub display_mode: String,
+    /// 窗口配置（仅对 window 模式有效）
+    pub window: Option<PluginWindowConfig>,
     /// 自动分离到独立窗口
     /// 如果为 true，HTML 插件将始终在独立窗口中打开
     #[serde(default)]

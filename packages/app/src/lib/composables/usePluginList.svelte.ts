@@ -7,6 +7,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { PluginSettingsSchema } from "$lib/types/plugin-settings";
+import { toast } from "svelte-sonner";
 
 export interface PluginManifest {
   id: string;
@@ -301,6 +302,10 @@ export function usePluginList(): PluginListReturn {
       await invoke("execute_plugin_entry", { pluginId });
     } catch (e) {
       console.error(`Failed to execute plugin with ID ${pluginId}:`, e);
+      toast.error("无法打开插件", {
+        description: String(e),
+        duration: 6000,
+      });
     }
   };
 

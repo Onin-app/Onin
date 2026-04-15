@@ -103,7 +103,11 @@ pub async fn get_basic_commands(app: AppHandle) -> Vec<Command> {
 }
 
 #[command]
-pub async fn execute_command(name: String, app: AppHandle, args: Option<serde_json::Value>) {
+pub async fn execute_command(
+    name: String,
+    app: AppHandle,
+    args: Option<serde_json::Value>,
+) -> Result<(), String> {
     // 记录使用情况
     let tracker_state = app.state::<crate::usage_tracker::UsageTrackerState>();
     if let Err(e) =
@@ -120,29 +124,37 @@ pub async fn execute_command(name: String, app: AppHandle, args: Option<serde_js
                 if let Some(cmd_info) = SYSTEM_COMMANDS.iter().find(|&cmd| cmd.name == sys_cmd_name)
                 {
                     (cmd_info.action)(app);
+                    Ok(())
                 } else {
-                    eprintln!("Unknown system command: {}", sys_cmd_name);
+                    let err = format!("Unknown system command: {}", sys_cmd_name);
+                    eprintln!("{}", err);
+                    Err(err)
                 }
             }
             CommandAction::App(path) => {
-                if let Err(e) = installed_apps::open_app(path.clone(), app.clone()) {
-                    eprintln!("Failed to open app {}: {}", path, e);
-                }
+                installed_apps::open_app(path.clone(), app.clone()).map_err(|e| {
+                    let err = format!("Failed to open app {}: {}", path, e);
+                    eprintln!("{}", err);
+                    err
+                })
             }
-            CommandAction::File(path) => {
-                if let Err(e) = opener::open(path) {
-                    eprintln!("Failed to open file {}: {}", path, e);
-                }
-            }
+            CommandAction::File(path) => opener::open(path).map_err(|e| {
+                let err = format!("Failed to open file {}: {}", path, e);
+                eprintln!("{}", err);
+                err
+            }),
             CommandAction::PluginEntry { plugin_id } => {
                 let plugin_store = app.state::<crate::plugin::PluginStore>();
-                if let Err(e) = crate::plugin::execute_plugin_entry(
+                crate::plugin::execute_plugin_entry(
                     app.clone(),
                     plugin_store,
                     plugin_id.clone(),
-                ) {
-                    eprintln!("Failed to execute plugin {}: {}", plugin_id, e);
-                }
+                )
+                .map_err(|e| {
+                    let err = format!("插件执行失败 {}: {}", plugin_id, e);
+                    eprintln!("{}", err);
+                    err
+                })
             }
             CommandAction::PluginCommand {
                 plugin_id,
@@ -165,11 +177,18 @@ pub async fn execute_command(name: String, app: AppHandle, args: Option<serde_js
                 {
                     Ok(result) => {
                         if !result.success {
-                            eprintln!("Plugin command failed: {:?}", result.error);
+                            let err_msg = result.error.unwrap_or_else(|| "未知插件错误".to_string());
+                            let err = format!("插件指令执行失败: {}", err_msg);
+                            eprintln!("{}", err);
+                            Err(err)
+                        } else {
+                            Ok(())
                         }
                     }
                     Err(e) => {
-                        eprintln!("Failed to execute plugin command {}: {}", command_code, e);
+                        let err = format!("无法触发插件指令 {}: {}", command_code, e);
+                        eprintln!("{}", err);
+                        Err(err)
                     }
                 }
             }
@@ -179,12 +198,18 @@ pub async fn execute_command(name: String, app: AppHandle, args: Option<serde_js
             } => {
                 let result = crate::extension::execute_extension_command(extension_id, "");
                 if let Some(error) = result.error {
-                    eprintln!("Extension command failed: {}", error);
+                    let err = format!("Extension command failed: {}", error);
+                    eprintln!("{}", err);
+                    Err(err)
+                } else {
+                    Ok(())
                 }
             }
         }
     } else {
-        eprintln!("Command not found: {}", name);
+        let err = format!("Command not found: {}", name);
+        eprintln!("{}", err);
+        Err(err)
     }
 }
 

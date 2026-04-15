@@ -9,6 +9,7 @@
     command,
     storage,
     notification,
+    toast,
     clipboard,
     fs,
     http,
@@ -68,6 +69,7 @@
     { id: 'command', name: 'Command', icon: '⌨️', count: 3 },
     { id: 'storage', name: 'Storage', icon: '💾', count: 9 },
     { id: 'notification', name: 'Notification', icon: '🔔', count: 1 },
+    { id: 'toast', name: 'Toast', icon: '🍞', count: 5 },
     { id: 'clipboard', name: 'Clipboard', icon: '📋', count: 9 },
     { id: 'fs', name: 'File System', icon: '📁', count: 10 },
     { id: 'http', name: 'HTTP', icon: '🌐', count: 6 },
@@ -147,6 +149,8 @@
           {@render storageTests()}
         {:else if currentModule === 'notification'}
           {@render notificationTests()}
+        {:else if currentModule === 'toast'}
+          {@render toastTests()}
         {:else if currentModule === 'clipboard'}
           {@render clipboardTests()}
         {:else if currentModule === 'fs'}
@@ -1188,6 +1192,59 @@
       >
         <span class="api-name">Vision API</span>
         <span class="api-desc">图片识别</span>
+      </button>
+    </div>
+  </div>
+{/snippet}
+
+<!-- Toast Tests -->
+{#snippet toastTests()}
+  <div class="api-group">
+    <h3>Toast 提示</h3>
+    <div class="test-grid">
+      <button
+        class="test-btn"
+        onclick={() =>
+          runTest('toast.show', () => toast.show('这是一条通用提示'))}
+      >
+        <span class="api-name">show</span>
+        <span class="api-desc">显示通用提示</span>
+      </button>
+      <button
+        class="test-btn"
+        onclick={() =>
+          runTest('toast.success', () =>
+            toast.success('操作成功！', { duration: 3000 }),
+          )}
+      >
+        <span class="api-name">success</span>
+        <span class="api-desc">显示成功提示 (3s)</span>
+      </button>
+      <button
+        class="test-btn"
+        onclick={() =>
+          runTest('toast.error', () => toast.error('发生错误，请重试'))}
+      >
+        <span class="api-name">error</span>
+        <span class="api-desc">显示错误提示</span>
+      </button>
+      <button
+        class="test-btn"
+        onclick={() =>
+          runTest('toast.warning', () =>
+            toast.warning('这是一条警告信息', { duration: 5000 }),
+          )}
+      >
+        <span class="api-name">warning</span>
+        <span class="api-desc">显示警告提示 (5s)</span>
+      </button>
+      <button
+        class="test-btn"
+        onclick={() =>
+          runTest('toast.info', () => toast.info('这是一条普通信息'))}
+      >
+        <span class="api-name">info</span>
+        <span class="api-desc">显示信息提示</span>
       </button>
     </div>
   </div>
