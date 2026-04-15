@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite build --watch",
-    "build": "vite build"
+    "build": "vite build",
+    "check": "svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
     "svelte-sonner": "^1.0.7"
@@ -14,6 +15,7 @@
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^6.2.4",
     "svelte": "^5.34.7",
+    "svelte-check": "^4.2.2",
     "typescript": "~5.8.3",
     "vite": "^7.0.0"
   }

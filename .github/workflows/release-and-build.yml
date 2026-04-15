@@ -8,6 +8,7 @@ on:
       - 'packages/app/**'
       - 'packages/sdk/**'
       - 'packages/create-onin-plugin/**'
+      - 'packages/onin-inject/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - '.github/workflows/release-and-build.yml'
@@ -31,6 +32,7 @@ jobs:
       version: ${{ steps.release.outputs.version }}
       tag: ${{ steps.release.outputs.tag }}
       app_changed: ${{ steps.filter.outputs.app }}
+      onin_inject_changed: ${{ steps.filter.outputs.onin_inject }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -56,6 +58,8 @@ jobs:
           filters: |
             app:
               - 'packages/app/**'
+            onin_inject:
+              - 'packages/onin-inject/**'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -172,7 +176,7 @@ jobs:
 
   build-tauri:
     needs: release
-    if: needs.release.outputs.released == 'true' && needs.release.outputs.app_changed == 'true'
+    if: needs.release.outputs.released == 'true' && (needs.release.outputs.app_changed == 'true' || needs.release.outputs.onin_inject_changed == 'true')
     strategy:
       fail-fast: false
       matrix:
