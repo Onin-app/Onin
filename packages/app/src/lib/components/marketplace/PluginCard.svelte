@@ -180,7 +180,7 @@
       {/if}
 
       <!-- 安装按钮 -->
-      {#if plugin.downloadUrl}
+      {#if plugin.downloadUrl || isInstalled}
         <button
           class="flex items-center gap-1 rounded bg-blue-500 px-3 py-1 text-xs text-white transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
           onclick={handleInstall}

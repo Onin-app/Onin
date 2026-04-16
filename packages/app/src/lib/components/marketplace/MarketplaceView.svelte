@@ -19,9 +19,10 @@
 
   interface Props {
     active?: boolean;
+    refreshTrigger?: number;
   }
 
-  let { active = false }: Props = $props();
+  let { active = false, refreshTrigger = 0 }: Props = $props();
 
   let plugins: MarketplacePlugin[] = $state([]);
   let installedPluginIds: Set<string> = $state(new Set());
@@ -213,6 +214,13 @@
   $effect(() => {
     if (active) {
       loadInstalledPlugins();
+    }
+  });
+
+  // 监听外部刷新触发
+  $effect(() => {
+    if (refreshTrigger > 0 && active) {
+      loadPlugins();
     }
   });
 
