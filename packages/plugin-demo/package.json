@@ -16,10 +16,10 @@
     "@tauri-apps/api": "^2.8.0"
   },
   "devDependencies": {
-    "@sveltejs/vite-plugin-svelte": "^6.2.1",
+    "@sveltejs/vite-plugin-svelte": "^7.0.0",
     "svelte": "^5.43.8",
     "svelte-check": "^4.3.4",
     "typescript": "~5.8.3",
-    "vite": "npm:rolldown-vite@7.2.5"
+    "vite": "npm:rolldown-vite@^8.0.0"
   }
 }
