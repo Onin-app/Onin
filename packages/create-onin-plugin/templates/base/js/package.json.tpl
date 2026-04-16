@@ -9,9 +9,9 @@
     "pack:plugin": "npm run build && bestzip plugin.zip manifest.json icon.svg dist"
   },
   "dependencies": {
-    "onin-sdk": "^1.6.0"
+    "onin-sdk": "^1.13.0"
   },
   "devDependencies": {
-    "bestzip": "^2.2.1"
+    "bestzip": "^2.3.0"
   }
 }
