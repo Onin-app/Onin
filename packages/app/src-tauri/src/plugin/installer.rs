@@ -160,7 +160,7 @@ pub fn import_plugin(
 ///
 /// 从系统中完全移除插件，包括文件、状态和运行时
 #[tauri::command]
-pub fn uninstall_plugin(
+pub async fn uninstall_plugin(
     app: tauri::AppHandle,
     store: State<'_, PluginStore>,
     plugin_id: String,
@@ -218,16 +218,9 @@ pub fn uninstall_plugin(
     }
 
     // 6. 清理 JavaScript 运行时
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|e| format!("创建运行时失败: {}", e))?;
-
-    rt.block_on(async {
-        if let Err(e) = js_runtime::clear_plugin_runtime(&plugin_id).await {
-            eprintln!("[plugin/installer] 清理 JS 运行时失败: {}", e);
-        }
-    });
+    if let Err(e) = js_runtime::clear_plugin_runtime(&plugin_id).await {
+        eprintln!("[plugin/installer] 清理 JS 运行时失败: {}", e);
+    }
 
     if !plugin_was_in_store && !plugin_link_path.exists() {
         return Err(format!("插件未找到: {}", plugin_id));
@@ -276,7 +269,9 @@ pub async fn download_and_install_plugin(
     download_url: String,
     plugin_id: String,
     icon_url: Option<String>,
+    overwrite: Option<bool>,
 ) -> Result<LoadedPlugin, String> {
+    let overwrite = overwrite.unwrap_or(false);
     // P1 安全增强：验证插件 ID 格式，防止路径穿透或非法文件名
     let id_regex = regex::Regex::new(r"^[a-z0-9][a-z0-9.-]*[a-z0-9]$").unwrap();
     if !id_regex.is_match(&plugin_id) || plugin_id.contains("..") {
@@ -345,10 +340,19 @@ pub async fn download_and_install_plugin(
     let target_dir = plugins_dir.join(&dir_name);
 
     if target_dir.exists() {
-        return Err(format!(
-            "插件 '{}' 已存在 (目录: {})。\n请先卸载现有版本，然后再安装。",
-            manifest.name, dir_name
-        ));
+        if overwrite {
+            // 清理 JavaScript 运行时
+            if let Err(e) = js_runtime::clear_plugin_runtime(&plugin_id).await {
+                eprintln!("[plugin/installer] 更新前清理 JS 运行时失败: {}", e);
+            }
+
+            remove_plugin_directory(&target_dir)?;
+        } else {
+            return Err(format!(
+                "插件 '{}' 已存在 (目录: {})。\n请先卸载现有版本，然后再安装。",
+                manifest.name, dir_name
+            ));
+        }
     }
 
     if !plugins_dir.exists() {
