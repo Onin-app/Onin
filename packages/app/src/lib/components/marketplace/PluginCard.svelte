@@ -8,6 +8,11 @@
   } from "phosphor-svelte";
   import type { MarketplacePlugin } from "$lib/types/marketplace";
   import { downloadAndInstallPlugin } from "$lib/api/marketplace";
+  import {
+    comparePluginVersions,
+    formatPluginVersion,
+    isValidPluginVersion,
+  } from "$lib/utils/pluginVersion";
   import { toast } from "svelte-sonner";
 
   interface Props {
@@ -15,7 +20,6 @@
     isInstalled?: boolean;
     installedVersion?: string;
     onclick?: () => void;
-    oninstall?: (isUpdate: boolean) => void;
     showStats?: boolean; // 是否显示统计信息（star 和 downloads）
   }
 
@@ -24,52 +28,17 @@
     isInstalled = false,
     installedVersion,
     onclick,
-    oninstall,
     showStats = true,
   }: Props = $props();
 
   let imageError = $state(false);
   let installing = $state(false);
 
-  function parseVersion(version?: string): number[] {
-    if (!version) {
-      return [];
-    }
-
-    return version
-      .trim()
-      .replace(/^[^\d]*/, "")
-      .split(/[^0-9]+/)
-      .filter(Boolean)
-      .map((part) => Number.parseInt(part, 10));
-  }
-
   function isNewerVersion(
     marketplaceVersion?: string,
     localVersion?: string,
   ): boolean {
-    const remoteParts = parseVersion(marketplaceVersion);
-    const localParts = parseVersion(localVersion);
-    const maxLength = Math.max(remoteParts.length, localParts.length);
-
-    if (maxLength === 0) {
-      return false;
-    }
-
-    for (let index = 0; index < maxLength; index += 1) {
-      const remotePart = remoteParts[index] ?? 0;
-      const localPart = localParts[index] ?? 0;
-
-      if (remotePart > localPart) {
-        return true;
-      }
-
-      if (remotePart < localPart) {
-        return false;
-      }
-    }
-
-    return false;
+    return comparePluginVersions(marketplaceVersion, localVersion) > 0;
   }
 
   // 仅当市场版本高于本地版本时显示更新
@@ -100,6 +69,7 @@
       
       let currentDownloadUrl = plugin.downloadUrl;
       let currentIcon = plugin.icon;
+      let currentVersion = plugin.version;
 
       // 如果缺少下载地址（列表接口通常不返回），则先获取插件详情
       if (!currentDownloadUrl) {
@@ -107,6 +77,7 @@
         const detail = await fetchPluginDetail(plugin.id);
         currentDownloadUrl = detail.downloadUrl;
         if (detail.icon) currentIcon = detail.icon;
+        if (isValidPluginVersion(detail.version)) currentVersion = detail.version;
       }
 
       if (!currentDownloadUrl) {
@@ -118,11 +89,11 @@
         plugin.id,
         currentIcon,
         hasUpdate, // 如果有更新，则使用覆盖模式
+        currentVersion,
       );
       const isUpdate = hasUpdate;
       const actionName = isUpdate ? "更新" : "安装";
       toast.success(`插件 ${plugin.name} ${actionName}成功`);
-      oninstall?.(isUpdate);
     } catch (error) {
       console.error("Failed to install plugin:", error);
       alert(`安装失败: ${error}`);
@@ -171,9 +142,9 @@
           <h3 class="truncate text-base leading-tight font-semibold">
             {plugin.name}
           </h3>
-          {#if plugin.version}
+          {#if isValidPluginVersion(plugin.version)}
             <span class="shrink-0 text-xs text-neutral-400"
-              >v{plugin.version}</span
+              >{formatPluginVersion(plugin.version)}</span
             >
           {/if}
         </div>

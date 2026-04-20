@@ -94,6 +94,7 @@ export async function downloadAndInstallPlugin(
   pluginId: string,
   iconUrl?: string,
   overwrite: boolean = false,
+  marketplaceVersion?: string,
 ): Promise<void> {
   const { invoke } = await import("@tauri-apps/api/core");
 
@@ -102,5 +103,6 @@ export async function downloadAndInstallPlugin(
     pluginId,
     iconUrl,
     overwrite,
+    marketplaceVersion,
   });
 }

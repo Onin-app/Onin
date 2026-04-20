@@ -15,6 +15,10 @@
   import { fetchPlugins } from "$lib/api/marketplace";
   import type { MarketplacePlugin } from "$lib/types/marketplace";
   import type { PluginManifest } from "$lib/composables/usePluginList.svelte";
+  import {
+    formatPluginVersion,
+    isValidPluginVersion,
+  } from "$lib/utils/pluginVersion";
   import { marked } from "marked";
 
   interface Props {
@@ -168,14 +172,6 @@
     }
   }
 
-  async function handleInstall(_isUpdate: boolean = false) {
-    // 强制刷新已安装版本信息
-    await loadInstalledPlugins();
-    // 强制 Svelte 刷新依赖此 Map 的派生状态
-    installedVersions = new Map(installedVersions);
-    detailDialogOpen = false;
-  }
-
   // 事件监听清理函数
   let unlistenFns: UnlistenFn[] = [];
 
@@ -301,7 +297,6 @@
                 {installedVersion}
                 showStats={true}
                 onclick={() => handlePluginClick(plugin)}
-                oninstall={(isUpdate) => handleInstall(isUpdate)}
               />
             {/each}
           </div>
@@ -405,8 +400,8 @@
               <div class="flex items-center gap-4 text-sm text-neutral-500">
                 <span>作者: {selectedPlugin.author}</span>
                 <span>分类: {selectedPlugin.category}</span>
-                {#if selectedPlugin.version}
-                  <span>版本: {selectedPlugin.version}</span>
+                {#if isValidPluginVersion(selectedPlugin.version)}
+                  <span>版本: {formatPluginVersion(selectedPlugin.version)}</span>
                 {/if}
               </div>
             </div>

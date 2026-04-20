@@ -270,12 +270,24 @@ pub async fn download_and_install_plugin(
     plugin_id: String,
     icon_url: Option<String>,
     overwrite: Option<bool>,
+    marketplace_version: Option<String>,
 ) -> Result<LoadedPlugin, String> {
     let overwrite = overwrite.unwrap_or(false);
     // P1 安全增强：验证插件 ID 格式，防止路径穿透或非法文件名
     let id_regex = regex::Regex::new(r"^[a-z0-9][a-z0-9.-]*[a-z0-9]$").unwrap();
     if !id_regex.is_match(&plugin_id) || plugin_id.contains("..") {
         return Err(format!("插件 ID 无效: {}", plugin_id));
+    }
+
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let plugins_dir = data_dir.join("plugins");
+    let dir_name = make_plugin_dir_name(&plugin_id, InstallSource::Marketplace);
+    let target_dir = plugins_dir.join(&dir_name);
+
+    if overwrite && target_dir.exists() {
+        if let Err(e) = js_runtime::clear_plugin_runtime(&plugin_id).await {
+            eprintln!("[plugin/installer] 更新前清理 JS 运行时失败: {}", e);
+        }
     }
 
     // 1. 下载 ZIP 文件
@@ -297,77 +309,84 @@ pub async fn download_and_install_plugin(
 
     std::fs::write(&zip_path, &bytes).map_err(|e| format!("写入 zip 文件失败: {}", e))?;
 
-    // 2. 解压
-    let extract_dir = temp_dir.path().join("extracted");
-    std::fs::create_dir_all(&extract_dir).map_err(|e| format!("创建解压目录失败: {}", e))?;
+    let zip_path_for_install = zip_path.clone();
+    let plugins_dir_for_install = plugins_dir.clone();
+    let target_dir_for_install = target_dir.clone();
+    let dir_name_for_install = dir_name.clone();
+    let plugin_id_for_install = plugin_id.clone();
+    let icon_url_for_install = icon_url.clone();
+    let marketplace_version_for_install = marketplace_version.clone();
 
-    extract_zip(&zip_path, &extract_dir)?;
+    let manifest = tauri::async_runtime::spawn_blocking(move || -> Result<PluginManifest, String> {
+        // 2. 解压
+        let extract_dir = zip_path_for_install
+            .parent()
+            .ok_or_else(|| "zip 临时目录无效".to_string())?
+            .join("extracted");
+        std::fs::create_dir_all(&extract_dir).map_err(|e| format!("创建解压目录失败: {}", e))?;
 
-    // 3. 查找插件根目录
-    let plugin_root = find_plugin_root(&extract_dir)?;
+        extract_zip(&zip_path_for_install, &extract_dir)?;
 
-    // 4. 读取 manifest
-    let manifest_path = plugin_root.join("manifest.json");
-    if !manifest_path.exists() {
-        return Err("解压文件中未找到 manifest.json".to_string());
-    }
+        // 3. 查找插件根目录
+        let plugin_root = find_plugin_root(&extract_dir)?;
 
-    let manifest_content = std::fs::read_to_string(&manifest_path)
-        .map_err(|e| format!("读取 manifest 失败: {}", e))?;
-    let mut manifest: PluginManifest =
-        serde_json::from_str(&manifest_content).map_err(|e| format!("manifest 格式无效: {}", e))?;
-
-    // 关键修正：强制使用插件市场提供的 ID，覆盖 manifest 中的 ID
-    // 解决如市场 ID 为 byper.pomodoro.onin 而 manifest 内部是 com.pomodoro.timer 的 ID 不匹配问题
-    manifest.id = plugin_id.clone();
-
-    // 强制禁用开发模式
-    if manifest.dev_mode {
-        manifest.dev_mode = false;
-        manifest.dev_server = None;
-    }
-
-    // 使用市场提供的图标
-    if let Some(icon) = icon_url {
-        manifest.icon = Some(icon);
-    }
-
-    // 5. 复制到 plugins 目录
-    // 使用市场提供的 plugin_id，确保 ID 一致性
-    let dir_name = make_plugin_dir_name(&plugin_id, InstallSource::Marketplace);
-    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let plugins_dir = data_dir.join("plugins");
-    let target_dir = plugins_dir.join(&dir_name);
-
-    if target_dir.exists() {
-        if overwrite {
-            // 清理 JavaScript 运行时
-            if let Err(e) = js_runtime::clear_plugin_runtime(&plugin_id).await {
-                eprintln!("[plugin/installer] 更新前清理 JS 运行时失败: {}", e);
-            }
-
-            remove_plugin_directory(&target_dir)?;
-        } else {
-            return Err(format!(
-                "插件 '{}' 已存在 (目录: {})。\n请先卸载现有版本，然后再安装。",
-                manifest.name, dir_name
-            ));
+        // 4. 读取 manifest
+        let manifest_path = plugin_root.join("manifest.json");
+        if !manifest_path.exists() {
+            return Err("解压文件中未找到 manifest.json".to_string());
         }
-    }
 
-    if !plugins_dir.exists() {
-        std::fs::create_dir_all(&plugins_dir)
-            .map_err(|e| format!("创建 plugins 目录失败: {}", e))?;
-    }
+        let manifest_content = std::fs::read_to_string(&manifest_path)
+            .map_err(|e| format!("读取 manifest 失败: {}", e))?;
+        let mut manifest: PluginManifest = serde_json::from_str(&manifest_content)
+            .map_err(|e| format!("manifest 格式无效: {}", e))?;
 
-    copy_dir_all(&plugin_root, &target_dir)?;
+        manifest.id = plugin_id_for_install;
 
-    // 写入更新后的 manifest
-    let target_manifest_path = target_dir.join("manifest.json");
-    let updated_manifest_content = serde_json::to_string_pretty(&manifest)
-        .map_err(|e| format!("序列化 manifest 失败: {}", e))?;
-    std::fs::write(&target_manifest_path, updated_manifest_content)
-        .map_err(|e| format!("写入更新后的 manifest 失败: {}", e))?;
+        if manifest.dev_mode {
+            manifest.dev_mode = false;
+            manifest.dev_server = None;
+        }
+
+        if let Some(icon) = icon_url_for_install {
+            manifest.icon = Some(icon);
+        }
+
+        if let Some(version) = marketplace_version_for_install {
+            let version = version.trim();
+            if !version.is_empty() {
+                manifest.version = version.to_string();
+            }
+        }
+
+        if target_dir_for_install.exists() {
+            if overwrite {
+                remove_plugin_directory(&target_dir_for_install)?;
+            } else {
+                return Err(format!(
+                    "插件 '{}' 已存在 (目录: {})。\n请先卸载现有版本，然后再安装。",
+                    manifest.name, dir_name_for_install
+                ));
+            }
+        }
+
+        if !plugins_dir_for_install.exists() {
+            std::fs::create_dir_all(&plugins_dir_for_install)
+                .map_err(|e| format!("创建 plugins 目录失败: {}", e))?;
+        }
+
+        copy_dir_all(&plugin_root, &target_dir_for_install)?;
+
+        let target_manifest_path = target_dir_for_install.join("manifest.json");
+        let updated_manifest_content = serde_json::to_string_pretty(&manifest)
+            .map_err(|e| format!("序列化 manifest 失败: {}", e))?;
+        std::fs::write(&target_manifest_path, updated_manifest_content)
+            .map_err(|e| format!("写入更新后的 manifest 失败: {}", e))?;
+
+        Ok(manifest)
+    })
+    .await
+    .map_err(|e| format!("安装任务执行失败: {}", e))??;
 
     // 6. 加载到 store
     let plugin_states = load_plugin_states(&app);
