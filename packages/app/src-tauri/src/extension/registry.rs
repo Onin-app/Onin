@@ -29,6 +29,13 @@ pub trait Extension: Send + Sync {
     /// 执行扩展命令
     fn execute(&self, input: &str) -> ExtensionResult;
 
+    /// 执行指定扩展命令
+    ///
+    /// 默认情况下，内置扩展只有一个命令，因此直接复用 `execute()`。
+    fn execute_command(&self, _command_code: &str, input: &str) -> ExtensionResult {
+        self.execute(input)
+    }
+
     /// 获取预览结果（用于实时显示）
     fn preview(&self, input: &str) -> Option<super::types::ExtensionPreview>;
 }

@@ -12,6 +12,7 @@
     description: string;
     icon?: string;
     isSelected?: boolean;
+    triggerMode?: "matched" | "preview";
     onClick: () => void;
   }
 
@@ -20,8 +21,17 @@
     description,
     icon = "calculator",
     isSelected = false,
+    triggerMode,
     onClick,
   }: Props = $props();
+
+  const triggerModeValue = $derived(
+    triggerMode === "matched"
+      ? "matched"
+      : triggerMode === "preview"
+        ? "preview"
+        : "function",
+  );
 </script>
 
 <button
@@ -33,10 +43,54 @@
   onclick={onClick}
 >
   <!-- 图标：与 AppListItem 一致的尺寸和样式 -->
-  <div
-    class="mr-2 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-blue-100 dark:bg-blue-900"
-  >
-    <PhosphorIcon {icon} class="h-5 w-5 text-blue-600 dark:text-blue-400" />
+  <div class="relative mr-2 h-8 w-8 flex-shrink-0">
+    <div
+      class="flex h-8 w-8 items-center justify-center rounded-md bg-blue-100 dark:bg-blue-900"
+    >
+      <PhosphorIcon {icon} class="h-5 w-5 text-blue-600 dark:text-blue-400" />
+    </div>
+    <span
+      class="absolute -right-1 -bottom-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border border-neutral-300 bg-white text-neutral-500 shadow-sm dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-400"
+    >
+      {#if triggerModeValue === "function"}
+        <svg viewBox="0 0 16 16" class="h-2.5 w-2.5" aria-hidden="true">
+          <rect
+            x="2.5"
+            y="3"
+            width="11"
+            height="10"
+            rx="2"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.4"
+          />
+          <path d="M2.5 5.5h11" fill="none" stroke="currentColor" stroke-width="1.2" />
+        </svg>
+      {:else if triggerModeValue === "matched"}
+        <svg viewBox="0 0 16 16" class="h-2.5 w-2.5" aria-hidden="true">
+          <circle
+            cx="8"
+            cy="8"
+            r="4.5"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.2"
+          />
+          <circle cx="8" cy="8" r="1.6" fill="currentColor" />
+        </svg>
+      {:else if triggerModeValue === "preview"}
+        <svg viewBox="0 0 16 16" class="h-2.5 w-2.5" aria-hidden="true">
+          <path
+            d="M2.2 8s2.1-3 5.8-3 5.8 3 5.8 3-2.1 3-5.8 3-5.8-3-5.8-3Z"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.2"
+            stroke-linejoin="round"
+          />
+          <circle cx="8" cy="8" r="1.6" fill="currentColor" />
+        </svg>
+      {/if}
+    </span>
   </div>
 
   <div class="relative min-w-0 flex-1">

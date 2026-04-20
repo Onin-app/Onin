@@ -16,6 +16,16 @@
 
   let { app, isSelected, onClick }: Props = $props();
 
+  const triggerMode = $derived(
+    app.trigger_mode === "matched"
+      ? "matched"
+      : app.trigger_mode === "preview"
+        ? "preview"
+        : app.source === "Extension"
+          ? "function"
+          : null,
+  );
+
   // 获取需要显示的别名（排除与名称相同的关键词，最多显示3个）
   const displayAliases = $derived(
     app.keywords
@@ -33,40 +43,83 @@
     : ''} {isSelected ? 'bg-neutral-300 dark:bg-neutral-600' : ''}"
   onclick={onClick}
 >
-  {#if app.icon}
-    {#if app.icon_type === "Base64"}
-      <img
-        src={app.icon.startsWith("data:")
-          ? app.icon
-          : `data:image/png;base64,${app.icon}`}
-        class="mr-2 inline-block h-8 w-8 flex-shrink-0"
-        alt=""
-      />
-    {:else if app.icon_type === "Url"}
-      <img
-        src={app.icon}
-        class="mr-2 inline-block h-8 w-8 flex-shrink-0"
-        alt=""
-      />
-    {:else}
-      <!-- 所有其他情况使用 Phosphor 图标 -->
+  <div class="relative mr-2 h-8 w-8 flex-shrink-0">
+    {#if app.icon}
+      {#if app.icon_type === "Base64"}
+        <img
+          src={app.icon.startsWith("data:")
+            ? app.icon
+            : `data:image/png;base64,${app.icon}`}
+          class="inline-block h-8 w-8"
+          alt=""
+        />
+      {:else if app.icon_type === "Url"}
+        <img src={app.icon} class="inline-block h-8 w-8" alt="" />
+      {:else}
+        <!-- 所有其他情况使用 Phosphor 图标 -->
+        <div
+          class="flex h-8 w-8 items-center justify-center rounded-md bg-gray-200 dark:bg-gray-700"
+        >
+          <PhosphorIcon icon={app.icon} class="h-6 w-6" />
+        </div>
+      {/if}
+    {:else if app.source === "Application"}
+      <!-- 应用程序默认图标 -->
       <div
-        class="mr-2 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-gray-200 dark:bg-gray-700"
+        class="flex h-8 w-8 items-center justify-center rounded-md bg-blue-100 dark:bg-blue-900"
       >
-        <PhosphorIcon icon={app.icon} class="h-6 w-6" />
+        <PhosphorIcon
+          icon="cube"
+          class="h-5 w-5 text-blue-600 dark:text-blue-400"
+        />
       </div>
     {/if}
-  {:else if app.source === "Application"}
-    <!-- 应用程序默认图标 -->
-    <div
-      class="mr-2 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-blue-100 dark:bg-blue-900"
-    >
-      <PhosphorIcon
-        icon="cube"
-        class="h-5 w-5 text-blue-600 dark:text-blue-400"
-      />
-    </div>
-  {/if}
+
+    {#if triggerMode}
+      <span
+        class="absolute -right-1 -bottom-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border border-neutral-300 bg-white text-neutral-500 shadow-sm dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-400"
+      >
+        {#if triggerMode === "function"}
+          <svg viewBox="0 0 16 16" class="h-2.5 w-2.5" aria-hidden="true">
+            <rect
+              x="2.5"
+              y="3"
+              width="11"
+              height="10"
+              rx="2"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.4"
+            />
+            <path d="M2.5 5.5h11" fill="none" stroke="currentColor" stroke-width="1.2" />
+          </svg>
+        {:else if triggerMode === "matched"}
+          <svg viewBox="0 0 16 16" class="h-2.5 w-2.5" aria-hidden="true">
+            <circle
+              cx="8"
+              cy="8"
+              r="4.5"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.2"
+            />
+            <circle cx="8" cy="8" r="1.6" fill="currentColor" />
+          </svg>
+        {:else if triggerMode === "preview"}
+          <svg viewBox="0 0 16 16" class="h-2.5 w-2.5" aria-hidden="true">
+            <path
+              d="M2.2 8s2.1-3 5.8-3 5.8 3 5.8 3-2.1 3-5.8 3-5.8-3-5.8-3Z"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.2"
+              stroke-linejoin="round"
+            />
+            <circle cx="8" cy="8" r="1.6" fill="currentColor" />
+          </svg>
+        {/if}
+      </span>
+    {/if}
+  </div>
   <div class="relative min-w-0 flex-1">
     <!-- 来源标签（绝对定位固定右上角） -->
     <span

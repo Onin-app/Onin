@@ -23,6 +23,7 @@ export interface LaunchableItem {
   source_display?: string;
   matches?: CommandMatch[];
   requires_confirmation?: boolean;
+  trigger_mode?: "matched" | "preview";
 }
 
 export interface CommandKeyword {

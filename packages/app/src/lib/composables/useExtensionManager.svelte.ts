@@ -63,10 +63,11 @@ function previewToLaunchableItem(preview: ExtensionPreview): LaunchableItem & {
     icon_type: "Iconfont",
     item_type: "App",
     source: "Command",
-    action: `extension:${preview.extension_id}`,
+    action: `extension:${preview.extension_id}:${preview.command_code}`,
     source_display: "Extension",
     view_type: preview.view_type,
     grid_data: preview.grid_data,
+    trigger_mode: "preview",
   };
 }
 
@@ -111,6 +112,7 @@ export function useExtensionManager() {
    */
   async function execute(
     extensionId: string,
+    commandCode: string,
     input: string,
   ): Promise<string | null> {
     try {
@@ -118,7 +120,7 @@ export function useExtensionManager() {
         success: boolean;
         copyable?: string;
         error?: string;
-      }>("execute_extension", { extensionId, input });
+      }>("execute_extension", { extensionId, commandCode, input });
 
       if (result.success && result.copyable) {
         return result.copyable;

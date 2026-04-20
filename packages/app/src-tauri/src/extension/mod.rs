@@ -34,9 +34,13 @@ pub fn get_preview_for_input(input: &str) -> Option<ExtensionPreview> {
 }
 
 /// 执行 Extension 命令
-pub fn execute_extension_command(extension_id: &str, input: &str) -> ExtensionResult {
+pub fn execute_extension_command(
+    extension_id: &str,
+    command_code: &str,
+    input: &str,
+) -> ExtensionResult {
     match get_extension_by_id(extension_id) {
-        Some(ext) => ext.execute(input),
+        Some(ext) => ext.execute_command(command_code, input),
         None => ExtensionResult::error(format!("Extension not found: {}", extension_id)),
     }
 }
