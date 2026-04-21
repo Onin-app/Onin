@@ -6,6 +6,10 @@ use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 
 const TRANSLATOR_TOP_BAR_HEIGHT: f64 = 36.0;
+#[cfg(target_os = "macos")]
+const TRANSLATOR_TITLEBAR_INSET: f64 = 28.0;
+#[cfg(not(target_os = "macos"))]
+const TRANSLATOR_TITLEBAR_INSET: f64 = 0.0;
 const TRANSLATOR_ESC_SCRIPT: &str = r#"
 (() => {
   const invoke = (cmd, args = {}) => {
@@ -133,13 +137,15 @@ fn refresh_translator_webviews(window: &tauri::Window, text: Option<&str>) -> Re
 fn layout_translator_webviews(window: &tauri::Window) -> Result<(), String> {
     let inner_size = window.inner_size().map_err(|e| e.to_string())?;
     let scale_factor = window.scale_factor().map_err(|e| e.to_string())?;
+    let titlebar_inset = (TRANSLATOR_TITLEBAR_INSET * scale_factor).round() as u32;
     let top_bar_height = (TRANSLATOR_TOP_BAR_HEIGHT * scale_factor).round() as u32;
-    let content_height = inner_size.height.saturating_sub(top_bar_height);
+    let webview_top = titlebar_inset.saturating_add(top_bar_height);
+    let content_height = inner_size.height.saturating_sub(webview_top);
 
     if let Some(ui_webview) = window.get_webview("translator-ui") {
         ui_webview
             .set_bounds(Rect {
-                position: PhysicalPosition::new(0, 0).into(),
+                position: PhysicalPosition::new(0, titlebar_inset as i32).into(),
                 size: PhysicalSize::new(inner_size.width, top_bar_height).into(),
             })
             .map_err(|e| e.to_string())?;
@@ -149,7 +155,7 @@ fn layout_translator_webviews(window: &tauri::Window) -> Result<(), String> {
         if let Some(webview) = window.get_webview(label) {
             webview
                 .set_bounds(Rect {
-                    position: PhysicalPosition::new(0, top_bar_height as i32).into(),
+                    position: PhysicalPosition::new(0, webview_top as i32).into(),
                     size: PhysicalSize::new(inner_size.width, content_height).into(),
                 })
                 .map_err(|e| e.to_string())?;
@@ -242,11 +248,13 @@ pub async fn open_window(app: &tauri::AppHandle, text: Option<String>) -> Result
 
     // 2. Create UI Webview (Top 50px)
     // This loads the dedicated translator shell route.
+    let titlebar_inset = TRANSLATOR_TITLEBAR_INSET;
+
     let _ui_webview = window
         .add_child(
             WebviewBuilder::new("translator-ui", WebviewUrl::App("/translator-shell".into()))
                 .initialization_script(TRANSLATOR_ESC_SCRIPT),
-            LogicalPosition::new(0.0, 0.0),
+            LogicalPosition::new(0.0, titlebar_inset),
             LogicalSize::new(1000.0, TRANSLATOR_TOP_BAR_HEIGHT),
         )
         .map_err(|e| e.to_string())?;
@@ -261,8 +269,8 @@ pub async fn open_window(app: &tauri::AppHandle, text: Option<String>) -> Result
                 WebviewUrl::External(urls.google.parse().unwrap()),
             )
             .initialization_script(TRANSLATOR_ESC_SCRIPT),
-            LogicalPosition::new(0.0, 50.0),
-            LogicalSize::new(1000.0, 750.0),
+            LogicalPosition::new(0.0, titlebar_inset + TRANSLATOR_TOP_BAR_HEIGHT),
+            LogicalSize::new(1000.0, 800.0 - titlebar_inset - TRANSLATOR_TOP_BAR_HEIGHT),
         )
         .map_err(|e| e.to_string())?;
 
@@ -276,8 +284,8 @@ pub async fn open_window(app: &tauri::AppHandle, text: Option<String>) -> Result
                 WebviewUrl::External(urls.baidu.parse().unwrap()),
             )
             .initialization_script(TRANSLATOR_ESC_SCRIPT),
-            LogicalPosition::new(0.0, 50.0),
-            LogicalSize::new(1000.0, 750.0),
+            LogicalPosition::new(0.0, titlebar_inset + TRANSLATOR_TOP_BAR_HEIGHT),
+            LogicalSize::new(1000.0, 800.0 - titlebar_inset - TRANSLATOR_TOP_BAR_HEIGHT),
         )
         .map_err(|e| e.to_string())?;
 
@@ -291,8 +299,8 @@ pub async fn open_window(app: &tauri::AppHandle, text: Option<String>) -> Result
                 WebviewUrl::External(urls.sougou.parse().unwrap()),
             )
             .initialization_script(TRANSLATOR_ESC_SCRIPT),
-            LogicalPosition::new(0.0, 50.0),
-            LogicalSize::new(1000.0, 750.0),
+            LogicalPosition::new(0.0, titlebar_inset + TRANSLATOR_TOP_BAR_HEIGHT),
+            LogicalSize::new(1000.0, 800.0 - titlebar_inset - TRANSLATOR_TOP_BAR_HEIGHT),
         )
         .map_err(|e| e.to_string())?;
 
