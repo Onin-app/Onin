@@ -60,6 +60,7 @@
   let extensionPreviewItem = $state<LaunchableItem | null>(null);
   let currentTheme = $state<Theme>(Theme.DARK);
   let unlisten = $state<null | (() => void)>(null);
+  let removeWindowEscapeListener = $state<null | (() => void)>(null);
 
   // Component references
   let searchInputRef: SearchInput;
@@ -419,7 +420,7 @@
     invoke("close_main_window");
   };
 
-  const handleKeyDown = (e: KeyboardEvent) => {
+  const handleNavigationKeyDown = (e: KeyboardEvent) => {
     appListManager.handleKeyDown(e, displayList, handleOpenApp);
   };
 
@@ -452,6 +453,25 @@
   onMount(async () => {
     escapeHandler.set(handleEsc);
     plugin.setModeSwitchConfirmHandler(confirmPluginModeSwitch);
+
+    const handleWindowEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) {
+        return;
+      }
+
+      if (page.route.id !== "/") {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      handleEsc();
+    };
+
+    window.addEventListener("keydown", handleWindowEscape, true);
+    removeWindowEscapeListener = () => {
+      window.removeEventListener("keydown", handleWindowEscape, true);
+    };
 
     // 加载配置
     await appListManager.loadConfig();
@@ -525,6 +545,8 @@
       unlisten();
     }
 
+    removeWindowEscapeListener?.();
+
     plugin.setModeSwitchConfirmHandler(null);
   });
 </script>
@@ -534,12 +556,12 @@
     class="h-full w-full overflow-hidden rounded-xl bg-neutral-100 p-3 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100"
     data-tauri-drag-region
   >
-    <div
-      class="flex h-full w-full flex-col"
-      role="listbox"
-      tabindex="0"
-      onkeydown={handleKeyDown}
-    >
+      <div
+        class="flex h-full w-full flex-col"
+        role="listbox"
+        tabindex="0"
+        onkeydown={handleNavigationKeyDown}
+      >
       <!-- Header: Logo + Search Input + Plugin Menu -->
       <div class="flex items-center gap-2 pb-2">
         <button class="flex-shrink-0 cursor-pointer" onclick={handleToSettings}>
