@@ -1,7 +1,8 @@
-use std::str::FromStr;
 use serde::Deserialize;
+use std::str::FromStr;
 use tauri::{webview::WebviewBuilder, Listener, Manager, WebviewUrl, WindowBuilder};
 use tauri::{LogicalPosition, LogicalSize, PhysicalPosition, PhysicalSize, Rect};
+use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 
 const TRANSLATOR_TOP_BAR_HEIGHT: f64 = 36.0;
@@ -37,6 +38,98 @@ struct TranslatorSwitchPayload {
     engine: Option<String>,
 }
 
+struct TranslatorUrls {
+    google: String,
+    baidu: String,
+    sougou: String,
+}
+
+fn resolve_translator_text(
+    app: &tauri::AppHandle,
+    text: Option<String>,
+) -> Result<Option<String>, String> {
+    let explicit_text = text
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string);
+
+    if explicit_text.is_some() {
+        return Ok(explicit_text);
+    }
+
+    match app.clipboard().read_text() {
+        Ok(clipboard_text) => {
+            let trimmed = clipboard_text.trim();
+            if trimmed.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(trimmed.to_string()))
+            }
+        }
+        Err(_) => Ok(None),
+    }
+}
+
+fn build_translator_urls(text: Option<&str>) -> TranslatorUrls {
+    let encoded = text
+        .map(|value| url::form_urlencoded::byte_serialize(value.as_bytes()).collect::<String>())
+        .unwrap_or_default();
+
+    let google = if text.is_some() {
+        format!(
+            "https://translate.google.com/?sl=auto&tl=zh-CN&text={}",
+            encoded
+        )
+    } else {
+        "https://translate.google.com/".to_string()
+    };
+
+    let baidu = if text.is_some() {
+        format!("https://fanyi.baidu.com/#auto/zh/{}", encoded)
+    } else {
+        "https://fanyi.baidu.com".to_string()
+    };
+
+    let sougou = if text.is_some() {
+        format!("https://fanyi.sogou.com/text?keyword={}", encoded)
+    } else {
+        "https://fanyi.sogou.com/".to_string()
+    };
+
+    TranslatorUrls {
+        google,
+        baidu,
+        sougou,
+    }
+}
+
+fn replace_webview_location(
+    window: &tauri::Window,
+    label: &str,
+    target_url: &str,
+) -> Result<(), String> {
+    if let Some(webview) = window.get_webview(label) {
+        let current_url = webview.url().map_err(|e| e.to_string())?.to_string();
+        if current_url != target_url {
+            let js_url = serde_json::to_string(target_url).map_err(|e| e.to_string())?;
+            webview
+                .eval(&format!("window.location.replace({});", js_url))
+                .map_err(|e| e.to_string())?;
+        }
+    }
+
+    Ok(())
+}
+
+fn refresh_translator_webviews(window: &tauri::Window, text: Option<&str>) -> Result<(), String> {
+    let urls = build_translator_urls(text);
+    replace_webview_location(window, "translator-google", &urls.google)?;
+    replace_webview_location(window, "translator-baidu", &urls.baidu)?;
+    replace_webview_location(window, "translator-sougou", &urls.sougou)?;
+    Ok(())
+}
+
 fn layout_translator_webviews(window: &tauri::Window) -> Result<(), String> {
     let inner_size = window.inner_size().map_err(|e| e.to_string())?;
     let scale_factor = window.scale_factor().map_err(|e| e.to_string())?;
@@ -52,11 +145,7 @@ fn layout_translator_webviews(window: &tauri::Window) -> Result<(), String> {
             .map_err(|e| e.to_string())?;
     }
 
-    for label in [
-        "translator-google",
-        "translator-baidu",
-        "translator-sougou",
-    ] {
+    for label in ["translator-google", "translator-baidu", "translator-sougou"] {
         if let Some(webview) = window.get_webview(label) {
             webview
                 .set_bounds(Rect {
@@ -86,13 +175,15 @@ pub fn close_translator_window(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 pub async fn open_window(app: &tauri::AppHandle, text: Option<String>) -> Result<(), String> {
+    let resolved_text = resolve_translator_text(app, text)?;
+
     if let Some(window) = app.get_window("translator-host") {
+        if resolved_text.is_some() {
+            refresh_translator_webviews(&window, resolved_text.as_deref())?;
+        }
         if let Err(e) = window.set_focus() {
             return Err(e.to_string());
         }
-        // If window exists and text is provided, we might want to update the tabs.
-        // But for now, let's just focus.
-        // TODO: Handle updating text in existing window via eval or reload.
         return Ok(());
     }
 
@@ -104,10 +195,8 @@ pub async fn open_window(app: &tauri::AppHandle, text: Option<String>) -> Result
         .build()
         .map_err(|e| e.to_string())?;
 
-    let esc_shortcut =
-        Shortcut::from_str(crate::window_manager::CLOSE_WINDOW_SHORTCUT_STR).map_err(|e| {
-            format!("Failed to parse translator ESC shortcut: {}", e)
-        })?;
+    let esc_shortcut = Shortcut::from_str(crate::window_manager::CLOSE_WINDOW_SHORTCUT_STR)
+        .map_err(|e| format!("Failed to parse translator ESC shortcut: {}", e))?;
 
     let app_for_window_event = app.clone();
     let esc_shortcut_for_event = esc_shortcut.clone();
@@ -145,44 +234,31 @@ pub async fn open_window(app: &tauri::AppHandle, text: Option<String>) -> Result
 
     let _ = app.global_shortcut().unregister(esc_shortcut.clone());
     if let Err(e) = app.global_shortcut().register(esc_shortcut) {
-        eprintln!("[translator] Failed to register ESC shortcut immediately: {}", e);
+        eprintln!(
+            "[translator] Failed to register ESC shortcut immediately: {}",
+            e
+        );
     }
 
     // 2. Create UI Webview (Top 50px)
     // This loads the dedicated translator shell route.
     let _ui_webview = window
         .add_child(
-            WebviewBuilder::new(
-                "translator-ui",
-                WebviewUrl::App("/translator-shell".into()),
-            )
-            .initialization_script(TRANSLATOR_ESC_SCRIPT),
+            WebviewBuilder::new("translator-ui", WebviewUrl::App("/translator-shell".into()))
+                .initialization_script(TRANSLATOR_ESC_SCRIPT),
             LogicalPosition::new(0.0, 0.0),
             LogicalSize::new(1000.0, TRANSLATOR_TOP_BAR_HEIGHT),
         )
         .map_err(|e| e.to_string())?;
 
-    let url_encoded_text = text.as_deref().unwrap_or("").to_string(); // Simple for now, need proper encoding
-    let encoded =
-        url::form_urlencoded::byte_serialize(url_encoded_text.as_bytes()).collect::<String>();
-
-    // Helper to append query (simplified)
-    // Google: ?text=...
-    let google_url = if let Some(_) = &text {
-        format!(
-            "https://translate.google.com/?sl=auto&tl=zh-CN&text={}",
-            encoded
-        )
-    } else {
-        "https://translate.google.com/".to_string()
-    };
+    let urls = build_translator_urls(resolved_text.as_deref());
 
     // 3. Create Google Webview (Rest of the area, default visible)
     let google_webview = window
         .add_child(
             WebviewBuilder::new(
                 "translator-google",
-                WebviewUrl::External(google_url.parse().unwrap()),
+                WebviewUrl::External(urls.google.parse().unwrap()),
             )
             .initialization_script(TRANSLATOR_ESC_SCRIPT),
             LogicalPosition::new(0.0, 50.0),
@@ -192,18 +268,12 @@ pub async fn open_window(app: &tauri::AppHandle, text: Option<String>) -> Result
 
     // Baidu: #zh/en/text (or auto/zh)
     // https://fanyi.baidu.com/#auto/zh/text
-    let baidu_url = if let Some(_) = &text {
-        format!("https://fanyi.baidu.com/#auto/zh/{}", encoded)
-    } else {
-        "https://fanyi.baidu.com".to_string()
-    };
-
     // Baidu
     let baidu_webview = window
         .add_child(
             WebviewBuilder::new(
                 "translator-baidu",
-                WebviewUrl::External(baidu_url.parse().unwrap()),
+                WebviewUrl::External(urls.baidu.parse().unwrap()),
             )
             .initialization_script(TRANSLATOR_ESC_SCRIPT),
             LogicalPosition::new(0.0, 50.0),
@@ -213,18 +283,12 @@ pub async fn open_window(app: &tauri::AppHandle, text: Option<String>) -> Result
 
     // Sougou: ?text=... (need to verify)
     // https://fanyi.sogou.com/text?keyword=...
-    let sougou_url = if let Some(_) = &text {
-        format!("https://fanyi.sogou.com/text?keyword={}", encoded)
-    } else {
-        "https://fanyi.sogou.com/".to_string()
-    };
-
     // Sougou
     let sougou_webview = window
         .add_child(
             WebviewBuilder::new(
                 "translator-sougou",
-                WebviewUrl::External(sougou_url.parse().unwrap()),
+                WebviewUrl::External(urls.sougou.parse().unwrap()),
             )
             .initialization_script(TRANSLATOR_ESC_SCRIPT),
             LogicalPosition::new(0.0, 50.0),
