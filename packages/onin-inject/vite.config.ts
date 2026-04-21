@@ -20,7 +20,7 @@ export default defineConfig({
     },
     outDir: resolve(__dirname, "../app/src-tauri/templates"),
     emptyOutDir: false, // 不清空目录，保留其他模板文件（如 plugin-window-fab.js）
-    minify: "esbuild",
+    minify: "oxc",
     rollupOptions: {
       output: {
         // 确保单文件输出
