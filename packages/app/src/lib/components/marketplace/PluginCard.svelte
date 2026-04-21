@@ -96,7 +96,7 @@
       toast.success(`插件 ${plugin.name} ${actionName}成功`);
     } catch (error) {
       console.error("Failed to install plugin:", error);
-      alert(`安装失败: ${error}`);
+      toast.error(`安装失败: ${String(error)}`);
     } finally {
       installing = false;
     }

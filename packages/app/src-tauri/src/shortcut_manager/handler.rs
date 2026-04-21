@@ -116,29 +116,48 @@ fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::
     }
 }
 
-fn handle_special_keys(app: &AppHandle, triggered_shortcut: &str) {
-    if triggered_shortcut.to_uppercase() == "ESCAPE" {
-        if let Some(active_window_state) = app.try_state::<crate::plugin::ActivePluginWindow>() {
-            if let Ok(active) = active_window_state.0.lock() {
-                if let Some(window_label) = active.as_ref() {
-                    if let Some(window) = app.get_webview_window(window_label) {
-                        if let Err(e) = window.minimize() {
-                            eprintln!("Failed to minimize plugin window: {}", e);
-                        }
-                        return;
+pub fn handle_escape_action(app: &AppHandle) {
+    if let Some(active_window_state) = app.try_state::<crate::plugin::ActivePluginWindow>() {
+        if let Ok(active) = active_window_state.0.lock() {
+            if let Some(window_label) = active.as_ref() {
+                if let Some(window) = app.get_webview_window(window_label) {
+                    if let Err(e) = window.minimize() {
+                        eprintln!("Failed to minimize plugin window: {}", e);
                     }
+                    return;
                 }
             }
         }
+    }
 
-        if let Some(window) = app.get_webview_window("main") {
-            if let Err(e) = window.emit("escape_pressed", ()) {
-                eprintln!("Error emitting escape_pressed event: {}", e);
+    if let Some(window) = app.get_window("translator-host") {
+        match window.is_visible() {
+            Ok(true) => {
+                if let Err(e) = window.close() {
+                    eprintln!("Failed to close translator window: {}", e);
+                }
+                return;
             }
-        } else if let Some(window) = app.get_window("main") {
-            let _ = window.emit("escape_pressed", ());
-        } else {
-            eprintln!("Main window not found when handling ESC");
+            Ok(false) => {}
+            Err(e) => {
+                eprintln!("Failed to check translator window visibility: {}", e);
+            }
         }
+    }
+
+    if let Some(window) = app.get_webview_window("main") {
+        if let Err(e) = window.emit("escape_pressed", ()) {
+            eprintln!("Error emitting escape_pressed event: {}", e);
+        }
+    } else if let Some(window) = app.get_window("main") {
+        let _ = window.emit("escape_pressed", ());
+    } else {
+        eprintln!("Main window not found when handling ESC");
+    }
+}
+
+fn handle_special_keys(app: &AppHandle, triggered_shortcut: &str) {
+    if triggered_shortcut.to_uppercase() == "ESCAPE" {
+        handle_escape_action(app);
     }
 }

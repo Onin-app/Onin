@@ -1,5 +1,4 @@
 use std::str::FromStr;
-use tauri::{Emitter, Manager};
 use tauri_plugin_global_shortcut::{Shortcut, ShortcutState};
 
 use tracing_subscriber;
@@ -45,6 +44,11 @@ fn create_shortcut_handler(
             return;
         }
 
+        if shortcut == &close_window_shortcut {
+            shortcut_manager::handle_escape_action(app);
+            return;
+        }
+
         // 使用 catch_unwind 包装快捷键处理，防止崩溃
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             shortcut_manager::handle_global_shortcut(app, shortcut, event.state());
@@ -52,13 +56,6 @@ fn create_shortcut_handler(
 
         if let Err(e) = result {
             eprintln!("Error in shortcut handler: {:?}", e);
-        }
-
-        // ESC 快捷键处理
-        if shortcut == &close_window_shortcut {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.emit("escape_pressed", ());
-            }
         }
     }
 }

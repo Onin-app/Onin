@@ -162,6 +162,7 @@ pub fn get_invoke_handler(
         // Google Translate Demo
         // Translator Extension
         crate::extensions::translator::commands::open_translator_window,
+        crate::extensions::translator::commands::close_translator_window,
         // Clipboard Extension
         crate::extensions::clipboard::commands::get_clipboard_history,
         crate::extensions::clipboard::commands::set_clipboard_item,
