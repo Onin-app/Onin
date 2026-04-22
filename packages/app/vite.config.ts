@@ -14,6 +14,9 @@ export default defineConfig({
       process.env.npm_package_version,
     ),
   },
+  build: {
+    sourcemap: true,
+  },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

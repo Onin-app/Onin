@@ -224,6 +224,10 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VITE_GLITCHTIP_DSN: ${{ secrets.VITE_GLITCHTIP_DSN }}
+          VITE_GLITCHTIP_ENVIRONMENT: production
+          GLITCHTIP_DSN_NATIVE: ${{ secrets.GLITCHTIP_DSN_NATIVE }}
+          GLITCHTIP_ENVIRONMENT: production
         with:
           projectPath: packages/app
           tagName: ${{ needs.release.outputs.tag }}
@@ -232,3 +236,13 @@ jobs:
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
+
+      - name: Upload frontend sourcemaps to GlitchTip
+        if: matrix.platform == 'ubuntu-latest'
+        env:
+          SENTRY_URL: ${{ secrets.GLITCHTIP_URL }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.GLITCHTIP_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.GLITCHTIP_ORG }}
+          SENTRY_PROJECT: ${{ secrets.GLITCHTIP_PROJECT }}
+        run: |
+          npx @sentry/cli releases files "onin@${{ needs.release.outputs.version }}" upload-sourcemaps packages/app/build --rewrite --url-prefix "~/"
