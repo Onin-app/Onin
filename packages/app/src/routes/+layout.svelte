@@ -72,28 +72,31 @@
         },
       );
 
-      const unlistenToast = await listen<ToastPayload>("plugin-toast", (event) => {
-        const { message, kind, duration } = event.payload;
-        const options = duration ? { duration } : {};
+      const unlistenToast = await listen<ToastPayload>(
+        "plugin-toast",
+        (event) => {
+          const { message, kind, duration } = event.payload;
+          const options = duration ? { duration } : {};
 
-        switch (kind) {
-          case "success":
-            toast.success(message, options);
-            break;
-          case "error":
-            toast.error(message, options);
-            break;
-          case "warning":
-            toast.warning(message, options);
-            break;
-          case "info":
-            toast.info(message, options);
-            break;
-          default:
-            toast(message, options);
-            break;
-        }
-      });
+          switch (kind) {
+            case "success":
+              toast.success(message, options);
+              break;
+            case "error":
+              toast.error(message, options);
+              break;
+            case "warning":
+              toast.warning(message, options);
+              break;
+            case "info":
+              toast.info(message, options);
+              break;
+            default:
+              toast(message, options);
+              break;
+          }
+        },
+      );
 
       return {
         unlisten,

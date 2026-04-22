@@ -23,6 +23,7 @@ pub mod shared_types;
 mod shortcut_manager;
 mod state;
 mod system_commands;
+mod telemetry;
 mod tray_manager;
 mod unified_launch_manager;
 mod usage_tracker;
@@ -62,11 +63,16 @@ fn create_shortcut_handler(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let _glitchtip = telemetry::init_glitchtip();
+
     // 初始化日志
-    tracing_subscriber::fmt()
-        .with_span_events(FmtSpan::FULL)
-        .try_init()
-        .ok();
+    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::util::SubscriberInitExt;
+
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer().with_span_events(FmtSpan::FULL))
+        .with(sentry_tracing::layer())
+        .init();
 
     // 解析关闭窗口快捷键
     let close_window_shortcut =
