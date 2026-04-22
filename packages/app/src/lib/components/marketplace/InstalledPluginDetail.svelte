@@ -3,6 +3,10 @@
   import { Star, Download, Package, GithubLogo } from "phosphor-svelte";
   import { Dialog } from "bits-ui";
   import AppScrollArea from "$lib/components/AppScrollArea.svelte";
+  import {
+    formatPluginVersion,
+    isValidPluginVersion,
+  } from "$lib/utils/pluginVersion";
   import { marked } from "marked";
 
   interface PluginDetail {
@@ -116,7 +120,9 @@
             stars: marketDetail.stars,
             downloads: marketDetail.downloads,
             repository: marketDetail.repository,
-            version: marketDetail.version || result.version,
+            version: isValidPluginVersion(marketDetail.version)
+              ? marketDetail.version
+              : result.version,
           };
         } catch (marketError) {
           console.error(
@@ -229,7 +235,9 @@
               {#if detail.author}
                 <span>作者: {detail.author}</span>
               {/if}
-              <span>版本: {detail.version}</span>
+              {#if isValidPluginVersion(detail.version)}
+                <span>版本: {formatPluginVersion(detail.version)}</span>
+              {/if}
               <span>ID: {detail.id}</span>
             </div>
           </div>

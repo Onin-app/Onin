@@ -8,30 +8,43 @@
   } from "phosphor-svelte";
   import type { MarketplacePlugin } from "$lib/types/marketplace";
   import { downloadAndInstallPlugin } from "$lib/api/marketplace";
+  import {
+    comparePluginVersions,
+    formatPluginVersion,
+    isValidPluginVersion,
+  } from "$lib/utils/pluginVersion";
+  import { toast } from "svelte-sonner";
 
   interface Props {
     plugin: MarketplacePlugin;
     isInstalled?: boolean;
+    installedVersion?: string;
     onclick?: () => void;
-    oninstall?: () => void;
     showStats?: boolean; // 是否显示统计信息（star 和 downloads）
   }
 
   let {
     plugin,
     isInstalled = false,
+    installedVersion,
     onclick,
-    oninstall,
     showStats = true,
   }: Props = $props();
+
   let imageError = $state(false);
   let installing = $state(false);
 
-  // 调试日志
-  $effect(() => {
-    if (isInstalled) {
-    }
-  });
+  function isNewerVersion(
+    marketplaceVersion?: string,
+    localVersion?: string,
+  ): boolean {
+    return comparePluginVersions(marketplaceVersion, localVersion) > 0;
+  }
+
+  // 仅当市场版本高于本地版本时显示更新
+  const hasUpdate = $derived(
+    isInstalled && isNewerVersion(plugin.version, installedVersion),
+  );
 
   function handleImageError() {
     imageError = true;
@@ -47,21 +60,43 @@
   async function handleInstall(e: MouseEvent) {
     e.stopPropagation();
 
-    if (!plugin.downloadUrl || installing || isInstalled) {
+    if (installing || (isInstalled && !hasUpdate)) {
       return;
     }
 
     try {
       installing = true;
+      
+      let currentDownloadUrl = plugin.downloadUrl;
+      let currentIcon = plugin.icon;
+      let currentVersion = plugin.version;
+
+      // 如果缺少下载地址（列表接口通常不返回），则先获取插件详情
+      if (!currentDownloadUrl) {
+        const { fetchPluginDetail } = await import("$lib/api/marketplace");
+        const detail = await fetchPluginDetail(plugin.id);
+        currentDownloadUrl = detail.downloadUrl;
+        if (detail.icon) currentIcon = detail.icon;
+        if (isValidPluginVersion(detail.version)) currentVersion = detail.version;
+      }
+
+      if (!currentDownloadUrl) {
+        throw new Error("未能获取到插件下载地址");
+      }
+
       await downloadAndInstallPlugin(
-        plugin.downloadUrl,
+        currentDownloadUrl,
         plugin.id,
-        plugin.icon,
+        currentIcon,
+        hasUpdate, // 如果有更新，则使用覆盖模式
+        currentVersion,
       );
-      oninstall?.();
+      const isUpdate = hasUpdate;
+      const actionName = isUpdate ? "更新" : "安装";
+      toast.success(`插件 ${plugin.name} ${actionName}成功`);
     } catch (error) {
       console.error("Failed to install plugin:", error);
-      alert(`安装失败: ${error}`);
+      toast.error(`安装失败: ${String(error)}`);
     } finally {
       installing = false;
     }
@@ -107,9 +142,9 @@
           <h3 class="truncate text-base leading-tight font-semibold">
             {plugin.name}
           </h3>
-          {#if plugin.version}
+          {#if isValidPluginVersion(plugin.version)}
             <span class="shrink-0 text-xs text-neutral-400"
-              >v{plugin.version}</span
+              >{formatPluginVersion(plugin.version)}</span
             >
           {/if}
         </div>
@@ -180,19 +215,22 @@
       {/if}
 
       <!-- 安装按钮 -->
-      {#if plugin.downloadUrl}
+      {#if plugin.id}
         <button
           class="flex items-center gap-1 rounded bg-blue-500 px-3 py-1 text-xs text-white transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
           onclick={handleInstall}
-          disabled={installing || isInstalled}
-          class:opacity-50={isInstalled}
-          class:cursor-not-allowed={isInstalled}
+          disabled={installing || (isInstalled && !hasUpdate)}
+          class:opacity-50={isInstalled && !hasUpdate}
+          class:cursor-not-allowed={isInstalled && !hasUpdate}
         >
-          {#if isInstalled}
+          {#if installing}
+            <span>{hasUpdate ? "更新中..." : "安装中..."}</span>
+          {:else if hasUpdate}
+            <DownloadSimple class="h-3.5 w-3.5" />
+            <span>更新</span>
+          {:else if isInstalled}
             <Check class="h-3.5 w-3.5" />
             <span>已安装</span>
-          {:else if installing}
-            <span>安装中...</span>
           {:else}
             <DownloadSimple class="h-3.5 w-3.5" />
             <span>安装</span>

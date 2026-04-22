@@ -16,8 +16,12 @@ pub fn get_extension_preview(input: String) -> Option<ExtensionPreview> {
 
 /// 执行 Extension 命令并复制结果
 #[command]
-pub fn execute_extension(extension_id: String, input: String) -> extension::ExtensionResult {
-    extension::execute_extension_command(&extension_id, &input)
+pub fn execute_extension(
+    extension_id: String,
+    command_code: String,
+    input: String,
+) -> extension::ExtensionResult {
+    extension::execute_extension_command(&extension_id, &command_code, &input)
 }
 
 /// 获取 Emoji 数据

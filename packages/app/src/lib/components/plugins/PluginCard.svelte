@@ -14,6 +14,10 @@
     WarningCircle,
   } from "phosphor-svelte";
   import { getPluginIconUrl, type PluginIconInfo } from "$lib/utils/pluginIcon";
+  import {
+    formatPluginVersion,
+    isValidPluginVersion,
+  } from "$lib/utils/pluginVersion";
   import type { PluginManifest } from "$lib/composables/usePluginList.svelte";
 
   interface Props {
@@ -103,9 +107,9 @@
           <h3 class="truncate text-base leading-tight font-semibold">
             {plugin.name}
           </h3>
-          {#if plugin.version}
+          {#if isValidPluginVersion(plugin.version)}
             <span class="shrink-0 text-xs text-neutral-400"
-              >v{plugin.version}</span
+              >{formatPluginVersion(plugin.version)}</span
             >
           {/if}
         </div>

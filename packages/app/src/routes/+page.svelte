@@ -60,6 +60,7 @@
   let extensionPreviewItem = $state<LaunchableItem | null>(null);
   let currentTheme = $state<Theme>(Theme.DARK);
   let unlisten = $state<null | (() => void)>(null);
+  let removeWindowEscapeListener = $state<null | (() => void)>(null);
 
   // Component references
   let searchInputRef: SearchInput;
@@ -81,7 +82,7 @@
 
   // ===== Computed =====
   // 合并匹配命令和搜索结果
-  // 优先级：Extension 预览 -> 精确/模糊匹配 -> 插件通配符匹配
+  // 优先级：Extension 预览 -> 精确/模糊匹配 -> 匹配指令
   const displayList = $derived.by(() => {
     const result: LaunchableItem[] = [];
 
@@ -94,24 +95,8 @@
       return [...result, ...appListManager.state.appList];
     }
 
-    // 获取匹配命令的 action 集合，用于去重
-    const matchedActions = new Set(
-      matchedCommands.map((cmd) => cmd.action).filter(Boolean),
-    );
-
-    // 过滤掉 appList 中已经在匹配命令中的项
-    const filteredAppList = appListManager.state.appList.filter(
-      (app) => !app.action || !matchedActions.has(app.action),
-    );
-
-    // 去重：当 Extension 预览已存在时，从匹配命令中过滤掉 Extension 来源的命令
-    // Extension 已通过预览条目展示（如 "翻译: hello"），无需在匹配命令中重复
-    const deduplicatedMatchedCommands = extensionPreviewItem
-      ? matchedCommands.filter((cmd) => cmd.source !== "Extension")
-      : matchedCommands;
-
-    // Extension 预览 -> 精确/模糊匹配(appList) -> 插件通配符匹配(matchedCommands)
-    return [...result, ...filteredAppList, ...deduplicatedMatchedCommands];
+    // 展示层不再做去重或语义过滤，是否显示由各命令自身的匹配规则决定
+    return [...result, ...appListManager.state.appList, ...matchedCommands];
   });
 
   // ===== Effects =====
@@ -169,10 +154,12 @@
   };
 
   const updateMatchedCommands = () => {
-    matchedCommands = clipboard.getMatchedCommands(
-      appListManager.state.originAppList,
-      inputValue,
-    );
+    matchedCommands = clipboard
+      .getMatchedCommands(appListManager.state.originAppList, inputValue)
+      .map((cmd) => ({
+        ...cmd,
+        trigger_mode: "matched" as const,
+      }));
   };
 
   const handlePaste = async (e: ClipboardEvent) => {
@@ -259,7 +246,7 @@
     if (app.source === "Extension") {
       const extensionInfo = parseExtensionAction(app.action);
       if (extensionInfo) {
-        const { extensionId } = extensionInfo;
+        const { extensionId, commandCode } = extensionInfo;
         // Emoji Extension 特殊处理：导航到独立页面
         if (extensionId === "emoji") {
           inputValue = "";
@@ -280,10 +267,31 @@
           goto("/extensions/clipboard");
           return;
         }
+        // 匹配指令：使用当前输入内容执行
+        if (app.trigger_mode === "matched") {
+          const effectiveText = clipboard.state.attachedText || inputValue;
+          await extensionManager.execute(
+            extensionId,
+            commandCode,
+            effectiveText,
+          );
+
+          inputValue = "";
+          clipboard.clearAttachments();
+          extensionPreviewItem = null;
+          extensionManager.clearPreview();
+          matchedCommands = [];
+          appListManager.resetToOriginList();
+          invoke("close_main_window");
+          return;
+        }
         // Translator Extension
         if (extensionId === "translator") {
-          const effectiveText = clipboard.state.attachedText || inputValue;
-          await extensionManager.execute(extensionId, effectiveText);
+          await extensionManager.execute(
+            extensionId,
+            commandCode,
+            "",
+          );
 
           inputValue = "";
           clipboard.clearAttachments();
@@ -384,8 +392,13 @@
       }
 
       // 使用有效文本（粘贴文本或输入框值）
+      const commandCode = parts[2] || "";
       const effectiveText = clipboard.state.attachedText || inputValue;
-      const result = await extensionManager.execute(extensionId, effectiveText);
+      const result = await extensionManager.execute(
+        extensionId,
+        commandCode,
+        effectiveText,
+      );
 
       if (result) {
         // 复制结果到剪贴板
@@ -407,7 +420,7 @@
     invoke("close_main_window");
   };
 
-  const handleKeyDown = (e: KeyboardEvent) => {
+  const handleNavigationKeyDown = (e: KeyboardEvent) => {
     appListManager.handleKeyDown(e, displayList, handleOpenApp);
   };
 
@@ -440,6 +453,25 @@
   onMount(async () => {
     escapeHandler.set(handleEsc);
     plugin.setModeSwitchConfirmHandler(confirmPluginModeSwitch);
+
+    const handleWindowEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) {
+        return;
+      }
+
+      if (page.route.id !== "/") {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      handleEsc();
+    };
+
+    window.addEventListener("keydown", handleWindowEscape, true);
+    removeWindowEscapeListener = () => {
+      window.removeEventListener("keydown", handleWindowEscape, true);
+    };
 
     // 加载配置
     await appListManager.loadConfig();
@@ -513,6 +545,8 @@
       unlisten();
     }
 
+    removeWindowEscapeListener?.();
+
     plugin.setModeSwitchConfirmHandler(null);
   });
 </script>
@@ -522,12 +556,12 @@
     class="h-full w-full overflow-hidden rounded-xl bg-neutral-100 p-3 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100"
     data-tauri-drag-region
   >
-    <div
-      class="flex h-full w-full flex-col"
-      role="listbox"
-      tabindex="0"
-      onkeydown={handleKeyDown}
-    >
+      <div
+        class="flex h-full w-full flex-col"
+        role="listbox"
+        tabindex="0"
+        onkeydown={handleNavigationKeyDown}
+      >
       <!-- Header: Logo + Search Input + Plugin Menu -->
       <div class="flex items-center gap-2 pb-2">
         <button class="flex-shrink-0 cursor-pointer" onclick={handleToSettings}>
@@ -605,6 +639,7 @@
                         title={app.name}
                         description={app.description || ""}
                         icon={app.icon}
+                        triggerMode={app.trigger_mode}
                         isSelected={appListManager.state.selectedIndex ===
                           index}
                         onClick={() => handleOpenApp(app)}

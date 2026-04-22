@@ -194,9 +194,10 @@ pub async fn execute_command(
             }
             CommandAction::Extension {
                 extension_id,
-                command_code: _command_code,
+                command_code,
             } => {
-                let result = crate::extension::execute_extension_command(extension_id, "");
+                let result =
+                    crate::extension::execute_extension_command(extension_id, command_code, "");
                 if let Some(error) = result.error {
                     let err = format!("Extension command failed: {}", error);
                     eprintln!("{}", err);

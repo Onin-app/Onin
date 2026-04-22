@@ -34,6 +34,7 @@
   let currentSettingsPlugin: PluginManifest | null = $state(null);
   let detailDialogOpen = $state(false);
   let selectedPluginForDetail: string | null = $state(null);
+  let marketRefreshTrigger = $state(0);
   let unlisten = $state<null | (() => void)>(null);
 
   // ===== Event Handlers =====
@@ -51,6 +52,14 @@
 
   const closePluginSettings = () => {
     currentSettingsPlugin = null;
+  };
+  
+  const handleRefresh = () => {
+    if (activeTab === "market") {
+      marketRefreshTrigger++;
+    } else {
+      pluginList.refreshPlugins();
+    }
   };
 
   const openPluginDetail = (pluginId: string) => {
@@ -107,7 +116,7 @@
       <PluginsHeader
         bind:searchQuery={pluginList.state.searchQuery}
         onBack={handleBackToSettings}
-        onRefresh={pluginList.refreshPlugins}
+        onRefresh={handleRefresh}
         onImport={pluginList.importPlugin}
         onSearchChange={pluginList.setSearchQuery}
       />
@@ -166,7 +175,10 @@
                 <div class="text-neutral-500">加载中...</div>
               </div>
             {:then { default: MarketplaceView }}
-              <MarketplaceView active={activeTab === "market"} />
+              <MarketplaceView 
+                active={activeTab === "market"} 
+                refreshTrigger={marketRefreshTrigger}
+              />
             {:catch error}
               <div
                 class="flex h-full flex-col items-center justify-center text-neutral-500"

@@ -151,17 +151,15 @@ pub fn get_invoke_handler(
         usage_tracker::record_command_usage,
         usage_tracker::get_usage_stats,
         usage_tracker::clear_usage_stats,
-        // Dialog
-        open_file_or_folder_dialog,
         // Extension API
         extension::api::get_extension_preview,
         extension::api::execute_extension,
         extension::api::get_emoji_data,
         // Keyboard simulation
         system_commands::simulate_paste,
-        // Google Translate Demo
         // Translator Extension
         crate::extensions::translator::commands::open_translator_window,
+        crate::extensions::translator::commands::close_translator_window,
         // Clipboard Extension
         crate::extensions::clipboard::commands::get_clipboard_history,
         crate::extensions::clipboard::commands::set_clipboard_item,
@@ -174,6 +172,8 @@ pub fn get_invoke_handler(
         crate::ai_manager::commands::validate_ai_provider,
         crate::ai_manager::commands::list_ai_models,
         crate::ai_manager::commands::get_ai_capabilities,
+        greet,
+        open_file_or_folder_dialog,
     ]
 }
 

@@ -15,16 +15,21 @@
   import { fetchPlugins } from "$lib/api/marketplace";
   import type { MarketplacePlugin } from "$lib/types/marketplace";
   import type { PluginManifest } from "$lib/composables/usePluginList.svelte";
+  import {
+    formatPluginVersion,
+    isValidPluginVersion,
+  } from "$lib/utils/pluginVersion";
   import { marked } from "marked";
 
   interface Props {
     active?: boolean;
+    refreshTrigger?: number;
   }
 
-  let { active = false }: Props = $props();
+  let { active = false, refreshTrigger = 0 }: Props = $props();
 
   let plugins: MarketplacePlugin[] = $state([]);
-  let installedPluginIds: Set<string> = $state(new Set());
+  let installedVersions: Map<string, string> = $state(new Map());
   let loading = $state(true);
   let error = $state<string | null>(null);
   let searchQuery = $state("");
@@ -78,12 +83,14 @@
       // 只有来源明确为“marketplace”的插件才在市场显示为“已安装”
       // 排除本地导入(@local)或其他非市场来源的版本
       // 同时考虑 id 和 dir_name，因为市场 ID 可能对应后端的 dir_name
-      installedPluginIds = new Set(
-        installed
-          .filter((p) => p.install_source === "marketplace")
-          .map((p) => [p.id, p.dir_name].filter(Boolean) as string[])
-          .flat(),
-      );
+      const versions = new Map<string, string>();
+      installed
+        .filter((p) => p.install_source === "marketplace")
+        .forEach((p) => {
+          if (p.id) versions.set(p.id, p.version);
+          if (p.dir_name) versions.set(p.dir_name, p.version);
+        });
+      installedVersions = versions;
     } catch (e) {
       console.error("Failed to load installed plugins:", e);
     }
@@ -101,7 +108,18 @@
         keyword: searchQuery || undefined,
       });
 
-      plugins = response.data;
+      // 去重：防止插件在多个分类中出现导致 Svelte Key 重复
+      const uniquePlugins: MarketplacePlugin[] = [];
+      const seenIds = new Set<string>();
+
+      for (const p of response.data) {
+        if (p.id && !seenIds.has(p.id)) {
+          seenIds.add(p.id);
+          uniquePlugins.push(p);
+        }
+      }
+
+      plugins = uniquePlugins;
       total = response.meta.total;
 
       // 同时加载已安装插件列表
@@ -154,23 +172,6 @@
     }
   }
 
-  async function handleInstall() {
-    // 安装成功后，我们不再在此处手动刷新已安装列表 (P3 优化)
-    // 因为后端成功后会发送 "plugin-installed" 事件，
-    // 我们在 onMount 中注册的监听器会自动触发 loadInstalledPlugins() 刷新 UI
-    try {
-      await invoke("show_notification", {
-        options: {
-          title: "安装成功",
-          body: "插件已安装，请在已安装列表中查看",
-        },
-      });
-    } catch (e) {
-      console.error("Failed to show notification:", e);
-    }
-    detailDialogOpen = false;
-  }
-
   // 事件监听清理函数
   let unlistenFns: UnlistenFn[] = [];
 
@@ -213,6 +214,13 @@
   $effect(() => {
     if (active) {
       loadInstalledPlugins();
+    }
+  });
+
+  // 监听外部刷新触发
+  $effect(() => {
+    if (refreshTrigger > 0 && active) {
+      loadPlugins();
     }
   });
 
@@ -281,14 +289,14 @@
         {:else}
           <div class="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
             {#each plugins as plugin (plugin.id)}
-              {@const isInstalled = installedPluginIds.has(plugin.id)}
-              {#if isInstalled}{/if}
+              {@const installedVersion = installedVersions.get(plugin.id)}
+              {@const isInstalled = !!installedVersion}
               <PluginCard
                 {plugin}
                 {isInstalled}
+                {installedVersion}
                 showStats={true}
                 onclick={() => handlePluginClick(plugin)}
-                oninstall={handleInstall}
               />
             {/each}
           </div>
@@ -392,8 +400,8 @@
               <div class="flex items-center gap-4 text-sm text-neutral-500">
                 <span>作者: {selectedPlugin.author}</span>
                 <span>分类: {selectedPlugin.category}</span>
-                {#if selectedPlugin.version}
-                  <span>版本: {selectedPlugin.version}</span>
+                {#if isValidPluginVersion(selectedPlugin.version)}
+                  <span>版本: {formatPluginVersion(selectedPlugin.version)}</span>
                 {/if}
               </div>
             </div>

@@ -132,6 +132,8 @@ export function useAppList(): AppListManagerReturn {
     displayList: LaunchableItem[],
     onEnter: (app: LaunchableItem) => void,
   ) => {
+    // Main page Escape is handled at window level in +page.svelte.
+    // Keep this handler focused on list navigation and activation only.
     if (e.key === "ArrowDown" || (e.key === "Tab" && !e.shiftKey)) {
       e.preventDefault();
       state.selectedIndex =

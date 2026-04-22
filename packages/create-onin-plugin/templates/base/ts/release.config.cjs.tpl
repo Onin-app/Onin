@@ -27,7 +27,7 @@ module.exports = {
     [
       '@semantic-release/exec',
       {
-        prepareCmd: "node -e \"const fs=require('fs'); const m=JSON.parse(fs.readFileSync('manifest.json', 'utf8')); m.version='${nextRelease.version}'; fs.writeFileSync('manifest.json', JSON.stringify(m, null, 2) + '\\n');\" && zip -qq -r " + pluginName + "-${nextRelease.version}.zip package.json manifest.json icon.png dist/"
+        prepareCmd: "node -e \"const fs=require('fs'); const m=JSON.parse(fs.readFileSync('manifest.json', 'utf8')); m.version='${nextRelease.version}'; fs.writeFileSync('manifest.json', JSON.stringify(m, null, 2) + '\\n');\" && npx bestzip " + pluginName + "-${nextRelease.version}.zip package.json manifest.json icon.svg dist/"
       }
     ],
     [
