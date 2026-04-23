@@ -13,6 +13,10 @@
     CalendarBlank,
     Smiley,
     Translate,
+    GlobeSimple,
+    Globe,
+    LinkSimple,
+    Link,
   } from "phosphor-svelte";
 
   interface PhosphorIconProps {
@@ -39,6 +43,10 @@
     calendar: CalendarBlank,
     smiley: Smiley,
     translate: Translate,
+    globe: Globe,
+    globeSimple: GlobeSimple,
+    link: Link,
+    linkSimple: LinkSimple,
   };
 
   const IconComponent = $derived(iconMap[icon] || Power);

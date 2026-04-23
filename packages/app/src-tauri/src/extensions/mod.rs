@@ -6,3 +6,4 @@ pub mod calculator;
 pub mod clipboard;
 pub mod emoji;
 pub mod translator;
+pub mod web;

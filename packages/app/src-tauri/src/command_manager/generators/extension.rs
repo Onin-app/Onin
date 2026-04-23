@@ -16,6 +16,42 @@ pub fn get_initial_extension_commands() -> Vec<Command> {
         .flat_map(|ext| {
             let manifest = ext.manifest();
             manifest.commands.iter().map(move |cmd| {
+                let (title, description, icon) = if manifest.id == "web" {
+                    match cmd.code {
+                        "open_url" => (
+                            "打开网址".to_string(),
+                            "在默认浏览器中打开输入的网址".to_string(),
+                            "linkSimple".to_string(),
+                        ),
+                        "search_google" => (
+                            "Google 搜索".to_string(),
+                            "使用 Google 搜索当前文本".to_string(),
+                            "globeSimple".to_string(),
+                        ),
+                        "search_bing" => (
+                            "Bing 搜索".to_string(),
+                            "使用 Bing 搜索当前文本".to_string(),
+                            "globeSimple".to_string(),
+                        ),
+                        "search_baidu" => (
+                            "百度搜索".to_string(),
+                            "使用百度搜索当前文本".to_string(),
+                            "globeSimple".to_string(),
+                        ),
+                        _ => (
+                            manifest.name.to_string(),
+                            manifest.description.to_string(),
+                            manifest.icon.to_string(),
+                        ),
+                    }
+                } else {
+                    (
+                        manifest.name.to_string(),
+                        manifest.description.to_string(),
+                        manifest.icon.to_string(),
+                    )
+                };
+
                 // 构建关键词
                 let keywords: Vec<CommandKeyword> = cmd
                     .keywords
@@ -45,11 +81,11 @@ pub fn get_initial_extension_commands() -> Vec<Command> {
 
                 Command {
                     name: format!("extension:{}:{}", manifest.id, cmd.code),
-                    title: manifest.name.to_string(),
-                    description: Some(manifest.description.to_string()),
+                    title,
+                    description: Some(description),
                     english_name: manifest.id.to_string(),
                     keywords,
-                    icon: manifest.icon.to_string(),
+                    icon,
                     source: ItemSource::Extension,
                     action: CommandAction::Extension {
                         extension_id: manifest.id.to_string(),
