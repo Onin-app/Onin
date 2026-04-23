@@ -15,6 +15,9 @@ pub static WEB_MANIFEST: ExtensionManifest = ExtensionManifest {
     commands: &[
         ExtensionCommand {
             code: "open_url",
+            name: "打开网址",
+            description: Some("在默认浏览器中打开输入的网址"),
+            icon: Some("linkSimple"),
             keywords: &["web", "url", "open", "link", "网址", "打开"],
             matches: Some(&[StaticCommandMatch {
                 match_type: "text",
@@ -29,6 +32,9 @@ pub static WEB_MANIFEST: ExtensionManifest = ExtensionManifest {
         },
         ExtensionCommand {
             code: "search_google",
+            name: "Google 搜索",
+            description: Some("使用 Google 搜索当前文本"),
+            icon: Some("globeSimple"),
             keywords: &["google", "搜索", "search"],
             matches: Some(&[StaticCommandMatch {
                 match_type: "text",
@@ -43,6 +49,9 @@ pub static WEB_MANIFEST: ExtensionManifest = ExtensionManifest {
         },
         ExtensionCommand {
             code: "search_bing",
+            name: "Bing 搜索",
+            description: Some("使用 Bing 搜索当前文本"),
+            icon: Some("globeSimple"),
             keywords: &["bing", "搜索", "search"],
             matches: Some(&[StaticCommandMatch {
                 match_type: "text",
@@ -57,6 +66,9 @@ pub static WEB_MANIFEST: ExtensionManifest = ExtensionManifest {
         },
         ExtensionCommand {
             code: "search_baidu",
+            name: "百度搜索",
+            description: Some("使用百度搜索当前文本"),
+            icon: Some("globeSimple"),
             keywords: &["baidu", "百度", "搜索", "search"],
             matches: Some(&[StaticCommandMatch {
                 match_type: "text",

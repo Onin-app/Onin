@@ -24,6 +24,9 @@ pub static TRANSLATOR_MANIFEST: ExtensionManifest = ExtensionManifest {
     icon: "translate",
     commands: &[ExtensionCommand {
         code: "open",
+        name: "翻译",
+        description: Some("多引擎聚合翻译"),
+        icon: Some("translate"),
         keywords: &["translate", "translator", "fy", "fanyi", "翻译"],
         // 使用统一的 CommandMatch 声明式配置
         // 匹配任意文本（≥1 字符），由前端 matchCommand.ts 处理

@@ -34,6 +34,12 @@ pub struct ExtensionManifest {
 pub struct ExtensionCommand {
     /// 命令代码，如 "calculate"
     pub code: &'static str,
+    /// 命令显示名称
+    pub name: &'static str,
+    /// 命令描述（可选）
+    pub description: Option<&'static str>,
+    /// 命令图标（可选，默认使用 manifest.icon）
+    pub icon: Option<&'static str>,
     /// 触发关键词
     pub keywords: &'static [&'static str],
     /// 匹配规则（可选），使用统一的 StaticCommandMatch 格式

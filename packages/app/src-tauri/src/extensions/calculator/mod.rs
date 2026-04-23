@@ -25,6 +25,9 @@ pub static CALCULATOR_MANIFEST: ExtensionManifest = ExtensionManifest {
     icon: "calculator",
     commands: &[ExtensionCommand {
         code: "calculate",
+        name: "计算器",
+        description: Some("数学、单位、日期与货币计算"),
+        icon: Some("calculator"),
         keywords: &[
             "calc", "计算", "=", "convert", "转换", "date", "日期", "currency", "货币",
         ],
