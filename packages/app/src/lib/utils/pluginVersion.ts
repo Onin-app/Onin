@@ -1,4 +1,6 @@
-export function isValidPluginVersion(version?: string | null): version is string {
+export function isValidPluginVersion(
+  version?: string | null,
+): version is string {
   if (!version) {
     return false;
   }
@@ -31,16 +33,17 @@ interface ParsedPluginVersion {
   prerelease: string[];
 }
 
-function parsePluginVersion(version?: string | null): ParsedPluginVersion | null {
+function parsePluginVersion(
+  version?: string | null,
+): ParsedPluginVersion | null {
   if (!isValidPluginVersion(version)) {
     return null;
   }
 
   const normalized = version.trim().replace(/^[vV]/, "");
-  const match =
-    normalized.match(
-      /^(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-([0-9A-Za-z.-]+))?$/,
-    );
+  const match = normalized.match(
+    /^(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-([0-9A-Za-z.-]+))?$/,
+  );
 
   if (!match) {
     return null;

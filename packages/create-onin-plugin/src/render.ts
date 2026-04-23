@@ -1,8 +1,19 @@
-import { copyFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
-import { join, relative } from "node:path";
+import {
+  copyFile,
+  mkdir,
+  readdir,
+  readFile,
+  stat,
+  writeFile,
+} from 'node:fs/promises';
+import { join, relative } from 'node:path';
 
-import type { PackageJsonField, PackageJsonShape, TemplateContext } from "./types.js";
-import { isNodeError } from "./validators.js";
+import type {
+  PackageJsonField,
+  PackageJsonShape,
+  TemplateContext,
+} from './types.js';
+import { isNodeError } from './validators.js';
 
 export async function ensureTargetDirectory(targetDir: string): Promise<void> {
   try {
@@ -20,7 +31,7 @@ export async function ensureTargetDirectory(targetDir: string): Promise<void> {
       );
     }
   } catch (error: unknown) {
-    if (isNodeError(error) && error.code === "ENOENT") {
+    if (isNodeError(error) && error.code === 'ENOENT') {
       await mkdir(targetDir, { recursive: true });
       return;
     }
@@ -29,16 +40,19 @@ export async function ensureTargetDirectory(targetDir: string): Promise<void> {
   }
 }
 
-export function renderTemplate(content: string, context: TemplateContext): string {
+export function renderTemplate(
+  content: string,
+  context: TemplateContext,
+): string {
   return content
-    .replaceAll("__PLUGIN_NAME__", context.pluginName)
-    .replaceAll("__PLUGIN_ID__", context.pluginId)
-    .replaceAll("__PACKAGE_NAME__", context.packageName)
-    .replaceAll("__PLUGIN_DESCRIPTION__", context.pluginDescription)
-    .replaceAll("__SETTINGS_BLOCK__", context.settingsBlock)
-    .replaceAll("__SETTINGS_IMPORT__", context.settingsImport)
-    .replaceAll("__SETTINGS_NOTE__", context.settingsNote)
-    .replaceAll("__KEYWORD__", context.keyword);
+    .replaceAll('__PLUGIN_NAME__', context.pluginName)
+    .replaceAll('__PLUGIN_ID__', context.pluginId)
+    .replaceAll('__PACKAGE_NAME__', context.packageName)
+    .replaceAll('__PLUGIN_DESCRIPTION__', context.pluginDescription)
+    .replaceAll('__SETTINGS_BLOCK__', context.settingsBlock)
+    .replaceAll('__SETTINGS_IMPORT__', context.settingsImport)
+    .replaceAll('__SETTINGS_NOTE__', context.settingsNote)
+    .replaceAll('__KEYWORD__', context.keyword);
 }
 
 export async function copyTemplateDir(
@@ -47,7 +61,13 @@ export async function copyTemplateDir(
   context: TemplateContext,
   skipRelativePaths: Set<string> = new Set(),
 ): Promise<void> {
-  await copyTemplateDirInternal(sourceDir, sourceDir, targetDir, context, skipRelativePaths);
+  await copyTemplateDirInternal(
+    sourceDir,
+    sourceDir,
+    targetDir,
+    context,
+    skipRelativePaths,
+  );
 }
 
 async function copyTemplateDirInternal(
@@ -61,23 +81,34 @@ async function copyTemplateDirInternal(
 
   for (const entry of entries) {
     const sourcePath = join(sourceDir, entry.name);
-    const relativePath = relative(rootSourceDir, sourcePath).replaceAll("\\", "/");
+    const relativePath = relative(rootSourceDir, sourcePath).replaceAll(
+      '\\',
+      '/',
+    );
     if (skipRelativePaths.has(relativePath)) {
       continue;
     }
 
-    const outputName = entry.name.endsWith(".tpl") ? entry.name.slice(0, -4) : entry.name;
+    const outputName = entry.name.endsWith('.tpl')
+      ? entry.name.slice(0, -4)
+      : entry.name;
     const targetPath = join(targetDir, outputName);
 
     if (entry.isDirectory()) {
       await mkdir(targetPath, { recursive: true });
-      await copyTemplateDirInternal(rootSourceDir, sourcePath, targetPath, context, skipRelativePaths);
+      await copyTemplateDirInternal(
+        rootSourceDir,
+        sourcePath,
+        targetPath,
+        context,
+        skipRelativePaths,
+      );
       continue;
     }
 
-    if (entry.name.endsWith(".tpl")) {
-      const content = await readFile(sourcePath, "utf8");
-      await writeFile(targetPath, renderTemplate(content, context), "utf8");
+    if (entry.name.endsWith('.tpl')) {
+      const content = await readFile(sourcePath, 'utf8');
+      await writeFile(targetPath, renderTemplate(content, context), 'utf8');
       continue;
     }
 
@@ -105,17 +136,25 @@ export async function renderPackageJson(
   context: TemplateContext,
 ): Promise<void> {
   const [baseTemplate, adapterFragment] = await Promise.all([
-    readFile(baseTemplatePath, "utf8"),
-    readFile(adapterFragmentPath, "utf8"),
+    readFile(baseTemplatePath, 'utf8'),
+    readFile(adapterFragmentPath, 'utf8'),
   ]);
 
   const renderedBase = renderTemplate(baseTemplate, context);
   const renderedAdapter = renderTemplate(adapterFragment, context);
   const basePkg = JSON.parse(renderedBase) as PackageJsonShape;
   const adapterPkg = JSON.parse(renderedAdapter) as PackageJsonShape;
-  const scripts = mergeOptionalRecordField(basePkg, adapterPkg, "scripts");
-  const dependencies = mergeOptionalRecordField(basePkg, adapterPkg, "dependencies");
-  const devDependencies = mergeOptionalRecordField(basePkg, adapterPkg, "devDependencies");
+  const scripts = mergeOptionalRecordField(basePkg, adapterPkg, 'scripts');
+  const dependencies = mergeOptionalRecordField(
+    basePkg,
+    adapterPkg,
+    'dependencies',
+  );
+  const devDependencies = mergeOptionalRecordField(
+    basePkg,
+    adapterPkg,
+    'devDependencies',
+  );
 
   const mergedPkg: PackageJsonShape = {
     ...basePkg,
@@ -134,33 +173,41 @@ export async function renderPackageJson(
     mergedPkg.devDependencies = devDependencies;
   }
 
-  removeEmptyRecordField(mergedPkg, "scripts");
-  removeEmptyRecordField(mergedPkg, "dependencies");
-  removeEmptyRecordField(mergedPkg, "devDependencies");
+  removeEmptyRecordField(mergedPkg, 'scripts');
+  removeEmptyRecordField(mergedPkg, 'dependencies');
+  removeEmptyRecordField(mergedPkg, 'devDependencies');
 
   if (context.withRelease) {
     if (!mergedPkg.devDependencies) {
       mergedPkg.devDependencies = {};
     }
-    mergedPkg.devDependencies["@semantic-release/changelog"] = "^6.0.3";
-    mergedPkg.devDependencies["@semantic-release/commit-analyzer"] = "^13.0.1";
-    mergedPkg.devDependencies["@semantic-release/exec"] = "^7.1.0";
-    mergedPkg.devDependencies["@semantic-release/git"] = "^10.0.1";
-    mergedPkg.devDependencies["@semantic-release/github"] = "^12.0.6";
-    mergedPkg.devDependencies["@semantic-release/npm"] = "^13.1.5";
-    mergedPkg.devDependencies["@semantic-release/release-notes-generator"] = "^14.1.0";
-    mergedPkg.devDependencies["semantic-release"] = "^25.0.3";
+    mergedPkg.devDependencies['@semantic-release/changelog'] = '^6.0.3';
+    mergedPkg.devDependencies['@semantic-release/commit-analyzer'] = '^13.0.1';
+    mergedPkg.devDependencies['@semantic-release/exec'] = '^7.1.0';
+    mergedPkg.devDependencies['@semantic-release/git'] = '^10.0.1';
+    mergedPkg.devDependencies['@semantic-release/github'] = '^12.0.6';
+    mergedPkg.devDependencies['@semantic-release/npm'] = '^13.1.5';
+    mergedPkg.devDependencies['@semantic-release/release-notes-generator'] =
+      '^14.1.0';
+    mergedPkg.devDependencies['semantic-release'] = '^25.0.3';
 
     if (!mergedPkg.scripts) {
       mergedPkg.scripts = {};
     }
-    mergedPkg.scripts["release"] = "semantic-release";
+    mergedPkg.scripts['release'] = 'semantic-release';
   }
 
-  await writeFile(targetPath, `${JSON.stringify(mergedPkg, null, 2)}\n`, "utf8");
+  await writeFile(
+    targetPath,
+    `${JSON.stringify(mergedPkg, null, 2)}\n`,
+    'utf8',
+  );
 }
 
-function removeEmptyRecordField(pkg: PackageJsonShape, field: PackageJsonField): void {
+function removeEmptyRecordField(
+  pkg: PackageJsonShape,
+  field: PackageJsonField,
+): void {
   const record = pkg[field];
   if (record && Object.keys(record).length === 0) {
     delete pkg[field];
@@ -169,7 +216,7 @@ function removeEmptyRecordField(pkg: PackageJsonShape, field: PackageJsonField):
 
 export function buildSettingsBlock(withSettings: boolean): string {
   if (!withSettings) {
-    return "  // Add settings.useSettingsSchema(...) here when your plugin needs configurable options.\n";
+    return '  // Add settings.useSettingsSchema(...) here when your plugin needs configurable options.\n';
   }
 
   return `  await settings.useSettingsSchema([

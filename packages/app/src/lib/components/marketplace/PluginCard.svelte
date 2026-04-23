@@ -66,7 +66,7 @@
 
     try {
       installing = true;
-      
+
       let currentDownloadUrl = plugin.downloadUrl;
       let currentIcon = plugin.icon;
       let currentVersion = plugin.version;
@@ -77,7 +77,8 @@
         const detail = await fetchPluginDetail(plugin.id);
         currentDownloadUrl = detail.downloadUrl;
         if (detail.icon) currentIcon = detail.icon;
-        if (isValidPluginVersion(detail.version)) currentVersion = detail.version;
+        if (isValidPluginVersion(detail.version))
+          currentVersion = detail.version;
       }
 
       if (!currentDownloadUrl) {

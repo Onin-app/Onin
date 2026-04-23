@@ -377,24 +377,24 @@ function getSchema(): SettingField[] {
 
 /**
  * Listen for settings changes
- * 
+ *
  * @param callback - Function to call when settings change
  * @returns Promise resolving to an unlisten function
- * 
+ *
  * @example
  * ```typescript
  * import { settings } from 'onin-sdk';
- * 
+ *
  * const unlisten = await settings.onChange((newSettings) => {
  *   console.log('Settings changed:', newSettings);
  * });
- * 
+ *
  * // Clean up listener when done
  * unlisten();
  * ```
  */
 async function onChange(
-  callback: (newSettings: SettingsValues) => void
+  callback: (newSettings: SettingsValues) => void,
 ): Promise<UnlistenFn> {
   const pluginId = (globalThis as { __PLUGIN_ID__?: string }).__PLUGIN_ID__;
   if (!pluginId) {
@@ -419,7 +419,7 @@ async function onChange(
         }
         callback(merged);
       }
-    }
+    },
   );
 }
 

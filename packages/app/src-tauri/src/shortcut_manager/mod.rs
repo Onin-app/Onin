@@ -16,8 +16,8 @@ mod storage;
 mod utils;
 
 // 重新导出公共接口
-pub use handler::handle_global_shortcut;
 pub use handler::handle_escape_action;
+pub use handler::handle_global_shortcut;
 pub use state::ShortcutState;
 
 use crate::shared_types::Shortcut as AppShortcut;

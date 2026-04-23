@@ -317,76 +317,78 @@ pub async fn download_and_install_plugin(
     let icon_url_for_install = icon_url.clone();
     let marketplace_version_for_install = marketplace_version.clone();
 
-    let manifest = tauri::async_runtime::spawn_blocking(move || -> Result<PluginManifest, String> {
-        // 2. 解压
-        let extract_dir = zip_path_for_install
-            .parent()
-            .ok_or_else(|| "zip 临时目录无效".to_string())?
-            .join("extracted");
-        std::fs::create_dir_all(&extract_dir).map_err(|e| format!("创建解压目录失败: {}", e))?;
+    let manifest =
+        tauri::async_runtime::spawn_blocking(move || -> Result<PluginManifest, String> {
+            // 2. 解压
+            let extract_dir = zip_path_for_install
+                .parent()
+                .ok_or_else(|| "zip 临时目录无效".to_string())?
+                .join("extracted");
+            std::fs::create_dir_all(&extract_dir)
+                .map_err(|e| format!("创建解压目录失败: {}", e))?;
 
-        extract_zip(&zip_path_for_install, &extract_dir)?;
+            extract_zip(&zip_path_for_install, &extract_dir)?;
 
-        // 3. 查找插件根目录
-        let plugin_root = find_plugin_root(&extract_dir)?;
+            // 3. 查找插件根目录
+            let plugin_root = find_plugin_root(&extract_dir)?;
 
-        // 4. 读取 manifest
-        let manifest_path = plugin_root.join("manifest.json");
-        if !manifest_path.exists() {
-            return Err("解压文件中未找到 manifest.json".to_string());
-        }
-
-        let manifest_content = std::fs::read_to_string(&manifest_path)
-            .map_err(|e| format!("读取 manifest 失败: {}", e))?;
-        let mut manifest: PluginManifest = serde_json::from_str(&manifest_content)
-            .map_err(|e| format!("manifest 格式无效: {}", e))?;
-
-        manifest.id = plugin_id_for_install;
-
-        if manifest.dev_mode {
-            manifest.dev_mode = false;
-            manifest.dev_server = None;
-        }
-
-        if let Some(icon) = icon_url_for_install {
-            manifest.icon = Some(icon);
-        }
-
-        if let Some(version) = marketplace_version_for_install {
-            let version = version.trim();
-            if !version.is_empty() {
-                manifest.version = version.to_string();
+            // 4. 读取 manifest
+            let manifest_path = plugin_root.join("manifest.json");
+            if !manifest_path.exists() {
+                return Err("解压文件中未找到 manifest.json".to_string());
             }
-        }
 
-        if target_dir_for_install.exists() {
-            if overwrite {
-                remove_plugin_directory(&target_dir_for_install)?;
-            } else {
-                return Err(format!(
-                    "插件 '{}' 已存在 (目录: {})。\n请先卸载现有版本，然后再安装。",
-                    manifest.name, dir_name_for_install
-                ));
+            let manifest_content = std::fs::read_to_string(&manifest_path)
+                .map_err(|e| format!("读取 manifest 失败: {}", e))?;
+            let mut manifest: PluginManifest = serde_json::from_str(&manifest_content)
+                .map_err(|e| format!("manifest 格式无效: {}", e))?;
+
+            manifest.id = plugin_id_for_install;
+
+            if manifest.dev_mode {
+                manifest.dev_mode = false;
+                manifest.dev_server = None;
             }
-        }
 
-        if !plugins_dir_for_install.exists() {
-            std::fs::create_dir_all(&plugins_dir_for_install)
-                .map_err(|e| format!("创建 plugins 目录失败: {}", e))?;
-        }
+            if let Some(icon) = icon_url_for_install {
+                manifest.icon = Some(icon);
+            }
 
-        copy_dir_all(&plugin_root, &target_dir_for_install)?;
+            if let Some(version) = marketplace_version_for_install {
+                let version = version.trim();
+                if !version.is_empty() {
+                    manifest.version = version.to_string();
+                }
+            }
 
-        let target_manifest_path = target_dir_for_install.join("manifest.json");
-        let updated_manifest_content = serde_json::to_string_pretty(&manifest)
-            .map_err(|e| format!("序列化 manifest 失败: {}", e))?;
-        std::fs::write(&target_manifest_path, updated_manifest_content)
-            .map_err(|e| format!("写入更新后的 manifest 失败: {}", e))?;
+            if target_dir_for_install.exists() {
+                if overwrite {
+                    remove_plugin_directory(&target_dir_for_install)?;
+                } else {
+                    return Err(format!(
+                        "插件 '{}' 已存在 (目录: {})。\n请先卸载现有版本，然后再安装。",
+                        manifest.name, dir_name_for_install
+                    ));
+                }
+            }
 
-        Ok(manifest)
-    })
-    .await
-    .map_err(|e| format!("安装任务执行失败: {}", e))??;
+            if !plugins_dir_for_install.exists() {
+                std::fs::create_dir_all(&plugins_dir_for_install)
+                    .map_err(|e| format!("创建 plugins 目录失败: {}", e))?;
+            }
+
+            copy_dir_all(&plugin_root, &target_dir_for_install)?;
+
+            let target_manifest_path = target_dir_for_install.join("manifest.json");
+            let updated_manifest_content = serde_json::to_string_pretty(&manifest)
+                .map_err(|e| format!("序列化 manifest 失败: {}", e))?;
+            std::fs::write(&target_manifest_path, updated_manifest_content)
+                .map_err(|e| format!("写入更新后的 manifest 失败: {}", e))?;
+
+            Ok(manifest)
+        })
+        .await
+        .map_err(|e| format!("安装任务执行失败: {}", e))??;
 
     // 6. 加载到 store
     let plugin_states = load_plugin_states(&app);

@@ -287,11 +287,7 @@
         }
         // Translator Extension
         if (extensionId === "translator") {
-          await extensionManager.execute(
-            extensionId,
-            commandCode,
-            "",
-          );
+          await extensionManager.execute(extensionId, commandCode, "");
 
           inputValue = "";
           clipboard.clearAttachments();
@@ -556,12 +552,12 @@
     class="h-full w-full overflow-hidden rounded-xl bg-neutral-100 p-3 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100"
     data-tauri-drag-region
   >
-      <div
-        class="flex h-full w-full flex-col"
-        role="listbox"
-        tabindex="0"
-        onkeydown={handleNavigationKeyDown}
-      >
+    <div
+      class="flex h-full w-full flex-col"
+      role="listbox"
+      tabindex="0"
+      onkeydown={handleNavigationKeyDown}
+    >
       <!-- Header: Logo + Search Input + Plugin Menu -->
       <div class="flex items-center gap-2 pb-2">
         <button class="flex-shrink-0 cursor-pointer" onclick={handleToSettings}>
@@ -630,31 +626,29 @@
             class="h-full w-full rounded-[10px] border px-2 py-2"
             viewportClass="h-full w-full overflow-x-hidden"
           >
-              <div class="app-list overflow-hidden">
-                <div use:animate>
-                  {#each displayList as app, index ((app.action || "") + app.path + app.name + index)}
-                    {#if app.path.startsWith("extension:")}
-                      <!-- Extension 预览项（如计算器结果） -->
-                      <ExtensionResultItem
-                        title={app.name}
-                        description={app.description || ""}
-                        icon={app.icon}
-                        triggerMode={app.trigger_mode}
-                        isSelected={appListManager.state.selectedIndex ===
-                          index}
-                        onClick={() => handleOpenApp(app)}
-                      />
-                    {:else}
-                      <AppListItem
-                        {app}
-                        isSelected={appListManager.state.selectedIndex ===
-                          index}
-                        onClick={() => handleOpenApp(app)}
-                      />
-                    {/if}
-                  {/each}
-                </div>
+            <div class="app-list overflow-hidden">
+              <div use:animate>
+                {#each displayList as app, index ((app.action || "") + app.path + app.name + index)}
+                  {#if app.path.startsWith("extension:")}
+                    <!-- Extension 预览项（如计算器结果） -->
+                    <ExtensionResultItem
+                      title={app.name}
+                      description={app.description || ""}
+                      icon={app.icon}
+                      triggerMode={app.trigger_mode}
+                      isSelected={appListManager.state.selectedIndex === index}
+                      onClick={() => handleOpenApp(app)}
+                    />
+                  {:else}
+                    <AppListItem
+                      {app}
+                      isSelected={appListManager.state.selectedIndex === index}
+                      onClick={() => handleOpenApp(app)}
+                    />
+                  {/if}
+                {/each}
               </div>
+            </div>
           </AppScrollArea>
         {/if}
       </div>

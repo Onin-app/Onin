@@ -91,7 +91,12 @@
               stroke="currentColor"
               stroke-width="1.4"
             />
-            <path d="M2.5 5.5h11" fill="none" stroke="currentColor" stroke-width="1.2" />
+            <path
+              d="M2.5 5.5h11"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.2"
+            />
           </svg>
         {:else if triggerMode === "matched"}
           <svg viewBox="0 0 16 16" class="h-2.5 w-2.5" aria-hidden="true">

@@ -53,7 +53,7 @@
   const closePluginSettings = () => {
     currentSettingsPlugin = null;
   };
-  
+
   const handleRefresh = () => {
     if (activeTab === "market") {
       marketRefreshTrigger++;
@@ -149,7 +149,9 @@
               viewportClass="h-full w-full overflow-x-hidden pr-2"
             >
               {#if pluginList.filteredPlugins.length > 0}
-                <div class="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                <div
+                  class="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3"
+                >
                   {#each pluginList.filteredPlugins as plugin (plugin.dir_name || plugin.id)}
                     <PluginCard
                       {plugin}
@@ -175,8 +177,8 @@
                 <div class="text-neutral-500">加载中...</div>
               </div>
             {:then { default: MarketplaceView }}
-              <MarketplaceView 
-                active={activeTab === "market"} 
+              <MarketplaceView
+                active={activeTab === "market"}
                 refreshTrigger={marketRefreshTrigger}
               />
             {:catch error}

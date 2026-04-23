@@ -5,9 +5,9 @@
  * 使用 svelte-sonner 提供与主程序一致的 Toast 通知。
  */
 
-import { mount } from "svelte";
-import Toast from "./components/Toast.svelte";
-import type { ToastPayload } from "./types";
+import { mount } from 'svelte';
+import Toast from './components/Toast.svelte';
+import type { ToastPayload } from './types';
 
 // 避免重复注入
 if (!window.__ONIN_TOAST_INJECTED__) {
@@ -23,8 +23,8 @@ function init() {
   let toastInstance: ReturnType<typeof mountToast> | null = null;
 
   function mountToast() {
-    const host = document.createElement("div");
-    host.id = "onin-inject-root";
+    const host = document.createElement('div');
+    host.id = 'onin-inject-root';
     document.body.appendChild(host);
     return mount(Toast, { target: host });
   }
@@ -55,9 +55,9 @@ function init() {
     blur: [],
   };
 
-  window.addEventListener("message", (event) => {
+  window.addEventListener('message', (event) => {
     const data = event.data;
-    if (data?.type === "plugin-lifecycle-event" && data.event) {
+    if (data?.type === 'plugin-lifecycle-event' && data.event) {
       const callbacks = listeners[data.event];
       if (callbacks) {
         callbacks.forEach((cb) => {
@@ -73,10 +73,10 @@ function init() {
 
   // 4. 暴露现代 Bridge API
   window.__ONIN_BRIDGE__ = {
-    version: "0.1.0",
+    version: '0.1.0',
     showToast,
     postMessage: (message: any) => {
-      window.postMessage(message, "*");
+      window.postMessage(message, '*');
     },
     onShow: (cb) => listeners.show.push(cb),
     onHide: (cb) => listeners.hide.push(cb),
@@ -84,8 +84,8 @@ function init() {
     onBlur: (cb) => listeners.blur.push(cb),
   };
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => ensureMounted());
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => ensureMounted());
   } else {
     ensureMounted();
   }
@@ -97,7 +97,7 @@ function init() {
  */
 function resolvePluginId() {
   const urlParams = new URLSearchParams(window.location.search);
-  const pluginIdFromUrl = urlParams.get("plugin_id");
+  const pluginIdFromUrl = urlParams.get('plugin_id');
 
   if (pluginIdFromUrl) {
     window.__PLUGIN_ID__ = pluginIdFromUrl;
@@ -105,7 +105,7 @@ function resolvePluginId() {
 
   if (!window.__PLUGIN_ID__) {
     // 兜底值，不应出现
-    window.__PLUGIN_ID__ = "unknown";
+    window.__PLUGIN_ID__ = 'unknown';
   }
 
   // 确保 globalThis 也有映射
@@ -119,10 +119,10 @@ function initRuntime() {
   if (!window.__ONIN_RUNTIME__) {
     const urlParams = new URLSearchParams(window.location.search);
     window.__ONIN_RUNTIME__ = {
-      mode: (urlParams.get("mode") as any) || "inline",
-      pluginId: window.__PLUGIN_ID__ || "unknown",
-      version: "dev-fallback",
-      mainWindowLabel: "main",
+      mode: (urlParams.get('mode') as any) || 'inline',
+      pluginId: window.__PLUGIN_ID__ || 'unknown',
+      version: 'dev-fallback',
+      mainWindowLabel: 'main',
     };
   }
 }

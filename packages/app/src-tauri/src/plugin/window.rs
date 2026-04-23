@@ -410,10 +410,30 @@ pub async fn create_or_show_plugin_window(
         ),
     )
     .title(plugin.manifest.name.clone())
-    .decorations(window_config.as_ref().and_then(|c| c.decorations).unwrap_or(true))
-    .transparent(window_config.as_ref().and_then(|c| c.transparent).unwrap_or(false))
-    .always_on_top(window_config.as_ref().and_then(|c| c.always_on_top).unwrap_or(false))
-    .resizable(window_config.as_ref().and_then(|c| c.resizable).unwrap_or(true))
+    .decorations(
+        window_config
+            .as_ref()
+            .and_then(|c| c.decorations)
+            .unwrap_or(true),
+    )
+    .transparent(
+        window_config
+            .as_ref()
+            .and_then(|c| c.transparent)
+            .unwrap_or(false),
+    )
+    .always_on_top(
+        window_config
+            .as_ref()
+            .and_then(|c| c.always_on_top)
+            .unwrap_or(false),
+    )
+    .resizable(
+        window_config
+            .as_ref()
+            .and_then(|c| c.resizable)
+            .unwrap_or(true),
+    )
     .initialization_script(&runtime_script);
 
     // 设置最小尺寸

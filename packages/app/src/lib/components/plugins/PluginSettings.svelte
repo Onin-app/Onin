@@ -109,45 +109,45 @@
 
   <!-- Content -->
   <AppScrollArea class="flex-1" viewportClass="h-full w-full overflow-x-hidden">
-      <div class="p-6 pr-8">
-        {#if loading}
-          <div class="flex items-center justify-center py-12">
-            <div class="text-neutral-500">加载中...</div>
+    <div class="p-6 pr-8">
+      {#if loading}
+        <div class="flex items-center justify-center py-12">
+          <div class="text-neutral-500">加载中...</div>
+        </div>
+      {:else if loadError}
+        <div class="mx-auto max-w-2xl">
+          <div
+            class="rounded-lg border border-red-200 bg-red-50 p-4 text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200"
+          >
+            <p class="font-semibold">加载失败</p>
+            <p class="mt-1 text-sm">{loadError}</p>
           </div>
-        {:else if loadError}
-          <div class="mx-auto max-w-2xl">
+        </div>
+      {:else}
+        <div class="mx-auto max-w-2xl">
+          {#if saveError}
             <div
-              class="rounded-lg border border-red-200 bg-red-50 p-4 text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200"
+              class="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200"
             >
-              <p class="font-semibold">加载失败</p>
-              <p class="mt-1 text-sm">{loadError}</p>
+              {saveError}
             </div>
+          {/if}
+          <div
+            class="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-800"
+          >
+            {#each schema.fields as field (field.key)}
+              <SettingField
+                {field}
+                bind:value={values[field.key]}
+                onChange={(newValue) => {
+                  values[field.key] = newValue;
+                  autoSaveSettings(field.key, newValue);
+                }}
+              />
+            {/each}
           </div>
-        {:else}
-          <div class="mx-auto max-w-2xl">
-            {#if saveError}
-              <div
-                class="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200"
-              >
-                {saveError}
-              </div>
-            {/if}
-            <div
-              class="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-800"
-            >
-              {#each schema.fields as field (field.key)}
-                <SettingField
-                  {field}
-                  bind:value={values[field.key]}
-                  onChange={(newValue) => {
-                    values[field.key] = newValue;
-                    autoSaveSettings(field.key, newValue);
-                  }}
-                />
-              {/each}
-            </div>
-          </div>
-        {/if}
-      </div>
+        </div>
+      {/if}
+    </div>
   </AppScrollArea>
 </div>
