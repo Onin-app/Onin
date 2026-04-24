@@ -11,6 +11,7 @@
     Keyboard,
     PlugsConnected,
     Sparkle,
+    PuzzlePiece,
   } from "phosphor-svelte";
 
   import GeneralSettings from "$lib/components/settings/GeneralSettings.svelte";
@@ -18,6 +19,7 @@
   import CommandSettings from "$lib/components/settings/CommandSettings.svelte";
   import ShortcutSettings from "$lib/components/settings/ShortcutSettings.svelte";
   import AISettings from "$lib/components/settings/AISettings.svelte";
+  import ExtensionSettings from "$lib/components/settings/ExtensionSettings.svelte";
   import { escapeHandler } from "$lib/stores/escapeHandler";
 
   interface SettingItem {
@@ -28,7 +30,8 @@
       | typeof FileCommandSettings
       | typeof CommandSettings
       | typeof ShortcutSettings
-      | typeof AISettings;
+      | typeof AISettings
+      | typeof ExtensionSettings;
     icon: any;
   }
 
@@ -50,6 +53,12 @@
       id: "commands",
       component: CommandSettings,
       icon: TerminalWindow,
+    },
+    {
+      name: "扩展",
+      id: "extensions",
+      component: ExtensionSettings,
+      icon: PuzzlePiece,
     },
     {
       name: "全局快捷键",

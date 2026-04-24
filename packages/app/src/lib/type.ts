@@ -103,4 +103,5 @@ export interface AppConfig {
   sort_mode: SortMode;
   enable_usage_tracking: boolean;
   marketplace_api_url?: string;
+  disabled_extension_ids?: string[];
 }

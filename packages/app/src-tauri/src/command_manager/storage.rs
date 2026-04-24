@@ -22,7 +22,7 @@ pub fn get_commands_file_path(app: &AppHandle) -> PathBuf {
 /// 生成并保存所有命令
 pub async fn generate_and_save_commands(app: &AppHandle) -> Vec<Command> {
     let mut initial_commands = generators::get_initial_system_commands();
-    let extension_commands = generators::get_initial_extension_commands();
+    let extension_commands = generators::get_initial_extension_commands(app);
     initial_commands.extend(extension_commands);
     let app_commands = generators::get_initial_app_commands().await;
     initial_commands.extend(app_commands);
@@ -122,7 +122,7 @@ async fn merge_commands(app: &AppHandle, saved_commands: Vec<Command>) -> Vec<Co
     }
 
     // 合并 Extension 命令 (类似系统命令)
-    let current_extension_commands = generators::get_initial_extension_commands();
+    let current_extension_commands = generators::get_initial_extension_commands(app);
     let current_extension_map: HashMap<_, _> = current_extension_commands
         .into_iter()
         .map(|c| (c.name.clone(), c))

@@ -42,6 +42,10 @@ pub struct AppConfig {
     /// 插件市场 API 地址（可选）
     #[serde(default = "default_marketplace_api_url")]
     pub marketplace_api_url: Option<String>,
+
+    /// 已禁用的内置扩展 ID
+    #[serde(default)]
+    pub disabled_extension_ids: Vec<String>,
 }
 
 fn default_auto_paste_time_limit() -> u64 {
@@ -68,6 +72,7 @@ impl Default for AppConfig {
             sort_mode: SortMode::default(),
             enable_usage_tracking: default_enable_usage_tracking(),
             marketplace_api_url: default_marketplace_api_url(),
+            disabled_extension_ids: Vec::new(),
         }
     }
 }
@@ -109,6 +114,18 @@ pub fn save_config(app: &AppHandle, config: &AppConfig) -> Result<(), String> {
         .map_err(|e| format!("Failed to write config file: {}", e))?;
 
     Ok(())
+}
+
+pub fn is_extension_enabled(app: &AppHandle, extension_id: &str) -> bool {
+    let config_state = app.state::<AppConfigState>();
+    let Ok(config) = config_state.0.lock() else {
+        return true;
+    };
+
+    !config
+        .disabled_extension_ids
+        .iter()
+        .any(|id| id == extension_id)
 }
 
 #[tauri::command]

@@ -46,6 +46,26 @@ pub struct ExtensionCommand {
     pub matches: Option<&'static [StaticCommandMatch]>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtensionCommandInfo {
+    pub code: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub icon: String,
+    pub keywords: Vec<String>,
+    pub has_matches: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtensionInfo {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub icon: String,
+    pub enabled: bool,
+    pub commands: Vec<ExtensionCommandInfo>,
+}
+
 /// 编译时静态的匹配规则
 ///
 /// 与 `CommandMatch`（shared_types.rs）语义一致，但使用 `&'static str`

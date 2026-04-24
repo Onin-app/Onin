@@ -27,6 +27,7 @@
   let sortMode = $state<SortMode>("smart");
   let enableUsageTracking = $state<boolean>(true);
   let marketplaceApiUrl = $state<string>("");
+  let disabledExtensionIds = $state<string[]>([]);
 
   const sortModeOptions: {
     value: SortMode;
@@ -85,6 +86,7 @@
           sort_mode: sortMode,
           enable_usage_tracking: enableUsageTracking,
           marketplace_api_url: marketplaceApiUrl || undefined,
+          disabled_extension_ids: disabledExtensionIds,
         },
       });
       toast.success("配置已保存");
@@ -140,6 +142,7 @@
       sortMode = config.sort_mode;
       enableUsageTracking = config.enable_usage_tracking;
       marketplaceApiUrl = config.marketplace_api_url || "";
+      disabledExtensionIds = config.disabled_extension_ids || [];
     } catch (e) {
       console.error("Failed to get app config:", e);
       toast.error("加载应用配置失败，请重启应用");
