@@ -18,6 +18,7 @@
     LinkSimple,
     Link,
     Clipboard,
+    File,
   } from "phosphor-svelte";
 
   interface PhosphorIconProps {
@@ -49,6 +50,7 @@
     link: Link,
     linkSimple: LinkSimple,
     clipboard: Clipboard,
+    file: File,
   };
 
   const IconComponent = $derived(iconMap[icon] || Power);

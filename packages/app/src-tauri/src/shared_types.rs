@@ -6,6 +6,7 @@ pub enum ItemSource {
     Custom,      // User-defined items (files, folders, URLs, etc.)
     Command,     // System commands
     FileCommand, // User-defined file commands
+    FileSearch,  // Indexed local file search results
     Plugin,      // Plugins
     Extension,   // Internal extensions (emoji, calculator, etc.)
 }

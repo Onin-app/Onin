@@ -44,6 +44,12 @@ pub fn on_app_setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     // Initialize Web Extension
     crate::extensions::web::init(app.handle());
 
+    // Initialize File Search Extension
+    crate::extensions::filesearch::init(app.handle());
+
+    // Initialize file search index in the background after startup.
+    crate::file_search::init(app.handle().clone());
+
     // 5. 初始化调度器状态
     init_scheduler_state(app);
 

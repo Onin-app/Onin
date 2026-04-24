@@ -11,6 +11,7 @@ mod commands;
 mod extension;
 mod extensions;
 mod file_command_manager;
+mod file_search;
 mod focus_manager;
 pub mod icon_utils;
 mod installed_apps;

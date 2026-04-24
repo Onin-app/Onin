@@ -4,6 +4,7 @@ export type Source =
   | "Custom"
   | "Command"
   | "FileCommand"
+  | "FileSearch"
   | "Plugin"
   | "Extension";
 export type IconType = "Base64" | "Iconfont" | "Url";

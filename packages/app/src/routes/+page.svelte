@@ -91,10 +91,6 @@
       result.push(extensionPreviewItem);
     }
 
-    if (matchedCommands.length === 0) {
-      return [...result, ...appListManager.state.appList];
-    }
-
     // 展示层不再做去重或语义过滤，是否显示由各命令自身的匹配规则决定
     return [...result, ...appListManager.state.appList, ...matchedCommands];
   });
@@ -247,6 +243,16 @@
       const extensionInfo = parseExtensionAction(app.action);
       if (extensionInfo) {
         const { extensionId, commandCode } = extensionInfo;
+        if (extensionId === "file_search") {
+          inputValue = "";
+          clipboard.clearAttachments();
+          extensionPreviewItem = null;
+          extensionManager.clearPreview();
+          matchedCommands = [];
+          appListManager.resetToOriginList();
+          goto("/extensions/filesearch");
+          return;
+        }
         // Emoji Extension 特殊处理：导航到独立页面
         if (extensionId === "emoji") {
           inputValue = "";

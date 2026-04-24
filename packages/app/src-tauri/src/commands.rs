@@ -4,7 +4,7 @@
 //! 使 `lib.rs` 更加简洁，同时方便统一管理和查找命令。
 
 use crate::{
-    app_config, command_manager, extension, file_command_manager, plugin, plugin_api,
+    app_config, command_manager, extension, file_command_manager, file_search, plugin, plugin_api,
     shortcut_manager, system_commands, tray_manager, unified_launch_manager, usage_tracker,
     window_manager,
 };
@@ -36,6 +36,10 @@ pub fn get_invoke_handler(
         file_command_manager::get_file_commands,
         file_command_manager::add_file_commands,
         file_command_manager::remove_file_command,
+        // File search
+        file_search::get_file_search_status,
+        file_search::search_indexed_files,
+        file_search::open_indexed_file,
         // System commands
         system_commands::execute_command,
         system_commands::get_basic_commands,
