@@ -105,4 +105,7 @@ export interface AppConfig {
   enable_usage_tracking: boolean;
   marketplace_api_url?: string;
   disabled_extension_ids?: string[];
+  file_search_roots?: string[];
+  file_search_excluded_paths?: string[];
+  file_search_include_hidden?: boolean;
 }

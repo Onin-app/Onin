@@ -19,6 +19,10 @@
     Link,
     Clipboard,
     File,
+    FolderPlus,
+    Trash,
+    Prohibit,
+    CaretDown,
   } from "phosphor-svelte";
 
   interface PhosphorIconProps {
@@ -37,6 +41,8 @@
     lock: Lock,
     logout: SignOut,
     folder: Folder,
+    folderPlus: FolderPlus,
+    "folder-plus": FolderPlus,
     cube: Cube,
     package: Cube,
     calculator: Calculator,
@@ -51,6 +57,10 @@
     linkSimple: LinkSimple,
     clipboard: Clipboard,
     file: File,
+    trash: Trash,
+    prohibit: Prohibit,
+    caretDown: CaretDown,
+    "caret-down": CaretDown,
   };
 
   const IconComponent = $derived(iconMap[icon] || Power);

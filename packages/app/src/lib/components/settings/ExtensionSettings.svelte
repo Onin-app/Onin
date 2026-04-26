@@ -4,6 +4,7 @@
   import { Switch } from "bits-ui";
   import { toast } from "svelte-sonner";
   import AppScrollArea from "$lib/components/AppScrollArea.svelte";
+  import FileSearchSettings from "$lib/components/settings/FileSearchSettings.svelte";
   import PhosphorIcon from "$lib/components/PhosphorIcon.svelte";
 
   interface ExtensionCommandInfo {
@@ -169,6 +170,25 @@
                 {/each}
               </div>
             </div>
+
+            {#if extension.id === "file_search"}
+              <details
+                class="group mt-4 border-t border-neutral-100 pt-3 dark:border-neutral-800"
+              >
+                <summary
+                  class="flex cursor-pointer list-none items-center justify-between text-xs font-medium text-neutral-500 transition-colors hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
+                >
+                  <span>设置</span>
+                  <PhosphorIcon
+                    icon="caretDown"
+                    class="h-4 w-4 transition-transform group-open:rotate-180"
+                  />
+                </summary>
+                <div class="pt-1">
+                  <FileSearchSettings />
+                </div>
+              </details>
+            {/if}
           </article>
         {/each}
       </section>

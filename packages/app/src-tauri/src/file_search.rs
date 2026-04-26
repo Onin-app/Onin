@@ -1,6 +1,6 @@
 use std::{
     collections::HashSet,
-    env, fs,
+    fs,
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -16,6 +16,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Manager};
 use walkdir::{DirEntry, WalkDir};
 
+use crate::app_config::AppConfigState;
 use crate::shared_types::{CommandKeyword, IconType, ItemSource, ItemType, LaunchableItem};
 
 const INDEX_WRITE_BATCH_SIZE: usize = 2_000;
@@ -34,10 +35,18 @@ struct IndexedFile {
     is_dir: bool,
 }
 
+#[derive(Clone, Debug)]
+struct FileSearchOptions {
+    roots: Vec<PathBuf>,
+    excluded_paths: Vec<PathBuf>,
+    include_hidden: bool,
+}
+
 #[derive(Default)]
 pub struct FileSearchState {
     is_indexing: AtomicBool,
     indexed_count: AtomicUsize,
+    watcher_generation: AtomicUsize,
 }
 
 #[derive(Serialize)]
@@ -47,96 +56,127 @@ pub struct FileSearchStatus {
 }
 
 pub fn init(app: AppHandle) {
+    start_indexing(app, false, Duration::from_secs(3));
+}
+
+fn start_indexing(app: AppHandle, reset_index: bool, delay: Duration) {
     thread::spawn(move || {
-        thread::sleep(Duration::from_secs(3));
+        if !delay.is_zero() {
+            thread::sleep(delay);
+        }
 
         let state = app.state::<FileSearchState>();
         if state.is_indexing.swap(true, Ordering::Relaxed) {
             return;
         }
 
-        let root = match default_search_root() {
-            Some(root) => root,
-            None => {
-                state.is_indexing.store(false, Ordering::Relaxed);
-                return;
-            }
-        };
-        let root_string = root.to_string_lossy().to_string();
+        let options = file_search_options(&app);
+        let generation = state.watcher_generation.fetch_add(1, Ordering::Relaxed) + 1;
 
-        let existing_index_count = match count_index_db(&app, &root_string) {
-            Ok(count) => {
-                state.indexed_count.store(count, Ordering::Relaxed);
-                count
-            }
-            Err(error) => {
-                eprintln!("[file_search] Failed to count SQLite index: {}", error);
-                0
-            }
-        };
+        if options.roots.is_empty() {
+            state.indexed_count.store(0, Ordering::Relaxed);
+            state.is_indexing.store(false, Ordering::Relaxed);
+            return;
+        }
+        state.indexed_count.store(0, Ordering::Relaxed);
 
-        let scan_id = new_scan_id();
         let mut db_connection = match open_index_db(&app) {
-            Ok(connection) => Some(connection),
+            Ok(connection) => {
+                if reset_index {
+                    if let Err(error) = clear_index_db(&connection) {
+                        eprintln!("[file_search] Failed to clear SQLite index: {}", error);
+                    }
+                }
+                Some(connection)
+            }
             Err(error) => {
                 eprintln!("[file_search] Failed to open SQLite index: {}", error);
                 None
             }
         };
-        let mut batch = Vec::with_capacity(INDEX_WRITE_BATCH_SIZE);
+
+        let scan_id = new_scan_id();
         let mut scanned_count = 0usize;
 
-        let walker = WalkDir::new(root)
-            .follow_links(false)
-            .into_iter()
-            .filter_entry(|entry| !should_skip_entry(entry));
-
-        for entry in walker.filter_map(Result::ok) {
-            if let Some(file) = indexed_file_from_entry(&entry) {
-                batch.push(file);
-                scanned_count += 1;
-                if existing_index_count == 0 {
-                    state.indexed_count.store(scanned_count, Ordering::Relaxed);
+        for root in &options.roots {
+            let root_string = root.to_string_lossy().to_string();
+            let existing_index_count = match count_index_db(&app, &root_string) {
+                Ok(count) => count,
+                Err(error) => {
+                    eprintln!("[file_search] Failed to count SQLite index: {}", error);
+                    0
                 }
+            };
 
-                if batch.len() >= INDEX_WRITE_BATCH_SIZE {
-                    if let Some(connection) = db_connection.as_mut() {
-                        if let Err(error) =
-                            save_index_batch(connection, &root_string, &scan_id, &batch)
-                        {
-                            eprintln!("[file_search] Failed to persist SQLite batch: {}", error);
-                            db_connection = None;
-                        }
+            if existing_index_count > 0 && !reset_index {
+                state
+                    .indexed_count
+                    .fetch_add(existing_index_count, Ordering::Relaxed);
+            }
+
+            let mut batch = Vec::with_capacity(INDEX_WRITE_BATCH_SIZE);
+            let mut root_scanned_count = 0usize;
+
+            let walker = WalkDir::new(root)
+                .follow_links(false)
+                .into_iter()
+                .filter_entry(|entry| !should_skip_entry(entry, &options));
+
+            for entry in walker.filter_map(Result::ok) {
+                if let Some(file) = indexed_file_from_entry(&entry) {
+                    batch.push(file);
+                    scanned_count += 1;
+                    root_scanned_count += 1;
+                    if existing_index_count == 0 || reset_index {
+                        state.indexed_count.store(scanned_count, Ordering::Relaxed);
                     }
-                    batch.clear();
-                }
 
-                if scanned_count % 1_000 == 0 {
-                    thread::sleep(Duration::from_millis(5));
+                    if batch.len() >= INDEX_WRITE_BATCH_SIZE {
+                        if let Some(connection) = db_connection.as_mut() {
+                            if let Err(error) =
+                                save_index_batch(connection, &root_string, &scan_id, &batch)
+                            {
+                                eprintln!(
+                                    "[file_search] Failed to persist SQLite batch: {}",
+                                    error
+                                );
+                                db_connection = None;
+                            }
+                        }
+                        batch.clear();
+                    }
+
+                    if root_scanned_count % 1_000 == 0 {
+                        thread::sleep(Duration::from_millis(5));
+                    }
                 }
             }
-        }
 
-        if let Some(connection) = db_connection.as_mut() {
-            if !batch.is_empty() {
-                if let Err(error) = save_index_batch(connection, &root_string, &scan_id, &batch) {
+            if let Some(connection) = db_connection.as_mut() {
+                if !batch.is_empty() {
+                    if let Err(error) = save_index_batch(connection, &root_string, &scan_id, &batch)
+                    {
+                        eprintln!(
+                            "[file_search] Failed to persist final SQLite batch: {}",
+                            error
+                        );
+                        db_connection = None;
+                    }
+                }
+            }
+
+            if let Some(connection) = db_connection.as_mut() {
+                if let Err(error) = finalize_index_scan(connection, &root_string, &scan_id) {
                     eprintln!(
-                        "[file_search] Failed to persist final SQLite batch: {}",
+                        "[file_search] Failed to finalize SQLite index scan: {}",
                         error
                     );
-                    db_connection = None;
                 }
             }
         }
 
         if let Some(connection) = db_connection.as_mut() {
-            if let Err(error) = finalize_index_scan(connection, &root_string, &scan_id) {
-                eprintln!(
-                    "[file_search] Failed to finalize SQLite index scan: {}",
-                    error
-                );
-            }
-            match count_index_db_with_connection(connection, &root_string) {
+            match count_index_db_for_roots(connection, &options.roots) {
                 Ok(count) => state.indexed_count.store(count, Ordering::Relaxed),
                 Err(error) => {
                     eprintln!("[file_search] Failed to recount SQLite index: {}", error);
@@ -149,7 +189,7 @@ pub fn init(app: AppHandle) {
 
         state.is_indexing.store(false, Ordering::Relaxed);
 
-        start_file_watcher(app, root_string);
+        start_file_watcher(app, options, generation);
     });
 }
 
@@ -159,6 +199,18 @@ pub fn get_file_search_status(state: tauri::State<FileSearchState>) -> FileSearc
         is_indexing: state.is_indexing.load(Ordering::Relaxed),
         indexed_count: state.indexed_count.load(Ordering::Relaxed),
     }
+}
+
+#[tauri::command]
+pub fn rebuild_file_search_index(app: AppHandle) -> Result<(), String> {
+    let state = app.state::<FileSearchState>();
+    if state.is_indexing.load(Ordering::Relaxed) {
+        return Err("文件搜索正在建立索引".to_string());
+    }
+
+    state.indexed_count.store(0, Ordering::Relaxed);
+    start_indexing(app, true, Duration::ZERO);
+    Ok(())
 }
 
 #[tauri::command]
@@ -178,17 +230,17 @@ pub fn search_indexed_files(
     }
 
     let limit = limit.unwrap_or(DEFAULT_RESULT_LIMIT).clamp(1, 100);
-    let root = match default_search_root() {
-        Some(root) => root.to_string_lossy().to_string(),
-        None => return Vec::new(),
-    };
-    let candidates = match search_index_db(&app, &root, &terms) {
-        Ok(candidates) => candidates,
-        Err(error) => {
-            eprintln!("[file_search] Failed to search SQLite index: {}", error);
-            return Vec::new();
+    let options = file_search_options(&app);
+    let mut candidates = Vec::new();
+    for root in &options.roots {
+        let root = root.to_string_lossy().to_string();
+        match search_index_db(&app, &root, &terms) {
+            Ok(root_candidates) => candidates.extend(root_candidates),
+            Err(error) => {
+                eprintln!("[file_search] Failed to search SQLite index: {}", error);
+            }
         }
-    };
+    }
 
     let mut top_results: Vec<(i32, IndexedFile)> = Vec::with_capacity(limit);
 
@@ -224,18 +276,6 @@ pub fn search_indexed_files(
 #[tauri::command]
 pub fn open_indexed_file(path: String) -> Result<(), String> {
     opener::open(&path).map_err(|e| format!("Failed to open file {}: {}", path, e))
-}
-
-fn default_search_root() -> Option<PathBuf> {
-    #[cfg(target_os = "windows")]
-    {
-        env::var_os("USERPROFILE").map(PathBuf::from)
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        env::var_os("HOME").map(PathBuf::from)
-    }
 }
 
 fn index_db_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -305,6 +345,45 @@ fn initialize_index_db(connection: &Connection) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+fn file_search_options(app: &AppHandle) -> FileSearchOptions {
+    let config_state = app.state::<AppConfigState>();
+    let Ok(config) = config_state.0.lock() else {
+        return FileSearchOptions {
+            roots: Vec::new(),
+            excluded_paths: Vec::new(),
+            include_hidden: false,
+        };
+    };
+
+    let roots = normalize_config_paths(&config.file_search_roots);
+    let excluded_paths = normalize_config_paths(&config.file_search_excluded_paths);
+
+    FileSearchOptions {
+        roots,
+        excluded_paths,
+        include_hidden: config.file_search_include_hidden,
+    }
+}
+
+fn normalize_config_paths(paths: &[String]) -> Vec<PathBuf> {
+    let mut normalized = paths
+        .iter()
+        .map(|path| path.trim())
+        .filter(|path| !path.is_empty())
+        .map(PathBuf::from)
+        .collect::<Vec<_>>();
+    normalized.sort();
+    normalized.dedup();
+    normalized
+}
+
+fn clear_index_db(connection: &Connection) -> Result<(), String> {
+    connection
+        .execute("DELETE FROM file_search_entries", [])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 fn count_index_db(app: &AppHandle, root: &str) -> Result<usize, String> {
     let db_path = index_db_path(app)?;
     if !db_path.exists() {
@@ -313,6 +392,13 @@ fn count_index_db(app: &AppHandle, root: &str) -> Result<usize, String> {
 
     let connection = open_index_db(app)?;
     count_index_db_with_connection(&connection, root)
+}
+
+fn count_index_db_for_roots(connection: &Connection, roots: &[PathBuf]) -> Result<usize, String> {
+    roots.iter().try_fold(0usize, |total, root| {
+        let root = root.to_string_lossy().to_string();
+        count_index_db_with_connection(connection, &root).map(|count| total + count)
+    })
 }
 
 fn count_index_db_with_connection(connection: &Connection, root: &str) -> Result<usize, String> {
@@ -443,8 +529,7 @@ fn finalize_index_scan(connection: &Connection, root: &str, scan_id: &str) -> Re
     Ok(())
 }
 
-fn start_file_watcher(app: AppHandle, root: String) {
-    let root_path = PathBuf::from(&root);
+fn start_file_watcher(app: AppHandle, options: FileSearchOptions, generation: usize) {
     let (event_tx, event_rx) = mpsc::channel::<notify::Result<Event>>();
 
     let mut watcher = match RecommendedWatcher::new(
@@ -460,18 +545,24 @@ fn start_file_watcher(app: AppHandle, root: String) {
         }
     };
 
-    if let Err(error) = watcher.watch(&root_path, RecursiveMode::Recursive) {
-        eprintln!(
-            "[file_search] Failed to watch file search root {:?}: {}",
-            root_path, error
-        );
-        return;
+    for root in &options.roots {
+        if let Err(error) = watcher.watch(root, RecursiveMode::Recursive) {
+            eprintln!(
+                "[file_search] Failed to watch file search root {:?}: {}",
+                root, error
+            );
+        }
     }
 
     let mut pending_paths: HashSet<PathBuf> = HashSet::new();
     let mut last_event_at: Option<Instant> = None;
 
     loop {
+        let state = app.state::<FileSearchState>();
+        if state.watcher_generation.load(Ordering::Relaxed) != generation {
+            break;
+        }
+
         match event_rx.recv_timeout(FILE_WATCH_DEBOUNCE) {
             Ok(Ok(event)) => {
                 for path in event.paths {
@@ -494,7 +585,7 @@ fn start_file_watcher(app: AppHandle, root: String) {
                 let paths = pending_paths.drain().collect::<Vec<_>>();
                 last_event_at = None;
 
-                if let Err(error) = apply_file_watch_changes(&app, &root, paths) {
+                if let Err(error) = apply_file_watch_changes(&app, &options, paths) {
                     eprintln!(
                         "[file_search] Failed to apply file watch changes: {}",
                         error
@@ -511,34 +602,41 @@ fn start_file_watcher(app: AppHandle, root: String) {
 
 fn apply_file_watch_changes(
     app: &AppHandle,
-    root: &str,
+    options: &FileSearchOptions,
     paths: Vec<PathBuf>,
 ) -> Result<(), String> {
     let mut connection = open_index_db(app)?;
-    let root_path = Path::new(root);
 
     for path in sorted_changed_paths(paths) {
-        if path == root_path {
+        let Some(root) = root_for_path(&path, &options.roots) else {
             continue;
-        }
+        };
+        let root_string = root.to_string_lossy().to_string();
 
-        if should_ignore_path(&path) {
+        if &path == root || should_ignore_path(&path, options) {
             continue;
         }
 
         if path.exists() {
-            index_changed_path(&mut connection, root, &path)?;
+            index_changed_path(&mut connection, &root_string, &path, options)?;
         } else {
-            delete_index_path(&connection, root, &path)?;
+            delete_index_path(&connection, &root_string, &path)?;
         }
     }
 
-    if let Ok(count) = count_index_db_with_connection(&connection, root) {
+    if let Ok(count) = count_index_db_for_roots(&connection, &options.roots) {
         let state = app.state::<FileSearchState>();
         state.indexed_count.store(count, Ordering::Relaxed);
     }
 
     Ok(())
+}
+
+fn root_for_path<'a>(path: &Path, roots: &'a [PathBuf]) -> Option<&'a PathBuf> {
+    roots
+        .iter()
+        .filter(|root| path.starts_with(root))
+        .max_by_key(|root| root.components().count())
 }
 
 fn sorted_changed_paths(paths: Vec<PathBuf>) -> Vec<PathBuf> {
@@ -550,7 +648,12 @@ fn sorted_changed_paths(paths: Vec<PathBuf>) -> Vec<PathBuf> {
     normalized
 }
 
-fn index_changed_path(connection: &mut Connection, root: &str, path: &Path) -> Result<(), String> {
+fn index_changed_path(
+    connection: &mut Connection,
+    root: &str,
+    path: &Path,
+    options: &FileSearchOptions,
+) -> Result<(), String> {
     let metadata = match fs::metadata(path) {
         Ok(metadata) => metadata,
         Err(_) => {
@@ -564,7 +667,7 @@ fn index_changed_path(connection: &mut Connection, root: &str, path: &Path) -> R
         for entry in WalkDir::new(path)
             .follow_links(false)
             .into_iter()
-            .filter_entry(|entry| !should_skip_entry(entry))
+            .filter_entry(|entry| !should_skip_entry(entry, options))
             .filter_map(Result::ok)
         {
             if let Some(file) = indexed_file_from_entry(&entry) {
@@ -656,7 +759,7 @@ fn indexed_file_from_path(path: &Path, is_dir: bool) -> Option<IndexedFile> {
     })
 }
 
-fn should_skip_entry(entry: &DirEntry) -> bool {
+fn should_skip_entry(entry: &DirEntry, options: &FileSearchOptions) -> bool {
     let path = entry.path();
     let name = path
         .file_name()
@@ -665,6 +768,10 @@ fn should_skip_entry(entry: &DirEntry) -> bool {
 
     if entry.depth() == 0 {
         return false;
+    }
+
+    if should_ignore_path(path, options) {
+        return true;
     }
 
     if entry.file_type().is_dir() {
@@ -686,13 +793,25 @@ fn should_skip_entry(entry: &DirEntry) -> bool {
     false
 }
 
-fn should_ignore_path(path: &Path) -> bool {
+fn should_ignore_path(path: &Path, options: &FileSearchOptions) -> bool {
     if is_platform_cache_dir(path) {
+        return true;
+    }
+
+    if options
+        .excluded_paths
+        .iter()
+        .any(|excluded_path| path.starts_with(excluded_path))
+    {
         return true;
     }
 
     path.components().any(|component| {
         let name = component.as_os_str().to_string_lossy().to_lowercase();
+        if !options.include_hidden && name.starts_with('.') {
+            return true;
+        }
+
         matches!(
             name.as_str(),
             ".git"

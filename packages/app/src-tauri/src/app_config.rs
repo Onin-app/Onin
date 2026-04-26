@@ -46,6 +46,18 @@ pub struct AppConfig {
     /// 已禁用的内置扩展 ID
     #[serde(default)]
     pub disabled_extension_ids: Vec<String>,
+
+    /// 文件搜索索引根目录
+    #[serde(default = "default_file_search_roots")]
+    pub file_search_roots: Vec<String>,
+
+    /// 文件搜索排除路径
+    #[serde(default)]
+    pub file_search_excluded_paths: Vec<String>,
+
+    /// 文件搜索是否包含隐藏文件
+    #[serde(default)]
+    pub file_search_include_hidden: bool,
 }
 
 fn default_auto_paste_time_limit() -> u64 {
@@ -64,6 +76,18 @@ fn default_marketplace_api_url() -> Option<String> {
     Some("https://onin.baiyapeng.cc".to_string())
 }
 
+pub fn default_file_search_roots() -> Vec<String> {
+    #[cfg(target_os = "windows")]
+    let home = std::env::var_os("USERPROFILE");
+
+    #[cfg(not(target_os = "windows"))]
+    let home = std::env::var_os("HOME");
+
+    home.map(PathBuf::from)
+        .map(|path| vec![path.to_string_lossy().to_string()])
+        .unwrap_or_default()
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
@@ -73,6 +97,9 @@ impl Default for AppConfig {
             enable_usage_tracking: default_enable_usage_tracking(),
             marketplace_api_url: default_marketplace_api_url(),
             disabled_extension_ids: Vec::new(),
+            file_search_roots: default_file_search_roots(),
+            file_search_excluded_paths: Vec::new(),
+            file_search_include_hidden: false,
         }
     }
 }
