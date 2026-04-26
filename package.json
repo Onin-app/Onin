@@ -6,7 +6,7 @@
   "license": "GPL-3.0",
   "type": "module",
   "scripts": {
-    "dev": "pnpm --filter onin-inject build && pnpm --filter app tauri:dev",
+    "dev": "pnpm --filter app tauri:dev",
     "dev:demo": "pnpm --filter plugin-demo dev",
     "build": "pnpm -r build",
     "build:inject": "pnpm --filter onin-inject build",

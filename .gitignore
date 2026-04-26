@@ -17,6 +17,9 @@ packages/*/dist
 packages/*/build
 packages/*/.svelte-kit
 
+# Generated inject bundle embedded by the Tauri app.
+packages/app/src-tauri/templates/onin-inject.js
+
 # VitePress
 packages/docs/.vitepress/cache
 packages/docs/.vitepress/dist
