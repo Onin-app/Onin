@@ -1,11 +1,16 @@
 use std::{
+    collections::HashSet,
     env, fs,
     path::{Path, PathBuf},
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+    sync::{
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+        mpsc,
+    },
     thread,
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
+use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use rusqlite::{params, params_from_iter, types::Value, Connection};
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
@@ -17,6 +22,8 @@ const INDEX_WRITE_BATCH_SIZE: usize = 2_000;
 const DEFAULT_RESULT_LIMIT: usize = 30;
 const INDEX_DB_FILE_NAME: &str = "file_search.sqlite";
 const SQLITE_BUSY_TIMEOUT: Duration = Duration::from_secs(2);
+const FILE_WATCH_DEBOUNCE: Duration = Duration::from_millis(800);
+const LIVE_SCAN_ID: &str = "live";
 
 #[derive(Clone, Debug)]
 struct IndexedFile {
@@ -141,6 +148,8 @@ pub fn init(app: AppHandle) {
         }
 
         state.is_indexing.store(false, Ordering::Relaxed);
+
+        start_file_watcher(app, root_string);
     });
 }
 
@@ -434,6 +443,164 @@ fn finalize_index_scan(connection: &Connection, root: &str, scan_id: &str) -> Re
     Ok(())
 }
 
+fn start_file_watcher(app: AppHandle, root: String) {
+    let root_path = PathBuf::from(&root);
+    let (event_tx, event_rx) = mpsc::channel::<notify::Result<Event>>();
+
+    let mut watcher = match RecommendedWatcher::new(
+        move |event| {
+            let _ = event_tx.send(event);
+        },
+        Config::default(),
+    ) {
+        Ok(watcher) => watcher,
+        Err(error) => {
+            eprintln!("[file_search] Failed to create file watcher: {}", error);
+            return;
+        }
+    };
+
+    if let Err(error) = watcher.watch(&root_path, RecursiveMode::Recursive) {
+        eprintln!(
+            "[file_search] Failed to watch file search root {:?}: {}",
+            root_path, error
+        );
+        return;
+    }
+
+    let mut pending_paths: HashSet<PathBuf> = HashSet::new();
+    let mut last_event_at: Option<Instant> = None;
+
+    loop {
+        match event_rx.recv_timeout(FILE_WATCH_DEBOUNCE) {
+            Ok(Ok(event)) => {
+                for path in event.paths {
+                    pending_paths.insert(path);
+                }
+                last_event_at = Some(Instant::now());
+            }
+            Ok(Err(error)) => {
+                eprintln!("[file_search] File watcher error: {}", error);
+            }
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                let Some(last_event) = last_event_at else {
+                    continue;
+                };
+
+                if last_event.elapsed() < FILE_WATCH_DEBOUNCE || pending_paths.is_empty() {
+                    continue;
+                }
+
+                let paths = pending_paths.drain().collect::<Vec<_>>();
+                last_event_at = None;
+
+                if let Err(error) = apply_file_watch_changes(&app, &root, paths) {
+                    eprintln!(
+                        "[file_search] Failed to apply file watch changes: {}",
+                        error
+                    );
+                }
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                eprintln!("[file_search] File watcher channel disconnected");
+                break;
+            }
+        }
+    }
+}
+
+fn apply_file_watch_changes(
+    app: &AppHandle,
+    root: &str,
+    paths: Vec<PathBuf>,
+) -> Result<(), String> {
+    let mut connection = open_index_db(app)?;
+    let root_path = Path::new(root);
+
+    for path in sorted_changed_paths(paths) {
+        if path == root_path {
+            continue;
+        }
+
+        if should_ignore_path(&path) {
+            continue;
+        }
+
+        if path.exists() {
+            index_changed_path(&mut connection, root, &path)?;
+        } else {
+            delete_index_path(&connection, root, &path)?;
+        }
+    }
+
+    if let Ok(count) = count_index_db_with_connection(&connection, root) {
+        let state = app.state::<FileSearchState>();
+        state.indexed_count.store(count, Ordering::Relaxed);
+    }
+
+    Ok(())
+}
+
+fn sorted_changed_paths(paths: Vec<PathBuf>) -> Vec<PathBuf> {
+    let mut normalized = paths
+        .into_iter()
+        .filter(|path| !path.as_os_str().is_empty())
+        .collect::<Vec<_>>();
+    normalized.sort_by_key(|path| path.components().count());
+    normalized
+}
+
+fn index_changed_path(connection: &mut Connection, root: &str, path: &Path) -> Result<(), String> {
+    let metadata = match fs::metadata(path) {
+        Ok(metadata) => metadata,
+        Err(_) => {
+            delete_index_path(connection, root, path)?;
+            return Ok(());
+        }
+    };
+
+    if metadata.is_dir() {
+        let mut batch = Vec::with_capacity(INDEX_WRITE_BATCH_SIZE);
+        for entry in WalkDir::new(path)
+            .follow_links(false)
+            .into_iter()
+            .filter_entry(|entry| !should_skip_entry(entry))
+            .filter_map(Result::ok)
+        {
+            if let Some(file) = indexed_file_from_entry(&entry) {
+                batch.push(file);
+                if batch.len() >= INDEX_WRITE_BATCH_SIZE {
+                    save_index_batch(connection, root, LIVE_SCAN_ID, &batch)?;
+                    batch.clear();
+                }
+            }
+        }
+
+        if !batch.is_empty() {
+            save_index_batch(connection, root, LIVE_SCAN_ID, &batch)?;
+        }
+    } else if let Some(file) = indexed_file_from_path(path, false) {
+        save_index_batch(connection, root, LIVE_SCAN_ID, &[file])?;
+    }
+
+    Ok(())
+}
+
+fn delete_index_path(connection: &Connection, root: &str, path: &Path) -> Result<(), String> {
+    let path = path.to_string_lossy().to_string();
+    let separator = std::path::MAIN_SEPARATOR;
+    let child_prefix = format!("{}{}%", escape_like_term(&path), separator);
+
+    connection
+        .execute(
+            "DELETE FROM file_search_entries WHERE root = ?1 AND (path = ?2 OR path LIKE ?3 ESCAPE '\\')",
+            params![root, path, child_prefix],
+        )
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
 fn has_column(connection: &Connection, table: &str, column: &str) -> Result<bool, String> {
     let mut statement = connection
         .prepare(&format!("PRAGMA table_info({})", table))
@@ -466,7 +633,10 @@ fn escape_like_term(term: &str) -> String {
 }
 
 fn indexed_file_from_entry(entry: &DirEntry) -> Option<IndexedFile> {
-    let path = entry.path();
+    indexed_file_from_path(entry.path(), entry.file_type().is_dir())
+}
+
+fn indexed_file_from_path(path: &Path, is_dir: bool) -> Option<IndexedFile> {
     let name = path.file_name()?.to_string_lossy().to_string();
     let parent = path
         .parent()
@@ -482,7 +652,7 @@ fn indexed_file_from_entry(entry: &DirEntry) -> Option<IndexedFile> {
         path: path.to_string_lossy().to_string(),
         parent,
         extension,
-        is_dir: entry.file_type().is_dir(),
+        is_dir,
     })
 }
 
@@ -514,6 +684,29 @@ fn should_skip_entry(entry: &DirEntry) -> bool {
     }
 
     false
+}
+
+fn should_ignore_path(path: &Path) -> bool {
+    if is_platform_cache_dir(path) {
+        return true;
+    }
+
+    path.components().any(|component| {
+        let name = component.as_os_str().to_string_lossy().to_lowercase();
+        matches!(
+            name.as_str(),
+            ".git"
+                | "node_modules"
+                | "target"
+                | "dist"
+                | "build"
+                | ".cache"
+                | "cache"
+                | "caches"
+                | "temp"
+                | "tmp"
+        )
+    })
 }
 
 fn is_platform_cache_dir(path: &Path) -> bool {
