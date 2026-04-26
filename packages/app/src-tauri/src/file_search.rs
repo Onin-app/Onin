@@ -1,22 +1,22 @@
 use std::{
-    env,
+    env, fs,
     path::{Path, PathBuf},
-    sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
-        RwLock,
-    },
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
     thread,
-    time::Duration,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use rusqlite::{params, params_from_iter, types::Value, Connection};
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
 use walkdir::{DirEntry, WalkDir};
 
 use crate::shared_types::{CommandKeyword, IconType, ItemSource, ItemType, LaunchableItem};
 
-const MAX_INDEXED_ENTRIES: usize = 300_000;
+const INDEX_WRITE_BATCH_SIZE: usize = 2_000;
 const DEFAULT_RESULT_LIMIT: usize = 30;
+const INDEX_DB_FILE_NAME: &str = "file_search.sqlite";
+const SQLITE_BUSY_TIMEOUT: Duration = Duration::from_secs(2);
 
 #[derive(Clone, Debug)]
 struct IndexedFile {
@@ -29,7 +29,6 @@ struct IndexedFile {
 
 #[derive(Default)]
 pub struct FileSearchState {
-    index: RwLock<Vec<IndexedFile>>,
     is_indexing: AtomicBool,
     indexed_count: AtomicUsize,
 }
@@ -56,8 +55,29 @@ pub fn init(app: AppHandle) {
                 return;
             }
         };
+        let root_string = root.to_string_lossy().to_string();
 
-        let mut index = Vec::with_capacity(32_768);
+        let existing_index_count = match count_index_db(&app, &root_string) {
+            Ok(count) => {
+                state.indexed_count.store(count, Ordering::Relaxed);
+                count
+            }
+            Err(error) => {
+                eprintln!("[file_search] Failed to count SQLite index: {}", error);
+                0
+            }
+        };
+
+        let scan_id = new_scan_id();
+        let mut db_connection = match open_index_db(&app) {
+            Ok(connection) => Some(connection),
+            Err(error) => {
+                eprintln!("[file_search] Failed to open SQLite index: {}", error);
+                None
+            }
+        };
+        let mut batch = Vec::with_capacity(INDEX_WRITE_BATCH_SIZE);
+        let mut scanned_count = 0usize;
 
         let walker = WalkDir::new(root)
             .follow_links(false)
@@ -65,23 +85,59 @@ pub fn init(app: AppHandle) {
             .filter_entry(|entry| !should_skip_entry(entry));
 
         for entry in walker.filter_map(Result::ok) {
-            if index.len() >= MAX_INDEXED_ENTRIES {
-                break;
-            }
-
             if let Some(file) = indexed_file_from_entry(&entry) {
-                index.push(file);
-                let count = index.len();
-                state.indexed_count.store(count, Ordering::Relaxed);
+                batch.push(file);
+                scanned_count += 1;
+                if existing_index_count == 0 {
+                    state.indexed_count.store(scanned_count, Ordering::Relaxed);
+                }
 
-                if count % 1_000 == 0 {
+                if batch.len() >= INDEX_WRITE_BATCH_SIZE {
+                    if let Some(connection) = db_connection.as_mut() {
+                        if let Err(error) =
+                            save_index_batch(connection, &root_string, &scan_id, &batch)
+                        {
+                            eprintln!("[file_search] Failed to persist SQLite batch: {}", error);
+                            db_connection = None;
+                        }
+                    }
+                    batch.clear();
+                }
+
+                if scanned_count % 1_000 == 0 {
                     thread::sleep(Duration::from_millis(5));
                 }
             }
         }
 
-        if let Ok(mut current_index) = state.index.write() {
-            *current_index = index;
+        if let Some(connection) = db_connection.as_mut() {
+            if !batch.is_empty() {
+                if let Err(error) = save_index_batch(connection, &root_string, &scan_id, &batch) {
+                    eprintln!(
+                        "[file_search] Failed to persist final SQLite batch: {}",
+                        error
+                    );
+                    db_connection = None;
+                }
+            }
+        }
+
+        if let Some(connection) = db_connection.as_mut() {
+            if let Err(error) = finalize_index_scan(connection, &root_string, &scan_id) {
+                eprintln!(
+                    "[file_search] Failed to finalize SQLite index scan: {}",
+                    error
+                );
+            }
+            match count_index_db_with_connection(connection, &root_string) {
+                Ok(count) => state.indexed_count.store(count, Ordering::Relaxed),
+                Err(error) => {
+                    eprintln!("[file_search] Failed to recount SQLite index: {}", error);
+                    state.indexed_count.store(scanned_count, Ordering::Relaxed);
+                }
+            }
+        } else {
+            state.indexed_count.store(scanned_count, Ordering::Relaxed);
         }
 
         state.is_indexing.store(false, Ordering::Relaxed);
@@ -100,7 +156,7 @@ pub fn get_file_search_status(state: tauri::State<FileSearchState>) -> FileSearc
 pub fn search_indexed_files(
     query: String,
     limit: Option<usize>,
-    state: tauri::State<FileSearchState>,
+    app: AppHandle,
 ) -> Vec<LaunchableItem> {
     let query = query.trim().to_lowercase();
     if query.len() < 2 {
@@ -113,15 +169,22 @@ pub fn search_indexed_files(
     }
 
     let limit = limit.unwrap_or(DEFAULT_RESULT_LIMIT).clamp(1, 100);
-    let index = match state.index.read() {
-        Ok(index) => index,
-        Err(_) => return Vec::new(),
+    let root = match default_search_root() {
+        Some(root) => root.to_string_lossy().to_string(),
+        None => return Vec::new(),
+    };
+    let candidates = match search_index_db(&app, &root, &terms) {
+        Ok(candidates) => candidates,
+        Err(error) => {
+            eprintln!("[file_search] Failed to search SQLite index: {}", error);
+            return Vec::new();
+        }
     };
 
-    let mut top_results: Vec<(i32, &IndexedFile)> = Vec::with_capacity(limit);
+    let mut top_results: Vec<(i32, IndexedFile)> = Vec::with_capacity(limit);
 
-    for file in index.iter() {
-        let Some(score) = score_file(file, &terms) else {
+    for file in candidates {
+        let Some(score) = score_file(&file, &terms) else {
             continue;
         };
 
@@ -135,7 +198,7 @@ pub fn search_indexed_files(
             .enumerate()
             .min_by(|(_, a), (_, b)| compare_scored_files(a, b))
         {
-            if compare_scored_files(&(score, file), &top_results[worst_index]).is_gt() {
+            if compare_scored_files(&(score, file.clone()), &top_results[worst_index]).is_gt() {
                 top_results[worst_index] = (score, file);
             }
         }
@@ -145,7 +208,7 @@ pub fn search_indexed_files(
 
     top_results
         .into_iter()
-        .map(|(_, file)| launchable_item_from_file(file))
+        .map(|(_, file)| launchable_item_from_file(&file))
         .collect()
 }
 
@@ -164,6 +227,242 @@ fn default_search_root() -> Option<PathBuf> {
     {
         env::var_os("HOME").map(PathBuf::from)
     }
+}
+
+fn index_db_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    Ok(app_data_dir
+        .join("extensions")
+        .join("filesearch")
+        .join(INDEX_DB_FILE_NAME))
+}
+
+fn open_index_db(app: &AppHandle) -> Result<Connection, String> {
+    let db_path = index_db_path(app)?;
+    if let Some(parent) = db_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+
+    let connection = Connection::open(db_path).map_err(|e| e.to_string())?;
+    connection
+        .busy_timeout(SQLITE_BUSY_TIMEOUT)
+        .map_err(|e| e.to_string())?;
+    initialize_index_db(&connection)?;
+    Ok(connection)
+}
+
+fn initialize_index_db(connection: &Connection) -> Result<(), String> {
+    connection
+        .execute_batch(
+            r#"
+            PRAGMA journal_mode = WAL;
+            PRAGMA synchronous = NORMAL;
+
+            CREATE TABLE IF NOT EXISTS file_search_entries (
+                path TEXT PRIMARY KEY,
+                root TEXT NOT NULL,
+                name TEXT NOT NULL,
+                parent TEXT NOT NULL,
+                extension TEXT NOT NULL,
+                is_dir INTEGER NOT NULL,
+                scan_id TEXT NOT NULL DEFAULT ''
+            );
+            "#,
+        )
+        .map_err(|e| e.to_string())?;
+
+    if !has_column(connection, "file_search_entries", "scan_id")? {
+        connection
+            .execute(
+                "ALTER TABLE file_search_entries ADD COLUMN scan_id TEXT NOT NULL DEFAULT ''",
+                [],
+            )
+            .map_err(|e| e.to_string())?;
+    }
+
+    connection
+        .execute_batch(
+            r#"
+            CREATE INDEX IF NOT EXISTS idx_file_search_entries_root_scan_id
+                ON file_search_entries(root, scan_id);
+            CREATE INDEX IF NOT EXISTS idx_file_search_entries_root
+                ON file_search_entries(root);
+            CREATE INDEX IF NOT EXISTS idx_file_search_entries_name
+                ON file_search_entries(name);
+            CREATE INDEX IF NOT EXISTS idx_file_search_entries_extension
+                ON file_search_entries(extension);
+            "#,
+        )
+        .map_err(|e| e.to_string())
+}
+
+fn count_index_db(app: &AppHandle, root: &str) -> Result<usize, String> {
+    let db_path = index_db_path(app)?;
+    if !db_path.exists() {
+        return Ok(0);
+    }
+
+    let connection = open_index_db(app)?;
+    count_index_db_with_connection(&connection, root)
+}
+
+fn count_index_db_with_connection(connection: &Connection, root: &str) -> Result<usize, String> {
+    let count = connection
+        .query_row(
+            "SELECT COUNT(*) FROM file_search_entries WHERE root = ?1",
+            params![root],
+            |row| row.get::<_, i64>(0),
+        )
+        .map_err(|e| e.to_string())?;
+
+    Ok(count.max(0) as usize)
+}
+
+fn search_index_db(
+    app: &AppHandle,
+    root: &str,
+    terms: &[String],
+) -> Result<Vec<IndexedFile>, String> {
+    let db_path = index_db_path(app)?;
+    if !db_path.exists() {
+        return Ok(Vec::new());
+    }
+
+    let connection = open_index_db(app)?;
+    let mut clauses = vec!["root = ?".to_string()];
+    let mut values = vec![Value::Text(root.to_string())];
+
+    for term in terms {
+        if term.starts_with('.') {
+            clauses.push("extension = ?".to_string());
+            values.push(Value::Text(term.clone()));
+            continue;
+        }
+
+        let like_term = format!("%{}%", escape_like_term(term));
+        clauses.push(
+            "(name LIKE ? ESCAPE '\\' OR parent LIKE ? ESCAPE '\\' OR path LIKE ? ESCAPE '\\')"
+                .to_string(),
+        );
+        values.push(Value::Text(like_term.clone()));
+        values.push(Value::Text(like_term.clone()));
+        values.push(Value::Text(like_term));
+    }
+
+    let sql = format!(
+        r#"
+        SELECT name, path, parent, extension, is_dir
+        FROM file_search_entries
+        WHERE {}
+        "#,
+        clauses.join(" AND ")
+    );
+
+    let mut statement = connection.prepare(&sql).map_err(|e| e.to_string())?;
+    let rows = statement
+        .query_map(params_from_iter(values.iter()), |row| {
+            Ok(IndexedFile {
+                name: row.get(0)?,
+                path: row.get(1)?,
+                parent: row.get(2)?,
+                extension: row.get(3)?,
+                is_dir: row.get::<_, i64>(4)? != 0,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut entries = Vec::new();
+    for row in rows {
+        entries.push(row.map_err(|e| e.to_string())?);
+    }
+
+    Ok(entries)
+}
+
+fn save_index_batch(
+    connection: &mut Connection,
+    root: &str,
+    scan_id: &str,
+    entries: &[IndexedFile],
+) -> Result<(), String> {
+    let transaction = connection.transaction().map_err(|e| e.to_string())?;
+
+    {
+        let mut statement = transaction
+            .prepare(
+                r#"
+                INSERT INTO file_search_entries
+                    (path, root, name, parent, extension, is_dir, scan_id)
+                VALUES
+                    (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+                ON CONFLICT(path) DO UPDATE SET
+                    root = excluded.root,
+                    name = excluded.name,
+                    parent = excluded.parent,
+                    extension = excluded.extension,
+                    is_dir = excluded.is_dir,
+                    scan_id = excluded.scan_id
+                "#,
+            )
+            .map_err(|e| e.to_string())?;
+
+        for entry in entries {
+            statement
+                .execute(params![
+                    &entry.path,
+                    root,
+                    &entry.name,
+                    &entry.parent,
+                    &entry.extension,
+                    if entry.is_dir { 1_i64 } else { 0_i64 },
+                    scan_id,
+                ])
+                .map_err(|e| e.to_string())?;
+        }
+    }
+
+    transaction.commit().map_err(|e| e.to_string())
+}
+
+fn finalize_index_scan(connection: &Connection, root: &str, scan_id: &str) -> Result<(), String> {
+    connection
+        .execute(
+            "DELETE FROM file_search_entries WHERE root = ?1 AND scan_id != ?2",
+            params![root, scan_id],
+        )
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn has_column(connection: &Connection, table: &str, column: &str) -> Result<bool, String> {
+    let mut statement = connection
+        .prepare(&format!("PRAGMA table_info({})", table))
+        .map_err(|e| e.to_string())?;
+    let rows = statement
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|e| e.to_string())?;
+
+    for row in rows {
+        if row.map_err(|e| e.to_string())? == column {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}
+
+fn new_scan_id() -> String {
+    let millis = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or_default();
+    format!("scan-{}", millis)
+}
+
+fn escape_like_term(term: &str) -> String {
+    term.replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
 }
 
 fn indexed_file_from_entry(entry: &DirEntry) -> Option<IndexedFile> {
@@ -265,8 +564,8 @@ fn score_file(file: &IndexedFile, terms: &[String]) -> Option<i32> {
 }
 
 fn compare_scored_files(
-    (score_a, file_a): &(i32, &IndexedFile),
-    (score_b, file_b): &(i32, &IndexedFile),
+    (score_a, file_a): &(i32, IndexedFile),
+    (score_b, file_b): &(i32, IndexedFile),
 ) -> std::cmp::Ordering {
     score_a
         .cmp(score_b)
