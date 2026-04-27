@@ -26,6 +26,8 @@
   let searchTimer: ReturnType<typeof setTimeout> | null = null;
 
   const selectedItem = $derived(results[selectedIndex] ?? null);
+  const queryExamples = ["ext:md", "ext:png", "type:folder", '"project plan"'];
+  const detailQueryExamples = [...queryExamples, "project ext:md"];
 
   const handleBack = () => {
     goto("/");
@@ -51,6 +53,11 @@
     searchTimer = setTimeout(() => {
       searchFiles(value);
     }, 250);
+  };
+
+  const applyQueryExample = (query: string) => {
+    handleSearch(query);
+    headerRef?.focus();
   };
 
   const searchFiles = async (value: string) => {
@@ -200,31 +207,58 @@
     {/if}
   </div>
 
-  <div class="flex flex-1 overflow-hidden">
-    <div
-      class="flex w-2/5 flex-col border-r border-neutral-200 dark:border-neutral-700"
-    >
-      <AppScrollArea class="h-full w-full" viewportClass="h-full w-full p-2">
-        {#if isSearching && searchQuery.trim().length >= 2 && results.length === 0}
+  {#if results.length === 0}
+    <div class="flex flex-1 items-center justify-center overflow-hidden px-8">
+      {#if isSearching && searchQuery.trim().length >= 2}
+        <div
+          class="flex flex-col items-center justify-center gap-3 text-center text-sm text-neutral-500"
+        >
           <div
-            class="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-sm text-neutral-500"
-          >
-            <div
-              class="h-5 w-5 animate-spin rounded-full border-2 border-neutral-300 border-t-blue-500 dark:border-neutral-700 dark:border-t-blue-400"
-            ></div>
-            <span>正在搜索...</span>
-          </div>
-        {:else if results.length === 0}
+            class="h-5 w-5 animate-spin rounded-full border-2 border-neutral-300 border-t-blue-500 dark:border-neutral-700 dark:border-t-blue-400"
+          ></div>
+          <span>正在搜索...</span>
+        </div>
+      {:else}
+        <div
+          class="flex max-w-lg flex-col items-center justify-center gap-4 text-center text-sm text-neutral-500"
+        >
           <div
-            class="flex h-full items-center justify-center px-6 text-center text-sm text-neutral-500"
+            class="flex h-16 w-16 items-center justify-center rounded-xl bg-neutral-100 text-neutral-400 dark:bg-neutral-800"
           >
-            {#if searchQuery.trim().length < 2}
-              输入至少 2 个字符开始搜索
-            {:else}
-              没有匹配的文件或文件夹
-            {/if}
+            <PhosphorIcon icon="folder" class="h-8 w-8" />
           </div>
-        {:else}
+          <div class="space-y-1">
+            <div class="font-medium text-neutral-700 dark:text-neutral-300">
+              {#if searchQuery.trim().length < 2}
+                输入至少 2 个字符开始搜索
+              {:else}
+                没有匹配的文件或文件夹
+              {/if}
+            </div>
+            <div class="text-xs text-neutral-400">
+              可组合关键词、扩展名和类型过滤
+            </div>
+          </div>
+          <div class="flex flex-wrap justify-center gap-1.5">
+            {#each detailQueryExamples as example (example)}
+              <button
+                class="rounded-md border border-neutral-200 bg-white px-2 py-1 font-mono text-[11px] text-neutral-600 transition-colors hover:border-neutral-300 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
+                title="使用 {example} 搜索"
+                onclick={() => applyQueryExample(example)}
+              >
+                {example}
+              </button>
+            {/each}
+          </div>
+        </div>
+      {/if}
+    </div>
+  {:else}
+    <div class="flex flex-1 overflow-hidden">
+      <div
+        class="flex w-2/5 flex-col border-r border-neutral-200 dark:border-neutral-700"
+      >
+        <AppScrollArea class="h-full w-full" viewportClass="h-full w-full p-2">
           <div class="flex flex-col gap-1">
             {#each results as item, index (item.path)}
               <button
@@ -265,14 +299,12 @@
               </button>
             {/each}
           </div>
-        {/if}
-      </AppScrollArea>
-    </div>
+        </AppScrollArea>
+      </div>
 
-    <div
-      class="flex w-3/5 flex-col overflow-hidden bg-white dark:bg-neutral-900"
-    >
-      {#if selectedItem}
+      <div
+        class="flex w-3/5 flex-col overflow-hidden bg-white dark:bg-neutral-900"
+      >
         <div
           class="flex flex-shrink-0 items-center justify-between border-b border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-900/50"
         >
@@ -331,20 +363,9 @@
             {/if}
           </AppScrollArea>
         </div>
-      {:else}
-        <div
-          class="flex h-full flex-col items-center justify-center gap-2 text-neutral-400"
-        >
-          <div
-            class="flex h-16 w-16 items-center justify-center rounded-xl bg-neutral-100 dark:bg-neutral-800"
-          >
-            <PhosphorIcon icon="folder" class="h-8 w-8" />
-          </div>
-          <span>选择文件或文件夹查看详情</span>
-        </div>
-      {/if}
+      </div>
     </div>
-  </div>
+  {/if}
 </div>
 
 <style>
