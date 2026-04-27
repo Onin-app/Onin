@@ -47,6 +47,7 @@ pub struct FileSearchState {
     is_indexing: AtomicBool,
     indexed_count: AtomicUsize,
     watcher_generation: AtomicUsize,
+    rebuild_requested: AtomicBool,
 }
 
 #[derive(Serialize)]
@@ -67,8 +68,13 @@ fn start_indexing(app: AppHandle, reset_index: bool, delay: Duration) {
 
         let state = app.state::<FileSearchState>();
         if state.is_indexing.swap(true, Ordering::Relaxed) {
+            if reset_index {
+                state.rebuild_requested.store(true, Ordering::Relaxed);
+                state.watcher_generation.fetch_add(1, Ordering::Relaxed);
+            }
             return;
         }
+        state.rebuild_requested.store(false, Ordering::Relaxed);
 
         let options = file_search_options(&app);
         let generation = state.watcher_generation.fetch_add(1, Ordering::Relaxed) + 1;
@@ -97,8 +103,14 @@ fn start_indexing(app: AppHandle, reset_index: bool, delay: Duration) {
 
         let scan_id = new_scan_id();
         let mut scanned_count = 0usize;
+        let mut cancelled = false;
 
         for root in &options.roots {
+            if state.watcher_generation.load(Ordering::Relaxed) != generation {
+                cancelled = true;
+                break;
+            }
+
             let root_string = root.to_string_lossy().to_string();
             let existing_index_count = match count_index_db(&app, &root_string) {
                 Ok(count) => count,
@@ -123,6 +135,11 @@ fn start_indexing(app: AppHandle, reset_index: bool, delay: Duration) {
                 .filter_entry(|entry| !should_skip_entry(entry, &options));
 
             for entry in walker.filter_map(Result::ok) {
+                if state.watcher_generation.load(Ordering::Relaxed) != generation {
+                    cancelled = true;
+                    break;
+                }
+
                 if let Some(file) = indexed_file_from_entry(&entry) {
                     batch.push(file);
                     scanned_count += 1;
@@ -152,6 +169,10 @@ fn start_indexing(app: AppHandle, reset_index: bool, delay: Duration) {
                 }
             }
 
+            if cancelled {
+                break;
+            }
+
             if let Some(connection) = db_connection.as_mut() {
                 if !batch.is_empty() {
                     if let Err(error) = save_index_batch(connection, &root_string, &scan_id, &batch)
@@ -175,7 +196,9 @@ fn start_indexing(app: AppHandle, reset_index: bool, delay: Duration) {
             }
         }
 
-        if let Some(connection) = db_connection.as_mut() {
+        if cancelled {
+            eprintln!("[file_search] Index scan cancelled because a rebuild was requested");
+        } else if let Some(connection) = db_connection.as_mut() {
             match count_index_db_for_roots(connection, &options.roots) {
                 Ok(count) => state.indexed_count.store(count, Ordering::Relaxed),
                 Err(error) => {
@@ -189,8 +212,24 @@ fn start_indexing(app: AppHandle, reset_index: bool, delay: Duration) {
 
         state.is_indexing.store(false, Ordering::Relaxed);
 
+        if state.rebuild_requested.swap(false, Ordering::Relaxed) {
+            start_indexing(app, true, Duration::ZERO);
+            return;
+        }
+
+        if cancelled {
+            return;
+        }
+
         start_file_watcher(app, options, generation);
     });
+}
+
+pub fn rebuild_file_search_index_after_config_change(app: AppHandle) {
+    let state = app.state::<FileSearchState>();
+    state.rebuild_requested.store(true, Ordering::Relaxed);
+    state.watcher_generation.fetch_add(1, Ordering::Relaxed);
+    start_indexing(app, true, Duration::ZERO);
 }
 
 #[tauri::command]

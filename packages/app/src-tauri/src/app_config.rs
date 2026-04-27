@@ -3,6 +3,8 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
 
+use crate::file_search;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SortMode {
     #[serde(rename = "smart")]
@@ -170,14 +172,29 @@ pub fn update_app_config(
     state: tauri::State<'_, AppConfigState>,
     config: AppConfig,
 ) -> Result<(), String> {
+    let should_rebuild_file_search = {
+        let current_config = state.0.lock().map_err(|e| e.to_string())?;
+        file_search_config_changed(&current_config, &config)
+    };
+
+    // 保存到文件
+    save_config(&app, &config)?;
+
     // 更新内存中的配置
     {
         let mut current_config = state.0.lock().map_err(|e| e.to_string())?;
         *current_config = config.clone();
     }
 
-    // 保存到文件
-    save_config(&app, &config)?;
+    if should_rebuild_file_search {
+        file_search::rebuild_file_search_index_after_config_change(app);
+    }
 
     Ok(())
+}
+
+fn file_search_config_changed(previous: &AppConfig, next: &AppConfig) -> bool {
+    previous.file_search_roots != next.file_search_roots
+        || previous.file_search_excluded_paths != next.file_search_excluded_paths
+        || previous.file_search_include_hidden != next.file_search_include_hidden
 }
