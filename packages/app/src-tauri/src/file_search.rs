@@ -11,7 +11,7 @@ use std::{
 };
 
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
-use rusqlite::{params, params_from_iter, types::Value, Connection};
+use rusqlite::{params, params_from_iter, types::Value, Connection, OptionalExtension};
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
 use walkdir::{DirEntry, WalkDir};
@@ -355,6 +355,19 @@ fn initialize_index_db(connection: &Connection) -> Result<(), String> {
                 is_dir INTEGER NOT NULL,
                 scan_id TEXT NOT NULL DEFAULT ''
             );
+
+            CREATE VIRTUAL TABLE IF NOT EXISTS file_search_entries_fts USING fts5(
+                path UNINDEXED,
+                name,
+                parent,
+                full_path,
+                extension
+            );
+
+            CREATE TABLE IF NOT EXISTS file_search_meta (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
             "#,
         )
         .map_err(|e| e.to_string())?;
@@ -381,7 +394,9 @@ fn initialize_index_db(connection: &Connection) -> Result<(), String> {
                 ON file_search_entries(extension);
             "#,
         )
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    backfill_fts_index_if_needed(connection)
 }
 
 fn file_search_options(app: &AppHandle) -> FileSearchOptions {
@@ -418,7 +433,79 @@ fn normalize_config_paths(paths: &[String]) -> Vec<PathBuf> {
 
 fn clear_index_db(connection: &Connection) -> Result<(), String> {
     connection
-        .execute("DELETE FROM file_search_entries", [])
+        .execute_batch(
+            r#"
+            DELETE FROM file_search_entries;
+            DELETE FROM file_search_entries_fts;
+            "#,
+        )
+        .map_err(|e| e.to_string())?;
+    set_file_search_meta(connection, "fts_backfilled", "1")?;
+    Ok(())
+}
+
+fn backfill_fts_index_if_needed(connection: &Connection) -> Result<(), String> {
+    if file_search_meta_value(connection, "fts_backfilled")?.as_deref() == Some("1") {
+        return Ok(());
+    }
+
+    let entry_count = connection
+        .query_row("SELECT COUNT(*) FROM file_search_entries", [], |row| {
+            row.get::<_, i64>(0)
+        })
+        .map_err(|e| e.to_string())?;
+    if entry_count == 0 {
+        set_file_search_meta(connection, "fts_backfilled", "1")?;
+        return Ok(());
+    }
+
+    let fts_count = connection
+        .query_row("SELECT COUNT(*) FROM file_search_entries_fts", [], |row| {
+            row.get::<_, i64>(0)
+        })
+        .map_err(|e| e.to_string())?;
+
+    if fts_count == entry_count {
+        set_file_search_meta(connection, "fts_backfilled", "1")?;
+        return Ok(());
+    }
+
+    connection
+        .execute_batch("DELETE FROM file_search_entries_fts")
+        .map_err(|e| e.to_string())?;
+    connection
+        .execute(
+            "INSERT INTO file_search_entries_fts
+                (path, name, parent, full_path, extension)
+            SELECT path, name, parent, path, extension
+            FROM file_search_entries",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+    set_file_search_meta(connection, "fts_backfilled", "1")?;
+
+    Ok(())
+}
+
+fn file_search_meta_value(connection: &Connection, key: &str) -> Result<Option<String>, String> {
+    connection
+        .query_row(
+            "SELECT value FROM file_search_meta WHERE key = ?1",
+            params![key],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .map_err(|e| e.to_string())
+}
+
+fn set_file_search_meta(connection: &Connection, key: &str, value: &str) -> Result<(), String> {
+    connection
+        .execute(
+            "INSERT INTO file_search_meta (key, value)
+            VALUES (?1, ?2)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![key, value],
+        )
         .map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -463,6 +550,99 @@ fn search_index_db(
     }
 
     let connection = open_index_db(app)?;
+    search_index_db_with_connection(&connection, root, terms)
+}
+
+fn search_index_db_with_connection(
+    connection: &Connection,
+    root: &str,
+    terms: &[String],
+) -> Result<Vec<IndexedFile>, String> {
+    let uses_fts = terms.iter().any(|term| !term.starts_with('.'));
+
+    match search_index_db_with_fts(connection, root, terms) {
+        Ok(entries) if !entries.is_empty() || !uses_fts => Ok(entries),
+        Ok(_) => search_index_db_with_like(connection, root, terms),
+        Err(error) => {
+            eprintln!(
+                "[file_search] Failed to search SQLite FTS index, falling back to LIKE: {}",
+                error
+            );
+            search_index_db_with_like(connection, root, terms)
+        }
+    }
+}
+
+fn search_index_db_with_fts(
+    connection: &Connection,
+    root: &str,
+    terms: &[String],
+) -> Result<Vec<IndexedFile>, String> {
+    let mut clauses = vec!["root = ?".to_string()];
+    let mut values = vec![Value::Text(root.to_string())];
+    let mut fts_terms = Vec::new();
+
+    for term in terms {
+        if term.starts_with('.') {
+            clauses.push("extension = ?".to_string());
+            values.push(Value::Text(term.clone()));
+            continue;
+        }
+
+        let fts_term = fts_prefix_term(term);
+        fts_terms.push(format!(
+            "(name:{0} OR parent:{0} OR full_path:{0})",
+            fts_term
+        ));
+    }
+
+    if !fts_terms.is_empty() {
+        clauses.push(
+            "path IN (
+                SELECT path
+                FROM file_search_entries_fts
+                WHERE file_search_entries_fts MATCH ?
+            )"
+            .to_string(),
+        );
+        values.push(Value::Text(fts_terms.join(" AND ")));
+    }
+
+    let sql = format!(
+        r#"
+        SELECT name, path, parent, extension, is_dir
+        FROM file_search_entries
+        WHERE {}
+        "#,
+        clauses.join(" AND ")
+    );
+
+    let mut statement = connection.prepare(&sql).map_err(|e| e.to_string())?;
+    let rows = statement
+        .query_map(params_from_iter(values.iter()), |row| {
+            Ok(IndexedFile {
+                name: row.get(0)?,
+                path: row.get(1)?,
+                parent: row.get(2)?,
+                extension: row.get(3)?,
+                is_dir: row.get::<_, i64>(4)? != 0,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut entries = Vec::new();
+    for row in rows {
+        entries.push(row.map_err(|e| e.to_string())?);
+    }
+
+    Ok(entries)
+}
+
+fn search_index_db_with_like(
+    connection: &Connection,
+    root: &str,
+    terms: &[String],
+) -> Result<Vec<IndexedFile>, String> {
     let mut clauses = vec!["root = ?".to_string()];
     let mut values = vec![Value::Text(root.to_string())];
 
@@ -522,7 +702,7 @@ fn save_index_batch(
     let transaction = connection.transaction().map_err(|e| e.to_string())?;
 
     {
-        let mut statement = transaction
+        let mut entry_statement = transaction
             .prepare(
                 r#"
                 INSERT INTO file_search_entries
@@ -539,9 +719,22 @@ fn save_index_batch(
                 "#,
             )
             .map_err(|e| e.to_string())?;
+        let mut delete_fts_statement = transaction
+            .prepare("DELETE FROM file_search_entries_fts WHERE path = ?1")
+            .map_err(|e| e.to_string())?;
+        let mut insert_fts_statement = transaction
+            .prepare(
+                r#"
+                INSERT INTO file_search_entries_fts
+                    (path, name, parent, full_path, extension)
+                VALUES
+                    (?1, ?2, ?3, ?4, ?5)
+                "#,
+            )
+            .map_err(|e| e.to_string())?;
 
         for entry in entries {
-            statement
+            entry_statement
                 .execute(params![
                     &entry.path,
                     root,
@@ -552,6 +745,18 @@ fn save_index_batch(
                     scan_id,
                 ])
                 .map_err(|e| e.to_string())?;
+            delete_fts_statement
+                .execute(params![&entry.path])
+                .map_err(|e| e.to_string())?;
+            insert_fts_statement
+                .execute(params![
+                    &entry.path,
+                    &entry.name,
+                    &entry.parent,
+                    &entry.path,
+                    &entry.extension,
+                ])
+                .map_err(|e| e.to_string())?;
         }
     }
 
@@ -559,6 +764,17 @@ fn save_index_batch(
 }
 
 fn finalize_index_scan(connection: &Connection, root: &str, scan_id: &str) -> Result<(), String> {
+    connection
+        .execute(
+            "DELETE FROM file_search_entries_fts
+            WHERE path IN (
+                SELECT path
+                FROM file_search_entries
+                WHERE root = ?1 AND scan_id != ?2
+            )",
+            params![root, scan_id],
+        )
+        .map_err(|e| e.to_string())?;
     connection
         .execute(
             "DELETE FROM file_search_entries WHERE root = ?1 AND scan_id != ?2",
@@ -735,6 +951,18 @@ fn delete_index_path(connection: &Connection, root: &str, path: &Path) -> Result
 
     connection
         .execute(
+            "DELETE FROM file_search_entries_fts
+            WHERE path IN (
+                SELECT path
+                FROM file_search_entries
+                WHERE root = ?1 AND (path = ?2 OR path LIKE ?3 ESCAPE '\\')
+            )",
+            params![root, path, child_prefix],
+        )
+        .map_err(|e| e.to_string())?;
+
+    connection
+        .execute(
             "DELETE FROM file_search_entries WHERE root = ?1 AND (path = ?2 OR path LIKE ?3 ESCAPE '\\')",
             params![root, path, child_prefix],
         )
@@ -772,6 +1000,10 @@ fn escape_like_term(term: &str) -> String {
     term.replace('\\', "\\\\")
         .replace('%', "\\%")
         .replace('_', "\\_")
+}
+
+fn fts_prefix_term(term: &str) -> String {
+    format!("\"{}\"*", term.replace('"', "\"\""))
 }
 
 fn indexed_file_from_entry(entry: &DirEntry) -> Option<IndexedFile> {
@@ -951,5 +1183,67 @@ fn launchable_item_from_file(file: &IndexedFile) -> LaunchableItem {
         source_display: Some("File".to_string()),
         matches: None,
         requires_confirmation: false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn indexed_file(name: &str, path: &str, extension: &str) -> IndexedFile {
+        IndexedFile {
+            name: name.to_string(),
+            path: path.to_string(),
+            parent: "C:/root/docs".to_string(),
+            extension: extension.to_string(),
+            is_dir: false,
+        }
+    }
+
+    fn setup_search_db() -> Connection {
+        let mut connection = Connection::open_in_memory().unwrap();
+        initialize_index_db(&connection).unwrap();
+        save_index_batch(
+            &mut connection,
+            "C:/root",
+            "scan-test",
+            &[
+                indexed_file("ProjectNotes.md", "C:/root/docs/ProjectNotes.md", ".md"),
+                indexed_file("image.png", "C:/root/docs/image.png", ".png"),
+            ],
+        )
+        .unwrap();
+        connection
+    }
+
+    #[test]
+    fn search_uses_fts_prefix_matches() {
+        let connection = setup_search_db();
+        let results =
+            search_index_db_with_connection(&connection, "C:/root", &parse_terms("proj")).unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].name, "ProjectNotes.md");
+    }
+
+    #[test]
+    fn search_falls_back_to_like_for_substring_matches() {
+        let connection = setup_search_db();
+        let results =
+            search_index_db_with_connection(&connection, "C:/root", &parse_terms("ject")).unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].name, "ProjectNotes.md");
+    }
+
+    #[test]
+    fn search_combines_fts_and_extension_filters() {
+        let connection = setup_search_db();
+        let results =
+            search_index_db_with_connection(&connection, "C:/root", &parse_terms("proj .md"))
+                .unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].name, "ProjectNotes.md");
     }
 }
