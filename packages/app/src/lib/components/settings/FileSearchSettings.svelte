@@ -1,11 +1,16 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
   import { Switch } from "bits-ui";
   import { toast } from "svelte-sonner";
   import PhosphorIcon from "$lib/components/PhosphorIcon.svelte";
   import type { AppConfig } from "$lib/type";
+
+  interface FileSearchStatus {
+    is_indexing: boolean;
+    indexed_count: number;
+  }
 
   let config = $state<AppConfig | null>(null);
   let loading = $state(true);
@@ -14,6 +19,11 @@
   let choosingDirectory = $state(false);
   let rootInput = $state("");
   let excludeInput = $state("");
+  let status = $state<FileSearchStatus>({
+    is_indexing: false,
+    indexed_count: 0,
+  });
+  let statusTimer: ReturnType<typeof setInterval> | null = null;
 
   const roots = $derived(config?.file_search_roots ?? []);
   const excludedPaths = $derived(config?.file_search_excluded_paths ?? []);
@@ -30,6 +40,14 @@
     }
   }
 
+  async function refreshStatus() {
+    try {
+      status = await invoke<FileSearchStatus>("get_file_search_status");
+    } catch (error) {
+      console.error("Failed to load file search status:", error);
+    }
+  }
+
   async function saveConfig(nextConfig: AppConfig) {
     if (saving) return;
 
@@ -37,6 +55,7 @@
     try {
       await invoke("update_app_config", { config: nextConfig });
       config = nextConfig;
+      await refreshStatus();
       toast.success("文件搜索设置已保存");
     } catch (error) {
       console.error("Failed to save file search config:", error);
@@ -128,6 +147,7 @@
     rebuilding = true;
     try {
       await invoke("rebuild_file_search_index");
+      await refreshStatus();
       toast.success("已开始重建文件搜索索引");
     } catch (error) {
       console.error("Failed to rebuild file search index:", error);
@@ -137,7 +157,16 @@
     }
   }
 
-  onMount(loadConfig);
+  onMount(async () => {
+    await Promise.all([loadConfig(), refreshStatus()]);
+    statusTimer = setInterval(refreshStatus, 1000);
+  });
+
+  onDestroy(() => {
+    if (statusTimer) {
+      clearInterval(statusTimer);
+    }
+  });
 </script>
 
 {#if loading}
@@ -306,16 +335,34 @@
           索引维护
         </h4>
         <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-          调整目录或排除项后，可手动重建索引。
+          调整目录或排除项后会自动重建，也可手动重新开始索引。
         </p>
+        <div
+          class="mt-2 inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-neutral-50 px-2 py-1 text-xs text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
+        >
+          <span
+            class="h-1.5 w-1.5 rounded-full {status.is_indexing
+              ? 'animate-pulse bg-amber-500'
+              : 'bg-emerald-500'}"
+          ></span>
+          <span>
+            {status.is_indexing ? "正在索引" : "索引就绪"} · {status.is_indexing
+              ? "已扫描"
+              : "已索引"}
+            {status.indexed_count.toLocaleString()} 项
+          </span>
+        </div>
       </div>
       <button
         class="inline-flex items-center gap-2 rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
         disabled={rebuilding}
         onclick={rebuildIndex}
       >
-        <PhosphorIcon icon="arrowsClockwise" class="h-4 w-4" />
-        {rebuilding ? "重建中" : "重建索引"}
+        <PhosphorIcon
+          icon="arrowsClockwise"
+          class="h-4 w-4 {status.is_indexing ? 'animate-spin' : ''}"
+        />
+        {rebuilding ? "处理中" : status.is_indexing ? "重新开始" : "重建索引"}
       </button>
     </section>
   </div>

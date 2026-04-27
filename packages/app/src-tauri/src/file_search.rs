@@ -86,7 +86,7 @@ fn start_indexing(app: AppHandle, reset_index: bool, delay: Duration) {
         }
         state.indexed_count.store(0, Ordering::Relaxed);
 
-        let mut db_connection = match open_index_db(&app) {
+        let mut db_connection = match open_index_db_for_indexing(&app, reset_index) {
             Ok(connection) => {
                 if reset_index {
                     if let Err(error) = clear_index_db(&connection) {
@@ -112,20 +112,6 @@ fn start_indexing(app: AppHandle, reset_index: bool, delay: Duration) {
             }
 
             let root_string = root.to_string_lossy().to_string();
-            let existing_index_count = match count_index_db(&app, &root_string) {
-                Ok(count) => count,
-                Err(error) => {
-                    eprintln!("[file_search] Failed to count SQLite index: {}", error);
-                    0
-                }
-            };
-
-            if existing_index_count > 0 && !reset_index {
-                state
-                    .indexed_count
-                    .fetch_add(existing_index_count, Ordering::Relaxed);
-            }
-
             let mut batch = Vec::with_capacity(INDEX_WRITE_BATCH_SIZE);
             let mut root_scanned_count = 0usize;
 
@@ -144,9 +130,7 @@ fn start_indexing(app: AppHandle, reset_index: bool, delay: Duration) {
                     batch.push(file);
                     scanned_count += 1;
                     root_scanned_count += 1;
-                    if existing_index_count == 0 || reset_index {
-                        state.indexed_count.store(scanned_count, Ordering::Relaxed);
-                    }
+                    state.indexed_count.store(scanned_count, Ordering::Relaxed);
 
                     if batch.len() >= INDEX_WRITE_BATCH_SIZE {
                         if let Some(connection) = db_connection.as_mut() {
@@ -227,6 +211,7 @@ fn start_indexing(app: AppHandle, reset_index: bool, delay: Duration) {
 
 pub fn rebuild_file_search_index_after_config_change(app: AppHandle) {
     let state = app.state::<FileSearchState>();
+    state.indexed_count.store(0, Ordering::Relaxed);
     state.rebuild_requested.store(true, Ordering::Relaxed);
     state.watcher_generation.fetch_add(1, Ordering::Relaxed);
     start_indexing(app, true, Duration::ZERO);
@@ -242,13 +227,7 @@ pub fn get_file_search_status(state: tauri::State<FileSearchState>) -> FileSearc
 
 #[tauri::command]
 pub fn rebuild_file_search_index(app: AppHandle) -> Result<(), String> {
-    let state = app.state::<FileSearchState>();
-    if state.is_indexing.load(Ordering::Relaxed) {
-        return Err("文件搜索正在建立索引".to_string());
-    }
-
-    state.indexed_count.store(0, Ordering::Relaxed);
-    start_indexing(app, true, Duration::ZERO);
+    rebuild_file_search_index_after_config_change(app);
     Ok(())
 }
 
@@ -327,6 +306,14 @@ fn index_db_path(app: &AppHandle) -> Result<PathBuf, String> {
 }
 
 fn open_index_db(app: &AppHandle) -> Result<Connection, String> {
+    open_index_db_with_backfill(app, true)
+}
+
+fn open_index_db_for_indexing(app: &AppHandle, reset_index: bool) -> Result<Connection, String> {
+    open_index_db_with_backfill(app, !reset_index)
+}
+
+fn open_index_db_with_backfill(app: &AppHandle, backfill_fts: bool) -> Result<Connection, String> {
     let db_path = index_db_path(app)?;
     if let Some(parent) = db_path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -336,11 +323,11 @@ fn open_index_db(app: &AppHandle) -> Result<Connection, String> {
     connection
         .busy_timeout(SQLITE_BUSY_TIMEOUT)
         .map_err(|e| e.to_string())?;
-    initialize_index_db(&connection)?;
+    initialize_index_db(&connection, backfill_fts)?;
     Ok(connection)
 }
 
-fn initialize_index_db(connection: &Connection) -> Result<(), String> {
+fn initialize_index_db(connection: &Connection, backfill_fts: bool) -> Result<(), String> {
     connection
         .execute_batch(
             r#"
@@ -397,7 +384,11 @@ fn initialize_index_db(connection: &Connection) -> Result<(), String> {
         )
         .map_err(|e| e.to_string())?;
 
-    backfill_fts_index_if_needed(connection)
+    if backfill_fts {
+        backfill_fts_index_if_needed(connection)?;
+    }
+
+    Ok(())
 }
 
 fn file_search_options(app: &AppHandle) -> FileSearchOptions {
@@ -474,15 +465,43 @@ fn backfill_fts_index_if_needed(connection: &Connection) -> Result<(), String> {
     connection
         .execute_batch("DELETE FROM file_search_entries_fts")
         .map_err(|e| e.to_string())?;
-    connection
-        .execute(
-            "INSERT INTO file_search_entries_fts
-                (path, name, parent, full_path, extension)
-            SELECT path, name, parent, path, extension
-            FROM file_search_entries",
-            [],
+    let mut select_statement = connection
+        .prepare("SELECT path, name, parent, extension FROM file_search_entries")
+        .map_err(|e| e.to_string())?;
+    let rows = select_statement
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+    let mut entries = Vec::new();
+    for row in rows {
+        entries.push(row.map_err(|e| e.to_string())?);
+    }
+
+    let mut insert_statement = connection
+        .prepare(
+            "INSERT OR REPLACE INTO file_search_entries_fts
+                (rowid, path, name, parent, full_path, extension)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         )
         .map_err(|e| e.to_string())?;
+    for (path, name, parent, extension) in entries {
+        insert_statement
+            .execute(params![
+                fts_rowid_for_path(&path),
+                &path,
+                &name,
+                &parent,
+                &path,
+                &extension,
+            ])
+            .map_err(|e| e.to_string())?;
+    }
     set_file_search_meta(connection, "fts_backfilled", "1")?;
 
     Ok(())
@@ -509,16 +528,6 @@ fn set_file_search_meta(connection: &Connection, key: &str, value: &str) -> Resu
         )
         .map_err(|e| e.to_string())?;
     Ok(())
-}
-
-fn count_index_db(app: &AppHandle, root: &str) -> Result<usize, String> {
-    let db_path = index_db_path(app)?;
-    if !db_path.exists() {
-        return Ok(0);
-    }
-
-    let connection = open_index_db(app)?;
-    count_index_db_with_connection(&connection, root)
 }
 
 fn count_index_db_for_roots(connection: &Connection, roots: &[PathBuf]) -> Result<usize, String> {
@@ -778,16 +787,13 @@ fn save_index_batch(
                 "#,
             )
             .map_err(|e| e.to_string())?;
-        let mut delete_fts_statement = transaction
-            .prepare("DELETE FROM file_search_entries_fts WHERE path = ?1")
-            .map_err(|e| e.to_string())?;
         let mut insert_fts_statement = transaction
             .prepare(
                 r#"
-                INSERT INTO file_search_entries_fts
-                    (path, name, parent, full_path, extension)
+                INSERT OR REPLACE INTO file_search_entries_fts
+                    (rowid, path, name, parent, full_path, extension)
                 VALUES
-                    (?1, ?2, ?3, ?4, ?5)
+                    (?1, ?2, ?3, ?4, ?5, ?6)
                 "#,
             )
             .map_err(|e| e.to_string())?;
@@ -804,11 +810,9 @@ fn save_index_batch(
                     scan_id,
                 ])
                 .map_err(|e| e.to_string())?;
-            delete_fts_statement
-                .execute(params![&entry.path])
-                .map_err(|e| e.to_string())?;
             insert_fts_statement
                 .execute(params![
+                    fts_rowid_for_path(&entry.path),
                     &entry.path,
                     &entry.name,
                     &entry.parent,
@@ -1065,6 +1069,16 @@ fn fts_prefix_term(term: &str) -> String {
     format!("\"{}\"*", term.replace('"', "\"\""))
 }
 
+fn fts_rowid_for_path(path: &str) -> i64 {
+    let mut hash = 0xcbf29ce484222325_u64;
+    for byte in path.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+
+    (hash & 0x7fff_ffff_ffff_ffff) as i64
+}
+
 fn indexed_file_from_entry(entry: &DirEntry) -> Option<IndexedFile> {
     indexed_file_from_path(entry.path(), entry.file_type().is_dir())
 }
@@ -1261,7 +1275,7 @@ mod tests {
 
     fn setup_search_db() -> Connection {
         let mut connection = Connection::open_in_memory().unwrap();
-        initialize_index_db(&connection).unwrap();
+        initialize_index_db(&connection, true).unwrap();
         save_index_batch(
             &mut connection,
             "C:/root",

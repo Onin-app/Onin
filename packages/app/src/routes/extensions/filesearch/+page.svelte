@@ -152,15 +152,7 @@
     await refreshStatus();
     headerRef?.focus();
 
-    if (status.is_indexing) {
-      statusTimer = setInterval(async () => {
-        await refreshStatus();
-        if (!status.is_indexing && statusTimer) {
-          clearInterval(statusTimer);
-          statusTimer = null;
-        }
-      }, 1000);
-    }
+    statusTimer = setInterval(refreshStatus, 1000);
   });
 
   onDestroy(() => {
