@@ -313,8 +313,9 @@ pub fn search_indexed_files(
 }
 
 #[tauri::command]
-pub fn open_indexed_file(path: String) -> Result<(), String> {
-    opener::open(&path).map_err(|e| format!("Failed to open file {}: {}", path, e))
+pub fn open_indexed_file(path: String, app: AppHandle) -> Result<(), String> {
+    let path = validate_indexed_file_path(&app, &path)?;
+    opener::open(&path).map_err(|e| format!("Failed to open file {}: {}", path.display(), e))
 }
 
 fn index_db_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -537,6 +538,64 @@ fn count_index_db_with_connection(connection: &Connection, root: &str) -> Result
         .map_err(|e| e.to_string())?;
 
     Ok(count.max(0) as usize)
+}
+
+fn indexed_path_exists(connection: &Connection, path: &str) -> Result<bool, String> {
+    connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM file_search_entries WHERE path = ?1)",
+            params![path],
+            |row| row.get::<_, i64>(0),
+        )
+        .map(|exists| exists != 0)
+        .map_err(|e| e.to_string())
+}
+
+fn validate_indexed_file_path(app: &AppHandle, path: &str) -> Result<PathBuf, String> {
+    let trimmed_path = path.trim();
+    if trimmed_path.is_empty() {
+        return Err("文件路径不能为空".to_string());
+    }
+
+    let requested_path = PathBuf::from(trimmed_path);
+    let canonical_path =
+        fs::canonicalize(&requested_path).map_err(|_| "文件不存在或无法访问".to_string())?;
+    let options = file_search_options(app);
+    if !is_path_allowed_by_options(&canonical_path, &options) {
+        return Err("文件不在当前文件搜索索引范围内".to_string());
+    }
+
+    let connection = open_index_db(app)?;
+    let canonical_path_string = canonical_path.to_string_lossy().to_string();
+    if !indexed_path_exists(&connection, trimmed_path)?
+        && !indexed_path_exists(&connection, &canonical_path_string)?
+    {
+        return Err("文件不在当前索引中".to_string());
+    }
+
+    Ok(canonical_path)
+}
+
+fn is_path_allowed_by_options(path: &Path, options: &FileSearchOptions) -> bool {
+    if options.roots.is_empty() {
+        return false;
+    }
+
+    let is_in_root = options
+        .roots
+        .iter()
+        .filter_map(|root| fs::canonicalize(root).ok())
+        .any(|root| path.starts_with(root));
+
+    if !is_in_root {
+        return false;
+    }
+
+    !options
+        .excluded_paths
+        .iter()
+        .filter_map(|excluded_path| fs::canonicalize(excluded_path).ok())
+        .any(|excluded_path| path.starts_with(excluded_path))
 }
 
 fn search_index_db(
@@ -1245,5 +1304,40 @@ mod tests {
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].name, "ProjectNotes.md");
+    }
+
+    #[test]
+    fn indexed_path_exists_checks_exact_index_entries() {
+        let connection = setup_search_db();
+
+        assert!(indexed_path_exists(&connection, "C:/root/docs/ProjectNotes.md").unwrap());
+        assert!(!indexed_path_exists(&connection, "C:/root/docs/missing.md").unwrap());
+    }
+
+    #[test]
+    fn path_allowed_by_options_accepts_roots_and_rejects_excludes() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let root = temp_dir.path().join("root");
+        let excluded = root.join("excluded");
+        let allowed_file = root.join("allowed.txt");
+        let excluded_file = excluded.join("blocked.txt");
+        fs::create_dir_all(&excluded).unwrap();
+        fs::write(&allowed_file, "allowed").unwrap();
+        fs::write(&excluded_file, "blocked").unwrap();
+
+        let options = FileSearchOptions {
+            roots: vec![root],
+            excluded_paths: vec![excluded],
+            include_hidden: false,
+        };
+
+        assert!(is_path_allowed_by_options(
+            &fs::canonicalize(allowed_file).unwrap(),
+            &options
+        ));
+        assert!(!is_path_allowed_by_options(
+            &fs::canonicalize(excluded_file).unwrap(),
+            &options
+        ));
     }
 }
