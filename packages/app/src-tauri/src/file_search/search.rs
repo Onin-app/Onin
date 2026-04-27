@@ -8,6 +8,19 @@ use super::path_utils::file_search_options;
 use super::types::{IndexedFile, DEFAULT_RESULT_LIMIT, SEARCH_CANDIDATE_LIMIT};
 use super::utils::{escape_like_term, fts_phrase_term, fts_prefix_term};
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) enum SearchTerm {
+    Text(String),
+    Extension(String),
+    Kind(SearchKind),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) enum SearchKind {
+    File,
+    Folder,
+}
+
 pub(super) fn search_indexed_files_blocking(
     query: String,
     limit: Option<usize>,
@@ -80,13 +93,16 @@ pub(super) fn search_indexed_files_blocking(
 pub(super) fn search_index_db_with_connection(
     connection: &Connection,
     root: &str,
-    terms: &[String],
+    terms: &[SearchTerm],
     candidate_limit: usize,
 ) -> Result<Vec<IndexedFile>, String> {
-    let uses_fts = terms.iter().any(|term| !term.starts_with('.'));
+    let uses_fts = terms.iter().any(|term| matches!(term, SearchTerm::Text(_)));
     let can_use_trigram = terms
         .iter()
-        .filter(|term| !term.starts_with('.'))
+        .filter_map(|term| match term {
+            SearchTerm::Text(text) => Some(text),
+            _ => None,
+        })
         .all(|term| term.chars().count() >= 3);
 
     match search_index_db_with_fts(connection, root, terms, candidate_limit) {
@@ -132,7 +148,7 @@ pub(super) fn search_index_db_with_connection(
 fn search_index_db_with_fts(
     connection: &Connection,
     root: &str,
-    terms: &[String],
+    terms: &[SearchTerm],
     candidate_limit: usize,
 ) -> Result<Vec<IndexedFile>, String> {
     let mut clauses = vec!["root = ?".to_string()];
@@ -140,17 +156,27 @@ fn search_index_db_with_fts(
     let mut fts_terms = Vec::new();
 
     for term in terms {
-        if term.starts_with('.') {
-            clauses.push("extension = ?".to_string());
-            values.push(Value::Text(term.clone()));
-            continue;
+        match term {
+            SearchTerm::Text(text) => {
+                let fts_term = fts_text_term(text);
+                fts_terms.push(format!(
+                    "(name:{0} OR parent:{0} OR full_path:{0})",
+                    fts_term
+                ));
+            }
+            SearchTerm::Extension(extension) => {
+                clauses.push("extension = ?".to_string());
+                values.push(Value::Text(extension.clone()));
+            }
+            SearchTerm::Kind(kind) => {
+                clauses.push("is_dir = ?".to_string());
+                values.push(Value::Integer(if matches!(kind, SearchKind::Folder) {
+                    1
+                } else {
+                    0
+                }));
+            }
         }
-
-        let fts_term = fts_prefix_term(term);
-        fts_terms.push(format!(
-            "(name:{0} OR parent:{0} OR full_path:{0})",
-            fts_term
-        ));
     }
 
     if !fts_terms.is_empty() {
@@ -210,7 +236,7 @@ fn search_index_db_with_fts(
 pub(super) fn search_index_db_with_trigram(
     connection: &Connection,
     root: &str,
-    terms: &[String],
+    terms: &[SearchTerm],
     candidate_limit: usize,
 ) -> Result<Vec<IndexedFile>, String> {
     let mut clauses = vec!["root = ?".to_string()];
@@ -218,16 +244,26 @@ pub(super) fn search_index_db_with_trigram(
     let mut trigram_terms = Vec::new();
 
     for term in terms {
-        if term.starts_with('.') {
-            clauses.push("extension = ?".to_string());
-            values.push(Value::Text(term.clone()));
-            continue;
+        match term {
+            SearchTerm::Text(text) => {
+                trigram_terms.push(format!(
+                    "(name:{0} OR parent:{0} OR full_path:{0})",
+                    fts_phrase_term(text)
+                ));
+            }
+            SearchTerm::Extension(extension) => {
+                clauses.push("extension = ?".to_string());
+                values.push(Value::Text(extension.clone()));
+            }
+            SearchTerm::Kind(kind) => {
+                clauses.push("is_dir = ?".to_string());
+                values.push(Value::Integer(if matches!(kind, SearchKind::Folder) {
+                    1
+                } else {
+                    0
+                }));
+            }
         }
-
-        trigram_terms.push(format!(
-            "(name:{0} OR parent:{0} OR full_path:{0})",
-            fts_phrase_term(term)
-        ));
     }
 
     if !trigram_terms.is_empty() {
@@ -287,27 +323,37 @@ pub(super) fn search_index_db_with_trigram(
 fn search_index_db_with_like(
     connection: &Connection,
     root: &str,
-    terms: &[String],
+    terms: &[SearchTerm],
     candidate_limit: usize,
 ) -> Result<Vec<IndexedFile>, String> {
     let mut clauses = vec!["root = ?".to_string()];
     let mut values = vec![Value::Text(root.to_string())];
 
     for term in terms {
-        if term.starts_with('.') {
-            clauses.push("extension = ?".to_string());
-            values.push(Value::Text(term.clone()));
-            continue;
+        match term {
+            SearchTerm::Text(text) => {
+                let like_term = format!("%{}%", escape_like_term(text));
+                clauses.push(
+                    "(name LIKE ? ESCAPE '\\' OR parent LIKE ? ESCAPE '\\' OR path LIKE ? ESCAPE '\\')"
+                        .to_string(),
+                );
+                values.push(Value::Text(like_term.clone()));
+                values.push(Value::Text(like_term.clone()));
+                values.push(Value::Text(like_term));
+            }
+            SearchTerm::Extension(extension) => {
+                clauses.push("extension = ?".to_string());
+                values.push(Value::Text(extension.clone()));
+            }
+            SearchTerm::Kind(kind) => {
+                clauses.push("is_dir = ?".to_string());
+                values.push(Value::Integer(if matches!(kind, SearchKind::Folder) {
+                    1
+                } else {
+                    0
+                }));
+            }
         }
-
-        let like_term = format!("%{}%", escape_like_term(term));
-        clauses.push(
-            "(name LIKE ? ESCAPE '\\' OR parent LIKE ? ESCAPE '\\' OR path LIKE ? ESCAPE '\\')"
-                .to_string(),
-        );
-        values.push(Value::Text(like_term.clone()));
-        values.push(Value::Text(like_term.clone()));
-        values.push(Value::Text(like_term));
     }
 
     let sql = format!(
@@ -343,42 +389,146 @@ fn search_index_db_with_like(
     Ok(entries)
 }
 
-pub(super) fn parse_terms(query: &str) -> Vec<String> {
-    query
-        .split_whitespace()
-        .map(str::trim)
-        .filter(|term| !term.is_empty())
-        .map(ToString::to_string)
+pub(super) fn parse_terms(query: &str) -> Vec<SearchTerm> {
+    split_query_tokens(query)
+        .into_iter()
+        .filter_map(|token| parse_query_token(&token))
         .collect()
 }
 
-fn score_file(file: &IndexedFile, terms: &[String]) -> Option<i32> {
+fn split_query_tokens(query: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+
+    for character in query.chars() {
+        match character {
+            '"' => {
+                in_quotes = !in_quotes;
+                if !in_quotes && !current.trim().is_empty() {
+                    tokens.push(current.trim().to_string());
+                    current.clear();
+                }
+            }
+            character if character.is_whitespace() && !in_quotes => {
+                if !current.trim().is_empty() {
+                    tokens.push(current.trim().to_string());
+                    current.clear();
+                }
+            }
+            _ => current.push(character),
+        }
+    }
+
+    if !current.trim().is_empty() {
+        tokens.push(current.trim().to_string());
+    }
+
+    tokens
+}
+
+fn parse_query_token(token: &str) -> Option<SearchTerm> {
+    let token = token.trim().to_lowercase();
+    if token.is_empty() {
+        return None;
+    }
+
+    if let Some(extension) = token
+        .strip_prefix("ext:")
+        .or_else(|| token.strip_prefix("extension:"))
+    {
+        return normalize_extension_filter(extension).map(SearchTerm::Extension);
+    }
+
+    if token.starts_with('.') {
+        return normalize_extension_filter(&token).map(SearchTerm::Extension);
+    }
+
+    if let Some(kind) = token
+        .strip_prefix("type:")
+        .or_else(|| token.strip_prefix("kind:"))
+        .and_then(parse_kind_filter)
+    {
+        return Some(SearchTerm::Kind(kind));
+    }
+
+    Some(SearchTerm::Text(token))
+}
+
+fn normalize_extension_filter(extension: &str) -> Option<String> {
+    let extension = extension.trim().trim_start_matches('.');
+    if extension.is_empty() {
+        return None;
+    }
+
+    Some(format!(".{}", extension))
+}
+
+fn parse_kind_filter(kind: &str) -> Option<SearchKind> {
+    match kind.trim() {
+        "file" | "files" => Some(SearchKind::File),
+        "folder" | "folders" | "dir" | "dirs" | "directory" | "directories" => {
+            Some(SearchKind::Folder)
+        }
+        _ => None,
+    }
+}
+
+fn fts_text_term(term: &str) -> String {
+    if term.chars().any(char::is_whitespace) {
+        fts_phrase_term(term)
+    } else {
+        fts_prefix_term(term)
+    }
+}
+
+fn score_file(file: &IndexedFile, terms: &[SearchTerm]) -> Option<i32> {
     let name = file.name.to_lowercase();
     let parent = file.parent.to_lowercase();
     let path = file.path.to_lowercase();
     let mut score = if file.is_dir { 10 } else { 0 };
 
     for term in terms {
-        if term.starts_with('.') {
-            if file.extension == *term {
-                score += 30;
-                continue;
+        match term {
+            SearchTerm::Extension(extension) => {
+                if file.extension == *extension {
+                    score += 30;
+                    continue;
+                }
+                return None;
             }
-            return None;
-        }
-
-        if name == *term {
-            score += 100;
-        } else if name.starts_with(term) {
-            score += 75;
-        } else if name.contains(term) {
-            score += 45;
-        } else if parent.contains(term) {
-            score += 15;
-        } else if path.contains(term) {
-            score += 5;
-        } else {
-            return None;
+            SearchTerm::Kind(SearchKind::Folder) => {
+                if file.is_dir {
+                    score += 20;
+                    continue;
+                }
+                return None;
+            }
+            SearchTerm::Kind(SearchKind::File) => {
+                if !file.is_dir {
+                    score += 20;
+                    continue;
+                }
+                return None;
+            }
+            SearchTerm::Text(text) if name == *text => {
+                score += 100;
+            }
+            SearchTerm::Text(text) if name.starts_with(text) => {
+                score += 75;
+            }
+            SearchTerm::Text(text) if name.contains(text) => {
+                score += 45;
+            }
+            SearchTerm::Text(text) if parent.contains(text) => {
+                score += 15;
+            }
+            SearchTerm::Text(text) if path.contains(text) => {
+                score += 5;
+            }
+            SearchTerm::Text(_) => {
+                return None;
+            }
         }
     }
 

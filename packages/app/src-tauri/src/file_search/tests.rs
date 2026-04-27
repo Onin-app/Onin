@@ -4,7 +4,10 @@ use rusqlite::Connection;
 
 use super::db::{indexed_path_exists, initialize_index_db, save_index_batch};
 use super::path_utils::is_path_allowed_by_options;
-use super::search::{parse_terms, search_index_db_with_connection, search_index_db_with_trigram};
+use super::search::{
+    parse_terms, search_index_db_with_connection, search_index_db_with_trigram, SearchKind,
+    SearchTerm,
+};
 use super::types::{FileSearchOptions, IndexedFile, SEARCH_CANDIDATE_LIMIT};
 
 fn indexed_file(name: &str, path: &str, extension: &str) -> IndexedFile {
@@ -17,6 +20,16 @@ fn indexed_file(name: &str, path: &str, extension: &str) -> IndexedFile {
     }
 }
 
+fn indexed_folder(name: &str, path: &str) -> IndexedFile {
+    IndexedFile {
+        name: name.to_string(),
+        path: path.to_string(),
+        parent: "C:/root".to_string(),
+        extension: String::new(),
+        is_dir: true,
+    }
+}
+
 fn setup_search_db() -> Connection {
     let mut connection = Connection::open_in_memory().unwrap();
     initialize_index_db(&connection, true).unwrap();
@@ -26,7 +39,9 @@ fn setup_search_db() -> Connection {
         "scan-test",
         &[
             indexed_file("ProjectNotes.md", "C:/root/docs/ProjectNotes.md", ".md"),
+            indexed_file("Project Plan.md", "C:/root/docs/Project Plan.md", ".md"),
             indexed_file("image.png", "C:/root/docs/image.png", ".png"),
+            indexed_folder("Projects", "C:/root/Projects"),
         ],
     )
     .unwrap();
@@ -39,7 +54,7 @@ fn search_uses_fts_prefix_matches() {
     let results = search_index_db_with_connection(
         &connection,
         "C:/root",
-        &parse_terms("proj"),
+        &parse_terms("projectnotes"),
         SEARCH_CANDIDATE_LIMIT,
     )
     .unwrap();
@@ -54,7 +69,7 @@ fn search_falls_back_to_like_for_substring_matches() {
     let results = search_index_db_with_connection(
         &connection,
         "C:/root",
-        &parse_terms("ject"),
+        &parse_terms("jectnotes"),
         SEARCH_CANDIDATE_LIMIT,
     )
     .unwrap();
@@ -69,7 +84,7 @@ fn trigram_search_matches_filename_substrings() {
     let results = search_index_db_with_trigram(
         &connection,
         "C:/root",
-        &parse_terms("ject"),
+        &parse_terms("jectnotes"),
         SEARCH_CANDIDATE_LIMIT,
     )
     .unwrap();
@@ -84,13 +99,71 @@ fn search_combines_fts_and_extension_filters() {
     let results = search_index_db_with_connection(
         &connection,
         "C:/root",
-        &parse_terms("proj .md"),
+        &parse_terms("projectnotes .md"),
         SEARCH_CANDIDATE_LIMIT,
     )
     .unwrap();
 
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].name, "ProjectNotes.md");
+}
+
+#[test]
+fn parse_terms_supports_filters_and_quoted_phrases() {
+    assert_eq!(
+        parse_terms("\"project plan\" ext:md type:file"),
+        vec![
+            SearchTerm::Text("project plan".to_string()),
+            SearchTerm::Extension(".md".to_string()),
+            SearchTerm::Kind(SearchKind::File),
+        ]
+    );
+}
+
+#[test]
+fn search_supports_extension_filter_syntax() {
+    let connection = setup_search_db();
+    let results = search_index_db_with_connection(
+        &connection,
+        "C:/root",
+        &parse_terms("ext:png"),
+        SEARCH_CANDIDATE_LIMIT,
+    )
+    .unwrap();
+
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].name, "image.png");
+}
+
+#[test]
+fn search_supports_kind_filter_syntax() {
+    let connection = setup_search_db();
+    let results = search_index_db_with_connection(
+        &connection,
+        "C:/root",
+        &parse_terms("type:folder proj"),
+        SEARCH_CANDIDATE_LIMIT,
+    )
+    .unwrap();
+
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].name, "Projects");
+    assert!(results[0].is_dir);
+}
+
+#[test]
+fn search_supports_quoted_phrase_queries() {
+    let connection = setup_search_db();
+    let results = search_index_db_with_connection(
+        &connection,
+        "C:/root",
+        &parse_terms("\"project plan\""),
+        SEARCH_CANDIDATE_LIMIT,
+    )
+    .unwrap();
+
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].name, "Project Plan.md");
 }
 
 #[test]
