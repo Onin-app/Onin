@@ -21,6 +21,7 @@ use crate::shared_types::{CommandKeyword, IconType, ItemSource, ItemType, Launch
 
 const INDEX_WRITE_BATCH_SIZE: usize = 2_000;
 const DEFAULT_RESULT_LIMIT: usize = 30;
+const SEARCH_CANDIDATE_LIMIT: usize = 1_000;
 const INDEX_DB_FILE_NAME: &str = "file_search.sqlite";
 const SQLITE_BUSY_TIMEOUT: Duration = Duration::from_secs(2);
 const FILE_WATCH_DEBOUNCE: Duration = Duration::from_millis(800);
@@ -232,7 +233,17 @@ pub fn rebuild_file_search_index(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn search_indexed_files(
+pub async fn search_indexed_files(
+    query: String,
+    limit: Option<usize>,
+    app: AppHandle,
+) -> Vec<LaunchableItem> {
+    tokio::task::spawn_blocking(move || search_indexed_files_blocking(query, limit, app))
+        .await
+        .unwrap_or_default()
+}
+
+fn search_indexed_files_blocking(
     query: String,
     limit: Option<usize>,
     app: AppHandle,
@@ -249,14 +260,24 @@ pub fn search_indexed_files(
 
     let limit = limit.unwrap_or(DEFAULT_RESULT_LIMIT).clamp(1, 100);
     let options = file_search_options(&app);
+    let candidate_limit = SEARCH_CANDIDATE_LIMIT.max(limit * 20);
     let mut candidates = Vec::new();
-    for root in &options.roots {
-        let root = root.to_string_lossy().to_string();
-        match search_index_db(&app, &root, &terms) {
-            Ok(root_candidates) => candidates.extend(root_candidates),
-            Err(error) => {
-                eprintln!("[file_search] Failed to search SQLite index: {}", error);
+
+    match open_index_db(&app) {
+        Ok(connection) => {
+            for root in &options.roots {
+                let root = root.to_string_lossy().to_string();
+                match search_index_db_with_connection(&connection, &root, &terms, candidate_limit) {
+                    Ok(root_candidates) => candidates.extend(root_candidates),
+                    Err(error) => {
+                        eprintln!("[file_search] Failed to search SQLite index: {}", error);
+                    }
+                }
             }
+        }
+        Err(error) => {
+            eprintln!("[file_search] Failed to open SQLite index: {}", error);
+            return Vec::new();
         }
     }
 
@@ -306,11 +327,11 @@ fn index_db_path(app: &AppHandle) -> Result<PathBuf, String> {
 }
 
 fn open_index_db(app: &AppHandle) -> Result<Connection, String> {
-    open_index_db_with_backfill(app, true)
+    open_index_db_with_backfill(app, false)
 }
 
-fn open_index_db_for_indexing(app: &AppHandle, reset_index: bool) -> Result<Connection, String> {
-    open_index_db_with_backfill(app, !reset_index)
+fn open_index_db_for_indexing(app: &AppHandle, _reset_index: bool) -> Result<Connection, String> {
+    open_index_db_with_backfill(app, false)
 }
 
 fn open_index_db_with_backfill(app: &AppHandle, backfill_fts: bool) -> Result<Connection, String> {
@@ -350,6 +371,14 @@ fn initialize_index_db(connection: &Connection, backfill_fts: bool) -> Result<()
                 parent,
                 full_path,
                 extension
+            );
+
+            CREATE VIRTUAL TABLE IF NOT EXISTS file_search_entries_trigram USING fts5(
+                path UNINDEXED,
+                name,
+                parent,
+                full_path,
+                tokenize = 'trigram'
             );
 
             CREATE TABLE IF NOT EXISTS file_search_meta (
@@ -429,6 +458,7 @@ fn clear_index_db(connection: &Connection) -> Result<(), String> {
             r#"
             DELETE FROM file_search_entries;
             DELETE FROM file_search_entries_fts;
+            DELETE FROM file_search_entries_trigram;
             "#,
         )
         .map_err(|e| e.to_string())?;
@@ -437,10 +467,6 @@ fn clear_index_db(connection: &Connection) -> Result<(), String> {
 }
 
 fn backfill_fts_index_if_needed(connection: &Connection) -> Result<(), String> {
-    if file_search_meta_value(connection, "fts_backfilled")?.as_deref() == Some("1") {
-        return Ok(());
-    }
-
     let entry_count = connection
         .query_row("SELECT COUNT(*) FROM file_search_entries", [], |row| {
             row.get::<_, i64>(0)
@@ -457,13 +483,27 @@ fn backfill_fts_index_if_needed(connection: &Connection) -> Result<(), String> {
         })
         .map_err(|e| e.to_string())?;
 
-    if fts_count == entry_count {
+    let trigram_count = connection
+        .query_row(
+            "SELECT COUNT(*) FROM file_search_entries_trigram",
+            [],
+            |row| row.get::<_, i64>(0),
+        )
+        .map_err(|e| e.to_string())?;
+
+    if file_search_meta_value(connection, "fts_backfilled")?.as_deref() == Some("1")
+        && fts_count == entry_count
+        && trigram_count == entry_count
+    {
         set_file_search_meta(connection, "fts_backfilled", "1")?;
         return Ok(());
     }
 
     connection
         .execute_batch("DELETE FROM file_search_entries_fts")
+        .map_err(|e| e.to_string())?;
+    connection
+        .execute_batch("DELETE FROM file_search_entries_trigram")
         .map_err(|e| e.to_string())?;
     let mut select_statement = connection
         .prepare("SELECT path, name, parent, extension FROM file_search_entries")
@@ -490,6 +530,13 @@ fn backfill_fts_index_if_needed(connection: &Connection) -> Result<(), String> {
             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         )
         .map_err(|e| e.to_string())?;
+    let mut insert_trigram_statement = connection
+        .prepare(
+            "INSERT OR REPLACE INTO file_search_entries_trigram
+                (rowid, path, name, parent, full_path)
+            VALUES (?1, ?2, ?3, ?4, ?5)",
+        )
+        .map_err(|e| e.to_string())?;
     for (path, name, parent, extension) in entries {
         insert_statement
             .execute(params![
@@ -499,6 +546,15 @@ fn backfill_fts_index_if_needed(connection: &Connection) -> Result<(), String> {
                 &parent,
                 &path,
                 &extension,
+            ])
+            .map_err(|e| e.to_string())?;
+        insert_trigram_statement
+            .execute(params![
+                fts_rowid_for_path(&path),
+                &path,
+                &name,
+                &parent,
+                &path,
             ])
             .map_err(|e| e.to_string())?;
     }
@@ -607,36 +663,54 @@ fn is_path_allowed_by_options(path: &Path, options: &FileSearchOptions) -> bool 
         .any(|excluded_path| path.starts_with(excluded_path))
 }
 
-fn search_index_db(
-    app: &AppHandle,
-    root: &str,
-    terms: &[String],
-) -> Result<Vec<IndexedFile>, String> {
-    let db_path = index_db_path(app)?;
-    if !db_path.exists() {
-        return Ok(Vec::new());
-    }
-
-    let connection = open_index_db(app)?;
-    search_index_db_with_connection(&connection, root, terms)
-}
-
 fn search_index_db_with_connection(
     connection: &Connection,
     root: &str,
     terms: &[String],
+    candidate_limit: usize,
 ) -> Result<Vec<IndexedFile>, String> {
     let uses_fts = terms.iter().any(|term| !term.starts_with('.'));
+    let can_use_trigram = terms
+        .iter()
+        .filter(|term| !term.starts_with('.'))
+        .all(|term| term.chars().count() >= 3);
 
-    match search_index_db_with_fts(connection, root, terms) {
+    match search_index_db_with_fts(connection, root, terms, candidate_limit) {
         Ok(entries) if !entries.is_empty() || !uses_fts => Ok(entries),
-        Ok(_) => search_index_db_with_like(connection, root, terms),
+        Ok(_) if can_use_trigram => {
+            match search_index_db_with_trigram(connection, root, terms, candidate_limit) {
+                Ok(entries) if !entries.is_empty() => Ok(entries),
+                Ok(_) => search_index_db_with_like(connection, root, terms, candidate_limit),
+                Err(error) => {
+                    eprintln!(
+                        "[file_search] Failed to search SQLite trigram index, falling back to LIKE: {}",
+                        error
+                    );
+                    search_index_db_with_like(connection, root, terms, candidate_limit)
+                }
+            }
+        }
+        Ok(_) => search_index_db_with_like(connection, root, terms, candidate_limit),
         Err(error) => {
             eprintln!(
                 "[file_search] Failed to search SQLite FTS index, falling back to LIKE: {}",
                 error
             );
-            search_index_db_with_like(connection, root, terms)
+            if can_use_trigram {
+                match search_index_db_with_trigram(connection, root, terms, candidate_limit) {
+                    Ok(entries) if !entries.is_empty() => Ok(entries),
+                    Ok(_) => search_index_db_with_like(connection, root, terms, candidate_limit),
+                    Err(error) => {
+                        eprintln!(
+                            "[file_search] Failed to search SQLite trigram index, falling back to LIKE: {}",
+                            error
+                        );
+                        search_index_db_with_like(connection, root, terms, candidate_limit)
+                    }
+                }
+            } else {
+                search_index_db_with_like(connection, root, terms, candidate_limit)
+            }
         }
     }
 }
@@ -645,6 +719,7 @@ fn search_index_db_with_fts(
     connection: &Connection,
     root: &str,
     terms: &[String],
+    candidate_limit: usize,
 ) -> Result<Vec<IndexedFile>, String> {
     let mut clauses = vec!["root = ?".to_string()];
     let mut values = vec![Value::Text(root.to_string())];
@@ -667,13 +742,22 @@ fn search_index_db_with_fts(
     if !fts_terms.is_empty() {
         clauses.push(
             "path IN (
-                SELECT path
+                SELECT file_search_entries_fts.path
                 FROM file_search_entries_fts
                 WHERE file_search_entries_fts MATCH ?
+                    AND path IN (
+                        SELECT path
+                        FROM file_search_entries
+                        WHERE root = ?
+                    )
+                ORDER BY rank
+                LIMIT ?
             )"
             .to_string(),
         );
         values.push(Value::Text(fts_terms.join(" AND ")));
+        values.push(Value::Text(root.to_string()));
+        values.push(Value::Integer(candidate_limit as i64));
     }
 
     let sql = format!(
@@ -681,9 +765,89 @@ fn search_index_db_with_fts(
         SELECT name, path, parent, extension, is_dir
         FROM file_search_entries
         WHERE {}
+        ORDER BY is_dir DESC, length(name) ASC, name ASC
+        LIMIT ?
         "#,
         clauses.join(" AND ")
     );
+    values.push(Value::Integer(candidate_limit as i64));
+
+    let mut statement = connection.prepare(&sql).map_err(|e| e.to_string())?;
+    let rows = statement
+        .query_map(params_from_iter(values.iter()), |row| {
+            Ok(IndexedFile {
+                name: row.get(0)?,
+                path: row.get(1)?,
+                parent: row.get(2)?,
+                extension: row.get(3)?,
+                is_dir: row.get::<_, i64>(4)? != 0,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut entries = Vec::new();
+    for row in rows {
+        entries.push(row.map_err(|e| e.to_string())?);
+    }
+
+    Ok(entries)
+}
+
+fn search_index_db_with_trigram(
+    connection: &Connection,
+    root: &str,
+    terms: &[String],
+    candidate_limit: usize,
+) -> Result<Vec<IndexedFile>, String> {
+    let mut clauses = vec!["root = ?".to_string()];
+    let mut values = vec![Value::Text(root.to_string())];
+    let mut trigram_terms = Vec::new();
+
+    for term in terms {
+        if term.starts_with('.') {
+            clauses.push("extension = ?".to_string());
+            values.push(Value::Text(term.clone()));
+            continue;
+        }
+
+        trigram_terms.push(format!(
+            "(name:{0} OR parent:{0} OR full_path:{0})",
+            fts_phrase_term(term)
+        ));
+    }
+
+    if !trigram_terms.is_empty() {
+        clauses.push(
+            "path IN (
+                SELECT file_search_entries_trigram.path
+                FROM file_search_entries_trigram
+                WHERE file_search_entries_trigram MATCH ?
+                    AND path IN (
+                        SELECT path
+                        FROM file_search_entries
+                        WHERE root = ?
+                    )
+                ORDER BY rank
+                LIMIT ?
+            )"
+            .to_string(),
+        );
+        values.push(Value::Text(trigram_terms.join(" AND ")));
+        values.push(Value::Text(root.to_string()));
+        values.push(Value::Integer(candidate_limit as i64));
+    }
+
+    let sql = format!(
+        r#"
+        SELECT name, path, parent, extension, is_dir
+        FROM file_search_entries
+        WHERE {}
+        ORDER BY is_dir DESC, length(name) ASC, name ASC
+        LIMIT ?
+        "#,
+        clauses.join(" AND ")
+    );
+    values.push(Value::Integer(candidate_limit as i64));
 
     let mut statement = connection.prepare(&sql).map_err(|e| e.to_string())?;
     let rows = statement
@@ -710,6 +874,7 @@ fn search_index_db_with_like(
     connection: &Connection,
     root: &str,
     terms: &[String],
+    candidate_limit: usize,
 ) -> Result<Vec<IndexedFile>, String> {
     let mut clauses = vec!["root = ?".to_string()];
     let mut values = vec![Value::Text(root.to_string())];
@@ -736,9 +901,12 @@ fn search_index_db_with_like(
         SELECT name, path, parent, extension, is_dir
         FROM file_search_entries
         WHERE {}
+        ORDER BY is_dir DESC, length(name) ASC, name ASC
+        LIMIT ?
         "#,
         clauses.join(" AND ")
     );
+    values.push(Value::Integer(candidate_limit as i64));
 
     let mut statement = connection.prepare(&sql).map_err(|e| e.to_string())?;
     let rows = statement
@@ -797,6 +965,16 @@ fn save_index_batch(
                 "#,
             )
             .map_err(|e| e.to_string())?;
+        let mut insert_trigram_statement = transaction
+            .prepare(
+                r#"
+                INSERT OR REPLACE INTO file_search_entries_trigram
+                    (rowid, path, name, parent, full_path)
+                VALUES
+                    (?1, ?2, ?3, ?4, ?5)
+                "#,
+            )
+            .map_err(|e| e.to_string())?;
 
         for entry in entries {
             entry_statement
@@ -820,6 +998,15 @@ fn save_index_batch(
                     &entry.extension,
                 ])
                 .map_err(|e| e.to_string())?;
+            insert_trigram_statement
+                .execute(params![
+                    fts_rowid_for_path(&entry.path),
+                    &entry.path,
+                    &entry.name,
+                    &entry.parent,
+                    &entry.path,
+                ])
+                .map_err(|e| e.to_string())?;
         }
     }
 
@@ -830,6 +1017,17 @@ fn finalize_index_scan(connection: &Connection, root: &str, scan_id: &str) -> Re
     connection
         .execute(
             "DELETE FROM file_search_entries_fts
+            WHERE path IN (
+                SELECT path
+                FROM file_search_entries
+                WHERE root = ?1 AND scan_id != ?2
+            )",
+            params![root, scan_id],
+        )
+        .map_err(|e| e.to_string())?;
+    connection
+        .execute(
+            "DELETE FROM file_search_entries_trigram
             WHERE path IN (
                 SELECT path
                 FROM file_search_entries
@@ -1026,6 +1224,18 @@ fn delete_index_path(connection: &Connection, root: &str, path: &Path) -> Result
 
     connection
         .execute(
+            "DELETE FROM file_search_entries_trigram
+            WHERE path IN (
+                SELECT path
+                FROM file_search_entries
+                WHERE root = ?1 AND (path = ?2 OR path LIKE ?3 ESCAPE '\\')
+            )",
+            params![root, path, child_prefix],
+        )
+        .map_err(|e| e.to_string())?;
+
+    connection
+        .execute(
             "DELETE FROM file_search_entries WHERE root = ?1 AND (path = ?2 OR path LIKE ?3 ESCAPE '\\')",
             params![root, path, child_prefix],
         )
@@ -1067,6 +1277,10 @@ fn escape_like_term(term: &str) -> String {
 
 fn fts_prefix_term(term: &str) -> String {
     format!("\"{}\"*", term.replace('"', "\"\""))
+}
+
+fn fts_phrase_term(term: &str) -> String {
+    format!("\"{}\"", term.replace('"', "\"\""))
 }
 
 fn fts_rowid_for_path(path: &str) -> i64 {
@@ -1292,8 +1506,13 @@ mod tests {
     #[test]
     fn search_uses_fts_prefix_matches() {
         let connection = setup_search_db();
-        let results =
-            search_index_db_with_connection(&connection, "C:/root", &parse_terms("proj")).unwrap();
+        let results = search_index_db_with_connection(
+            &connection,
+            "C:/root",
+            &parse_terms("proj"),
+            SEARCH_CANDIDATE_LIMIT,
+        )
+        .unwrap();
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].name, "ProjectNotes.md");
@@ -1302,8 +1521,28 @@ mod tests {
     #[test]
     fn search_falls_back_to_like_for_substring_matches() {
         let connection = setup_search_db();
-        let results =
-            search_index_db_with_connection(&connection, "C:/root", &parse_terms("ject")).unwrap();
+        let results = search_index_db_with_connection(
+            &connection,
+            "C:/root",
+            &parse_terms("ject"),
+            SEARCH_CANDIDATE_LIMIT,
+        )
+        .unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].name, "ProjectNotes.md");
+    }
+
+    #[test]
+    fn trigram_search_matches_filename_substrings() {
+        let connection = setup_search_db();
+        let results = search_index_db_with_trigram(
+            &connection,
+            "C:/root",
+            &parse_terms("ject"),
+            SEARCH_CANDIDATE_LIMIT,
+        )
+        .unwrap();
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].name, "ProjectNotes.md");
@@ -1312,9 +1551,13 @@ mod tests {
     #[test]
     fn search_combines_fts_and_extension_filters() {
         let connection = setup_search_db();
-        let results =
-            search_index_db_with_connection(&connection, "C:/root", &parse_terms("proj .md"))
-                .unwrap();
+        let results = search_index_db_with_connection(
+            &connection,
+            "C:/root",
+            &parse_terms("proj .md"),
+            SEARCH_CANDIDATE_LIMIT,
+        )
+        .unwrap();
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].name, "ProjectNotes.md");

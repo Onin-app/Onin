@@ -50,7 +50,7 @@
     isSearching = true;
     searchTimer = setTimeout(() => {
       searchFiles(value);
-    }, 180);
+    }, 250);
   };
 
   const searchFiles = async (value: string) => {
@@ -67,7 +67,7 @@
         "search_indexed_files",
         {
           query,
-          limit: 100,
+          limit: 60,
         },
       );
 
