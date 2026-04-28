@@ -8,8 +8,8 @@
   import type { AppConfig } from "$lib/type";
 
   interface FileSearchStatus {
-    is_indexing: boolean;
-    indexed_count: number;
+    is_searching: boolean;
+    last_result_count: number;
     backend: string;
     everything_installed: boolean;
     everything_ipc_available: boolean;
@@ -24,8 +24,8 @@
   let choosingDirectory = $state(false);
   let excludeInput = $state("");
   let status = $state<FileSearchStatus>({
-    is_indexing: false,
-    indexed_count: 0,
+    is_searching: false,
+    last_result_count: 0,
     backend: "",
     everything_installed: false,
     everything_ipc_available: false,
@@ -242,7 +242,7 @@
           class="mt-2 inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-neutral-50 px-2 py-1 text-xs text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
         >
           <span
-            class="h-1.5 w-1.5 rounded-full {status.is_indexing
+            class="h-1.5 w-1.5 rounded-full {status.is_searching
               ? 'animate-pulse bg-amber-500'
               : status.available
                 ? 'bg-emerald-500'

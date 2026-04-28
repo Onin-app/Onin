@@ -12,7 +12,7 @@ pub use types::FileSearchState;
 use types::FileSearchStatus;
 
 pub fn init(_app: AppHandle) {
-    // File search now delegates to the platform search index on demand.
+    // File search delegates to the platform search backend on demand.
 }
 
 #[tauri::command]
@@ -24,8 +24,8 @@ pub fn get_file_search_status(
     let everything_ipc_available = provider::everything_ipc_available();
 
     FileSearchStatus {
-        is_indexing: state.is_searching(),
-        indexed_count: 0,
+        is_searching: state.is_searching(),
+        last_result_count: state.last_result_count(),
         backend: provider::backend_name().to_string(),
         everything_installed,
         everything_ipc_available,
@@ -43,13 +43,13 @@ pub async fn install_file_search_everything() -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn search_indexed_files(
+pub async fn search_files(
     query: String,
     limit: Option<usize>,
     app: AppHandle,
 ) -> Vec<LaunchableItem> {
     let state = app.state::<FileSearchState>();
-    state.set_searching(true);
+    state.begin_search();
 
     let app_for_search = app.clone();
     let result = tokio::task::spawn_blocking(move || {
@@ -58,14 +58,16 @@ pub async fn search_indexed_files(
     .await
     .unwrap_or_else(|error| Err(error.to_string()));
 
-    state.set_searching(false);
+    state.end_search();
 
     match result {
         Ok(items) => {
+            state.set_last_result_count(items.len());
             state.set_last_error(None);
             items
         }
         Err(error) => {
+            state.set_last_result_count(0);
             state.set_last_error(Some(error));
             Vec::new()
         }
@@ -73,7 +75,7 @@ pub async fn search_indexed_files(
 }
 
 #[tauri::command]
-pub fn open_indexed_file(path: String, app: AppHandle) -> Result<(), String> {
+pub fn open_file_search_result(path: String, app: AppHandle) -> Result<(), String> {
     let path = path_utils::validate_search_result_path(&app, &path)?;
     opener::open(&path).map_err(|e| format!("Failed to open file {}: {}", path.display(), e))
 }

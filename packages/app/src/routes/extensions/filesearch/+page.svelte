@@ -10,8 +10,8 @@
   import type { LaunchableItem } from "$lib/type";
 
   interface FileSearchStatus {
-    is_indexing: boolean;
-    indexed_count: number;
+    is_searching: boolean;
+    last_result_count: number;
     backend: string;
     everything_installed: boolean;
     everything_ipc_available: boolean;
@@ -24,8 +24,8 @@
   let results = $state<LaunchableItem[]>([]);
   let selectedIndex = $state(0);
   let status = $state<FileSearchStatus>({
-    is_indexing: false,
-    indexed_count: 0,
+    is_searching: false,
+    last_result_count: 0,
     backend: "",
     everything_installed: false,
     everything_ipc_available: false,
@@ -104,13 +104,10 @@
     }
 
     try {
-      const nextResults = await invoke<LaunchableItem[]>(
-        "search_indexed_files",
-        {
-          query,
-          limit: 60,
-        },
-      );
+      const nextResults = await invoke<LaunchableItem[]>("search_files", {
+        query,
+        limit: 60,
+      });
 
       if (currentRequestId === requestId) {
         results = nextResults;
@@ -201,7 +198,7 @@
 
   const openItem = async (item: LaunchableItem) => {
     try {
-      await invoke("open_indexed_file", { path: item.path });
+      await invoke("open_file_search_result", { path: item.path });
       invoke("close_main_window");
     } catch (error) {
       console.error("[FileSearch] Failed to open file:", error);
@@ -255,7 +252,7 @@
         title={status.last_error || "系统文件搜索后端状态"}
       >
         <span
-          class="h-1.5 w-1.5 rounded-full {status.is_indexing
+          class="h-1.5 w-1.5 rounded-full {status.is_searching
             ? 'animate-pulse bg-amber-500'
             : status.available
               ? 'bg-emerald-500'

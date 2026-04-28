@@ -22,21 +22,41 @@ pub(super) struct PlatformFile {
 
 #[derive(Default)]
 pub struct FileSearchState {
-    is_searching: Mutex<bool>,
+    active_search_count: Mutex<usize>,
+    last_result_count: Mutex<usize>,
     last_error: Mutex<Option<String>>,
 }
 
 impl FileSearchState {
     pub(super) fn is_searching(&self) -> bool {
-        self.is_searching
+        self.active_search_count
             .lock()
-            .map(|is_searching| *is_searching)
+            .map(|active_search_count| *active_search_count > 0)
             .unwrap_or(false)
     }
 
-    pub(super) fn set_searching(&self, searching: bool) {
-        if let Ok(mut is_searching) = self.is_searching.lock() {
-            *is_searching = searching;
+    pub(super) fn begin_search(&self) {
+        if let Ok(mut active_search_count) = self.active_search_count.lock() {
+            *active_search_count = active_search_count.saturating_add(1);
+        }
+    }
+
+    pub(super) fn end_search(&self) {
+        if let Ok(mut active_search_count) = self.active_search_count.lock() {
+            *active_search_count = active_search_count.saturating_sub(1);
+        }
+    }
+
+    pub(super) fn last_result_count(&self) -> usize {
+        self.last_result_count
+            .lock()
+            .map(|last_result_count| *last_result_count)
+            .unwrap_or(0)
+    }
+
+    pub(super) fn set_last_result_count(&self, count: usize) {
+        if let Ok(mut last_result_count) = self.last_result_count.lock() {
+            *last_result_count = count;
         }
     }
 
@@ -56,8 +76,8 @@ impl FileSearchState {
 
 #[derive(Serialize)]
 pub struct FileSearchStatus {
-    pub is_indexing: bool,
-    pub indexed_count: usize,
+    pub is_searching: bool,
+    pub last_result_count: usize,
     pub backend: String,
     pub everything_installed: bool,
     pub everything_ipc_available: bool,

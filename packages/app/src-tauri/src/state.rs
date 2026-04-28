@@ -51,6 +51,6 @@ pub fn setup_managed_state(builder: tauri::Builder<tauri::Wry>) -> tauri::Builde
             shortcuts: Mutex::new(vec![]),
             last_executed: Mutex::new(std::collections::HashMap::new()),
         })
-        // 文件搜索索引状态
+        // 文件搜索运行状态
         .manage(file_search::FileSearchState::default())
 }
