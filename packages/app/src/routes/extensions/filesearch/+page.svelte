@@ -38,7 +38,9 @@
   let installEverythingDialogOpen = $state(false);
   let dismissedEverythingInstallPrompt = $state(false);
   let headerRef = $state<ExtensionHeader>(null!);
-  let requestId = 0;
+  let searchVersion = 0;
+  let searchInFlight = false;
+  let queuedSearch: { query: string; version: number } | null = null;
   let searchTimer: ReturnType<typeof setTimeout> | null = null;
   let loadingTimer: ReturnType<typeof setTimeout> | null = null;
   let showSearchingIndicator = $state(false);
@@ -56,20 +58,27 @@
     goto("/");
   };
 
-  const handleSearch = (value: string) => {
-    searchQuery = value;
-    selectedIndex = 0;
-
+  const clearSearchTimers = () => {
     if (searchTimer) {
       clearTimeout(searchTimer);
+      searchTimer = null;
     }
     if (loadingTimer) {
       clearTimeout(loadingTimer);
+      loadingTimer = null;
     }
+  };
+
+  const handleSearch = (value: string) => {
+    searchQuery = value;
+    selectedIndex = 0;
+    searchVersion += 1;
+    const version = searchVersion;
+    clearSearchTimers();
 
     const query = value.trim();
     if (query.length < 2) {
-      requestId++;
+      queuedSearch = null;
       results = [];
       isSearching = false;
       showSearchingIndicator = false;
@@ -80,7 +89,7 @@
     showSearchingIndicator = false;
     const searchDelay = status.everything_ipc_available ? 25 : 180;
     searchTimer = setTimeout(() => {
-      searchFiles(value);
+      enqueueSearch(query, version);
     }, searchDelay);
     loadingTimer = setTimeout(() => {
       if (isSearching && results.length === 0) {
@@ -94,32 +103,54 @@
     headerRef?.focus();
   };
 
-  const searchFiles = async (value: string) => {
-    const currentRequestId = ++requestId;
-    const query = value.trim();
-
+  const enqueueSearch = (query: string, version: number) => {
     if (query.length < 2) {
-      results = [];
       return;
     }
 
+    queuedSearch = { query, version };
+    if (!searchInFlight) {
+      void runQueuedSearch();
+    }
+  };
+
+  const runQueuedSearch = async () => {
+    if (searchInFlight || !queuedSearch) {
+      return;
+    }
+
+    const currentSearch = queuedSearch;
+    queuedSearch = null;
+    searchInFlight = true;
+
     try {
       const nextResults = await invoke<LaunchableItem[]>("search_files", {
-        query,
+        query: currentSearch.query,
         limit: 60,
       });
 
-      if (currentRequestId === requestId) {
+      if (
+        currentSearch.version === searchVersion &&
+        currentSearch.query === searchQuery.trim()
+      ) {
         results = nextResults;
         isSearching = false;
         showSearchingIndicator = false;
       }
     } catch (error) {
       console.error("[FileSearch] Failed to search files:", error);
-      if (currentRequestId === requestId) {
+      if (
+        currentSearch.version === searchVersion &&
+        currentSearch.query === searchQuery.trim()
+      ) {
         results = [];
         isSearching = false;
         showSearchingIndicator = false;
+      }
+    } finally {
+      searchInFlight = false;
+      if (queuedSearch) {
+        void runQueuedSearch();
       }
     }
   };
@@ -150,8 +181,10 @@
       toast.success("Everything 已安装，文件搜索将优先使用 Everything", {
         id: toastId,
       });
-      if (searchQuery.trim().length >= 2) {
-        searchFiles(searchQuery);
+      const query = searchQuery.trim();
+      if (query.length >= 2) {
+        searchVersion += 1;
+        enqueueSearch(query, searchVersion);
       }
     } catch (error) {
       console.error("[FileSearch] Failed to install Everything:", error);
@@ -228,12 +261,9 @@
   });
 
   onDestroy(() => {
-    if (searchTimer) {
-      clearTimeout(searchTimer);
-    }
-    if (loadingTimer) {
-      clearTimeout(loadingTimer);
-    }
+    searchVersion += 1;
+    queuedSearch = null;
+    clearSearchTimers();
   });
 </script>
 

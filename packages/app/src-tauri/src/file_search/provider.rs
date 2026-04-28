@@ -2,9 +2,9 @@ use std::{
     cmp::Ordering,
     collections::HashSet,
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Output, Stdio},
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 #[cfg(target_os = "windows")]
@@ -387,6 +387,40 @@ fn platform_search(
     }
 }
 
+fn run_command_with_timeout(
+    command: &mut Command,
+    label: &str,
+    timeout: Duration,
+) -> Result<Output, String> {
+    command.stdout(Stdio::piped()).stderr(Stdio::piped());
+
+    let mut child = command
+        .spawn()
+        .map_err(|error| format!("{} 启动失败: {}", label, error))?;
+    let start = Instant::now();
+
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => {
+                return child
+                    .wait_with_output()
+                    .map_err(|error| format!("读取 {} 输出失败: {}", label, error));
+            }
+            Ok(None) if start.elapsed() >= timeout => {
+                let _ = child.kill();
+                let _ = child.wait_with_output();
+                return Err(format!("{} 超时，请稍后重试", label));
+            }
+            Ok(None) => thread::sleep(Duration::from_millis(20)),
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!("等待 {} 结束失败: {}", label, error));
+            }
+        }
+    }
+}
+
 #[cfg(target_os = "windows")]
 #[derive(Deserialize)]
 struct WindowsSearchRow {
@@ -620,10 +654,10 @@ fn search_everything_cli(
 ) -> Result<Vec<PlatformFile>, String> {
     let mut files = Vec::new();
     for search_query in everything_queries(query, options) {
-        let output = Command::new("es.exe")
-            .args(["-n", &limit.to_string(), &search_query])
-            .output()
-            .map_err(|error| format!("Everything CLI 查询启动失败: {}", error))?;
+        let mut command = Command::new("es.exe");
+        command.args(["-n", &limit.to_string(), &search_query]);
+        let output =
+            run_command_with_timeout(&mut command, "Everything CLI 查询", Duration::from_secs(2))?;
 
         if !output.status.success() {
             return Err(format!(
@@ -672,7 +706,8 @@ try {
 }
 "#;
 
-    let output = Command::new(windows_powershell_path())
+    let mut command = Command::new(windows_powershell_path());
+    command
         .args([
             "-NoProfile",
             "-NonInteractive",
@@ -682,9 +717,9 @@ try {
             script,
         ])
         .env("ONIN_FILE_SEARCH_QUERY", query)
-        .env("ONIN_FILE_SEARCH_LIMIT", limit.to_string())
-        .output()
-        .map_err(|error| format!("Windows Search 查询启动失败: {}", error))?;
+        .env("ONIN_FILE_SEARCH_LIMIT", limit.to_string());
+    let output =
+        run_command_with_timeout(&mut command, "Windows Search 查询", Duration::from_secs(5))?;
 
     if !output.status.success() {
         return Err(format!(
@@ -843,10 +878,9 @@ fn windows_powershell_path() -> PathBuf {
 #[cfg(target_os = "macos")]
 fn search_macos(query: &str, limit: usize) -> Result<Vec<PlatformFile>, String> {
     let query = format!("kMDItemFSName == '*{}*'cd", query.replace('\'', "\\'"));
-    let output = Command::new("mdfind")
-        .args(["-0", &query])
-        .output()
-        .map_err(|error| format!("Spotlight 查询启动失败: {}", error))?;
+    let mut command = Command::new("mdfind");
+    command.args(["-0", &query]);
+    let output = run_command_with_timeout(&mut command, "Spotlight 查询", Duration::from_secs(3))?;
 
     if !output.status.success() {
         return Err(format!(
@@ -872,10 +906,13 @@ fn search_linux(query: &str, limit: usize) -> Result<Vec<PlatformFile>, String> 
         return Err("未找到 plocate 或 locate 文件搜索后端".to_string());
     };
 
-    let output = Command::new(command)
-        .args(["-0", "-i", "-l", &limit.to_string(), query])
-        .output()
-        .map_err(|error| format!("{} 查询启动失败: {}", command, error))?;
+    let mut search_command = Command::new(command);
+    search_command.args(["-0", "-i", "-l", &limit.to_string(), query]);
+    let output = run_command_with_timeout(
+        &mut search_command,
+        &format!("{} 查询", command),
+        Duration::from_secs(3),
+    )?;
 
     if !output.status.success() {
         return Err(format!(
