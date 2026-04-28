@@ -1,7 +1,22 @@
-use std::{cmp::Ordering, collections::HashSet, path::PathBuf, process::Command};
+use std::{
+    cmp::Ordering,
+    collections::HashSet,
+    path::{Path, PathBuf},
+    process::Command,
+    thread,
+    time::Duration,
+};
+
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 
 use serde::Deserialize;
 use tauri::AppHandle;
+#[cfg(target_os = "windows")]
+use winreg::{
+    enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE},
+    RegKey, HKEY,
+};
 
 use crate::shared_types::{CommandKeyword, IconType, ItemSource, ItemType, LaunchableItem};
 
@@ -13,6 +28,10 @@ use super::{
 pub(super) fn backend_name() -> &'static str {
     #[cfg(target_os = "windows")]
     {
+        if everything_installed() {
+            return "Everything";
+        }
+
         "Windows Search"
     }
     #[cfg(target_os = "macos")]
@@ -26,6 +45,63 @@ pub(super) fn backend_name() -> &'static str {
     #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
     {
         "Unsupported"
+    }
+}
+
+pub(super) fn everything_installed() -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        find_everything_exe_path().is_some()
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        false
+    }
+}
+
+pub(super) fn everything_ipc_available() -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        everything_ipc_window_available()
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        false
+    }
+}
+
+pub(super) fn everything_install_required() -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        !everything_installed()
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        false
+    }
+}
+
+pub(super) fn install_everything_backend() -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        install_everything_with_winget()?;
+
+        let path = find_everything_exe_path()
+            .ok_or_else(|| "Everything 安装完成后仍未找到 Everything.exe".to_string())?;
+        start_everything_client(&path)?;
+
+        for _ in 0..30 {
+            thread::sleep(Duration::from_millis(200));
+            if everything_ipc_window_available() {
+                return Ok(());
+            }
+        }
+
+        Err("Everything 已安装，但 IPC 尚未就绪，请稍后再试".to_string())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("当前平台不支持自动安装 Everything".to_string())
     }
 }
 
@@ -65,7 +141,11 @@ pub(super) fn search_platform_files(
 
     let limit = limit.unwrap_or(DEFAULT_RESULT_LIMIT).clamp(1, 100);
     let options = file_search_options(app);
-    let mut files = platform_search(&terms.text_query(), limit.saturating_mul(10).max(100))?;
+    let mut files = platform_search(
+        &terms.text_query(),
+        limit.saturating_mul(10).max(100),
+        &options,
+    )?;
     files = filter_files(files, &terms, &options);
     files.sort_by(|a, b| compare_files(a, b, &terms));
     files.dedup_by(|a, b| paths_equal(&a.path, &b.path));
@@ -277,21 +357,27 @@ fn launchable_item_from_file(file: PlatformFile) -> LaunchableItem {
     }
 }
 
-fn platform_search(query: &str, limit: usize) -> Result<Vec<PlatformFile>, String> {
+fn platform_search(
+    query: &str,
+    limit: usize,
+    options: &FileSearchOptions,
+) -> Result<Vec<PlatformFile>, String> {
     if query.trim().is_empty() {
         return Ok(Vec::new());
     }
 
     #[cfg(target_os = "windows")]
     {
-        search_windows(query, limit)
+        search_windows(query, limit, options)
     }
     #[cfg(target_os = "macos")]
     {
+        let _ = options;
         search_macos(query, limit)
     }
     #[cfg(target_os = "linux")]
     {
+        let _ = options;
         search_linux(query, limit)
     }
     #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
@@ -309,7 +395,256 @@ struct WindowsSearchRow {
 }
 
 #[cfg(target_os = "windows")]
-fn search_windows(query: &str, limit: usize) -> Result<Vec<PlatformFile>, String> {
+fn search_windows(
+    query: &str,
+    limit: usize,
+    options: &FileSearchOptions,
+) -> Result<Vec<PlatformFile>, String> {
+    match search_everything_ipc(query, limit, options) {
+        Ok(files) => return Ok(files),
+        Err(error) => {
+            tracing::warn!(backend = "Everything", %error, "file search backend failed");
+        }
+    }
+
+    match search_everything_cli(query, limit, options) {
+        Ok(files) => return Ok(files),
+        Err(error) => {
+            tracing::warn!(backend = "Everything CLI", %error, "file search backend failed");
+        }
+    }
+
+    search_windows_search(query, limit)
+}
+
+#[cfg(target_os = "windows")]
+fn search_everything_ipc(
+    query: &str,
+    limit: usize,
+    options: &FileSearchOptions,
+) -> Result<Vec<PlatformFile>, String> {
+    use everything_ipc::wm::{RequestFlags, Sort};
+
+    let everything = everything_client_or_start()?;
+    let request_flags = RequestFlags::FileName | RequestFlags::Path;
+    let mut files = Vec::new();
+
+    for search_query in everything_queries(query, options) {
+        let list = everything
+            .query_wait(&search_query)
+            .request_flags(request_flags)
+            .sort(Sort::NameAscending)
+            .max_results(limit as u32)
+            .timeout(std::time::Duration::from_millis(700))
+            .call()
+            .map_err(|error| error.to_string())?;
+
+        for item in list.iter() {
+            let Some(name) = item.get_string(RequestFlags::FileName) else {
+                continue;
+            };
+            let Some(parent) = item.get_string(RequestFlags::Path) else {
+                continue;
+            };
+
+            let path = PathBuf::from(parent).join(name);
+            if let Some(file) = platform_file_from_path(&path) {
+                files.push(file);
+            }
+
+            if files.len() >= limit {
+                return Ok(files);
+            }
+        }
+    }
+
+    Ok(files)
+}
+
+#[cfg(target_os = "windows")]
+fn everything_client_or_start() -> Result<everything_ipc::wm::EverythingClient, String> {
+    use everything_ipc::wm::EverythingClient;
+
+    if let Ok(client) = EverythingClient::new() {
+        return Ok(client);
+    }
+
+    let Some(path) = find_everything_exe_path() else {
+        return Err("Everything IPC 不可用，且未找到 Everything.exe".to_string());
+    };
+
+    start_everything_client(&path)?;
+
+    for _ in 0..15 {
+        thread::sleep(Duration::from_millis(100));
+        if let Ok(client) = EverythingClient::new() {
+            return Ok(client);
+        }
+    }
+
+    Err(format!(
+        "已启动 Everything 客户端，但 IPC 窗口仍不可用: {}",
+        path.display()
+    ))
+}
+
+#[cfg(target_os = "windows")]
+fn start_everything_client(path: &Path) -> Result<(), String> {
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+    Command::new(path)
+        .arg("-startup")
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("启动 Everything 客户端失败: {}", error))
+}
+
+#[cfg(target_os = "windows")]
+fn find_everything_exe_path() -> Option<PathBuf> {
+    find_everything_exe_path_from_registry().or_else(|| {
+        [
+            r"C:\Program Files\Everything\Everything.exe",
+            r"C:\Program Files (x86)\Everything\Everything.exe",
+        ]
+        .into_iter()
+        .map(PathBuf::from)
+        .find(|path| path.exists())
+    })
+}
+
+#[cfg(target_os = "windows")]
+fn find_everything_exe_path_from_registry() -> Option<PathBuf> {
+    const UNINSTALL_PATHS: &[(&str, HKEY)] = &[
+        (
+            "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+            HKEY_CURRENT_USER,
+        ),
+        (
+            "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+            HKEY_LOCAL_MACHINE,
+        ),
+        (
+            "SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+            HKEY_LOCAL_MACHINE,
+        ),
+    ];
+
+    for (path, hive) in UNINSTALL_PATHS {
+        let root = RegKey::predef(*hive);
+        let Ok(uninstall_key) = root.open_subkey(path) else {
+            continue;
+        };
+
+        for item in uninstall_key.enum_keys().filter_map(Result::ok) {
+            let Ok(subkey) = uninstall_key.open_subkey(item) else {
+                continue;
+            };
+
+            let display_name = subkey.get_value::<String, _>("DisplayName").ok();
+            if !display_name
+                .as_deref()
+                .map(|name| name.to_lowercase().contains("everything"))
+                .unwrap_or(false)
+            {
+                continue;
+            }
+
+            for value_name in ["DisplayIcon", "InstallLocation"] {
+                let Some(path) = subkey
+                    .get_value::<String, _>(value_name)
+                    .ok()
+                    .and_then(|value| everything_exe_from_registry_value(&value))
+                else {
+                    continue;
+                };
+
+                if path.exists() {
+                    return Some(path);
+                }
+            }
+        }
+    }
+
+    None
+}
+
+#[cfg(target_os = "windows")]
+fn everything_exe_from_registry_value(value: &str) -> Option<PathBuf> {
+    let trimmed = value.trim().trim_matches('"');
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let path = PathBuf::from(trimmed);
+    if path.is_dir() {
+        return Some(path.join("Everything.exe"));
+    }
+
+    if path
+        .file_name()
+        .map(|name| {
+            name.to_string_lossy()
+                .eq_ignore_ascii_case("Everything.exe")
+        })
+        .unwrap_or(false)
+    {
+        return Some(path);
+    }
+
+    let before_comma = trimmed.split(',').next().unwrap_or(trimmed).trim();
+    let path = PathBuf::from(before_comma);
+    if path
+        .file_name()
+        .map(|name| {
+            name.to_string_lossy()
+                .eq_ignore_ascii_case("Everything.exe")
+        })
+        .unwrap_or(false)
+    {
+        return Some(path);
+    }
+
+    None
+}
+
+#[cfg(target_os = "windows")]
+fn search_everything_cli(
+    query: &str,
+    limit: usize,
+    options: &FileSearchOptions,
+) -> Result<Vec<PlatformFile>, String> {
+    let mut files = Vec::new();
+    for search_query in everything_queries(query, options) {
+        let output = Command::new("es.exe")
+            .args(["-n", &limit.to_string(), &search_query])
+            .output()
+            .map_err(|error| format!("Everything CLI 查询启动失败: {}", error))?;
+
+        if !output.status.success() {
+            return Err(format!(
+                "Everything CLI 查询失败: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            ));
+        }
+
+        for line in String::from_utf8_lossy(&output.stdout).lines() {
+            let path = PathBuf::from(line.trim());
+            if let Some(file) = platform_file_from_path(&path) {
+                files.push(file);
+            }
+
+            if files.len() >= limit {
+                return Ok(files);
+            }
+        }
+    }
+
+    Ok(files)
+}
+
+#[cfg(target_os = "windows")]
+fn search_windows_search(query: &str, limit: usize) -> Result<Vec<PlatformFile>, String> {
     let script = r#"
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
@@ -367,6 +702,93 @@ try {
         .filter_map(|row| path_from_windows_item_url(&row.url))
         .filter_map(|path| platform_file_from_path(&path))
         .collect())
+}
+
+#[cfg(target_os = "windows")]
+fn everything_ipc_window_available() -> bool {
+    everything_ipc::IpcWindow::new()
+        .map(|window| window.is_ipc_available() && window.is_db_loaded())
+        .unwrap_or(false)
+}
+
+#[cfg(target_os = "windows")]
+fn install_everything_with_winget() -> Result<(), String> {
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+    let output = Command::new("winget")
+        .args([
+            "install",
+            "--id",
+            "voidtools.Everything",
+            "--exact",
+            "--source",
+            "winget",
+            "--silent",
+            "--accept-package-agreements",
+            "--accept-source-agreements",
+        ])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .map_err(|error| {
+            format!(
+                "启动 winget 失败: {}。请确认系统已安装 App Installer，或手动安装 Everything。",
+                error
+            )
+        })?;
+
+    if output.status.success() {
+        return Ok(());
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Err(format!(
+        "winget 安装 Everything 失败: {}{}",
+        stdout.trim(),
+        stderr.trim()
+    ))
+}
+
+#[cfg(target_os = "windows")]
+fn everything_queries(query: &str, options: &FileSearchOptions) -> Vec<String> {
+    let query = query.trim();
+    let roots = options
+        .roots
+        .iter()
+        .filter(|root| root.exists())
+        .collect::<Vec<_>>();
+
+    if roots.is_empty() {
+        return vec![query.to_string()];
+    }
+
+    roots
+        .into_iter()
+        .map(|root| {
+            let root = everything_path_scope(root);
+            if root.is_empty() {
+                query.to_string()
+            } else {
+                format!("{} {}", root, query)
+            }
+        })
+        .collect()
+}
+
+#[cfg(target_os = "windows")]
+fn everything_path_scope(path: &Path) -> String {
+    let normalized = path.to_string_lossy().replace('/', "\\");
+    let normalized = normalized.trim_end_matches('\\');
+    if normalized.is_empty() {
+        return String::new();
+    }
+
+    let scoped = format!(r"{}\", normalized.replace('"', r#"\""#));
+    if scoped.chars().any(char::is_whitespace) {
+        format!("\"{}\"", scoped)
+    } else {
+        scoped
+    }
 }
 
 #[cfg(target_os = "windows")]

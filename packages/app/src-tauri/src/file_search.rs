@@ -24,10 +24,16 @@ pub fn get_file_search_status(
     _app: AppHandle,
     state: tauri::State<FileSearchState>,
 ) -> FileSearchStatus {
+    let everything_installed = provider::everything_installed();
+    let everything_ipc_available = provider::everything_ipc_available();
+
     FileSearchStatus {
         is_indexing: state.is_searching(),
         indexed_count: 0,
         backend: provider::backend_name().to_string(),
+        everything_installed,
+        everything_ipc_available,
+        everything_install_required: provider::everything_install_required(),
         available: provider::backend_available(),
         last_error: state.last_error(),
     }
@@ -36,6 +42,13 @@ pub fn get_file_search_status(
 #[tauri::command]
 pub fn rebuild_file_search_index(_app: AppHandle) -> Result<(), String> {
     Ok(())
+}
+
+#[tauri::command]
+pub async fn install_file_search_everything() -> Result<(), String> {
+    tokio::task::spawn_blocking(provider::install_everything_backend)
+        .await
+        .unwrap_or_else(|error| Err(error.to_string()))
 }
 
 #[tauri::command]

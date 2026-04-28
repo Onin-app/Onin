@@ -2,7 +2,9 @@
   import { onDestroy, onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+  import { toast } from "svelte-sonner";
   import AppScrollArea from "$lib/components/AppScrollArea.svelte";
+  import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import ExtensionHeader from "$lib/components/ExtensionHeader.svelte";
   import PhosphorIcon from "$lib/components/PhosphorIcon.svelte";
   import type { LaunchableItem } from "$lib/type";
@@ -11,6 +13,9 @@
     is_indexing: boolean;
     indexed_count: number;
     backend: string;
+    everything_installed: boolean;
+    everything_ipc_available: boolean;
+    everything_install_required: boolean;
     available: boolean;
     last_error?: string | null;
   }
@@ -22,10 +27,16 @@
     is_indexing: false,
     indexed_count: 0,
     backend: "",
+    everything_installed: false,
+    everything_ipc_available: false,
+    everything_install_required: false,
     available: true,
     last_error: null,
   });
   let isSearching = $state(false);
+  let isInstallingEverything = $state(false);
+  let installEverythingDialogOpen = $state(false);
+  let dismissedEverythingInstallPrompt = $state(false);
   let headerRef = $state<ExtensionHeader>(null!);
   let requestId = 0;
   let statusTimer: ReturnType<typeof setInterval> | null = null;
@@ -105,9 +116,43 @@
   const refreshStatus = async () => {
     try {
       status = await invoke<FileSearchStatus>("get_file_search_status");
+      if (
+        status.everything_install_required &&
+        !dismissedEverythingInstallPrompt &&
+        !isInstallingEverything
+      ) {
+        installEverythingDialogOpen = true;
+      }
     } catch (error) {
       console.error("[FileSearch] Failed to get status:", error);
     }
+  };
+
+  const installEverything = async () => {
+    if (isInstallingEverything) return;
+
+    isInstallingEverything = true;
+    const toastId = toast.loading("正在安装 Everything...");
+    try {
+      await invoke("install_file_search_everything");
+      await refreshStatus();
+      toast.success("Everything 已安装，文件搜索将优先使用 Everything", {
+        id: toastId,
+      });
+      if (searchQuery.trim().length >= 2) {
+        searchFiles(searchQuery);
+      }
+    } catch (error) {
+      console.error("[FileSearch] Failed to install Everything:", error);
+      dismissedEverythingInstallPrompt = true;
+      toast.error(String(error), { id: toastId });
+    } finally {
+      isInstallingEverything = false;
+    }
+  };
+
+  const cancelEverythingInstall = () => {
+    dismissedEverythingInstallPrompt = true;
   };
 
   const handleKeyDown = (e: KeyboardEvent) => {
@@ -381,6 +426,14 @@
     </div>
   {/if}
 </div>
+
+<ConfirmDialog
+  bind:open={installEverythingDialogOpen}
+  title="安装 Everything 加速文件搜索"
+  description="当前未检测到 Everything。安装后 Onin 会优先使用 Everything IPC 获取实时文件搜索结果；取消后本次将继续使用 Windows Search。"
+  onConfirm={installEverything}
+  onCancel={cancelEverythingInstall}
+/>
 
 <style>
   @keyframes file-search-loading {

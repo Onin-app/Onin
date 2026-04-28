@@ -11,6 +11,9 @@
     is_indexing: boolean;
     indexed_count: number;
     backend: string;
+    everything_installed: boolean;
+    everything_ipc_available: boolean;
+    everything_install_required: boolean;
     available: boolean;
     last_error?: string | null;
   }
@@ -26,6 +29,9 @@
     is_indexing: false,
     indexed_count: 0,
     backend: "",
+    everything_installed: false,
+    everything_ipc_available: false,
+    everything_install_required: false,
     available: true,
     last_error: null,
   });
@@ -359,6 +365,13 @@
               : "不可用"}
           </span>
         </div>
+        <p class="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
+          Everything：{status.everything_installed
+            ? status.everything_ipc_available
+              ? "已连接 IPC"
+              : "已安装，等待客户端 IPC"
+            : "未安装，文件搜索将使用 Windows Search"}
+        </p>
         {#if status.last_error}
           <p class="mt-2 text-xs text-red-500">{status.last_error}</p>
         {/if}

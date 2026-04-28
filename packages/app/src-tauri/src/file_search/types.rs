@@ -59,6 +59,9 @@ pub struct FileSearchStatus {
     pub is_indexing: bool,
     pub indexed_count: usize,
     pub backend: String,
+    pub everything_installed: bool,
+    pub everything_ipc_available: bool,
+    pub everything_install_required: bool,
     pub available: bool,
     pub last_error: Option<String>,
 }
