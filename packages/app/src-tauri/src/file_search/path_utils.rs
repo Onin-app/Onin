@@ -20,7 +20,7 @@ pub(super) fn file_search_options(app: &AppHandle) -> FileSearchOptions {
     };
 
     FileSearchOptions {
-        roots: normalize_config_paths(&config.file_search_roots),
+        roots: Vec::new(),
         excluded_paths: normalize_config_paths(&config.file_search_excluded_paths),
         include_hidden: config.file_search_include_hidden,
     }
@@ -81,17 +81,14 @@ pub(super) fn platform_file_from_path_with_kind(path: &Path, is_dir: bool) -> Op
 }
 
 pub(super) fn is_path_allowed_by_options(path: &Path, options: &FileSearchOptions) -> bool {
-    if options.roots.is_empty() {
-        return false;
-    }
-
     let path = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
 
-    let is_in_root = options
-        .roots
-        .iter()
-        .filter_map(|root| fs::canonicalize(root).ok())
-        .any(|root| path.starts_with(&root));
+    let is_in_root = options.roots.is_empty()
+        || options
+            .roots
+            .iter()
+            .filter_map(|root| fs::canonicalize(root).ok())
+            .any(|root| path.starts_with(&root));
 
     if !is_in_root || should_ignore_path(&path, options) {
         return false;
@@ -105,16 +102,13 @@ pub(super) fn is_path_allowed_by_options(path: &Path, options: &FileSearchOption
 }
 
 pub(super) fn is_path_allowed_by_options_fast(path: &Path, options: &FileSearchOptions) -> bool {
-    if options.roots.is_empty() {
-        return false;
-    }
-
     let normalized_path = normalize_path_for_prefix(path);
 
-    let is_in_root = options
-        .roots
-        .iter()
-        .any(|root| path_has_prefix(&normalized_path, &normalize_path_for_prefix(root)));
+    let is_in_root = options.roots.is_empty()
+        || options
+            .roots
+            .iter()
+            .any(|root| path_has_prefix(&normalized_path, &normalize_path_for_prefix(root)));
 
     if !is_in_root || should_ignore_path(path, options) {
         return false;

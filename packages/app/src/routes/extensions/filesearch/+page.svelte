@@ -39,7 +39,6 @@
   let dismissedEverythingInstallPrompt = $state(false);
   let headerRef = $state<ExtensionHeader>(null!);
   let requestId = 0;
-  let statusTimer: ReturnType<typeof setInterval> | null = null;
   let searchTimer: ReturnType<typeof setTimeout> | null = null;
   let loadingTimer: ReturnType<typeof setTimeout> | null = null;
   let showSearchingIndicator = $state(false);
@@ -229,14 +228,9 @@
   onMount(async () => {
     await refreshStatus();
     headerRef?.focus();
-
-    statusTimer = setInterval(refreshStatus, 1000);
   });
 
   onDestroy(() => {
-    if (statusTimer) {
-      clearInterval(statusTimer);
-    }
     if (searchTimer) {
       clearTimeout(searchTimer);
     }

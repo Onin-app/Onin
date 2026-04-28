@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy, onMount } from "svelte";
+  import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
   import { Switch } from "bits-ui";
@@ -21,9 +21,7 @@
   let config = $state<AppConfig | null>(null);
   let loading = $state(true);
   let saving = $state(false);
-  let rebuilding = $state(false);
   let choosingDirectory = $state(false);
-  let rootInput = $state("");
   let excludeInput = $state("");
   let status = $state<FileSearchStatus>({
     is_indexing: false,
@@ -35,9 +33,6 @@
     available: true,
     last_error: null,
   });
-  let statusTimer: ReturnType<typeof setInterval> | null = null;
-
-  const roots = $derived(config?.file_search_roots ?? []);
   const excludedPaths = $derived(config?.file_search_excluded_paths ?? []);
 
   async function loadConfig() {
@@ -83,13 +78,6 @@
     );
   }
 
-  async function addRoot(path: string) {
-    if (!config) return;
-    const nextRoots = normalizedList([...roots, path]);
-    await saveConfig({ ...config, file_search_roots: nextRoots });
-    rootInput = "";
-  }
-
   async function addExcludedPath(path: string) {
     if (!config) return;
     const nextExcludedPaths = normalizedList([...excludedPaths, path]);
@@ -98,14 +86,6 @@
       file_search_excluded_paths: nextExcludedPaths,
     });
     excludeInput = "";
-  }
-
-  async function removeRoot(path: string) {
-    if (!config) return;
-    await saveConfig({
-      ...config,
-      file_search_roots: roots.filter((root) => root !== path),
-    });
   }
 
   async function removeExcludedPath(path: string) {
@@ -118,7 +98,7 @@
     });
   }
 
-  async function chooseDirectory(target: "root" | "exclude") {
+  async function chooseDirectory() {
     if (choosingDirectory) return;
 
     choosingDirectory = true;
@@ -133,11 +113,7 @@
         return;
       }
 
-      if (target === "root") {
-        await addRoot(selected);
-      } else {
-        await addExcludedPath(selected);
-      }
+      await addExcludedPath(selected);
     } catch (error) {
       console.error("Failed to choose file search directory:", error);
       toast.error("选择目录失败");
@@ -155,29 +131,8 @@
     });
   }
 
-  async function rebuildIndex() {
-    rebuilding = true;
-    try {
-      await invoke("rebuild_file_search_index");
-      await refreshStatus();
-      toast.success("系统搜索后端无需重建本地索引");
-    } catch (error) {
-      console.error("Failed to rebuild file search index:", error);
-      toast.error(String(error));
-    } finally {
-      rebuilding = false;
-    }
-  }
-
   onMount(async () => {
     await Promise.all([loadConfig(), refreshStatus()]);
-    statusTimer = setInterval(refreshStatus, 1000);
-  });
-
-  onDestroy(() => {
-    if (statusTimer) {
-      clearInterval(statusTimer);
-    }
   });
 </script>
 
@@ -193,71 +148,6 @@
           <h4
             class="text-sm font-semibold text-neutral-950 dark:text-neutral-50"
           >
-            搜索范围
-          </h4>
-          <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-            文件搜索只会返回这些目录及其子目录中的结果。
-          </p>
-        </div>
-        <button
-          class="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800"
-          disabled={choosingDirectory}
-          onclick={() => chooseDirectory("root")}
-        >
-          <PhosphorIcon icon="folderPlus" class="h-4 w-4" />
-          选择目录
-        </button>
-      </div>
-
-      <div class="mb-3 flex gap-2">
-        <input
-          class="min-w-0 flex-1 rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm outline-none focus:border-neutral-400 dark:border-neutral-700 dark:bg-neutral-950 dark:focus:border-neutral-500"
-          placeholder="/Users/name/Documents"
-          bind:value={rootInput}
-          onkeydown={(event) => {
-            if (event.key === "Enter") addRoot(rootInput);
-          }}
-        />
-        <button
-          class="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
-          disabled={!rootInput.trim()}
-          onclick={() => addRoot(rootInput)}
-        >
-          添加
-        </button>
-      </div>
-
-      <div class="flex flex-col gap-2">
-        {#each roots as root (root)}
-          <div
-            class="flex items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 text-sm dark:bg-neutral-800"
-          >
-            <PhosphorIcon icon="folder" class="h-4 w-4 shrink-0" />
-            <span class="min-w-0 flex-1 truncate font-mono text-xs">
-              {root}
-            </span>
-            <button
-              class="rounded p-1 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900 dark:hover:bg-neutral-700 dark:hover:text-neutral-100"
-              title="移除"
-              onclick={() => removeRoot(root)}
-            >
-              <PhosphorIcon icon="trash" class="h-4 w-4" />
-            </button>
-          </div>
-        {:else}
-          <div class="text-sm text-neutral-500 dark:text-neutral-400">
-            暂无搜索范围
-          </div>
-        {/each}
-      </div>
-    </section>
-
-    <section class="border-t border-neutral-100 pt-4 dark:border-neutral-800">
-      <div class="mb-3 flex items-center justify-between gap-4">
-        <div>
-          <h4
-            class="text-sm font-semibold text-neutral-950 dark:text-neutral-50"
-          >
             排除路径
           </h4>
           <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
@@ -267,7 +157,7 @@
         <button
           class="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800"
           disabled={choosingDirectory}
-          onclick={() => chooseDirectory("exclude")}
+          onclick={chooseDirectory}
         >
           <PhosphorIcon icon="folderPlus" class="h-4 w-4" />
           选择目录
@@ -277,7 +167,7 @@
       <div class="mb-3 flex gap-2">
         <input
           class="min-w-0 flex-1 rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm outline-none focus:border-neutral-400 dark:border-neutral-700 dark:bg-neutral-950 dark:focus:border-neutral-500"
-          placeholder="/Users/name/Downloads/tmp"
+          placeholder="C:\Users\name\Downloads\tmp"
           bind:value={excludeInput}
           onkeydown={(event) => {
             if (event.key === "Enter") addExcludedPath(excludeInput);
@@ -325,7 +215,7 @@
           隐藏文件
         </h4>
         <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-          开启后会索引以点号开头的文件和目录。
+          开启后会显示以点号开头的文件和目录。
         </p>
       </div>
       <Switch.Root
@@ -339,15 +229,14 @@
       </Switch.Root>
     </section>
 
-    <section
-      class="flex items-center justify-between gap-4 border-t border-neutral-100 pt-4 dark:border-neutral-800"
-    >
+    <section class="border-t border-neutral-100 pt-4 dark:border-neutral-800">
       <div>
         <h4 class="text-sm font-semibold text-neutral-950 dark:text-neutral-50">
           搜索后端
         </h4>
         <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-          文件搜索使用系统索引，不再维护本地 SQLite 索引库。
+          Windows 优先使用 Everything 实时索引；不可用时自动回退到 Windows
+          Search。
         </p>
         <div
           class="mt-2 inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-neutral-50 px-2 py-1 text-xs text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
@@ -376,14 +265,6 @@
           <p class="mt-2 text-xs text-red-500">{status.last_error}</p>
         {/if}
       </div>
-      <button
-        class="inline-flex items-center gap-2 rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
-        disabled={rebuilding}
-        onclick={rebuildIndex}
-      >
-        <PhosphorIcon icon="arrowsClockwise" class="h-4 w-4" />
-        {rebuilding ? "处理中" : "刷新状态"}
-      </button>
     </section>
   </div>
 {/if}

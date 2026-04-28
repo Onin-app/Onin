@@ -40,7 +40,6 @@ pub fn get_invoke_handler(
         file_search::get_file_search_status,
         file_search::search_indexed_files,
         file_search::open_indexed_file,
-        file_search::rebuild_file_search_index,
         file_search::install_file_search_everything,
         // System commands
         system_commands::execute_command,

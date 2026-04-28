@@ -15,10 +15,6 @@ pub fn init(_app: AppHandle) {
     // File search now delegates to the platform search index on demand.
 }
 
-pub fn rebuild_file_search_index_after_config_change(_app: AppHandle) {
-    // There is no local index to rebuild. Platform index maintenance is owned by the OS.
-}
-
 #[tauri::command]
 pub fn get_file_search_status(
     _app: AppHandle,
@@ -37,11 +33,6 @@ pub fn get_file_search_status(
         available: provider::backend_available(),
         last_error: state.last_error(),
     }
-}
-
-#[tauri::command]
-pub fn rebuild_file_search_index(_app: AppHandle) -> Result<(), String> {
-    Ok(())
 }
 
 #[tauri::command]

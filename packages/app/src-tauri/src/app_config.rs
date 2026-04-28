@@ -3,8 +3,6 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
 
-use crate::file_search;
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SortMode {
     #[serde(rename = "smart")]
@@ -49,10 +47,6 @@ pub struct AppConfig {
     #[serde(default)]
     pub disabled_extension_ids: Vec<String>,
 
-    /// 文件搜索索引根目录
-    #[serde(default = "default_file_search_roots")]
-    pub file_search_roots: Vec<String>,
-
     /// 文件搜索排除路径
     #[serde(default)]
     pub file_search_excluded_paths: Vec<String>,
@@ -78,18 +72,6 @@ fn default_marketplace_api_url() -> Option<String> {
     Some("https://onin.baiyapeng.cc".to_string())
 }
 
-pub fn default_file_search_roots() -> Vec<String> {
-    #[cfg(target_os = "windows")]
-    let home = std::env::var_os("USERPROFILE");
-
-    #[cfg(not(target_os = "windows"))]
-    let home = std::env::var_os("HOME");
-
-    home.map(PathBuf::from)
-        .map(|path| vec![path.to_string_lossy().to_string()])
-        .unwrap_or_default()
-}
-
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
@@ -99,7 +81,6 @@ impl Default for AppConfig {
             enable_usage_tracking: default_enable_usage_tracking(),
             marketplace_api_url: default_marketplace_api_url(),
             disabled_extension_ids: Vec::new(),
-            file_search_roots: default_file_search_roots(),
             file_search_excluded_paths: Vec::new(),
             file_search_include_hidden: false,
         }
@@ -172,11 +153,6 @@ pub fn update_app_config(
     state: tauri::State<'_, AppConfigState>,
     config: AppConfig,
 ) -> Result<(), String> {
-    let should_rebuild_file_search = {
-        let current_config = state.0.lock().map_err(|e| e.to_string())?;
-        file_search_config_changed(&current_config, &config)
-    };
-
     // 保存到文件
     save_config(&app, &config)?;
 
@@ -186,15 +162,5 @@ pub fn update_app_config(
         *current_config = config.clone();
     }
 
-    if should_rebuild_file_search {
-        file_search::rebuild_file_search_index_after_config_change(app);
-    }
-
     Ok(())
-}
-
-fn file_search_config_changed(previous: &AppConfig, next: &AppConfig) -> bool {
-    previous.file_search_roots != next.file_search_roots
-        || previous.file_search_excluded_paths != next.file_search_excluded_paths
-        || previous.file_search_include_hidden != next.file_search_include_hidden
 }
