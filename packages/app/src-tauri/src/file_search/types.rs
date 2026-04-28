@@ -1,27 +1,8 @@
-use std::{
-    path::PathBuf,
-    sync::atomic::{AtomicBool, AtomicUsize},
-    time::Duration,
-};
+use std::{path::PathBuf, sync::Mutex};
 
 use serde::Serialize;
 
-pub(super) const INDEX_WRITE_BATCH_SIZE: usize = 2_000;
 pub(super) const DEFAULT_RESULT_LIMIT: usize = 30;
-pub(super) const SEARCH_CANDIDATE_LIMIT: usize = 1_000;
-pub(super) const INDEX_DB_FILE_NAME: &str = "file_search.sqlite";
-pub(super) const SQLITE_BUSY_TIMEOUT: Duration = Duration::from_secs(2);
-pub(super) const FILE_WATCH_DEBOUNCE: Duration = Duration::from_millis(800);
-pub(super) const LIVE_SCAN_ID: &str = "live";
-
-#[derive(Clone, Debug)]
-pub(super) struct IndexedFile {
-    pub(super) name: String,
-    pub(super) path: String,
-    pub(super) parent: String,
-    pub(super) extension: String,
-    pub(super) is_dir: bool,
-}
 
 #[derive(Clone, Debug)]
 pub(super) struct FileSearchOptions {
@@ -30,16 +11,54 @@ pub(super) struct FileSearchOptions {
     pub(super) include_hidden: bool,
 }
 
+#[derive(Clone, Debug)]
+pub(super) struct PlatformFile {
+    pub(super) name: String,
+    pub(super) path: String,
+    pub(super) parent: String,
+    pub(super) extension: String,
+    pub(super) is_dir: bool,
+}
+
 #[derive(Default)]
 pub struct FileSearchState {
-    pub(super) is_indexing: AtomicBool,
-    pub(super) indexed_count: AtomicUsize,
-    pub(super) watcher_generation: AtomicUsize,
-    pub(super) rebuild_requested: AtomicBool,
+    is_searching: Mutex<bool>,
+    last_error: Mutex<Option<String>>,
+}
+
+impl FileSearchState {
+    pub(super) fn is_searching(&self) -> bool {
+        self.is_searching
+            .lock()
+            .map(|is_searching| *is_searching)
+            .unwrap_or(false)
+    }
+
+    pub(super) fn set_searching(&self, searching: bool) {
+        if let Ok(mut is_searching) = self.is_searching.lock() {
+            *is_searching = searching;
+        }
+    }
+
+    pub(super) fn last_error(&self) -> Option<String> {
+        self.last_error
+            .lock()
+            .ok()
+            .and_then(|last_error| last_error.clone())
+    }
+
+    pub(super) fn set_last_error(&self, error: Option<String>) {
+        if let Ok(mut last_error) = self.last_error.lock() {
+            *last_error = error;
+        }
+    }
 }
 
 #[derive(Serialize)]
 pub struct FileSearchStatus {
     pub is_indexing: bool,
     pub indexed_count: usize,
+    pub backend: String,
+    pub available: bool,
+    pub last_error: Option<String>,
 }

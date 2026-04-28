@@ -10,6 +10,9 @@
   interface FileSearchStatus {
     is_indexing: boolean;
     indexed_count: number;
+    backend: string;
+    available: boolean;
+    last_error?: string | null;
   }
 
   let searchQuery = $state("");
@@ -18,6 +21,9 @@
   let status = $state<FileSearchStatus>({
     is_indexing: false,
     indexed_count: 0,
+    backend: "",
+    available: true,
+    last_error: null,
   });
   let isSearching = $state(false);
   let headerRef = $state<ExtensionHeader>(null!);
@@ -26,8 +32,13 @@
   let searchTimer: ReturnType<typeof setTimeout> | null = null;
 
   const selectedItem = $derived(results[selectedIndex] ?? null);
-  const queryExamples = ["ext:md", "ext:png", "type:folder", '"project plan"'];
-  const detailQueryExamples = [...queryExamples, "project ext:md"];
+  const detailQueryExamples = [
+    "logseq",
+    "project ext:md",
+    "image ext:png",
+    "notes type:folder",
+    '"project plan"',
+  ];
 
   const handleBack = () => {
     goto("/");
@@ -184,16 +195,19 @@
     {#snippet right()}
       <div
         class="flex items-center gap-1.5 rounded-md border border-neutral-300/70 bg-neutral-200/70 px-2 py-1 text-xs text-neutral-600 dark:border-neutral-600/70 dark:bg-neutral-700/70 dark:text-neutral-300"
-        title={status.is_indexing ? "正在建立本地文件索引" : "本地文件索引状态"}
+        title={status.last_error || "系统文件搜索后端状态"}
       >
         <span
           class="h-1.5 w-1.5 rounded-full {status.is_indexing
             ? 'animate-pulse bg-amber-500'
-            : 'bg-emerald-500'}"
+            : status.available
+              ? 'bg-emerald-500'
+              : 'bg-red-500'}"
         ></span>
         <span class="whitespace-nowrap">
-          {status.is_indexing ? "索引中" : "已索引"} ·
-          {status.indexed_count.toLocaleString()} 项
+          {status.backend || "系统搜索"} · {status.available
+            ? "可用"
+            : "不可用"}
         </span>
       </div>
     {/snippet}

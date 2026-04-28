@@ -10,6 +10,9 @@
   interface FileSearchStatus {
     is_indexing: boolean;
     indexed_count: number;
+    backend: string;
+    available: boolean;
+    last_error?: string | null;
   }
 
   let config = $state<AppConfig | null>(null);
@@ -22,6 +25,9 @@
   let status = $state<FileSearchStatus>({
     is_indexing: false,
     indexed_count: 0,
+    backend: "",
+    available: true,
+    last_error: null,
   });
   let statusTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -148,7 +154,7 @@
     try {
       await invoke("rebuild_file_search_index");
       await refreshStatus();
-      toast.success("已开始重建文件搜索索引");
+      toast.success("系统搜索后端无需重建本地索引");
     } catch (error) {
       console.error("Failed to rebuild file search index:", error);
       toast.error(String(error));
@@ -181,10 +187,10 @@
           <h4
             class="text-sm font-semibold text-neutral-950 dark:text-neutral-50"
           >
-            索引目录
+            搜索范围
           </h4>
           <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-            文件搜索只会索引这些目录及其子目录。
+            文件搜索只会返回这些目录及其子目录中的结果。
           </p>
         </div>
         <button
@@ -234,7 +240,7 @@
           </div>
         {:else}
           <div class="text-sm text-neutral-500 dark:text-neutral-400">
-            暂无索引目录
+            暂无搜索范围
           </div>
         {/each}
       </div>
@@ -249,7 +255,7 @@
             排除路径
           </h4>
           <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-            匹配这些路径的文件和目录不会进入索引。
+            匹配这些路径的文件和目录不会出现在搜索结果中。
           </p>
         </div>
         <button
@@ -332,10 +338,10 @@
     >
       <div>
         <h4 class="text-sm font-semibold text-neutral-950 dark:text-neutral-50">
-          索引维护
+          搜索后端
         </h4>
         <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-          调整目录或排除项后会自动重建，也可手动重新开始索引。
+          文件搜索使用系统索引，不再维护本地 SQLite 索引库。
         </p>
         <div
           class="mt-2 inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-neutral-50 px-2 py-1 text-xs text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
@@ -343,26 +349,27 @@
           <span
             class="h-1.5 w-1.5 rounded-full {status.is_indexing
               ? 'animate-pulse bg-amber-500'
-              : 'bg-emerald-500'}"
+              : status.available
+                ? 'bg-emerald-500'
+                : 'bg-red-500'}"
           ></span>
           <span>
-            {status.is_indexing ? "正在索引" : "索引就绪"} · {status.is_indexing
-              ? "已扫描"
-              : "已索引"}
-            {status.indexed_count.toLocaleString()} 项
+            {status.backend || "系统搜索"} · {status.available
+              ? "可用"
+              : "不可用"}
           </span>
         </div>
+        {#if status.last_error}
+          <p class="mt-2 text-xs text-red-500">{status.last_error}</p>
+        {/if}
       </div>
       <button
         class="inline-flex items-center gap-2 rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
         disabled={rebuilding}
         onclick={rebuildIndex}
       >
-        <PhosphorIcon
-          icon="arrowsClockwise"
-          class="h-4 w-4 {status.is_indexing ? 'animate-spin' : ''}"
-        />
-        {rebuilding ? "处理中" : status.is_indexing ? "重新开始" : "重建索引"}
+        <PhosphorIcon icon="arrowsClockwise" class="h-4 w-4" />
+        {rebuilding ? "处理中" : "刷新状态"}
       </button>
     </section>
   </div>
