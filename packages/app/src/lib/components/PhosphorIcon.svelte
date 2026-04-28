@@ -27,10 +27,11 @@
 
   interface PhosphorIconProps {
     icon: string;
+    size?: number | string;
     class?: string;
   }
 
-  const { icon, class: cls }: PhosphorIconProps = $props();
+  const { icon, size, class: cls }: PhosphorIconProps = $props();
 
   // 图标映射表
   const iconMap: Record<string, any> = {
@@ -66,4 +67,4 @@
   const IconComponent = $derived(iconMap[icon] || Power);
 </script>
 
-{@render IconComponent({ class: cls })}
+<IconComponent {size} class={cls} />

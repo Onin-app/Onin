@@ -44,6 +44,8 @@
   let searchTimer: ReturnType<typeof setTimeout> | null = null;
   let loadingTimer: ReturnType<typeof setTimeout> | null = null;
   let showSearchingIndicator = $state(false);
+  let listPaneWidth = $state(40);
+  let isResizingPane = $state(false);
 
   const selectedItem = $derived(results[selectedIndex] ?? null);
   const detailQueryExamples = [
@@ -255,15 +257,85 @@
   const getKindLabel = (item: LaunchableItem) =>
     item.item_type === "Folder" ? "Folder" : "File";
 
+  const clampListPaneWidth = (value: number) =>
+    Math.min(64, Math.max(28, value));
+
+  const startPaneResize = (event: MouseEvent) => {
+    event.preventDefault();
+    isResizingPane = true;
+    document.body.classList.add("select-none", "cursor-col-resize");
+  };
+
+  const handlePaneResize = (event: MouseEvent) => {
+    if (!isResizingPane) return;
+
+    const shell = document.getElementById("file-search-split-shell");
+    if (!shell) return;
+
+    const rect = shell.getBoundingClientRect();
+    const nextWidth = ((event.clientX - rect.left) / rect.width) * 100;
+    listPaneWidth = clampListPaneWidth(nextWidth);
+  };
+
+  const stopPaneResize = () => {
+    if (!isResizingPane) return;
+    isResizingPane = false;
+    document.body.classList.remove("select-none", "cursor-col-resize");
+  };
+
+  const getParentPath = (path: string) => {
+    const normalized = path.replace(/[\\/]+$/, "");
+    const separatorIndex = Math.max(
+      normalized.lastIndexOf("\\"),
+      normalized.lastIndexOf("/"),
+    );
+
+    if (separatorIndex <= 0) {
+      return path;
+    }
+
+    return normalized.slice(0, separatorIndex);
+  };
+
+  const getFileExtension = (item: LaunchableItem) => {
+    if (item.item_type === "Folder") return "";
+
+    const dotIndex = item.name.lastIndexOf(".");
+    if (dotIndex <= 0 || dotIndex === item.name.length - 1) {
+      return "";
+    }
+
+    return item.name.slice(dotIndex + 1).toUpperCase();
+  };
+
+  const getPreviewKind = (item: LaunchableItem) => {
+    if (item.item_type === "Folder") return "文件夹";
+
+    const extension = getFileExtension(item);
+    return extension ? `${extension} 文件` : "文件";
+  };
+
+  const getPreviewMeta = (item: LaunchableItem) => [
+    { label: "Name", value: item.name },
+    { label: "Where", value: getParentPath(item.path) },
+    { label: "Type", value: getPreviewKind(item) },
+    { label: "Path", value: item.path },
+  ];
+
   onMount(async () => {
     await refreshStatus();
     headerRef?.focus();
+    window.addEventListener("mousemove", handlePaneResize);
+    window.addEventListener("mouseup", stopPaneResize);
   });
 
   onDestroy(() => {
     searchVersion += 1;
     queuedSearch = null;
     clearSearchTimers();
+    window.removeEventListener("mousemove", handlePaneResize);
+    window.removeEventListener("mouseup", stopPaneResize);
+    document.body.classList.remove("select-none", "cursor-col-resize");
   });
 </script>
 
@@ -352,16 +424,17 @@
       {/if}
     </div>
   {:else}
-    <div class="flex flex-1 overflow-hidden">
-      <div
-        class="flex w-2/5 flex-col border-r border-neutral-200 dark:border-neutral-700"
-      >
-        <AppScrollArea class="h-full w-full" viewportClass="h-full w-full p-2">
+    <div id="file-search-split-shell" class="flex flex-1 overflow-hidden">
+      <div class="flex min-w-0 flex-col" style={`width: ${listPaneWidth}%`}>
+        <AppScrollArea
+          class="h-full w-full"
+          viewportClass="h-full w-full p-1.5"
+        >
           <div class="flex flex-col gap-1">
             {#each results as item, index (item.path)}
               <button
                 id="file-search-item-{index}"
-                class="group flex w-full items-center gap-3 rounded-md border border-transparent px-3 py-2 text-left text-sm transition-colors {selectedIndex ===
+                class="group flex w-full items-center gap-2.5 rounded-md border border-transparent px-2.5 py-1.5 text-left text-sm transition-colors {selectedIndex ===
                 index
                   ? 'bg-neutral-200 dark:bg-neutral-700/50'
                   : 'hover:bg-neutral-200/50 dark:hover:bg-neutral-800'}"
@@ -369,9 +442,9 @@
                 ondblclick={() => openItem(item)}
               >
                 <div
-                  class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md bg-neutral-200 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300"
+                  class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-neutral-200 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300"
                 >
-                  <PhosphorIcon icon={item.icon} class="h-5 w-5" />
+                  <PhosphorIcon icon={item.icon} size={18} />
                 </div>
 
                 <div class="min-w-0 flex-1">
@@ -400,11 +473,24 @@
         </AppScrollArea>
       </div>
 
+      <button
+        class="group relative z-10 flex w-2 flex-shrink-0 cursor-col-resize items-stretch justify-center border-x border-transparent bg-neutral-200/70 transition-colors hover:bg-blue-500/15 focus:outline-none dark:bg-neutral-800/80 dark:hover:bg-blue-400/15 {isResizingPane
+          ? 'bg-blue-500/20 dark:bg-blue-400/20'
+          : ''}"
+        title="拖动调整列表和预览宽度"
+        aria-label="拖动调整列表和预览宽度"
+        onmousedown={startPaneResize}
+      >
+        <span
+          class="my-auto h-10 w-0.5 rounded-full bg-neutral-300 transition-colors group-hover:bg-blue-500 dark:bg-neutral-600 dark:group-hover:bg-blue-400"
+        ></span>
+      </button>
+
       <div
-        class="flex w-3/5 flex-col overflow-hidden bg-white dark:bg-neutral-900"
+        class="flex min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-neutral-900"
       >
         <div
-          class="flex flex-shrink-0 items-center justify-between border-b border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-900/50"
+          class="flex flex-shrink-0 items-center justify-between border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 dark:border-neutral-800 dark:bg-neutral-900/50"
         >
           <div class="min-w-0">
             <div
@@ -423,13 +509,10 @@
         </div>
 
         <div class="relative flex-1 overflow-hidden">
-          <AppScrollArea
-            class="h-full w-full"
-            viewportClass="h-full w-full p-6"
-          >
+          <AppScrollArea class="h-full w-full" viewportClass="h-full w-full">
             {#if selectedItem.item_type === "File" && isImageFile(selectedItem.path)}
               <div
-                class="flex min-h-full items-center justify-center bg-[url('/checker-board.svg')] bg-repeat"
+                class="flex min-h-full items-center justify-center bg-[url('/checker-board.svg')] bg-repeat p-8"
               >
                 <img
                   src={convertFileSrc(selectedItem.path)}
@@ -438,25 +521,73 @@
                 />
               </div>
             {:else}
-              <div
-                class="flex h-full min-h-[320px] flex-col items-center justify-center gap-3 text-neutral-400"
-              >
+              <div class="flex min-h-full flex-col">
                 <div
-                  class="flex h-20 w-20 items-center justify-center rounded-xl bg-neutral-100 dark:bg-neutral-800"
+                  class="flex min-h-[220px] flex-1 items-center justify-center px-8 py-8"
                 >
-                  <PhosphorIcon icon={selectedItem.icon} class="h-10 w-10" />
+                  {#if selectedItem.item_type === "Folder"}
+                    <div class="folder-preview-icon" aria-hidden="true">
+                      <div class="folder-preview-icon__back"></div>
+                      <div class="folder-preview-icon__front"></div>
+                    </div>
+                  {:else}
+                    <div
+                      class="relative flex h-28 w-24 items-center justify-center rounded-lg border border-neutral-200 bg-gradient-to-b from-white to-neutral-100 text-neutral-400 shadow-[0_18px_45px_rgba(15,23,42,0.12)] dark:border-neutral-700 dark:from-neutral-800 dark:to-neutral-900 dark:text-neutral-500"
+                    >
+                      <div
+                        class="absolute top-0 right-0 h-7 w-7 rounded-bl-lg border-b border-l border-neutral-200 bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800"
+                      ></div>
+                      <PhosphorIcon icon={selectedItem.icon} size={40} />
+                    </div>
+                  {/if}
                 </div>
-                <div class="text-sm">
-                  {selectedItem.item_type === "Folder"
-                    ? "文件夹预览"
-                    : "文件预览"}
-                </div>
-                <button
-                  class="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
-                  onclick={() => openItem(selectedItem)}
+
+                <div
+                  class="border-t border-neutral-200 px-5 py-4 dark:border-neutral-800"
                 >
-                  打开
-                </button>
+                  <div
+                    class="mb-3 text-xs font-semibold text-neutral-500 dark:text-neutral-400"
+                  >
+                    Metadata
+                  </div>
+                  <div
+                    class="divide-y divide-neutral-200 dark:divide-neutral-800"
+                  >
+                    {#each getPreviewMeta(selectedItem) as row (row.label)}
+                      <div
+                        class="grid grid-cols-[96px_minmax(0,1fr)] gap-4 py-2 text-xs"
+                      >
+                        <div
+                          class="font-medium text-neutral-500 dark:text-neutral-400"
+                        >
+                          {row.label}
+                        </div>
+                        <div
+                          class="truncate text-right font-medium text-neutral-900 dark:text-neutral-100"
+                          title={row.value}
+                        >
+                          {row.value}
+                        </div>
+                      </div>
+                    {/each}
+                  </div>
+                </div>
+
+                <div
+                  class="flex items-center justify-between gap-3 border-t border-neutral-200 px-5 py-3 dark:border-neutral-800"
+                >
+                  <div
+                    class="min-w-0 text-xs text-neutral-500 dark:text-neutral-400"
+                  >
+                    双击结果或按 Enter 打开
+                  </div>
+                  <button
+                    class="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
+                    onclick={() => openItem(selectedItem)}
+                  >
+                    打开
+                  </button>
+                </div>
               </div>
             {/if}
           </AppScrollArea>
@@ -485,5 +616,48 @@
     100% {
       transform: translateX(320%);
     }
+  }
+
+  .folder-preview-icon {
+    position: relative;
+    width: 112px;
+    height: 102px;
+    filter: drop-shadow(0 16px 18px rgb(15 23 42 / 0.13));
+  }
+
+  .folder-preview-icon__back,
+  .folder-preview-icon__front {
+    position: absolute;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #ffe99d 0%, #ffd54f 48%, #ffc83d 100%);
+  }
+
+  .folder-preview-icon__back {
+    top: 10px;
+    right: 7px;
+    width: 76px;
+    height: 80px;
+  }
+
+  .folder-preview-icon__back::before {
+    position: absolute;
+    top: 0;
+    left: -15px;
+    width: 36px;
+    height: 24px;
+    border-radius: 6px 6px 0 0;
+    background: #ffe690;
+    content: "";
+  }
+
+  .folder-preview-icon__front {
+    bottom: 3px;
+    left: 15px;
+    width: 70px;
+    height: 78px;
+    transform: skewY(28deg);
+    transform-origin: bottom left;
+    background: linear-gradient(145deg, #fff0b1 0%, #ffd96b 58%, #ffc743 100%);
+    opacity: 0.96;
   }
 </style>
