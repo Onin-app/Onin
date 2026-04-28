@@ -57,6 +57,10 @@ pub(super) fn validate_search_result_path(app: &AppHandle, path: &str) -> Result
 
 pub(super) fn platform_file_from_path(path: &Path) -> Option<PlatformFile> {
     let metadata = fs::metadata(path).ok()?;
+    platform_file_from_path_with_kind(path, metadata.is_dir())
+}
+
+pub(super) fn platform_file_from_path_with_kind(path: &Path, is_dir: bool) -> Option<PlatformFile> {
     let name = path.file_name()?.to_string_lossy().to_string();
     let parent = path
         .parent()
@@ -72,7 +76,7 @@ pub(super) fn platform_file_from_path(path: &Path) -> Option<PlatformFile> {
         path: path.to_string_lossy().to_string(),
         parent,
         extension,
-        is_dir: metadata.is_dir(),
+        is_dir,
     })
 }
 
@@ -98,6 +102,47 @@ pub(super) fn is_path_allowed_by_options(path: &Path, options: &FileSearchOption
         .iter()
         .filter_map(|excluded_path| fs::canonicalize(excluded_path).ok())
         .any(|excluded_path| path.starts_with(&excluded_path))
+}
+
+pub(super) fn is_path_allowed_by_options_fast(path: &Path, options: &FileSearchOptions) -> bool {
+    if options.roots.is_empty() {
+        return false;
+    }
+
+    let normalized_path = normalize_path_for_prefix(path);
+
+    let is_in_root = options
+        .roots
+        .iter()
+        .any(|root| path_has_prefix(&normalized_path, &normalize_path_for_prefix(root)));
+
+    if !is_in_root || should_ignore_path(path, options) {
+        return false;
+    }
+
+    !options.excluded_paths.iter().any(|excluded_path| {
+        path_has_prefix(&normalized_path, &normalize_path_for_prefix(excluded_path))
+    })
+}
+
+fn normalize_path_for_prefix(path: &Path) -> String {
+    #[cfg(target_os = "windows")]
+    {
+        path.to_string_lossy().replace('/', "\\").to_lowercase()
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        path.to_string_lossy().to_string()
+    }
+}
+
+fn path_has_prefix(path: &str, prefix: &str) -> bool {
+    let prefix = prefix.trim_end_matches(['\\', '/']);
+    path == prefix
+        || path
+            .strip_prefix(prefix)
+            .map(|rest| rest.starts_with('\\') || rest.starts_with('/'))
+            .unwrap_or(false)
 }
 
 pub(super) fn should_ignore_path(path: &Path, options: &FileSearchOptions) -> bool {

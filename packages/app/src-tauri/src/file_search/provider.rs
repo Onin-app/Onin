@@ -21,7 +21,10 @@ use winreg::{
 use crate::shared_types::{CommandKeyword, IconType, ItemSource, ItemType, LaunchableItem};
 
 use super::{
-    path_utils::{file_search_options, is_path_allowed_by_options, platform_file_from_path},
+    path_utils::{
+        file_search_options, is_path_allowed_by_options_fast, platform_file_from_path,
+        platform_file_from_path_with_kind,
+    },
     types::{FileSearchOptions, PlatformFile, DEFAULT_RESULT_LIMIT},
 };
 
@@ -141,11 +144,8 @@ pub(super) fn search_platform_files(
 
     let limit = limit.unwrap_or(DEFAULT_RESULT_LIMIT).clamp(1, 100);
     let options = file_search_options(app);
-    let mut files = platform_search(
-        &terms.text_query(),
-        limit.saturating_mul(10).max(100),
-        &options,
-    )?;
+    let candidate_limit = limit.saturating_mul(4).max(100);
+    let mut files = platform_search(&terms.text_query(), candidate_limit, &options)?;
     files = filter_files(files, &terms, &options);
     files.sort_by(|a, b| compare_files(a, b, &terms));
     files.dedup_by(|a, b| paths_equal(&a.path, &b.path));
@@ -285,7 +285,7 @@ fn filter_files(
         })
         .filter(|file| {
             let path = PathBuf::from(&file.path);
-            is_path_allowed_by_options(&path, options)
+            is_path_allowed_by_options_fast(&path, options)
         })
         .filter(|file| score_file(file, terms).is_some())
         .collect()
@@ -426,7 +426,7 @@ fn search_everything_ipc(
     use everything_ipc::wm::{RequestFlags, Sort};
 
     let everything = everything_client_or_start()?;
-    let request_flags = RequestFlags::FileName | RequestFlags::Path;
+    let request_flags = RequestFlags::FileName | RequestFlags::Path | RequestFlags::Attributes;
     let mut files = Vec::new();
 
     for search_query in everything_queries(query, options) {
@@ -446,9 +446,13 @@ fn search_everything_ipc(
             let Some(parent) = item.get_string(RequestFlags::Path) else {
                 continue;
             };
+            let is_dir = item
+                .get_u32(RequestFlags::Attributes)
+                .map(|attributes| attributes & 0x10 != 0)
+                .unwrap_or(false);
 
             let path = PathBuf::from(parent).join(name);
-            if let Some(file) = platform_file_from_path(&path) {
+            if let Some(file) = platform_file_from_path_with_kind(&path, is_dir) {
                 files.push(file);
             }
 

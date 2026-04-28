@@ -41,6 +41,8 @@
   let requestId = 0;
   let statusTimer: ReturnType<typeof setInterval> | null = null;
   let searchTimer: ReturnType<typeof setTimeout> | null = null;
+  let loadingTimer: ReturnType<typeof setTimeout> | null = null;
+  let showSearchingIndicator = $state(false);
 
   const selectedItem = $derived(results[selectedIndex] ?? null);
   const detailQueryExamples = [
@@ -62,19 +64,30 @@
     if (searchTimer) {
       clearTimeout(searchTimer);
     }
+    if (loadingTimer) {
+      clearTimeout(loadingTimer);
+    }
 
     const query = value.trim();
     if (query.length < 2) {
       requestId++;
       results = [];
       isSearching = false;
+      showSearchingIndicator = false;
       return;
     }
 
     isSearching = true;
+    showSearchingIndicator = false;
+    const searchDelay = status.everything_ipc_available ? 25 : 180;
     searchTimer = setTimeout(() => {
       searchFiles(value);
-    }, 250);
+    }, searchDelay);
+    loadingTimer = setTimeout(() => {
+      if (isSearching && results.length === 0) {
+        showSearchingIndicator = true;
+      }
+    }, 140);
   };
 
   const applyQueryExample = (query: string) => {
@@ -103,12 +116,14 @@
       if (currentRequestId === requestId) {
         results = nextResults;
         isSearching = false;
+        showSearchingIndicator = false;
       }
     } catch (error) {
       console.error("[FileSearch] Failed to search files:", error);
       if (currentRequestId === requestId) {
         results = [];
         isSearching = false;
+        showSearchingIndicator = false;
       }
     }
   };
@@ -225,6 +240,9 @@
     if (searchTimer) {
       clearTimeout(searchTimer);
     }
+    if (loadingTimer) {
+      clearTimeout(loadingTimer);
+    }
   });
 </script>
 
@@ -259,7 +277,7 @@
   </ExtensionHeader>
 
   <div class="h-0.5 flex-shrink-0 overflow-hidden bg-transparent">
-    {#if isSearching}
+    {#if showSearchingIndicator}
       <div
         class="h-full w-1/3 animate-[file-search-loading_900ms_ease-in-out_infinite] rounded-full bg-blue-500/80"
       ></div>
@@ -268,7 +286,7 @@
 
   {#if results.length === 0}
     <div class="flex flex-1 items-center justify-center overflow-hidden px-8">
-      {#if isSearching && searchQuery.trim().length >= 2}
+      {#if showSearchingIndicator && searchQuery.trim().length >= 2}
         <div
           class="flex flex-col items-center justify-center gap-3 text-center text-sm text-neutral-500"
         >
