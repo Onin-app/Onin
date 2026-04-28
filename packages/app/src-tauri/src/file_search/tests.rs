@@ -18,6 +18,7 @@ fn path_allowed_by_options_accepts_roots_and_rejects_excludes() {
 
     let options = FileSearchOptions {
         roots: vec![root],
+        preferred_paths: Vec::new(),
         excluded_paths: vec![excluded],
         include_hidden: false,
     };
@@ -46,6 +47,7 @@ fn path_allowed_by_options_respects_hidden_paths() {
 
     let options = FileSearchOptions {
         roots: vec![root.clone()],
+        preferred_paths: Vec::new(),
         excluded_paths: Vec::new(),
         include_hidden: false,
     };
@@ -56,6 +58,7 @@ fn path_allowed_by_options_respects_hidden_paths() {
 
     let options = FileSearchOptions {
         roots: vec![root],
+        preferred_paths: Vec::new(),
         excluded_paths: Vec::new(),
         include_hidden: true,
     };
@@ -72,6 +75,7 @@ fn path_allowed_by_options_accepts_uncanonicalized_windows_paths() {
     let home = std::path::PathBuf::from(home);
     let options = FileSearchOptions {
         roots: vec![home.clone()],
+        preferred_paths: Vec::new(),
         excluded_paths: Vec::new(),
         include_hidden: false,
     };

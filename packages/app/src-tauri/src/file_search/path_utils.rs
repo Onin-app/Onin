@@ -14,6 +14,7 @@ pub(super) fn file_search_options(app: &AppHandle) -> FileSearchOptions {
     let Ok(config) = config_state.0.lock() else {
         return FileSearchOptions {
             roots: Vec::new(),
+            preferred_paths: default_preferred_paths(),
             excluded_paths: Vec::new(),
             include_hidden: false,
         };
@@ -21,9 +22,41 @@ pub(super) fn file_search_options(app: &AppHandle) -> FileSearchOptions {
 
     FileSearchOptions {
         roots: Vec::new(),
+        preferred_paths: default_preferred_paths(),
         excluded_paths: normalize_config_paths(&config.file_search_excluded_paths),
         include_hidden: config.file_search_include_hidden,
     }
+}
+
+fn default_preferred_paths() -> Vec<PathBuf> {
+    let Some(home) = std::env::var_os(home_env_var()) else {
+        return Vec::new();
+    };
+
+    let home = PathBuf::from(home);
+    [
+        "Desktop",
+        "Documents",
+        "Downloads",
+        "Pictures",
+        "Projects",
+        "Code",
+        "Workspace",
+    ]
+    .into_iter()
+    .map(|name| home.join(name))
+    .filter(|path| path.exists())
+    .collect()
+}
+
+#[cfg(target_os = "windows")]
+fn home_env_var() -> &'static str {
+    "USERPROFILE"
+}
+
+#[cfg(not(target_os = "windows"))]
+fn home_env_var() -> &'static str {
+    "HOME"
 }
 
 fn normalize_config_paths(paths: &[String]) -> Vec<PathBuf> {

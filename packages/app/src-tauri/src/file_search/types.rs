@@ -7,6 +7,7 @@ pub(super) const DEFAULT_RESULT_LIMIT: usize = 30;
 #[derive(Clone, Debug)]
 pub(super) struct FileSearchOptions {
     pub(super) roots: Vec<PathBuf>,
+    pub(super) preferred_paths: Vec<PathBuf>,
     pub(super) excluded_paths: Vec<PathBuf>,
     pub(super) include_hidden: bool,
 }

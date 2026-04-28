@@ -144,10 +144,11 @@ pub(super) fn search_platform_files(
 
     let limit = limit.unwrap_or(DEFAULT_RESULT_LIMIT).clamp(1, 100);
     let options = file_search_options(app);
-    let candidate_limit = limit.saturating_mul(4).max(100);
+    // 拉大候选池，避免 Everything 按字母序返回时把相关结果切掉
+    let candidate_limit = limit.saturating_mul(6).max(200);
     let mut files = platform_search(&terms.text_query(), candidate_limit, &options)?;
     files = filter_files(files, &terms, &options);
-    files.sort_by(|a, b| compare_files(a, b, &terms));
+    files.sort_by(|a, b| compare_files(a, b, &terms, &options));
     files.dedup_by(|a, b| paths_equal(&a.path, &b.path));
 
     Ok(files
@@ -291,9 +292,14 @@ fn filter_files(
         .collect()
 }
 
-fn compare_files(a: &PlatformFile, b: &PlatformFile, terms: &ParsedTerms) -> Ordering {
-    let score_a = score_file(a, terms).unwrap_or_default();
-    let score_b = score_file(b, terms).unwrap_or_default();
+fn compare_files(
+    a: &PlatformFile,
+    b: &PlatformFile,
+    terms: &ParsedTerms,
+    options: &FileSearchOptions,
+) -> Ordering {
+    let score_a = score_file_with_options(a, terms, options).unwrap_or_default();
+    let score_b = score_file_with_options(b, terms, options).unwrap_or_default();
 
     score_b
         .cmp(&score_a)
@@ -303,28 +309,153 @@ fn compare_files(a: &PlatformFile, b: &PlatformFile, terms: &ParsedTerms) -> Ord
 }
 
 fn score_file(file: &PlatformFile, terms: &ParsedTerms) -> Option<i32> {
+    score_file_with_options(
+        file,
+        terms,
+        &FileSearchOptions {
+            roots: Vec::new(),
+            preferred_paths: Vec::new(),
+            excluded_paths: Vec::new(),
+            include_hidden: false,
+        },
+    )
+}
+
+fn score_file_with_options(
+    file: &PlatformFile,
+    terms: &ParsedTerms,
+    options: &FileSearchOptions,
+) -> Option<i32> {
     let name = file.name.to_lowercase();
     let parent = file.parent.to_lowercase();
     let path = file.path.to_lowercase();
-    let mut score = if file.is_dir { 10 } else { 0 };
+    let stem = Path::new(&file.name)
+        .file_stem()
+        .map(|stem| stem.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
+    // 目录基础分略高：搜索 src/config 等词时优先展示目录本身
+    let mut score = if file.is_dir { 15 } else { 0 };
 
     for text in &terms.text {
-        if name == *text {
-            score += 100;
-        } else if name.starts_with(text) {
-            score += 75;
-        } else if name.contains(text) {
-            score += 45;
-        } else if parent.contains(text) {
-            score += 15;
-        } else if path.contains(text) {
-            score += 5;
-        } else {
-            return None;
+        score += match_text_score(&name, &stem, &parent, &path, text)?;
+    }
+
+    score += preferred_path_bonus(file, options);
+
+    Some(score)
+}
+
+fn match_text_score(name: &str, stem: &str, parent: &str, path: &str, text: &str) -> Option<i32> {
+    if name == text {
+        return Some(260);
+    }
+
+    if stem == text {
+        return Some(245);
+    }
+
+    if name.starts_with(text) {
+        return Some(220);
+    }
+
+    if stem.starts_with(text) {
+        return Some(205);
+    }
+
+    if let Some(index) = word_boundary_index(name, text) {
+        return Some(185 - index.min(25) as i32);
+    }
+
+    if let Some(index) = name.find(text) {
+        return Some(160 - index.min(40) as i32);
+    }
+
+    // 规范化匹配放在 fuzzy 之前：
+    // 对 stem（不含扩展名）做规范化，避免 .ts 等扩展名污染匹配结果。
+    // 例如 my-project.ts 的 stem 是 my-project，规范化后是 myproject，精确命中得 130；
+    // 若用 name 做规范化，myprojectts 只能走 starts_with 得 110。
+    if stem.contains(['-', '_', '.']) {
+        let normalized_stem = stem.replace(['-', '_', '.'], "");
+        // 用户输入若也带分隔符（如 my-project），同样规范化后再比
+        let normalized_text = text.replace(['-', '_'], "");
+        if !normalized_text.is_empty() {
+            if normalized_stem == normalized_text {
+                return Some(130);
+            }
+            if normalized_stem.starts_with(&normalized_text) {
+                return Some(110);
+            }
+            if let Some(index) = word_boundary_index(&normalized_stem, &normalized_text) {
+                return Some(90 - index.min(20) as i32);
+            }
         }
     }
 
-    Some(score)
+    if let Some(score) = fuzzy_subsequence_score(name, text) {
+        return Some(score);
+    }
+
+    if let Some(index) = parent.find(text) {
+        return Some(45 - index.min(25) as i32);
+    }
+
+    if let Some(index) = path.find(text) {
+        return Some(20 - index.min(15) as i32);
+    }
+
+    None
+}
+
+fn word_boundary_index(value: &str, text: &str) -> Option<usize> {
+    // 注意：调用方传入的 value 和 text 均已 to_lowercase()，
+    // 因此驼峰边界（大写首字符检测）在此无效，仅保留 ASCII 分隔符边界。
+    value.match_indices(text).find_map(|(index, _)| {
+        if index == 0 {
+            return Some(index);
+        }
+
+        let prev_char = value[..index].chars().last()?;
+        if matches!(prev_char, '-' | '_' | '.' | ' ' | '\\' | '/') {
+            return Some(index);
+        }
+
+        None
+    })
+}
+
+fn fuzzy_subsequence_score(value: &str, text: &str) -> Option<i32> {
+    let mut last_index = None;
+    let mut first_index = None;
+    let mut gap_count = 0usize;
+    let mut search_start = 0usize;
+
+    for character in text.chars() {
+        let relative_index = value[search_start..].find(character)?;
+        let index = search_start + relative_index;
+
+        if let Some(last_index) = last_index {
+            gap_count += index.saturating_sub(last_index + 1);
+        } else {
+            first_index = Some(index);
+        }
+
+        last_index = Some(index);
+        search_start = index + character.len_utf8();
+    }
+
+    Some(95 - first_index.unwrap_or(0).min(25) as i32 - gap_count.min(45) as i32)
+}
+
+fn preferred_path_bonus(file: &PlatformFile, options: &FileSearchOptions) -> i32 {
+    let file_path = PathBuf::from(&file.path);
+
+    options
+        .preferred_paths
+        .iter()
+        .position(|preferred_path| path_is_inside(&file_path, preferred_path))
+        // 上限从 35 提高到 50，确保偏好路径加成高于父目录匹配分数（最高 45）
+        .map(|index| 50 - (index.min(4) as i32 * 5))
+        .unwrap_or(0)
 }
 
 fn launchable_item_from_file(file: PlatformFile) -> LaunchableItem {
@@ -947,6 +1078,18 @@ fn paths_equal(a: &str, b: &str) -> bool {
     normalize_path_key(a) == normalize_path_key(b)
 }
 
+fn path_is_inside(path: &Path, prefix: &Path) -> bool {
+    let path = normalize_path_key(&path.to_string_lossy());
+    let prefix = normalize_path_key(&prefix.to_string_lossy());
+    let prefix = prefix.trim_end_matches(['\\', '/']);
+
+    path == prefix
+        || path
+            .strip_prefix(prefix)
+            .map(|rest| rest.starts_with('\\') || rest.starts_with('/'))
+            .unwrap_or(false)
+}
+
 fn normalize_path_key(path: &str) -> String {
     #[cfg(target_os = "windows")]
     {
@@ -955,6 +1098,93 @@ fn normalize_path_key(path: &str) -> String {
     #[cfg(not(target_os = "windows"))]
     {
         path.to_string()
+    }
+}
+
+#[cfg(test)]
+mod scoring_tests {
+    use std::{cmp::Ordering, path::PathBuf};
+
+    use super::{
+        compare_files, score_file_with_options, FileSearchOptions, ParsedTerms, PlatformFile,
+    };
+
+    fn file(path: &str, name: &str, parent: &str) -> PlatformFile {
+        PlatformFile {
+            name: name.to_string(),
+            path: path.to_string(),
+            parent: parent.to_string(),
+            extension: PathBuf::from(name)
+                .extension()
+                .map(|extension| format!(".{}", extension.to_string_lossy().to_lowercase()))
+                .unwrap_or_default(),
+            is_dir: false,
+        }
+    }
+
+    fn terms(text: &str) -> ParsedTerms {
+        ParsedTerms {
+            text: vec![text.to_string()],
+            extension: None,
+            kind: None,
+        }
+    }
+
+    fn options(preferred_paths: Vec<PathBuf>) -> FileSearchOptions {
+        FileSearchOptions {
+            roots: Vec::new(),
+            preferred_paths,
+            excluded_paths: Vec::new(),
+            include_hidden: false,
+        }
+    }
+
+    #[test]
+    fn filename_exact_and_prefix_matches_rank_above_path_matches() {
+        let terms = terms("config");
+        let options = options(Vec::new());
+        let exact = file("/project/config.ts", "config.ts", "/project");
+        let prefix = file("/project/configuration.ts", "configuration.ts", "/project");
+        let path_only = file("/project/config/app.ts", "app.ts", "/project/config");
+
+        assert!(
+            score_file_with_options(&exact, &terms, &options)
+                > score_file_with_options(&prefix, &terms, &options)
+        );
+        assert!(
+            score_file_with_options(&prefix, &terms, &options)
+                > score_file_with_options(&path_only, &terms, &options)
+        );
+    }
+
+    #[test]
+    fn consecutive_matches_rank_above_sparse_fuzzy_matches() {
+        let terms = terms("con");
+        let options = options(Vec::new());
+        let consecutive = file("/project/config.ts", "config.ts", "/project");
+        let sparse = file("/project/c_o_n_file.ts", "c_o_n_file.ts", "/project");
+
+        assert!(
+            score_file_with_options(&consecutive, &terms, &options)
+                > score_file_with_options(&sparse, &terms, &options)
+        );
+    }
+
+    #[test]
+    fn preferred_paths_can_break_close_matches_without_usage_storage() {
+        let terms = terms("notes");
+        let options = options(vec![PathBuf::from("/home/me/Documents")]);
+        let preferred = file(
+            "/home/me/Documents/notes.txt",
+            "notes.txt",
+            "/home/me/Documents",
+        );
+        let other = file("/tmp/notes.txt", "notes.txt", "/tmp");
+
+        assert_eq!(
+            compare_files(&preferred, &other, &terms, &options),
+            Ordering::Less
+        );
     }
 }
 
