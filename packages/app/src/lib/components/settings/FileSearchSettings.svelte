@@ -4,6 +4,7 @@
   import { open } from "@tauri-apps/plugin-dialog";
   import { Switch } from "bits-ui";
   import { toast } from "svelte-sonner";
+  import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import PhosphorIcon from "$lib/components/PhosphorIcon.svelte";
   import type { AppConfig } from "$lib/type";
 
@@ -22,6 +23,9 @@
   let loading = $state(true);
   let saving = $state(false);
   let choosingDirectory = $state(false);
+  let installingEverything = $state(false);
+  let installEverythingDialogOpen = $state(false);
+  let everythingInstallCloseLockHeld = false;
   let excludeInput = $state("");
   let status = $state<FileSearchStatus>({
     is_searching: false,
@@ -52,6 +56,39 @@
       status = await invoke<FileSearchStatus>("get_file_search_status");
     } catch (error) {
       console.error("Failed to load file search status:", error);
+    }
+  }
+
+  async function setEverythingInstallCloseLock(locked: boolean) {
+    if (locked === everythingInstallCloseLockHeld) return;
+
+    everythingInstallCloseLockHeld = locked;
+    await invoke(
+      locked ? "acquire_window_close_lock" : "release_window_close_lock",
+    ).catch((error) => {
+      everythingInstallCloseLockHeld = !locked;
+      console.error("Failed to update Everything install window lock:", error);
+    });
+  }
+
+  async function installEverything() {
+    if (installingEverything) return;
+
+    installingEverything = true;
+    const toastId = toast.loading("正在安装 Everything...");
+    try {
+      await invoke("install_file_search_everything");
+      await refreshStatus();
+      installEverythingDialogOpen = false;
+      toast.success("Everything 已安装，文件搜索将优先使用 Everything", {
+        id: toastId,
+      });
+    } catch (error) {
+      console.error("Failed to install Everything:", error);
+      installEverythingDialogOpen = false;
+      toast.error(String(error), { id: toastId });
+    } finally {
+      installingEverything = false;
     }
   }
 
@@ -133,6 +170,12 @@
 
   onMount(async () => {
     await Promise.all([loadConfig(), refreshStatus()]);
+  });
+
+  $effect(() => {
+    void setEverythingInstallCloseLock(
+      installEverythingDialogOpen || installingEverything,
+    );
   });
 </script>
 
@@ -231,36 +274,72 @@
 
     <section class="border-t border-neutral-100 pt-4 dark:border-neutral-800">
       <div>
-        <h4 class="text-sm font-semibold text-neutral-950 dark:text-neutral-50">
-          搜索后端
-        </h4>
-        <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-          Windows 优先使用 Everything 实时索引；不可用时自动回退到 Windows
-          Search。
-        </p>
-        <div
-          class="mt-2 inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-neutral-50 px-2 py-1 text-xs text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
-        >
-          <span
-            class="h-1.5 w-1.5 rounded-full {status.is_searching
-              ? 'animate-pulse bg-amber-500'
-              : status.available
-                ? 'bg-emerald-500'
-                : 'bg-red-500'}"
-          ></span>
-          <span>
-            {status.backend || "系统搜索"} · {status.available
-              ? "可用"
-              : "不可用"}
-          </span>
+        <div class="flex items-start justify-between gap-4">
+          <div class="min-w-0">
+            <h4
+              class="text-sm font-semibold text-neutral-950 dark:text-neutral-50"
+            >
+              搜索后端
+            </h4>
+            <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+              Windows 可安装 Everything 获取实时索引；未安装或不可用时使用
+              Windows Search。
+            </p>
+          </div>
+          {#if status.everything_install_required}
+            <button
+              class="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-neutral-900 px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
+              disabled={installingEverything}
+              onclick={() => (installEverythingDialogOpen = true)}
+            >
+              <PhosphorIcon icon="download" class="h-4 w-4" />
+              安装 Everything
+            </button>
+          {/if}
         </div>
-        <p class="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
-          Everything：{status.everything_installed
-            ? status.everything_ipc_available
-              ? "已连接 IPC"
-              : "已安装，等待客户端 IPC"
-            : "未安装，文件搜索将使用 Windows Search"}
-        </p>
+
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+          <div
+            class="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-neutral-50 px-2 py-1 text-xs text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
+          >
+            <span
+              class="h-1.5 w-1.5 rounded-full {status.is_searching
+                ? 'animate-pulse bg-amber-500'
+                : status.available
+                  ? 'bg-emerald-500'
+                  : 'bg-red-500'}"
+            ></span>
+            <span>
+              当前：{status.backend || "系统搜索"} · {status.available
+                ? "可用"
+                : "不可用"}
+            </span>
+          </div>
+          <div
+            class="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-600 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-300"
+          >
+            <span
+              class="h-1.5 w-1.5 rounded-full {status.everything_installed
+                ? status.everything_ipc_available
+                  ? 'bg-emerald-500'
+                  : 'bg-amber-500'
+                : 'bg-neutral-300 dark:bg-neutral-600'}"
+            ></span>
+            <span>
+              Everything：{status.everything_installed
+                ? status.everything_ipc_available
+                  ? "已连接"
+                  : "已安装，等待后台启动"
+                : "未安装"}
+            </span>
+          </div>
+        </div>
+        {#if status.everything_install_required}
+          <p class="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
+            当前会继续使用 Windows Search。安装 Everything
+            后可获得更快的全盘文件名搜索。
+          </p>
+        {/if}
         {#if status.last_error}
           <p class="mt-2 text-xs text-red-500">{status.last_error}</p>
         {/if}
@@ -268,3 +347,20 @@
     </section>
   </div>
 {/if}
+
+<ConfirmDialog
+  bind:open={installEverythingDialogOpen}
+  title="安装 Everything 加速文件搜索"
+  description="Onin 会通过 winget 安装 Everything，并优先使用 Everything IPC 获取实时文件搜索结果。未安装时仍会继续使用 Windows Search。"
+  confirmLabel="安装"
+  cancelLabel="暂不安装"
+  variant="default"
+  loading={installingEverything}
+  closeOnConfirm={false}
+  onConfirm={installEverything}
+  onCancel={() => {
+    if (!installingEverything) {
+      installEverythingDialogOpen = false;
+    }
+  }}
+/>

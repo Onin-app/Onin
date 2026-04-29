@@ -31,7 +31,7 @@ use super::{
 pub(super) fn backend_name() -> &'static str {
     #[cfg(target_os = "windows")]
     {
-        if everything_installed() {
+        if everything_ipc_available() {
             return "Everything";
         }
 
@@ -661,12 +661,42 @@ fn everything_client_or_start() -> Result<everything_ipc::wm::EverythingClient, 
 fn start_everything_client(path: &Path) -> Result<(), String> {
     const CREATE_NO_WINDOW: u32 = 0x08000000;
 
+    if let Err(error) = disable_everything_update_notification(path) {
+        tracing::warn!(%error, "failed to disable Everything update notification before startup");
+    }
+
     Command::new(path)
         .arg("-startup")
         .creation_flags(CREATE_NO_WINDOW)
         .spawn()
         .map(|_| ())
         .map_err(|error| format!("启动 Everything 客户端失败: {}", error))
+}
+
+#[cfg(target_os = "windows")]
+fn disable_everything_update_notification(path: &Path) -> Result<(), String> {
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+    let mut command = Command::new(path);
+    command
+        .arg("-disable-update-notification")
+        .creation_flags(CREATE_NO_WINDOW);
+
+    let output = run_command_with_timeout(
+        &mut command,
+        "Everything 禁用启动更新提示",
+        Duration::from_secs(2),
+    )?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "Everything 禁用启动更新提示失败: {}{}",
+            String::from_utf8_lossy(&output.stdout).trim(),
+            String::from_utf8_lossy(&output.stderr).trim()
+        ))
+    }
 }
 
 #[cfg(target_os = "windows")]

@@ -37,6 +37,7 @@
   let isInstallingEverything = $state(false);
   let installEverythingDialogOpen = $state(false);
   let dismissedEverythingInstallPrompt = $state(false);
+  let everythingPromptCloseLockHeld = false;
   let headerRef = $state<ExtensionHeader>(null!);
   let searchVersion = 0;
   let searchInFlight = false;
@@ -183,6 +184,7 @@
       toast.success("Everything 已安装，文件搜索将优先使用 Everything", {
         id: toastId,
       });
+      installEverythingDialogOpen = false;
       const query = searchQuery.trim();
       if (query.length >= 2) {
         searchVersion += 1;
@@ -191,6 +193,7 @@
     } catch (error) {
       console.error("[FileSearch] Failed to install Everything:", error);
       dismissedEverythingInstallPrompt = true;
+      installEverythingDialogOpen = false;
       toast.error(String(error), { id: toastId });
     } finally {
       isInstallingEverything = false;
@@ -198,8 +201,27 @@
   };
 
   const cancelEverythingInstall = () => {
+    if (isInstallingEverything) return;
     dismissedEverythingInstallPrompt = true;
   };
+
+  const setEverythingPromptCloseLock = async (locked: boolean) => {
+    if (locked === everythingPromptCloseLockHeld) return;
+
+    everythingPromptCloseLockHeld = locked;
+    await invoke(
+      locked ? "acquire_window_close_lock" : "release_window_close_lock",
+    ).catch((error) => {
+      everythingPromptCloseLockHeld = !locked;
+      console.error("[FileSearch] Failed to update window close lock:", error);
+    });
+  };
+
+  $effect(() => {
+    void setEverythingPromptCloseLock(
+      installEverythingDialogOpen || isInstallingEverything,
+    );
+  });
 
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Backspace" && searchQuery === "") {
@@ -336,6 +358,10 @@
     window.removeEventListener("mousemove", handlePaneResize);
     window.removeEventListener("mouseup", stopPaneResize);
     document.body.classList.remove("select-none", "cursor-col-resize");
+    if (everythingPromptCloseLockHeld) {
+      void invoke("release_window_close_lock");
+      everythingPromptCloseLockHeld = false;
+    }
   });
 </script>
 
@@ -601,6 +627,11 @@
   bind:open={installEverythingDialogOpen}
   title="安装 Everything 加速文件搜索"
   description="当前未检测到 Everything。安装后 Onin 会优先使用 Everything IPC 获取实时文件搜索结果；取消后本次将继续使用 Windows Search。"
+  confirmLabel="安装"
+  cancelLabel="暂不安装"
+  variant="default"
+  loading={isInstallingEverything}
+  closeOnConfirm={false}
   onConfirm={installEverything}
   onCancel={cancelEverythingInstall}
 />
