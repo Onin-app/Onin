@@ -1,11 +1,12 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import { goto } from "$app/navigation";
-  import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+  import { invoke } from "@tauri-apps/api/core";
   import { toast } from "svelte-sonner";
   import AppScrollArea from "$lib/components/AppScrollArea.svelte";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import ExtensionHeader from "$lib/components/ExtensionHeader.svelte";
+  import FilePreview from "$lib/components/FilePreview.svelte";
   import PhosphorIcon from "$lib/components/PhosphorIcon.svelte";
   import type { LaunchableItem } from "$lib/type";
 
@@ -261,22 +262,6 @@
       console.error("[FileSearch] Failed to open file:", error);
     }
   };
-
-  const isImageFile = (path: string) => {
-    const lower = path.toLowerCase();
-    return [
-      ".png",
-      ".jpg",
-      ".jpeg",
-      ".gif",
-      ".bmp",
-      ".webp",
-      ".ico",
-      ".svg",
-    ].some((ext) => lower.endsWith(ext));
-  };
-
-  const isPdfFile = (path: string) => path.toLowerCase().endsWith(".pdf");
 
   const getKindLabel = (item: LaunchableItem) =>
     item.item_type === "Folder" ? "Folder" : "File";
@@ -558,43 +543,12 @@
 
         <div class="relative flex-1 overflow-hidden">
           <AppScrollArea class="h-full w-full" viewportClass="h-full w-full">
-            {#if selectedItem.item_type === "File" && isImageFile(selectedItem.path)}
-              <div
-                class="flex min-h-full items-center justify-center bg-[url('/checker-board.svg')] bg-repeat p-8"
-              >
-                <img
-                  src={convertFileSrc(selectedItem.path)}
-                  class="max-h-[75vh] max-w-full rounded border border-neutral-200 shadow-lg dark:border-neutral-700"
-                  alt="Preview"
-                />
-              </div>
-            {:else if selectedItem.item_type === "File" && isPdfFile(selectedItem.path)}
-              <div
-                class="flex h-full min-h-full flex-col bg-neutral-100 dark:bg-neutral-950"
-              >
-                <object
-                  data={convertFileSrc(selectedItem.path)}
-                  type="application/pdf"
-                  class="h-full min-h-[520px] w-full flex-1"
-                  aria-label="PDF Preview"
-                >
-                  <div
-                    class="flex min-h-[360px] flex-col items-center justify-center gap-4 px-8 text-center"
-                  >
-                    <div
-                      class="flex h-20 w-16 items-center justify-center rounded-lg border border-neutral-200 bg-white text-neutral-500 shadow-sm dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-400"
-                    >
-                      <PhosphorIcon icon="file" size={32} />
-                    </div>
-                    <button
-                      class="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
-                      onclick={() => openItem(selectedItem)}
-                    >
-                      打开
-                    </button>
-                  </div>
-                </object>
-              </div>
+            {#if selectedItem.item_type === "File"}
+              <FilePreview
+                path={selectedItem.path}
+                fileName={selectedItem.name}
+                onOpen={() => openItem(selectedItem)}
+              />
             {:else}
               <div class="flex min-h-full flex-col">
                 <div
