@@ -1,7 +1,11 @@
 <script lang="ts">
   import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+  import { marked } from "marked";
+  import { onDestroy, onMount } from "svelte";
   import FileTypeIcon from "$lib/components/FileTypeIcon.svelte";
+  import { Theme } from "$lib/type";
   import { inferMimeType } from "$lib/utils/mimeTypeMap";
+  import { getTheme, theme } from "$lib/utils/theme";
 
   interface Props {
     path?: string;
@@ -23,6 +27,12 @@
   let textPreviewError = $state<string | null>(null);
   let isLoadingTextPreview = $state(false);
   let textPreviewRequestId = 0;
+  let highlightedHtml = $state<string | null>(null);
+  let renderedMarkdownHtml = $state<string | null>(null);
+  let isHighlighting = $state(false);
+  let highlightRequestId = 0;
+  let currentResolvedTheme = $state<Theme.DARK | Theme.LIGHT>(Theme.DARK);
+  let unsubscribeTheme: (() => void) | null = null;
 
   const previewName = $derived(fileName || path?.split(/[/\\]/).pop() || "");
   const mimeType = $derived(path ? inferMimeType(path) : "");
@@ -48,6 +58,64 @@
     return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   };
 
+  const getExtension = (name: string) => {
+    const index = name.lastIndexOf(".");
+    if (index <= 0 || index === name.length - 1) return "";
+    return name.slice(index + 1).toLowerCase();
+  };
+
+  const getHighlightLanguage = (name: string, type: string) => {
+    const ext = getExtension(name);
+    const byExtension: Record<string, string> = {
+      c: "c",
+      conf: "ini",
+      cpp: "cpp",
+      css: "css",
+      go: "go",
+      h: "c",
+      htm: "html",
+      html: "html",
+      ini: "ini",
+      java: "java",
+      js: "javascript",
+      json: "json",
+      jsx: "jsx",
+      log: "log",
+      markdown: "markdown",
+      md: "markdown",
+      php: "php",
+      ps1: "powershell",
+      py: "python",
+      rb: "ruby",
+      rs: "rust",
+      sh: "shellscript",
+      sql: "sql",
+      svelte: "svelte",
+      toml: "toml",
+      ts: "typescript",
+      tsx: "tsx",
+      txt: "text",
+      vue: "vue",
+      xml: "xml",
+      yaml: "yaml",
+      yml: "yaml",
+    };
+
+    if (byExtension[ext]) return byExtension[ext];
+    if (type === "application/json") return "json";
+    if (type === "application/xml" || type === "text/xml") return "xml";
+    if (type === "text/markdown") return "markdown";
+    if (type === "text/css") return "css";
+    if (type === "text/html") return "html";
+    if (type === "text/javascript") return "javascript";
+    return "text";
+  };
+
+  const isMarkdownFile = (name: string, type: string) => {
+    const ext = getExtension(name);
+    return ext === "md" || ext === "markdown" || type === "text/markdown";
+  };
+
   const loadTextPreview = async (nextPath: string, requestId: number) => {
     isLoadingTextPreview = true;
     textPreview = null;
@@ -70,6 +138,35 @@
     }
   };
 
+  const highlightTextPreview = async (
+    content: string,
+    language: string,
+    resolvedTheme: Theme.DARK | Theme.LIGHT,
+    requestId: number,
+  ) => {
+    isHighlighting = true;
+    highlightedHtml = null;
+
+    try {
+      const { codeToHtml } = await import("shiki");
+      const html = await codeToHtml(content, {
+        lang: language,
+        theme: resolvedTheme === Theme.DARK ? "github-dark" : "github-light",
+      });
+
+      if (requestId !== highlightRequestId) return;
+      highlightedHtml = html;
+    } catch (error) {
+      console.warn("[FilePreview] Failed to highlight text preview:", error);
+      if (requestId !== highlightRequestId) return;
+      highlightedHtml = null;
+    } finally {
+      if (requestId === highlightRequestId) {
+        isHighlighting = false;
+      }
+    }
+  };
+
   $effect(() => {
     textPreviewRequestId += 1;
     const requestId = textPreviewRequestId;
@@ -82,6 +179,46 @@
     }
 
     void loadTextPreview(path, requestId);
+  });
+
+  $effect(() => {
+    highlightRequestId += 1;
+    const requestId = highlightRequestId;
+
+    if (!textPreview?.content) {
+      highlightedHtml = null;
+      renderedMarkdownHtml = null;
+      isHighlighting = false;
+      return;
+    }
+
+    if (isMarkdownFile(previewName, mimeType)) {
+      highlightedHtml = null;
+      isHighlighting = false;
+      renderedMarkdownHtml = marked.parse(textPreview.content, {
+        async: false,
+      }) as string;
+      return;
+    }
+
+    renderedMarkdownHtml = null;
+    const language = getHighlightLanguage(previewName, mimeType);
+    void highlightTextPreview(
+      textPreview.content,
+      language,
+      currentResolvedTheme,
+      requestId,
+    );
+  });
+
+  onMount(() => {
+    unsubscribeTheme = theme.subscribe((value) => {
+      currentResolvedTheme = getTheme(value);
+    });
+  });
+
+  onDestroy(() => {
+    unsubscribeTheme?.();
   });
 </script>
 
@@ -184,15 +321,35 @@
         正在加载预览...
       </div>
     {:else if textPreview}
-      <pre
-        class="min-h-full overflow-auto p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap text-neutral-800 dark:text-neutral-200"><code
-          >{textPreview.content}</code
-        ></pre>
+      <div class="min-h-full overflow-auto text-xs leading-relaxed">
+        {#if renderedMarkdownHtml}
+          <div
+            class="prose prose-sm dark:prose-invert file-preview-markdown max-w-none p-4"
+          >
+            {@html renderedMarkdownHtml}
+          </div>
+        {:else if highlightedHtml}
+          <div class="file-preview-code">
+            {@html highlightedHtml}
+          </div>
+        {:else}
+          <pre
+            class="min-h-full p-4 font-mono whitespace-pre-wrap text-neutral-800 dark:text-neutral-200"><code
+              >{textPreview.content}</code
+            ></pre>
+        {/if}
+      </div>
       {#if textPreview.truncated}
         <div
           class="border-t border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300"
         >
           文件较大，仅显示前 {formatBytes(textPreview.bytes_read)}。
+        </div>
+      {:else if isHighlighting}
+        <div
+          class="border-t border-neutral-200 bg-neutral-50 px-4 py-2 text-xs text-neutral-500 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-400"
+        >
+          正在应用语法高亮...
         </div>
       {/if}
     {:else}
@@ -248,3 +405,32 @@
     {/if}
   </div>
 {/if}
+
+<style>
+  :global(.file-preview-code pre.shiki) {
+    min-height: 100%;
+    margin: 0;
+    padding: 1rem;
+    overflow: visible;
+    font-family:
+      ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+      "Courier New", monospace;
+    font-size: 0.75rem;
+    line-height: 1.625;
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: transparent !important;
+  }
+
+  :global(.file-preview-code code) {
+    font-family: inherit;
+  }
+
+  :global(.file-preview-markdown) {
+    color: inherit;
+  }
+
+  :global(.file-preview-markdown pre) {
+    overflow-x: auto;
+  }
+</style>
