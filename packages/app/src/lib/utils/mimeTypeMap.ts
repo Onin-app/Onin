@@ -100,7 +100,10 @@ export const EXTENSION_TO_MIME: Record<string, string> = {
   ".go": "text/x-go",
   ".php": "text/x-php",
   ".rb": "text/x-ruby",
+  ".vue": "text/x-vue",
+  ".svelte": "text/x-svelte",
   ".sh": "text/x-shellscript",
+  ".ps1": "text/x-powershell",
   ".sql": "text/x-sql",
 
   // 文本文件
