@@ -337,12 +337,32 @@
     return extension ? `${extension} 文件` : "文件";
   };
 
-  const getPreviewMeta = (item: LaunchableItem) => [
-    { label: "Name", value: item.name },
-    { label: "Where", value: getParentPath(item.path) },
-    { label: "Type", value: getPreviewKind(item) },
-    { label: "Path", value: item.path },
-  ];
+  const formatModifiedTime = (timestamp?: number) => {
+    if (!timestamp) return null;
+
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) return null;
+
+    return new Intl.DateTimeFormat(undefined, {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(date);
+  };
+
+  const getPreviewMeta = (item: LaunchableItem) => {
+    const modifiedTime = formatModifiedTime(item.modified_time);
+
+    return [
+      { label: "Name", value: item.name },
+      { label: "Where", value: getParentPath(item.path) },
+      { label: "Type", value: getPreviewKind(item) },
+      ...(modifiedTime ? [{ label: "Modified", value: modifiedTime }] : []),
+      { label: "Path", value: item.path },
+    ];
+  };
 
   onMount(async () => {
     await refreshStatus();

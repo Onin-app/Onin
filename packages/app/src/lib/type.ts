@@ -23,6 +23,7 @@ export interface LaunchableItem {
   origin?: AppOrigin;
   source_display?: string;
   matches?: CommandMatch[];
+  modified_time?: number;
   requires_confirmation?: boolean;
   trigger_mode?: "matched" | "preview";
 }

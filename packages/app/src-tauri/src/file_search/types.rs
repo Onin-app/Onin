@@ -19,6 +19,7 @@ pub(super) struct PlatformFile {
     pub(super) parent: String,
     pub(super) extension: String,
     pub(super) is_dir: bool,
+    pub(super) modified_time: Option<u64>,
 }
 
 #[derive(Default)]

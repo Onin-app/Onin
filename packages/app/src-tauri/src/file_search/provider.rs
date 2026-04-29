@@ -23,7 +23,7 @@ use crate::shared_types::{CommandKeyword, IconType, ItemSource, ItemType, Launch
 use super::{
     path_utils::{
         file_search_options, is_path_allowed_by_options_fast, platform_file_from_path,
-        platform_file_from_path_with_kind,
+        platform_file_from_path_with_kind_and_modified_time,
     },
     types::{FileSearchOptions, PlatformFile, DEFAULT_RESULT_LIMIT},
 };
@@ -484,6 +484,7 @@ fn launchable_item_from_file(file: PlatformFile) -> LaunchableItem {
         origin: None,
         source_display: Some("File".to_string()),
         matches: None,
+        modified_time: file.modified_time,
         requires_confirmation: false,
     }
 }
@@ -591,7 +592,10 @@ fn search_everything_ipc(
     use everything_ipc::wm::{RequestFlags, Sort};
 
     let everything = everything_client_or_start()?;
-    let request_flags = RequestFlags::FileName | RequestFlags::Path | RequestFlags::Attributes;
+    let request_flags = RequestFlags::FileName
+        | RequestFlags::Path
+        | RequestFlags::Attributes
+        | RequestFlags::DateModified;
     let mut files = Vec::new();
 
     for search_query in everything_queries(query, options) {
@@ -617,7 +621,15 @@ fn search_everything_ipc(
                 .unwrap_or(false);
 
             let path = PathBuf::from(parent).join(name);
-            if let Some(file) = platform_file_from_path_with_kind(&path, is_dir) {
+            let modified_time = item
+                .get_time(RequestFlags::DateModified)
+                .and_then(|filetime| {
+                    filetime_to_unix_millis(filetime.dwHighDateTime, filetime.dwLowDateTime)
+                });
+
+            if let Some(file) =
+                platform_file_from_path_with_kind_and_modified_time(&path, is_dir, modified_time)
+            {
                 files.push(file);
             }
 
@@ -671,6 +683,17 @@ fn start_everything_client(path: &Path) -> Result<(), String> {
         .spawn()
         .map(|_| ())
         .map_err(|error| format!("启动 Everything 客户端失败: {}", error))
+}
+
+#[cfg(target_os = "windows")]
+fn filetime_to_unix_millis(high: u32, low: u32) -> Option<u64> {
+    const UNIX_EPOCH_FILETIME_TICKS: u64 = 116_444_736_000_000_000;
+    const FILETIME_TICKS_PER_MILLISECOND: u64 = 10_000;
+
+    let ticks = ((high as u64) << 32) | low as u64;
+    ticks
+        .checked_sub(UNIX_EPOCH_FILETIME_TICKS)
+        .map(|unix_ticks| unix_ticks / FILETIME_TICKS_PER_MILLISECOND)
 }
 
 #[cfg(target_os = "windows")]

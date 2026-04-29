@@ -1,6 +1,7 @@
 use std::{
     fs,
     path::{Path, PathBuf},
+    time::UNIX_EPOCH,
 };
 
 use tauri::{AppHandle, Manager};
@@ -90,10 +91,18 @@ pub(super) fn validate_search_result_path(app: &AppHandle, path: &str) -> Result
 
 pub(super) fn platform_file_from_path(path: &Path) -> Option<PlatformFile> {
     let metadata = fs::metadata(path).ok()?;
-    platform_file_from_path_with_kind(path, metadata.is_dir())
+    platform_file_from_path_with_kind_and_modified_time(
+        path,
+        metadata.is_dir(),
+        modified_time_from_metadata(&metadata),
+    )
 }
 
-pub(super) fn platform_file_from_path_with_kind(path: &Path, is_dir: bool) -> Option<PlatformFile> {
+pub(super) fn platform_file_from_path_with_kind_and_modified_time(
+    path: &Path,
+    is_dir: bool,
+    modified_time: Option<u64>,
+) -> Option<PlatformFile> {
     let name = path.file_name()?.to_string_lossy().to_string();
     let parent = path
         .parent()
@@ -110,7 +119,16 @@ pub(super) fn platform_file_from_path_with_kind(path: &Path, is_dir: bool) -> Op
         parent,
         extension,
         is_dir,
+        modified_time,
     })
+}
+
+fn modified_time_from_metadata(metadata: &fs::Metadata) -> Option<u64> {
+    metadata
+        .modified()
+        .ok()
+        .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+        .and_then(|duration| u64::try_from(duration.as_millis()).ok())
 }
 
 pub(super) fn is_path_allowed_by_options(path: &Path, options: &FileSearchOptions) -> bool {

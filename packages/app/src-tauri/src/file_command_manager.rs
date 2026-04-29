@@ -173,6 +173,7 @@ impl FileCommandManager {
             origin: None,
             source_display: None,
             matches: None,
+            modified_time: None,
             requires_confirmation: false,
         })
     }
