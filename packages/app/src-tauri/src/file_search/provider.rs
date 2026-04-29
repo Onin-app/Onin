@@ -25,8 +25,11 @@ use super::{
         file_search_options, is_path_allowed_by_options_fast, platform_file_from_path,
         platform_file_from_path_with_kind_and_modified_time,
     },
-    types::{FileSearchOptions, PlatformFile, DEFAULT_RESULT_LIMIT},
+    types::{FileSearchOptions, FileSearchResponse, PlatformFile, DEFAULT_RESULT_LIMIT},
 };
+
+const MAX_PAGE_OFFSET: usize = 5_000;
+const MAX_CANDIDATE_LIMIT: usize = 5_000;
 
 pub(super) fn backend_name() -> &'static str {
     #[cfg(target_os = "windows")]
@@ -130,32 +133,63 @@ pub(super) fn backend_available() -> bool {
 pub(super) fn search_platform_files(
     query: String,
     limit: Option<usize>,
+    offset: Option<usize>,
     app: &AppHandle,
-) -> Result<Vec<LaunchableItem>, String> {
+) -> Result<FileSearchResponse, String> {
     let query = query.trim().to_lowercase();
+    let limit = limit.unwrap_or(DEFAULT_RESULT_LIMIT).clamp(1, 100);
+    let offset = offset.unwrap_or(0).min(MAX_PAGE_OFFSET);
+
     if query.chars().count() < 2 {
-        return Ok(Vec::new());
+        return Ok(empty_search_response(offset, limit));
     }
 
     let terms = parse_terms(&query);
     if terms.text.is_empty() {
-        return Ok(Vec::new());
+        return Ok(empty_search_response(offset, limit));
     }
 
-    let limit = limit.unwrap_or(DEFAULT_RESULT_LIMIT).clamp(1, 100);
     let options = file_search_options(app);
     // 拉大候选池，避免 Everything 按字母序返回时把相关结果切掉
-    let candidate_limit = limit.saturating_mul(6).max(200);
+    let requested_end = offset.saturating_add(limit);
+    let candidate_limit = requested_end
+        .saturating_mul(6)
+        .max(200)
+        .min(MAX_CANDIDATE_LIMIT);
     let mut files = platform_search(&terms.text_query(), candidate_limit, &options)?;
+    let candidate_limit_reached = files.len() >= candidate_limit;
     files = filter_files(files, &terms, &options);
     files.sort_by(|a, b| compare_files(a, b, &terms, &options));
     files.dedup_by(|a, b| paths_equal(&a.path, &b.path));
 
-    Ok(files
+    let total_count = files.len();
+    let items = files
         .into_iter()
+        .skip(offset)
         .take(limit)
         .map(launchable_item_from_file)
-        .collect())
+        .collect();
+
+    Ok(FileSearchResponse {
+        items,
+        total_count,
+        total_count_is_exact: !candidate_limit_reached,
+        has_more: total_count > requested_end
+            || (candidate_limit_reached && total_count >= requested_end),
+        offset,
+        limit,
+    })
+}
+
+fn empty_search_response(offset: usize, limit: usize) -> FileSearchResponse {
+    FileSearchResponse {
+        items: Vec::new(),
+        total_count: 0,
+        total_count_is_exact: true,
+        has_more: false,
+        offset,
+        limit,
+    }
 }
 
 #[derive(Default)]
@@ -1172,6 +1206,7 @@ mod scoring_tests {
                 .map(|extension| format!(".{}", extension.to_string_lossy().to_lowercase()))
                 .unwrap_or_default(),
             is_dir: false,
+            modified_time: None,
         }
     }
 

@@ -21,6 +21,17 @@
     last_error?: string | null;
   }
 
+  interface FileSearchResponse {
+    items: LaunchableItem[];
+    total_count: number;
+    total_count_is_exact: boolean;
+    has_more: boolean;
+    offset: number;
+    limit: number;
+  }
+
+  const PAGE_SIZE = 60;
+
   let searchQuery = $state("");
   let results = $state<LaunchableItem[]>([]);
   let selectedIndex = $state(0);
@@ -41,11 +52,16 @@
   let everythingPromptCloseLockHeld = false;
   let headerRef = $state<ExtensionHeader>(null!);
   let searchVersion = 0;
-  let searchInFlight = false;
-  let queuedSearch: { query: string; version: number } | null = null;
+  let searchInFlight = $state(false);
+  let queuedSearch: { query: string; version: number; offset: number } | null =
+    null;
   let searchTimer: ReturnType<typeof setTimeout> | null = null;
   let loadingTimer: ReturnType<typeof setTimeout> | null = null;
   let showSearchingIndicator = $state(false);
+  let hasMoreResults = $state(false);
+  let isLoadingMore = $state(false);
+  let loadMoreSentinel = $state<HTMLDivElement | null>(null);
+  let loadMoreObserver: IntersectionObserver | null = null;
   let listPaneWidth = $state(40);
   let isResizingPane = $state(false);
 
@@ -57,6 +73,14 @@
     "notes type:folder",
     '"project plan"',
   ];
+
+  const resetSearchResultState = () => {
+    queuedSearch = null;
+    results = [];
+    selectedIndex = 0;
+    hasMoreResults = false;
+    isLoadingMore = false;
+  };
 
   const handleBack = () => {
     goto("/");
@@ -82,18 +106,20 @@
 
     const query = value.trim();
     if (query.length < 2) {
-      queuedSearch = null;
-      results = [];
+      resetSearchResultState();
       isSearching = false;
       showSearchingIndicator = false;
       return;
     }
 
+    results = [];
+    hasMoreResults = false;
     isSearching = true;
+    isLoadingMore = false;
     showSearchingIndicator = false;
     const searchDelay = status.everything_ipc_available ? 25 : 180;
     searchTimer = setTimeout(() => {
-      enqueueSearch(query, version);
+      enqueueSearch(query, version, 0);
     }, searchDelay);
     loadingTimer = setTimeout(() => {
       if (isSearching && results.length === 0) {
@@ -107,15 +133,30 @@
     headerRef?.focus();
   };
 
-  const enqueueSearch = (query: string, version: number) => {
+  const enqueueSearch = (query: string, version: number, offset: number) => {
     if (query.length < 2) {
       return;
     }
 
-    queuedSearch = { query, version };
+    queuedSearch = { query, version, offset };
     if (!searchInFlight) {
       void runQueuedSearch();
     }
+  };
+
+  const loadMoreResults = () => {
+    const query = searchQuery.trim();
+    if (
+      query.length < 2 ||
+      searchInFlight ||
+      isLoadingMore ||
+      !hasMoreResults
+    ) {
+      return;
+    }
+
+    isLoadingMore = true;
+    enqueueSearch(query, searchVersion, results.length);
   };
 
   const runQueuedSearch = async () => {
@@ -128,17 +169,23 @@
     searchInFlight = true;
 
     try {
-      const nextResults = await invoke<LaunchableItem[]>("search_files", {
+      const response = await invoke<FileSearchResponse>("search_files", {
         query: currentSearch.query,
-        limit: 60,
+        limit: PAGE_SIZE,
+        offset: currentSearch.offset,
       });
 
       if (
         currentSearch.version === searchVersion &&
         currentSearch.query === searchQuery.trim()
       ) {
-        results = nextResults;
+        results =
+          currentSearch.offset === 0
+            ? response.items
+            : [...results, ...response.items];
+        hasMoreResults = response.has_more;
         isSearching = false;
+        isLoadingMore = false;
         showSearchingIndicator = false;
       }
     } catch (error) {
@@ -147,12 +194,17 @@
         currentSearch.version === searchVersion &&
         currentSearch.query === searchQuery.trim()
       ) {
-        results = [];
+        if (currentSearch.offset === 0) {
+          results = [];
+          hasMoreResults = false;
+        }
         isSearching = false;
+        isLoadingMore = false;
         showSearchingIndicator = false;
       }
     } finally {
       searchInFlight = false;
+      isLoadingMore = false;
       if (queuedSearch) {
         void runQueuedSearch();
       }
@@ -189,7 +241,8 @@
       const query = searchQuery.trim();
       if (query.length >= 2) {
         searchVersion += 1;
-        enqueueSearch(query, searchVersion);
+        resetSearchResultState();
+        enqueueSearch(query, searchVersion, 0);
       }
     } catch (error) {
       console.error("[FileSearch] Failed to install Everything:", error);
@@ -358,10 +411,35 @@
     window.addEventListener("mouseup", stopPaneResize);
   });
 
+  $effect(() => {
+    loadMoreObserver?.disconnect();
+    loadMoreObserver = null;
+
+    if (!loadMoreSentinel || !hasMoreResults || results.length === 0) {
+      return;
+    }
+
+    loadMoreObserver = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          loadMoreResults();
+        }
+      },
+      { root: null, rootMargin: "120px" },
+    );
+    loadMoreObserver.observe(loadMoreSentinel);
+
+    return () => {
+      loadMoreObserver?.disconnect();
+      loadMoreObserver = null;
+    };
+  });
+
   onDestroy(() => {
     searchVersion += 1;
     queuedSearch = null;
     clearSearchTimers();
+    loadMoreObserver?.disconnect();
     window.removeEventListener("mousemove", handlePaneResize);
     window.removeEventListener("mouseup", stopPaneResize);
     document.body.classList.remove("select-none", "cursor-col-resize");
@@ -502,6 +580,28 @@
                 </span>
               </button>
             {/each}
+            <div bind:this={loadMoreSentinel} class="h-px"></div>
+            {#if hasMoreResults || isLoadingMore}
+              <div class="px-1 pt-1 pb-2">
+                <button
+                  class="flex w-full items-center justify-center rounded-md border border-neutral-200 px-3 py-2 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                  disabled={isLoadingMore || searchInFlight}
+                  onclick={loadMoreResults}
+                >
+                  {#if isLoadingMore}
+                    正在加载更多...
+                  {:else}
+                    加载更多结果
+                  {/if}
+                </button>
+              </div>
+            {:else if results.length > 0}
+              <div
+                class="px-2 pt-1 pb-2 text-center text-[11px] text-neutral-400"
+              >
+                已显示全部结果
+              </div>
+            {/if}
           </div>
         </AppScrollArea>
       </div>

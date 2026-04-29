@@ -2,6 +2,8 @@ use std::{path::PathBuf, sync::Mutex};
 
 use serde::Serialize;
 
+use crate::shared_types::LaunchableItem;
+
 pub(super) const DEFAULT_RESULT_LIMIT: usize = 30;
 
 #[derive(Clone, Debug)]
@@ -20,6 +22,16 @@ pub(super) struct PlatformFile {
     pub(super) extension: String,
     pub(super) is_dir: bool,
     pub(super) modified_time: Option<u64>,
+}
+
+#[derive(Serialize)]
+pub struct FileSearchResponse {
+    pub items: Vec<LaunchableItem>,
+    pub total_count: usize,
+    pub total_count_is_exact: bool,
+    pub has_more: bool,
+    pub offset: usize,
+    pub limit: usize,
 }
 
 #[derive(Default)]

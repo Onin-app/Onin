@@ -12,10 +12,8 @@ use std::{
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
-use crate::shared_types::LaunchableItem;
-
 pub use types::FileSearchState;
-use types::FileSearchStatus;
+use types::{FileSearchResponse, FileSearchStatus};
 
 const TEXT_PREVIEW_MAX_BYTES: u64 = 512 * 1024;
 
@@ -62,14 +60,15 @@ pub async fn install_file_search_everything() -> Result<(), String> {
 pub async fn search_files(
     query: String,
     limit: Option<usize>,
+    offset: Option<usize>,
     app: AppHandle,
-) -> Vec<LaunchableItem> {
+) -> FileSearchResponse {
     let state = app.state::<FileSearchState>();
     state.begin_search();
 
     let app_for_search = app.clone();
     let result = tokio::task::spawn_blocking(move || {
-        provider::search_platform_files(query, limit, &app_for_search)
+        provider::search_platform_files(query, limit, offset, &app_for_search)
     })
     .await
     .unwrap_or_else(|error| Err(error.to_string()));
@@ -78,14 +77,21 @@ pub async fn search_files(
 
     match result {
         Ok(items) => {
-            state.set_last_result_count(items.len());
+            state.set_last_result_count(items.total_count);
             state.set_last_error(None);
             items
         }
         Err(error) => {
             state.set_last_result_count(0);
             state.set_last_error(Some(error));
-            Vec::new()
+            FileSearchResponse {
+                items: Vec::new(),
+                total_count: 0,
+                total_count_is_exact: true,
+                has_more: false,
+                offset: offset.unwrap_or(0),
+                limit: limit.unwrap_or(types::DEFAULT_RESULT_LIMIT),
+            }
         }
     }
 }
