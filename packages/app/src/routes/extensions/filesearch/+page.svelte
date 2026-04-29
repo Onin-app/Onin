@@ -276,6 +276,8 @@
     ].some((ext) => lower.endsWith(ext));
   };
 
+  const isPdfFile = (path: string) => path.toLowerCase().endsWith(".pdf");
+
   const getKindLabel = (item: LaunchableItem) =>
     item.item_type === "Folder" ? "Folder" : "File";
 
@@ -565,6 +567,33 @@
                   class="max-h-[75vh] max-w-full rounded border border-neutral-200 shadow-lg dark:border-neutral-700"
                   alt="Preview"
                 />
+              </div>
+            {:else if selectedItem.item_type === "File" && isPdfFile(selectedItem.path)}
+              <div
+                class="flex h-full min-h-full flex-col bg-neutral-100 dark:bg-neutral-950"
+              >
+                <object
+                  data={convertFileSrc(selectedItem.path)}
+                  type="application/pdf"
+                  class="h-full min-h-[520px] w-full flex-1"
+                  aria-label="PDF Preview"
+                >
+                  <div
+                    class="flex min-h-[360px] flex-col items-center justify-center gap-4 px-8 text-center"
+                  >
+                    <div
+                      class="flex h-20 w-16 items-center justify-center rounded-lg border border-neutral-200 bg-white text-neutral-500 shadow-sm dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-400"
+                    >
+                      <PhosphorIcon icon="file" size={32} />
+                    </div>
+                    <button
+                      class="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
+                      onclick={() => openItem(selectedItem)}
+                    >
+                      打开
+                    </button>
+                  </div>
+                </object>
               </div>
             {:else}
               <div class="flex min-h-full flex-col">
