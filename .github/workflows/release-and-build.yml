@@ -249,5 +249,5 @@ jobs:
           SENTRY_PROJECT: ${{ secrets.GLITCHTIP_PROJECT }}
         run: |
           # Use the modern artifact bundle flow supported by GlitchTip 4.2+.
-          npx @sentry/cli@3.4.0 sourcemaps inject packages/app/build
-          npx @sentry/cli@3.4.0 sourcemaps upload packages/app/build
+          npx @sentry/cli@3.4.0 sourcemaps inject packages/app/build/_app/immutable
+          npx @sentry/cli@3.4.0 sourcemaps upload packages/app/build/_app/immutable
