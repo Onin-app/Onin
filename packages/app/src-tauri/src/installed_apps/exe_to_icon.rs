@@ -28,17 +28,21 @@ pub fn extract_icon_from_exe(exe_path: &str) -> Option<String> {
         let hicon = ExtractIconW(None, c_path, 0); // <--- ExtractIconA 改为 ExtractIconW
         if hicon.is_invalid() {
             let err = windows::core::Error::from_win32(); // 获取详细的错误信息
-            tracing::error!("ExtractIconW failed for {}: {:?}", exe_path, err); // <--- 打印错误
-            return None;
+            tracing::debug!(
+                "ExtractIconW failed for {}, falling back to file icon: {:?}",
+                exe_path,
+                err
+            );
+            return extract_icon_from_file(exe_path);
         }
 
         // 获取图标信息
         let mut icon_info = ICONINFO::default();
         if GetIconInfo(hicon, &mut icon_info).is_err() {
             let err = windows::core::Error::from_win32();
-            tracing::error!("GetIconInfo failed for {}: {:?}", exe_path, err);
+            tracing::warn!("GetIconInfo failed for {}: {:?}", exe_path, err);
             let _ = DestroyIcon(hicon);
-            return None;
+            return extract_icon_from_file(exe_path);
         }
 
         // 提取位图数据
@@ -79,13 +83,13 @@ pub fn extract_icon_from_file(file_path: &str) -> Option<String> {
         );
 
         if result == 0 {
-            tracing::warn!("SHGetFileInfoW failed for {}", file_path);
+            tracing::debug!("SHGetFileInfoW failed for {}", file_path);
             return None;
         }
 
         let hicon = shfi.hIcon;
         if hicon.is_invalid() {
-            tracing::warn!("SHGetFileInfoW returned invalid icon for {}", file_path);
+            tracing::debug!("SHGetFileInfoW returned invalid icon for {}", file_path);
             return None;
         }
 
@@ -93,7 +97,7 @@ pub fn extract_icon_from_file(file_path: &str) -> Option<String> {
         let mut icon_info = ICONINFO::default();
         if GetIconInfo(hicon, &mut icon_info).is_err() {
             let err = windows::core::Error::from_win32();
-            tracing::error!("GetIconInfo failed for {}: {:?}", file_path, err);
+            tracing::warn!("GetIconInfo failed for {}: {:?}", file_path, err);
             let _ = DestroyIcon(hicon);
             return None;
         }
@@ -123,14 +127,14 @@ unsafe fn extract_bitmap_data(hbitmap: HBITMAP) -> Option<BitmapData> {
     let hdc = GetDC(HWND::default());
     if hdc.is_invalid() {
         let err = windows::core::Error::from_win32();
-        tracing::error!("GetDC failed: {:?}", err);
+        tracing::warn!("GetDC failed: {:?}", err);
         return None;
     }
 
     let hdc_mem = CreateCompatibleDC(hdc);
     if hdc_mem.is_invalid() {
         let err = windows::core::Error::from_win32();
-        tracing::error!("CreateCompatibleDC failed: {:?}", err);
+        tracing::warn!("CreateCompatibleDC failed: {:?}", err);
         let _ = ReleaseDC(HWND::default(), hdc);
         return None;
     }
@@ -138,7 +142,7 @@ unsafe fn extract_bitmap_data(hbitmap: HBITMAP) -> Option<BitmapData> {
     let old_bitmap = SelectObject(hdc_mem, hbitmap);
     if old_bitmap.is_invalid() {
         let err = windows::core::Error::from_win32();
-        tracing::error!("SelectObject failed: {:?}", err);
+        tracing::warn!("SelectObject failed: {:?}", err);
         let _ = DeleteDC(hdc_mem);
         let _ = ReleaseDC(HWND::default(), hdc);
         return None;
@@ -174,7 +178,7 @@ unsafe fn extract_bitmap_data(hbitmap: HBITMAP) -> Option<BitmapData> {
     ) == 0
     {
         let err = windows::core::Error::from_win32();
-        tracing::error!("GetDIBits (info) failed: {:?}", err);
+        tracing::warn!("GetDIBits (info) failed: {:?}", err);
         let _ = SelectObject(hdc_mem, old_bitmap);
         let _ = DeleteDC(hdc_mem);
         let _ = ReleaseDC(HWND::default(), hdc);
@@ -210,7 +214,7 @@ unsafe fn extract_bitmap_data(hbitmap: HBITMAP) -> Option<BitmapData> {
     ) == 0
     {
         let err = windows::core::Error::from_win32();
-        tracing::error!("GetDIBits (data) failed: {:?}", err);
+        tracing::warn!("GetDIBits (data) failed: {:?}", err);
         let _ = SelectObject(hdc_mem, old_bitmap);
         let _ = DeleteDC(hdc_mem);
         let _ = ReleaseDC(HWND::default(), hdc);
