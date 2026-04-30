@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Onin",
-  "version": "1.14.0",
+  "version": "1.15.0",
   "identifier": "com.onin.data",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -35,9 +35,7 @@
       "dangerousDisableAssetCspModification": true,
       "assetProtocol": {
         "enable": true,
-        "scope": [
-          "**"
-        ]
+        "scope": ["**"]
       }
     }
   },
