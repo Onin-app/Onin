@@ -91,6 +91,27 @@
     isLoadingMore = false;
   };
 
+  const getFileSearchResultKey = (item: LaunchableItem) =>
+    item.path.trim().replaceAll("/", "\\").toLowerCase();
+
+  const uniqueFileSearchResults = (items: LaunchableItem[]) => {
+    const seen = new Set<string>();
+    return items.filter((item) => {
+      const key = getFileSearchResultKey(item);
+      if (seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    });
+  };
+
+  const mergeFileSearchResults = (
+    currentItems: LaunchableItem[],
+    nextItems: LaunchableItem[],
+  ) => uniqueFileSearchResults([...currentItems, ...nextItems]);
+
   const handleBack = () => {
     goto("/");
   };
@@ -190,8 +211,8 @@
       ) {
         results =
           currentSearch.offset === 0
-            ? response.items
-            : [...results, ...response.items];
+            ? uniqueFileSearchResults(response.items)
+            : mergeFileSearchResults(results, response.items);
         hasMoreResults = response.has_more;
         isSearching = false;
         isLoadingMore = false;
