@@ -226,6 +226,12 @@ impl ParsedTerms {
     fn text_query(&self) -> String {
         self.text.join(" ")
     }
+
+    fn is_single_cjk_text_query(&self) -> bool {
+        self.text.len() == 1
+            && self.text[0].chars().count() == 1
+            && self.text[0].chars().any(is_cjk_search_character)
+    }
 }
 
 fn parse_terms(query: &str) -> ParsedTerms {
@@ -355,6 +361,8 @@ fn compare_files(
     score_b
         .cmp(&score_a)
         .then_with(|| b.is_dir.cmp(&a.is_dir))
+        .then_with(|| b.modified_time.cmp(&a.modified_time))
+        .then_with(|| path_depth(&a.path).cmp(&path_depth(&b.path)))
         .then_with(|| a.name.len().cmp(&b.name.len()))
         .then_with(|| a.name.cmp(&b.name))
 }
@@ -386,9 +394,10 @@ fn score_file_with_options(
         .unwrap_or_default();
     // 目录基础分略高：搜索 src/config 等词时优先展示目录本身
     let mut score = if file.is_dir { 15 } else { 0 };
+    let demote_path_matches = terms.is_single_cjk_text_query();
 
     for text in &terms.text {
-        score += match_text_score(&name, &stem, &parent, &path, text)?;
+        score += match_text_score(&name, &stem, &parent, &path, text, demote_path_matches)?;
     }
 
     score += preferred_path_bonus(file, options);
@@ -396,7 +405,14 @@ fn score_file_with_options(
     Some(score)
 }
 
-fn match_text_score(name: &str, stem: &str, parent: &str, path: &str, text: &str) -> Option<i32> {
+fn match_text_score(
+    name: &str,
+    stem: &str,
+    parent: &str,
+    path: &str,
+    text: &str,
+    demote_path_matches: bool,
+) -> Option<i32> {
     if name == text {
         return Some(260);
     }
@@ -447,11 +463,19 @@ fn match_text_score(name: &str, stem: &str, parent: &str, path: &str, text: &str
     }
 
     if let Some(index) = parent.find(text) {
-        return Some(45 - index.min(25) as i32);
+        return if demote_path_matches {
+            Some(12 - index.min(8) as i32)
+        } else {
+            Some(45 - index.min(25) as i32)
+        };
     }
 
     if let Some(index) = path.find(text) {
-        return Some(20 - index.min(15) as i32);
+        return if demote_path_matches {
+            Some(4 - index.min(4) as i32)
+        } else {
+            Some(20 - index.min(15) as i32)
+        };
     }
 
     None
@@ -507,6 +531,12 @@ fn preferred_path_bonus(file: &PlatformFile, options: &FileSearchOptions) -> i32
         // 上限从 35 提高到 50，确保偏好路径加成高于父目录匹配分数（最高 45）
         .map(|index| 50 - (index.min(4) as i32 * 5))
         .unwrap_or(0)
+}
+
+fn path_depth(path: &str) -> usize {
+    path.split(['\\', '/'])
+        .filter(|part| !part.is_empty())
+        .count()
 }
 
 fn launchable_item_from_file(file: PlatformFile) -> LaunchableItem {
@@ -1290,6 +1320,51 @@ mod scoring_tests {
         assert_eq!(
             compare_files(&preferred, &other, &terms, &options),
             Ordering::Less
+        );
+    }
+
+    #[test]
+    fn newer_files_break_score_ties() {
+        let terms = terms("notes");
+        let options = options(Vec::new());
+        let mut newer = file("/project/a/notes.txt", "notes.txt", "/project/a");
+        newer.modified_time = Some(2_000);
+        let mut older = file("/project/b/notes.txt", "notes.txt", "/project/b");
+        older.modified_time = Some(1_000);
+
+        assert_eq!(
+            compare_files(&newer, &older, &terms, &options),
+            Ordering::Less
+        );
+    }
+
+    #[test]
+    fn shallower_paths_break_score_ties_after_modified_time() {
+        let terms = terms("notes");
+        let options = options(Vec::new());
+        let shallow = file("/project/notes.txt", "notes.txt", "/project");
+        let deep = file(
+            "/project/archive/old/notes.txt",
+            "notes.txt",
+            "/project/archive/old",
+        );
+
+        assert_eq!(
+            compare_files(&shallow, &deep, &terms, &options),
+            Ordering::Less
+        );
+    }
+
+    #[test]
+    fn single_cjk_queries_prefer_filename_matches_over_path_matches() {
+        let terms = terms("文");
+        let options = options(Vec::new());
+        let name_match = file("/project/文档.txt", "文档.txt", "/project");
+        let path_match = file("/project/文档/app.txt", "app.txt", "/project/文档");
+
+        assert!(
+            score_file_with_options(&name_match, &terms, &options)
+                > score_file_with_options(&path_match, &terms, &options)
         );
     }
 
