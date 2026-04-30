@@ -5,4 +5,6 @@
 pub mod calculator;
 pub mod clipboard;
 pub mod emoji;
+pub mod filesearch;
 pub mod translator;
+pub mod web;

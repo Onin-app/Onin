@@ -35,24 +35,24 @@ jobs:
       onin_inject_changed: ${{ steps.filter.outputs.onin_inject }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
         with:
           version: 10
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: 'pnpm'
 
       - name: Detect changed paths
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
@@ -102,17 +102,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ needs.release.outputs.tag }}
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
         with:
           version: 10
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: 'pnpm'
@@ -142,15 +142,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
         with:
           version: 10
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: 'pnpm'
@@ -190,7 +190,7 @@ jobs:
           echo "Tag: ${{ needs.release.outputs.tag }}"
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-latest'
@@ -199,12 +199,12 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev libxdo-dev patchelf pkg-config libxcb-shape0-dev libxcb-xfixes0-dev
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
         with:
           version: 10
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: 'pnpm'
@@ -219,6 +219,9 @@ jobs:
 
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Build inject script
+        run: pnpm build:inject
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
@@ -245,4 +248,6 @@ jobs:
           SENTRY_ORG: ${{ secrets.GLITCHTIP_ORG }}
           SENTRY_PROJECT: ${{ secrets.GLITCHTIP_PROJECT }}
         run: |
-          npx @sentry/cli releases files "onin@${{ needs.release.outputs.version }}" upload-sourcemaps packages/app/build --rewrite --url-prefix "~/"
+          # Use the modern artifact bundle flow supported by GlitchTip 4.2+.
+          npx @sentry/cli@3.4.0 sourcemaps inject packages/app/build
+          npx @sentry/cli@3.4.0 sourcemaps upload packages/app/build

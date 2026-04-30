@@ -4,6 +4,7 @@ export type Source =
   | "Custom"
   | "Command"
   | "FileCommand"
+  | "FileSearch"
   | "Plugin"
   | "Extension";
 export type IconType = "Base64" | "Iconfont" | "Url";
@@ -22,6 +23,7 @@ export interface LaunchableItem {
   origin?: AppOrigin;
   source_display?: string;
   matches?: CommandMatch[];
+  modified_time?: number;
   requires_confirmation?: boolean;
   trigger_mode?: "matched" | "preview";
 }
@@ -103,4 +105,7 @@ export interface AppConfig {
   sort_mode: SortMode;
   enable_usage_tracking: boolean;
   marketplace_api_url?: string;
+  disabled_extension_ids?: string[];
+  file_search_excluded_paths?: string[];
+  file_search_include_hidden?: boolean;
 }

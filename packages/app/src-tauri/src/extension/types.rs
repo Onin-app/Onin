@@ -34,10 +34,36 @@ pub struct ExtensionManifest {
 pub struct ExtensionCommand {
     /// 命令代码，如 "calculate"
     pub code: &'static str,
+    /// 命令显示名称
+    pub name: &'static str,
+    /// 命令描述（可选）
+    pub description: Option<&'static str>,
+    /// 命令图标（可选，默认使用 manifest.icon）
+    pub icon: Option<&'static str>,
     /// 触发关键词
     pub keywords: &'static [&'static str],
     /// 匹配规则（可选），使用统一的 StaticCommandMatch 格式
     pub matches: Option<&'static [StaticCommandMatch]>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtensionCommandInfo {
+    pub code: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub icon: String,
+    pub keywords: Vec<String>,
+    pub has_matches: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtensionInfo {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub icon: String,
+    pub enabled: bool,
+    pub commands: Vec<ExtensionCommandInfo>,
 }
 
 /// 编译时静态的匹配规则

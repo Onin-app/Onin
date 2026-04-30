@@ -45,7 +45,7 @@ function getAdapter(): WindowAdapter {
     // 探测运行模式
     const params = new URLSearchParams(window.location.search);
     const mode = params.get('mode');
-    
+
     if (mode === 'window') {
       console.log('[pluginWindow] Creating WindowModeAdapter');
       adapter = new WindowModeAdapter();

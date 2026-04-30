@@ -91,10 +91,6 @@
       result.push(extensionPreviewItem);
     }
 
-    if (matchedCommands.length === 0) {
-      return [...result, ...appListManager.state.appList];
-    }
-
     // 展示层不再做去重或语义过滤，是否显示由各命令自身的匹配规则决定
     return [...result, ...appListManager.state.appList, ...matchedCommands];
   });
@@ -247,6 +243,16 @@
       const extensionInfo = parseExtensionAction(app.action);
       if (extensionInfo) {
         const { extensionId, commandCode } = extensionInfo;
+        if (extensionId === "file_search") {
+          inputValue = "";
+          clipboard.clearAttachments();
+          extensionPreviewItem = null;
+          extensionManager.clearPreview();
+          matchedCommands = [];
+          appListManager.resetToOriginList();
+          goto("/extensions/filesearch");
+          return;
+        }
         // Emoji Extension 特殊处理：导航到独立页面
         if (extensionId === "emoji") {
           inputValue = "";
@@ -287,11 +293,7 @@
         }
         // Translator Extension
         if (extensionId === "translator") {
-          await extensionManager.execute(
-            extensionId,
-            commandCode,
-            "",
-          );
+          await extensionManager.execute(extensionId, commandCode, "");
 
           inputValue = "";
           clipboard.clearAttachments();
@@ -556,12 +558,12 @@
     class="h-full w-full overflow-hidden rounded-xl bg-neutral-100 p-3 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100"
     data-tauri-drag-region
   >
-      <div
-        class="flex h-full w-full flex-col"
-        role="listbox"
-        tabindex="0"
-        onkeydown={handleNavigationKeyDown}
-      >
+    <div
+      class="flex h-full w-full flex-col"
+      role="listbox"
+      tabindex="0"
+      onkeydown={handleNavigationKeyDown}
+    >
       <!-- Header: Logo + Search Input + Plugin Menu -->
       <div class="flex items-center gap-2 pb-2">
         <button class="flex-shrink-0 cursor-pointer" onclick={handleToSettings}>
@@ -630,31 +632,29 @@
             class="h-full w-full rounded-[10px] border px-2 py-2"
             viewportClass="h-full w-full overflow-x-hidden"
           >
-              <div class="app-list overflow-hidden">
-                <div use:animate>
-                  {#each displayList as app, index ((app.action || "") + app.path + app.name + index)}
-                    {#if app.path.startsWith("extension:")}
-                      <!-- Extension 预览项（如计算器结果） -->
-                      <ExtensionResultItem
-                        title={app.name}
-                        description={app.description || ""}
-                        icon={app.icon}
-                        triggerMode={app.trigger_mode}
-                        isSelected={appListManager.state.selectedIndex ===
-                          index}
-                        onClick={() => handleOpenApp(app)}
-                      />
-                    {:else}
-                      <AppListItem
-                        {app}
-                        isSelected={appListManager.state.selectedIndex ===
-                          index}
-                        onClick={() => handleOpenApp(app)}
-                      />
-                    {/if}
-                  {/each}
-                </div>
+            <div class="app-list overflow-hidden">
+              <div use:animate>
+                {#each displayList as app, index ((app.action || "") + app.path + app.name + index)}
+                  {#if app.path.startsWith("extension:")}
+                    <!-- Extension 预览项（如计算器结果） -->
+                    <ExtensionResultItem
+                      title={app.name}
+                      description={app.description || ""}
+                      icon={app.icon}
+                      triggerMode={app.trigger_mode}
+                      isSelected={appListManager.state.selectedIndex === index}
+                      onClick={() => handleOpenApp(app)}
+                    />
+                  {:else}
+                    <AppListItem
+                      {app}
+                      isSelected={appListManager.state.selectedIndex === index}
+                      onClick={() => handleOpenApp(app)}
+                    />
+                  {/if}
+                {/each}
               </div>
+            </div>
           </AppScrollArea>
         {/if}
       </div>

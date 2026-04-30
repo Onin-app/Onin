@@ -220,7 +220,10 @@ pub fn get_plugin_settings(
     app: tauri::AppHandle,
     plugin_id: String,
 ) -> Result<HashMap<String, JsonValue>, String> {
-    println!("[plugin/settings] get_plugin_settings: plugin_id = {}", plugin_id);
+    println!(
+        "[plugin/settings] get_plugin_settings: plugin_id = {}",
+        plugin_id
+    );
     load_plugin_settings(&app, &plugin_id)
 }
 
@@ -233,15 +236,21 @@ pub fn save_plugin_settings(
     plugin_id: String,
     settings: HashMap<String, JsonValue>,
 ) -> Result<(), String> {
-    println!("[plugin/settings] save_plugin_settings: plugin_id = {}", plugin_id);
+    println!(
+        "[plugin/settings] save_plugin_settings: plugin_id = {}",
+        plugin_id
+    );
     save_plugin_settings_to_file(&app, &plugin_id, &settings)?;
-    
+
     // 通知插件设置已更改
-    let _ = app.emit("plugin-settings-changed", &serde_json::json!({
-        "pluginId": plugin_id,
-        "settings": settings,
-    }));
-    
+    let _ = app.emit(
+        "plugin-settings-changed",
+        &serde_json::json!({
+            "pluginId": plugin_id,
+            "settings": settings,
+        }),
+    );
+
     // 或者发送特定的消息如果是在内联模式 (但app.emit也会被内联Webview的Tauri API接收到)
     Ok(())
 }

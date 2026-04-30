@@ -131,13 +131,12 @@ pub async fn execute_command(
                     Err(err)
                 }
             }
-            CommandAction::App(path) => {
-                installed_apps::open_app(path.clone(), app.clone()).map_err(|e| {
+            CommandAction::App(path) => installed_apps::open_app(path.clone(), app.clone())
+                .map_err(|e| {
                     let err = format!("Failed to open app {}: {}", path, e);
                     eprintln!("{}", err);
                     err
-                })
-            }
+                }),
             CommandAction::File(path) => opener::open(path).map_err(|e| {
                 let err = format!("Failed to open file {}: {}", path, e);
                 eprintln!("{}", err);
@@ -145,16 +144,12 @@ pub async fn execute_command(
             }),
             CommandAction::PluginEntry { plugin_id } => {
                 let plugin_store = app.state::<crate::plugin::PluginStore>();
-                crate::plugin::execute_plugin_entry(
-                    app.clone(),
-                    plugin_store,
-                    plugin_id.clone(),
-                )
-                .map_err(|e| {
-                    let err = format!("插件执行失败 {}: {}", plugin_id, e);
-                    eprintln!("{}", err);
-                    err
-                })
+                crate::plugin::execute_plugin_entry(app.clone(), plugin_store, plugin_id.clone())
+                    .map_err(|e| {
+                        let err = format!("插件执行失败 {}: {}", plugin_id, e);
+                        eprintln!("{}", err);
+                        err
+                    })
             }
             CommandAction::PluginCommand {
                 plugin_id,
@@ -177,7 +172,8 @@ pub async fn execute_command(
                 {
                     Ok(result) => {
                         if !result.success {
-                            let err_msg = result.error.unwrap_or_else(|| "未知插件错误".to_string());
+                            let err_msg =
+                                result.error.unwrap_or_else(|| "未知插件错误".to_string());
                             let err = format!("插件指令执行失败: {}", err_msg);
                             eprintln!("{}", err);
                             Err(err)
@@ -196,8 +192,12 @@ pub async fn execute_command(
                 extension_id,
                 command_code,
             } => {
-                let result =
-                    crate::extension::execute_extension_command(extension_id, command_code, "");
+                let result = crate::extension::execute_extension_command(
+                    &app,
+                    extension_id,
+                    command_code,
+                    "",
+                );
                 if let Some(error) = result.error {
                     let err = format!("Extension command failed: {}", error);
                     eprintln!("{}", err);

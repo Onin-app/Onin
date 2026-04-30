@@ -7,7 +7,11 @@
    */
   import { onMount, onDestroy } from "svelte";
   import { Menu } from "@tauri-apps/api/menu";
-  import { CheckMenuItem, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
+  import {
+    CheckMenuItem,
+    MenuItem,
+    PredefinedMenuItem,
+  } from "@tauri-apps/api/menu";
 
   interface Props {
     autoDetach: boolean;
@@ -84,14 +88,14 @@
       }),
       await PredefinedMenuItem.new({ item: "Separator" }),
       await MenuItem.new({
-          text: "刷新界面",
-          action: onRefresh,
+        text: "刷新界面",
+        action: onRefresh,
       }),
       await MenuItem.new({
-          text: "重启插件",
-          action: () => {
-              if (onRestart) onRestart();
-          },
+        text: "重启插件",
+        action: () => {
+          if (onRestart) onRestart();
+        },
       }),
       await MenuItem.new({
         text: "开发者工具",

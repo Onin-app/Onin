@@ -13,14 +13,26 @@
     CalendarBlank,
     Smiley,
     Translate,
+    GlobeSimple,
+    Globe,
+    LinkSimple,
+    Link,
+    Clipboard,
+    File,
+    FolderPlus,
+    Trash,
+    Prohibit,
+    CaretDown,
+    DownloadSimple,
   } from "phosphor-svelte";
 
   interface PhosphorIconProps {
     icon: string;
+    size?: number | string;
     class?: string;
   }
 
-  const { icon, class: cls }: PhosphorIconProps = $props();
+  const { icon, size, class: cls }: PhosphorIconProps = $props();
 
   // 图标映射表
   const iconMap: Record<string, any> = {
@@ -31,6 +43,8 @@
     lock: Lock,
     logout: SignOut,
     folder: Folder,
+    folderPlus: FolderPlus,
+    "folder-plus": FolderPlus,
     cube: Cube,
     package: Cube,
     calculator: Calculator,
@@ -39,9 +53,20 @@
     calendar: CalendarBlank,
     smiley: Smiley,
     translate: Translate,
+    globe: Globe,
+    globeSimple: GlobeSimple,
+    link: Link,
+    linkSimple: LinkSimple,
+    clipboard: Clipboard,
+    file: File,
+    trash: Trash,
+    prohibit: Prohibit,
+    caretDown: CaretDown,
+    "caret-down": CaretDown,
+    download: DownloadSimple,
   };
 
   const IconComponent = $derived(iconMap[icon] || Power);
 </script>
 
-{@render IconComponent({ class: cls })}
+<IconComponent {size} class={cls} />

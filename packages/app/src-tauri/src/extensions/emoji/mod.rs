@@ -25,6 +25,9 @@ pub static EMOJI_MANIFEST: ExtensionManifest = ExtensionManifest {
     icon: "smiley",
     commands: &[ExtensionCommand {
         code: "search",
+        name: "Emoji",
+        description: Some("搜索和选择 Emoji 表情"),
+        icon: Some("smiley"),
         keywords: &["emoji", "表情", "😀", "smiley", "emoticon"],
         matches: None, // 不参与匹配指令，仅通过关键词触发
     }],

@@ -4,10 +4,11 @@
    */
   import { onMount, onDestroy } from "svelte";
   import { goto } from "$app/navigation";
-  import { invoke, convertFileSrc } from "@tauri-apps/api/core";
+  import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import AppScrollArea from "$lib/components/AppScrollArea.svelte";
   import ExtensionHeader from "$lib/components/ExtensionHeader.svelte";
+  import FilePreview from "$lib/components/FilePreview.svelte";
 
   type ClipboardItem = {
     id: string;
@@ -116,20 +117,6 @@
       hour: "2-digit",
       minute: "2-digit",
     });
-  }
-
-  function isImageFile(path: string) {
-    const lower = path.trim().toLowerCase();
-    return (
-      lower.endsWith(".png") ||
-      lower.endsWith(".jpg") ||
-      lower.endsWith(".jpeg") ||
-      lower.endsWith(".gif") ||
-      lower.endsWith(".bmp") ||
-      lower.endsWith(".webp") ||
-      lower.endsWith(".ico") ||
-      lower.endsWith(".svg")
-    );
   }
 
   function getDisplayName(item: ClipboardItem) {
@@ -274,35 +261,16 @@
               viewportClass="h-full w-full p-6"
             >
               {#if selectedItem.item_type === "Image" && selectedItem.thumbnail}
-                <div
-                  class="flex min-h-full items-center justify-center bg-[url('/checker-board.svg')] bg-repeat"
-                >
-                  <img
-                    src={selectedItem.thumbnail}
-                    class="max-w-full rounded border border-neutral-200 shadow-lg dark:border-neutral-700"
-                    alt="Preview"
-                  />
-                </div>
+                <FilePreview
+                  imageSrc={selectedItem.thumbnail}
+                  fileName="Clipboard Image"
+                />
               {:else if selectedItem.item_type === "File"}
-                {#if isImageFile(selectedItem.text)}
-                  <div
-                    class="flex min-h-full items-center justify-center bg-[url('/checker-board.svg')] bg-repeat"
-                  >
-                    <img
-                      src={convertFileSrc(selectedItem.text)}
-                      class="max-h-[80vh] max-w-full rounded border border-neutral-200 shadow-lg dark:border-neutral-700"
-                      alt="Preview"
-                    />
-                  </div>
-                {:else}
-                  <!-- For non-image files, we might want to show icon or details -->
-                  <div
-                    class="flex h-full flex-col items-center justify-center gap-2 text-neutral-400"
-                  >
-                    <div class="i-lucide-file-text text-6xl opacity-20"></div>
-                    <span>File Preview</span>
-                  </div>
-                {/if}
+                <FilePreview
+                  path={selectedItem.text}
+                  fileName={getDisplayName(selectedItem)}
+                  onOpen={() => handleItemSelect(selectedItem)}
+                />
               {:else}
                 <!-- Text Content -->
                 <div

@@ -62,6 +62,7 @@ pub async fn get_all_launchable_items(
             let icon_type = match cmd.source {
                 ItemSource::Application => IconType::Base64,
                 ItemSource::FileCommand => IconType::Base64,
+                ItemSource::FileSearch => IconType::Iconfont,
                 ItemSource::Plugin
                     if cmd.icon.starts_with("http://") || cmd.icon.starts_with("https://") =>
                 {
@@ -89,6 +90,7 @@ pub async fn get_all_launchable_items(
                 icon_type,
                 item_type: match cmd.source {
                     ItemSource::FileCommand => ItemType::File,
+                    ItemSource::FileSearch => ItemType::File,
                     _ => ItemType::App,
                 },
                 source: cmd.source,
@@ -96,6 +98,7 @@ pub async fn get_all_launchable_items(
                 origin: cmd.origin,
                 source_display,
                 matches: cmd.matches,
+                modified_time: None,
                 requires_confirmation: cmd.requires_confirmation,
             })
         })

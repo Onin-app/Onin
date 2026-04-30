@@ -8,7 +8,7 @@
 use tauri::{Manager, State};
 
 use super::state::load_plugin_states;
-use super::types::{LoadedPlugin, PluginManifest, PluginStore, parse_plugin_dir_name};
+use super::types::{parse_plugin_dir_name, LoadedPlugin, PluginManifest, PluginStore};
 use crate::js_runtime;
 
 // ============================================================================
@@ -98,9 +98,11 @@ pub fn load_plugins_internal(
         manifest_with_state.terminate_on_bg = terminate_on_bg;
         manifest_with_state.run_at_startup = run_at_startup;
 
-        if let Some(lifecycle_path) =
-            super::lifecycle::resolve_lifecycle_script_path(&path, &manifest, install_source.clone())
-        {
+        if let Some(lifecycle_path) = super::lifecycle::resolve_lifecycle_script_path(
+            &path,
+            &manifest,
+            install_source.clone(),
+        ) {
             plugins_to_init.push((manifest.id.clone(), lifecycle_path, dir_name.clone()));
         }
 

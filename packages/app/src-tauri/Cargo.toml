@@ -82,6 +82,7 @@ tempfile = "3.13"
 evalexpr = "12"
 
 [target.'cfg(windows)'.dependencies]
+everything-ipc = "0.1.2"
 winreg = "0.55"
 
 [target.'cfg(target_os = "macos")'.dependencies]

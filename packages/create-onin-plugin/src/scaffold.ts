@@ -1,14 +1,19 @@
-import { basename, resolve } from "node:path";
+import { basename, resolve } from 'node:path';
 
-import { promptForMissingOptions } from "./prompts.js";
+import { promptForMissingOptions } from './prompts.js';
 import {
   buildSettingsBlock,
   copyTemplateDir,
   ensureTargetDirectory,
   renderPackageJson,
-} from "./render.js";
-import type { CliOptions, Framework, Language, TemplateContext } from "./types.js";
-import { isValidPackageName, isValidPluginId, slugify } from "./validators.js";
+} from './render.js';
+import type {
+  CliOptions,
+  Framework,
+  Language,
+  TemplateContext,
+} from './types.js';
+import { isValidPackageName, isValidPluginId, slugify } from './validators.js';
 
 export async function scaffoldPlugin(
   options: CliOptions,
@@ -27,9 +32,11 @@ export async function scaffoldPlugin(
   }
 
   if (!adapterTemplateDir) {
-    const supportedLanguages = frameworkTemplateDirs ? Object.keys(frameworkTemplateDirs) : [];
+    const supportedLanguages = frameworkTemplateDirs
+      ? Object.keys(frameworkTemplateDirs)
+      : [];
     throw new Error(
-      `Unsupported language for framework: ${answers.framework}/${answers.language}\nSupported languages for ${answers.framework}: ${supportedLanguages.join(", ") || "none"}`,
+      `Unsupported language for framework: ${answers.framework}/${answers.language}\nSupported languages for ${answers.framework}: ${supportedLanguages.join(', ') || 'none'}`,
     );
   }
 
@@ -52,27 +59,32 @@ export async function scaffoldPlugin(
     pluginName: answers.pluginName,
     pluginId: answers.pluginId,
     pluginDescription: `${answers.pluginName} plugin for Onin`,
-    keyword: packageName.split(".").pop() || packageName,
-    settingsImport: answers.withSettings ? ", settings" : "",
+    keyword: packageName.split('.').pop() || packageName,
+    settingsImport: answers.withSettings ? ', settings' : '',
     settingsBlock: buildSettingsBlock(answers.withSettings),
     settingsNote: answers.withSettings
-      ? "This template includes a sample settings schema registered from background.ts."
-      : "This template omits settings schema. Add it later in src/background.ts if needed.",
+      ? 'This template includes a sample settings schema registered from background.ts.'
+      : 'This template omits settings schema. Add it later in src/background.ts if needed.',
     withRelease: answers.withRelease,
   };
 
-  const skipRelativePaths = new Set(["package.json.tpl"]);
+  const skipRelativePaths = new Set(['package.json.tpl']);
   if (!answers.withRelease) {
-    skipRelativePaths.add("release.config.cjs.tpl");
-    skipRelativePaths.add(".github/workflows/release.yml.tpl");
+    skipRelativePaths.add('release.config.cjs.tpl');
+    skipRelativePaths.add('.github/workflows/release.yml.tpl');
   }
 
   await copyTemplateDir(baseTemplateDir, targetDir, context, skipRelativePaths);
-  await copyTemplateDir(adapterTemplateDir, targetDir, context, new Set(["package.fragment.json"]));
+  await copyTemplateDir(
+    adapterTemplateDir,
+    targetDir,
+    context,
+    new Set(['package.fragment.json']),
+  );
   await renderPackageJson(
-    resolve(baseTemplateDir, "package.json.tpl"),
-    resolve(adapterTemplateDir, "package.fragment.json"),
-    resolve(targetDir, "package.json"),
+    resolve(baseTemplateDir, 'package.json.tpl'),
+    resolve(adapterTemplateDir, 'package.fragment.json'),
+    resolve(targetDir, 'package.json'),
     context,
   );
 

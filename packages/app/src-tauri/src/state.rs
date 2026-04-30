@@ -7,7 +7,8 @@ use std::sync::atomic::{AtomicBool, AtomicU32};
 use std::sync::Mutex;
 
 use crate::{
-    app_config, plugin, plugin_api, shortcut_manager, tray_manager, usage_tracker, window_manager,
+    app_config, file_search, plugin, plugin_api, shortcut_manager, tray_manager, usage_tracker,
+    window_manager,
 };
 
 /// 为 Tauri Builder 配置所有应用状态
@@ -50,4 +51,6 @@ pub fn setup_managed_state(builder: tauri::Builder<tauri::Wry>) -> tauri::Builde
             shortcuts: Mutex::new(vec![]),
             last_executed: Mutex::new(std::collections::HashMap::new()),
         })
+        // 文件搜索运行状态
+        .manage(file_search::FileSearchState::default())
 }

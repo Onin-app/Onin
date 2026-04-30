@@ -4,15 +4,17 @@
 
 use crate::extension::get_all_extensions;
 use crate::shared_types::{Command, CommandAction, CommandKeyword, CommandMatch, ItemSource};
+use tauri::AppHandle;
 
 /// 生成 Extension 命令列表
 ///
 /// 将所有内置 Extension 转换为 Command，使其可以在搜索中匹配。
 /// StaticCommandMatch 会被转换为运行时的 CommandMatch，
 /// 使前端 matchCommand.ts 能统一处理 Extension 和 Plugin 的匹配指令。
-pub fn get_initial_extension_commands() -> Vec<Command> {
+pub fn get_initial_extension_commands(app: &AppHandle) -> Vec<Command> {
     get_all_extensions()
         .iter()
+        .filter(|ext| crate::app_config::is_extension_enabled(app, ext.manifest().id))
         .flat_map(|ext| {
             let manifest = ext.manifest();
             manifest.commands.iter().map(move |cmd| {
@@ -45,11 +47,11 @@ pub fn get_initial_extension_commands() -> Vec<Command> {
 
                 Command {
                     name: format!("extension:{}:{}", manifest.id, cmd.code),
-                    title: manifest.name.to_string(),
-                    description: Some(manifest.description.to_string()),
+                    title: cmd.name.to_string(),
+                    description: Some(cmd.description.unwrap_or(manifest.description).to_string()),
                     english_name: manifest.id.to_string(),
                     keywords,
-                    icon: manifest.icon.to_string(),
+                    icon: cmd.icon.unwrap_or(manifest.icon).to_string(),
                     source: ItemSource::Extension,
                     action: CommandAction::Extension {
                         extension_id: manifest.id.to_string(),

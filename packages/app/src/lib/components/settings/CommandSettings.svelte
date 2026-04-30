@@ -262,38 +262,38 @@
       <Tabs.Content value="function" class="-mr-2 flex-1 overflow-hidden">
         <AppScrollArea class="h-full w-full" viewportClass="h-full w-full pr-2">
           <div class="flex flex-col gap-3 pb-8">
-              {#if selectedPlugin}
-                <!-- 插件功能指令列表 -->
-                {#each functionCommands as command}
-                  <CommandCard
-                    {command}
-                    mode="function"
-                    onExecute={executeCommand}
-                    onToggleKeyword={toggleKeywordDisabled}
-                    onAddKeyword={addKeyword}
-                    onRemoveKeyword={removeKeyword}
-                  />
-                {/each}
-                {#if functionCommands.length === 0}
-                  <div
-                    class="flex h-full flex-col items-center justify-center text-neutral-400"
-                  >
-                    <p>暂无功能指令</p>
-                  </div>
-                {/if}
-              {:else}
-                <!-- 内置指令列表（排除有匹配指令的，它们显示在匹配指令标签页） -->
-                {#each categoryFunctionCommands as command}
-                  <CommandCard
-                    {command}
-                    mode="function"
-                    onExecute={executeCommand}
-                    onToggleKeyword={toggleKeywordDisabled}
-                    onAddKeyword={addKeyword}
-                    onRemoveKeyword={removeKeyword}
-                  />
-                {/each}
+            {#if selectedPlugin}
+              <!-- 插件功能指令列表 -->
+              {#each functionCommands as command}
+                <CommandCard
+                  {command}
+                  mode="function"
+                  onExecute={executeCommand}
+                  onToggleKeyword={toggleKeywordDisabled}
+                  onAddKeyword={addKeyword}
+                  onRemoveKeyword={removeKeyword}
+                />
+              {/each}
+              {#if functionCommands.length === 0}
+                <div
+                  class="flex h-full flex-col items-center justify-center text-neutral-400"
+                >
+                  <p>暂无功能指令</p>
+                </div>
               {/if}
+            {:else}
+              <!-- 内置指令列表（排除有匹配指令的，它们显示在匹配指令标签页） -->
+              {#each categoryFunctionCommands as command}
+                <CommandCard
+                  {command}
+                  mode="function"
+                  onExecute={executeCommand}
+                  onToggleKeyword={toggleKeywordDisabled}
+                  onAddKeyword={addKeyword}
+                  onRemoveKeyword={removeKeyword}
+                />
+              {/each}
+            {/if}
           </div>
         </AppScrollArea>
       </Tabs.Content>
@@ -301,45 +301,45 @@
       <Tabs.Content value="match" class="-mr-2 flex-1 overflow-hidden">
         <AppScrollArea class="h-full w-full" viewportClass="h-full w-full pr-2">
           <div class="flex flex-col gap-3 pb-8">
-              {#if selectedPlugin}
-                <!-- 插件匹配指令列表 -->
-                {#each matchCommands as command}
-                  <CommandCard
-                    {command}
-                    mode="match"
-                    onExecute={executeCommand}
-                    onToggleKeyword={toggleKeywordDisabled}
-                    onAddKeyword={addKeyword}
-                    onRemoveKeyword={removeKeyword}
-                  />
-                {/each}
-                {#if matchCommands.length === 0}
-                  <div
-                    class="flex h-full flex-col items-center justify-center text-neutral-400"
-                  >
-                    <p>暂无匹配指令</p>
-                  </div>
-                {/if}
-              {:else}
-                <!-- 内置分类的匹配指令 -->
-                {#each categoryMatchCommands as command}
-                  <CommandCard
-                    {command}
-                    mode="match"
-                    onExecute={executeCommand}
-                    onToggleKeyword={toggleKeywordDisabled}
-                    onAddKeyword={addKeyword}
-                    onRemoveKeyword={removeKeyword}
-                  />
-                {/each}
-                {#if categoryMatchCommands.length === 0}
-                  <div
-                    class="flex h-full flex-col items-center justify-center text-neutral-400"
-                  >
-                    <p>暂无匹配指令</p>
-                  </div>
-                {/if}
+            {#if selectedPlugin}
+              <!-- 插件匹配指令列表 -->
+              {#each matchCommands as command}
+                <CommandCard
+                  {command}
+                  mode="match"
+                  onExecute={executeCommand}
+                  onToggleKeyword={toggleKeywordDisabled}
+                  onAddKeyword={addKeyword}
+                  onRemoveKeyword={removeKeyword}
+                />
+              {/each}
+              {#if matchCommands.length === 0}
+                <div
+                  class="flex h-full flex-col items-center justify-center text-neutral-400"
+                >
+                  <p>暂无匹配指令</p>
+                </div>
               {/if}
+            {:else}
+              <!-- 内置分类的匹配指令 -->
+              {#each categoryMatchCommands as command}
+                <CommandCard
+                  {command}
+                  mode="match"
+                  onExecute={executeCommand}
+                  onToggleKeyword={toggleKeywordDisabled}
+                  onAddKeyword={addKeyword}
+                  onRemoveKeyword={removeKeyword}
+                />
+              {/each}
+              {#if categoryMatchCommands.length === 0}
+                <div
+                  class="flex h-full flex-col items-center justify-center text-neutral-400"
+                >
+                  <p>暂无匹配指令</p>
+                </div>
+              {/if}
+            {/if}
           </div>
         </AppScrollArea>
       </Tabs.Content>

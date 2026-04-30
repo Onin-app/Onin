@@ -4,12 +4,12 @@
  */
 export interface ToastPayload {
   message: string;
-  kind: "default" | "success" | "error" | "warning" | "info";
+  kind: 'default' | 'success' | 'error' | 'warning' | 'info';
   duration?: number;
 }
 
 export interface OninRuntime {
-  mode: "inline" | "window";
+  mode: 'inline' | 'window';
   pluginId: string;
   version: string;
   mainWindowLabel: string;

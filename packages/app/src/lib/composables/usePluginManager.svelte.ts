@@ -54,9 +54,9 @@ export function usePluginManager(): PluginManagerReturn {
     currentPluginTerminateOnBg: false,
     currentPluginRunAtStartup: false,
   });
-  let confirmModeSwitchHandler: ((
-    direction: "inline-to-window",
-  ) => Promise<boolean>) | null = null;
+  let confirmModeSwitchHandler:
+    | ((direction: "inline-to-window") => Promise<boolean>)
+    | null = null;
 
   // ===== Methods =====
 

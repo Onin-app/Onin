@@ -6,6 +6,7 @@ pub enum ItemSource {
     Custom,      // User-defined items (files, folders, URLs, etc.)
     Command,     // System commands
     FileCommand, // User-defined file commands
+    FileSearch,  // Indexed local file search results
     Plugin,      // Plugins
     Extension,   // Internal extensions (emoji, calculator, etc.)
 }
@@ -72,6 +73,9 @@ pub struct LaunchableItem {
     /// Match conditions for paste content
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub matches: Option<Vec<CommandMatch>>,
+    /// Last modified time in Unix milliseconds, when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub modified_time: Option<u64>,
     /// 是否需要二次确认(用于敏感操作如关机、重启等)
     #[serde(default)]
     pub requires_confirmation: bool,

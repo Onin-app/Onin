@@ -11,8 +11,8 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "tauri": "tauri",
-    "tauri:dev": "tauri dev --config src-tauri/tauri.dev.json",
-    "tauri:build": "tauri build",
+    "tauri:dev": "pnpm --dir ../.. build:inject && tauri dev --config src-tauri/tauri.dev.json",
+    "tauri:build": "pnpm --dir ../.. build:inject && tauri build",
     "format": "prettier --write \"src/**/*.svelte\"",
     "release": "semantic-release"
   },
@@ -32,6 +32,7 @@
     "bits-ui": "^2.8.8",
     "marked": "^17.0.1",
     "pinyin": "^2.11.2",
+    "shiki": "^4.0.2",
     "svelte-sonner": "^1.0.7",
     "tailwindcss": "^4.2.1"
   },

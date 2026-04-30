@@ -181,4 +181,3 @@ fn process_html_content(content: Vec<u8>, _plugin_id: &str) -> Vec<u8> {
 fn fix_asset_paths(html: &str) -> String {
     html.replace("=\"/", "=\"./").replace("='/", "='./")
 }
-

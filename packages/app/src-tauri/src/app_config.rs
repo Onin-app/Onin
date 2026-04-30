@@ -42,6 +42,18 @@ pub struct AppConfig {
     /// 插件市场 API 地址（可选）
     #[serde(default = "default_marketplace_api_url")]
     pub marketplace_api_url: Option<String>,
+
+    /// 已禁用的内置扩展 ID
+    #[serde(default)]
+    pub disabled_extension_ids: Vec<String>,
+
+    /// 文件搜索排除路径
+    #[serde(default)]
+    pub file_search_excluded_paths: Vec<String>,
+
+    /// 文件搜索是否包含隐藏文件
+    #[serde(default)]
+    pub file_search_include_hidden: bool,
 }
 
 fn default_auto_paste_time_limit() -> u64 {
@@ -68,6 +80,9 @@ impl Default for AppConfig {
             sort_mode: SortMode::default(),
             enable_usage_tracking: default_enable_usage_tracking(),
             marketplace_api_url: default_marketplace_api_url(),
+            disabled_extension_ids: Vec::new(),
+            file_search_excluded_paths: Vec::new(),
+            file_search_include_hidden: false,
         }
     }
 }
@@ -111,6 +126,18 @@ pub fn save_config(app: &AppHandle, config: &AppConfig) -> Result<(), String> {
     Ok(())
 }
 
+pub fn is_extension_enabled(app: &AppHandle, extension_id: &str) -> bool {
+    let config_state = app.state::<AppConfigState>();
+    let Ok(config) = config_state.0.lock() else {
+        return true;
+    };
+
+    !config
+        .disabled_extension_ids
+        .iter()
+        .any(|id| id == extension_id)
+}
+
 #[tauri::command]
 pub fn get_app_config(
     _app: AppHandle,
@@ -126,14 +153,14 @@ pub fn update_app_config(
     state: tauri::State<'_, AppConfigState>,
     config: AppConfig,
 ) -> Result<(), String> {
+    // 保存到文件
+    save_config(&app, &config)?;
+
     // 更新内存中的配置
     {
         let mut current_config = state.0.lock().map_err(|e| e.to_string())?;
         *current_config = config.clone();
     }
-
-    // 保存到文件
-    save_config(&app, &config)?;
 
     Ok(())
 }

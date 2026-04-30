@@ -1,5 +1,5 @@
-export type Framework = "svelte" | "react" | "vue" | "vanilla" | "solid";
-export type Language = "ts" | "js";
+export type Framework = 'svelte' | 'react' | 'vue' | 'vanilla' | 'solid';
+export type Language = 'ts' | 'js';
 
 export interface CliOptions {
   targetDir: string | undefined;
@@ -44,4 +44,4 @@ export interface PackageJsonShape {
   devDependencies?: Record<string, string>;
 }
 
-export type PackageJsonField = "scripts" | "dependencies" | "devDependencies";
+export type PackageJsonField = 'scripts' | 'dependencies' | 'devDependencies';

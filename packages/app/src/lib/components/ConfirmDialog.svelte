@@ -6,8 +6,13 @@
     open: boolean;
     title: string;
     description: string;
-    onConfirm: () => void;
+    onConfirm: () => void | Promise<void>;
     onCancel: () => void;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    loading?: boolean;
+    closeOnConfirm?: boolean;
+    variant?: "danger" | "default";
   }
 
   let {
@@ -16,6 +21,11 @@
     description,
     onConfirm,
     onCancel,
+    confirmLabel = "确认",
+    cancelLabel = "取消",
+    loading = false,
+    closeOnConfirm = true,
+    variant = "danger",
   }: Props = $props();
 
   function handleOpenChange(newOpen: boolean) {
@@ -26,9 +36,15 @@
     }
   }
 
-  function handleConfirm() {
-    onConfirm();
-    open = false;
+  async function handleConfirm(event: MouseEvent) {
+    if (loading) return;
+    if (!closeOnConfirm) {
+      event.preventDefault();
+    }
+    await onConfirm();
+    if (closeOnConfirm) {
+      open = false;
+    }
   }
 
   function handleCancel() {
@@ -48,10 +64,15 @@
       <!-- 警告图标 -->
       <div class="mb-4 flex items-center gap-3">
         <div
-          class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30"
+          class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full {variant ===
+          'danger'
+            ? 'bg-red-100 dark:bg-red-900/30'
+            : 'bg-neutral-100 dark:bg-neutral-800'}"
         >
           <WarningCircle
-            class="h-6 w-6 text-red-600 dark:text-red-400"
+            class="h-6 w-6 {variant === 'danger'
+              ? 'text-red-600 dark:text-red-400'
+              : 'text-neutral-700 dark:text-neutral-200'}"
             weight="fill"
           />
         </div>
@@ -75,15 +96,20 @@
       <div class="flex justify-end gap-3">
         <AlertDialog.Cancel
           class="inline-flex h-9 items-center justify-center rounded-md border border-neutral-300 bg-white px-4 text-sm font-medium text-neutral-700 hover:bg-neutral-50 focus:ring-2 focus:ring-neutral-400 focus:ring-offset-2 focus:outline-none dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+          disabled={loading}
           onclick={handleCancel}
         >
-          取消
+          {cancelLabel}
         </AlertDialog.Cancel>
         <AlertDialog.Action
-          class="inline-flex h-9 items-center justify-center rounded-md bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:outline-none dark:bg-red-700 dark:hover:bg-red-800"
+          class="inline-flex h-9 items-center justify-center rounded-md px-4 text-sm font-medium text-white focus:ring-2 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-70 {variant ===
+          'danger'
+            ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500 dark:bg-red-700 dark:hover:bg-red-800'
+            : 'bg-neutral-900 hover:bg-neutral-700 focus:ring-neutral-500 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300'}"
+          disabled={loading}
           onclick={handleConfirm}
         >
-          确认
+          {loading ? "处理中..." : confirmLabel}
         </AlertDialog.Action>
       </div>
     </AlertDialog.Content>

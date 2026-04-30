@@ -870,13 +870,12 @@
         class="test-btn"
         onclick={() =>
           runTest('settings.onChange', async () => {
-             const unlisten = await settings.onChange((newSettings) => {
-               log(`⚙️ 设置已更改: ${JSON.stringify(newSettings)}`, 'info');
-             });
-             log('✓ 已添加设置更改侦听器', 'success');
-             return '监听中...';
-          })
-        }
+            const unlisten = await settings.onChange((newSettings) => {
+              log(`⚙️ 设置已更改: ${JSON.stringify(newSettings)}`, 'info');
+            });
+            log('✓ 已添加设置更改侦听器', 'success');
+            return '监听中...';
+          })}
       >
         <span class="api-name">onChange</span>
         <span class="api-desc">监听设置更改</span>
