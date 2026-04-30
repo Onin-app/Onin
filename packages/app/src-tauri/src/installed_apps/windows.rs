@@ -7,6 +7,7 @@ use regex::Regex;
 use std::{
     collections::HashMap,
     io::Cursor,
+    panic::{catch_unwind, AssertUnwindSafe},
     path::{Path, PathBuf},
     process::Command,
 };
@@ -211,7 +212,16 @@ fn extract_exe_path(
 
 fn get_all_shortcuts_sync() -> Vec<PathBuf> {
     let mut shortcuts = Vec::new();
-    let user_profile = std::env::var("USERPROFILE").unwrap();
+    let user_profile = match std::env::var("USERPROFILE") {
+        Ok(profile) => profile,
+        Err(e) => {
+            tracing::warn!(
+                "Failed to read USERPROFILE while scanning shortcuts: {:?}",
+                e
+            );
+            return shortcuts;
+        }
+    };
 
     let start_menu_paths = vec![
         "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs".to_string(),
@@ -245,6 +255,56 @@ fn get_all_shortcuts_sync() -> Vec<PathBuf> {
     shortcuts
 }
 
+fn panic_message(payload: Box<dyn std::any::Any + Send>) -> String {
+    if let Some(message) = payload.downcast_ref::<&str>() {
+        message.to_string()
+    } else if let Some(message) = payload.downcast_ref::<String>() {
+        message.clone()
+    } else {
+        "unknown panic payload".to_string()
+    }
+}
+
+fn app_from_shortcut(shortcut_path: PathBuf) -> Result<Option<AppInfo>, String> {
+    let shell_link = match ShellLink::open(&shortcut_path) {
+        Ok(link) => link,
+        Err(e) => {
+            tracing::warn!("Failed to open shortcut {:?}: {:?}", shortcut_path, e);
+            return Ok(None);
+        }
+    };
+
+    if should_filter_shortcut_with_link(&shell_link) {
+        return Ok(None);
+    }
+
+    let mut app_info: Option<AppInfo> = None;
+    if let Some(target_path) = extract_target_from_lnk_with_link(&shell_link) {
+        let app_name = shortcut_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_string();
+
+        let icon = extract_icon_from_shortcut_with_link(&shell_link, &target_path);
+
+        if target_path.to_lowercase().ends_with(".exe")
+            || target_path.to_lowercase().ends_with(".msi")
+            || target_path.to_lowercase().ends_with(".bat")
+        {
+            app_info = Some(AppInfo {
+                name: normalize_app_name(&app_name),
+                keywords: vec![],
+                path: Some(target_path.clone()),
+                icon,
+                origin: Some(AppOrigin::Shortcut),
+            });
+        }
+    }
+
+    Ok(app_info)
+}
+
 // 从快捷方式中获取应用列表
 #[tracing::instrument]
 async fn get_apps_from_shortcuts() -> Result<Vec<AppInfo>, String> {
@@ -252,52 +312,19 @@ async fn get_apps_from_shortcuts() -> Result<Vec<AppInfo>, String> {
     let mut futures: Vec<tokio::task::JoinHandle<Result<Option<AppInfo>, String>>> = Vec::new();
 
     for shortcut_path in shortcut_paths {
-        // 重命名为 shortcut_path 更清晰
-        // 不需要在这里克隆，因为 PathBuf 会在 move 闭包中被所有权转移
         futures.push(task::spawn_blocking(move || {
-            // 在这里打开 ShellLink 一次
-            let shell_link = match ShellLink::open(&shortcut_path) {
-                Ok(link) => link,
-                Err(e) => {
-                    // 记录无法打开快捷方式的错误，并跳过
-                    tracing::warn!("Failed to open shortcut {:?}: {:?}", shortcut_path, e);
-                    return Ok(None);
-                }
-            };
-
-            // 1. 过滤快捷方式，使用已打开的 shell_link
-            if should_filter_shortcut_with_link(&shell_link) {
-                // <<-- 新增函数，使用已打开的 link
-                return Ok(None);
-            }
-
-            let mut app_info: Option<AppInfo> = None;
-            // 2. 解析快捷方式目标路径，使用已打开的 shell_link
-            if let Some(target_path) = extract_target_from_lnk_with_link(&shell_link) {
-                // <<-- 新增函数，使用已打开的 link
-                let app_name = shortcut_path // 使用原始 shortcut_path 获取文件名
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("")
-                    .to_string();
-
-                // 3. 提取图标，使用已打开的 shell_link
-                let icon = extract_icon_from_shortcut_with_link(&shell_link, &target_path); // <<-- 新增函数，使用已打开的 link 和 target_path
-
-                if target_path.to_lowercase().ends_with(".exe")
-                    || target_path.to_lowercase().ends_with(".msi")
-                    || target_path.to_lowercase().ends_with(".bat")
-                {
-                    app_info = Some(AppInfo {
-                        name: normalize_app_name(&app_name),
-                        keywords: vec![],
-                        path: Some(target_path.clone()),
-                        icon: icon,
-                        origin: Some(AppOrigin::Shortcut),
-                    });
+            let shortcut_path_for_log = shortcut_path.clone();
+            match catch_unwind(AssertUnwindSafe(|| app_from_shortcut(shortcut_path))) {
+                Ok(result) => result,
+                Err(payload) => {
+                    tracing::error!(
+                        "get_apps_from_shortcuts: panic while processing shortcut {:?}: {}",
+                        shortcut_path_for_log,
+                        panic_message(payload)
+                    );
+                    Ok(None)
                 }
             }
-            Ok(app_info)
         }));
     }
 
