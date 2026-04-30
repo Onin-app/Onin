@@ -2,6 +2,7 @@
   import { onDestroy, onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { invoke } from "@tauri-apps/api/core";
+  import { platform } from "@tauri-apps/plugin-os";
   import { toast } from "svelte-sonner";
   import AppScrollArea from "$lib/components/AppScrollArea.svelte";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
@@ -64,6 +65,7 @@
   let loadMoreObserver: IntersectionObserver | null = null;
   let listPaneWidth = $state(40);
   let isResizingPane = $state(false);
+  let currentPlatform = $state("");
 
   const selectedItem = $derived(results[selectedIndex] ?? null);
   const detailQueryExamples = [
@@ -91,8 +93,15 @@
     isLoadingMore = false;
   };
 
+  const normalizePathKey = (path: string) => {
+    const trimmedPath = path.trim();
+    return currentPlatform === "windows"
+      ? trimmedPath.replaceAll("/", "\\").toLowerCase()
+      : trimmedPath;
+  };
+
   const getFileSearchResultKey = (item: LaunchableItem) =>
-    item.path.trim().replaceAll("/", "\\").toLowerCase();
+    normalizePathKey(item.path);
 
   const uniqueFileSearchResults = (items: LaunchableItem[]) => {
     const seen = new Set<string>();
@@ -124,6 +133,15 @@
     if (loadingTimer) {
       clearTimeout(loadingTimer);
       loadingTimer = null;
+    }
+  };
+
+  const loadPlatform = () => {
+    try {
+      currentPlatform = platform();
+    } catch (error) {
+      console.error("Failed to detect platform:", error);
+      currentPlatform = "";
     }
   };
 
@@ -435,6 +453,7 @@
   };
 
   onMount(async () => {
+    loadPlatform();
     await refreshStatus();
     headerRef?.focus();
     window.addEventListener("mousemove", handlePaneResize);

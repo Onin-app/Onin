@@ -4,6 +4,7 @@
   import AppScrollArea from "$lib/components/AppScrollArea.svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
+  import { platform } from "@tauri-apps/plugin-os";
   import type { LaunchableItem } from "$lib/type";
   import PhosphorIcon from "$lib/components/PhosphorIcon.svelte";
   // import { Webview } from "@tauri-apps/api/webview";
@@ -17,16 +18,51 @@
   let isProcessing = $state(false);
   let isDraggingOver = $state(false);
   let unlistenDragDrop = $state<() => void>();
+  let currentPlatform = $state("");
+
+  const normalizePathKey = (path: string) => {
+    const trimmedPath = path.trim();
+    return currentPlatform === "windows"
+      ? trimmedPath.replaceAll("/", "\\").toLowerCase()
+      : trimmedPath;
+  };
+
+  const getFileCommandKey = (item: LaunchableItem) =>
+    normalizePathKey(item.path);
+
+  const uniqueFileCommands = (items: LaunchableItem[]) => {
+    const seen = new Set<string>();
+    return items.filter((item) => {
+      const key = getFileCommandKey(item);
+      if (seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    });
+  };
 
   async function fetchFileCommands() {
     isLoading = true;
     try {
       const items = await invoke<LaunchableItem[]>("get_all_launchable_items");
-      fileCommands = items.filter((item) => item.source === "FileCommand");
+      fileCommands = uniqueFileCommands(
+        items.filter((item) => item.source === "FileCommand"),
+      );
     } catch (e) {
       console.error("Failed to get file commands:", e);
     } finally {
       isLoading = false;
+    }
+  }
+
+  function loadPlatform() {
+    try {
+      currentPlatform = platform();
+    } catch (error) {
+      console.error("Failed to detect platform:", error);
+      currentPlatform = "";
     }
   }
 
@@ -38,7 +74,7 @@
       const newItems: LaunchableItem[] = await invoke("add_file_commands", {
         paths,
       });
-      fileCommands = newItems;
+      fileCommands = uniqueFileCommands(newItems);
     } catch (e) {
       console.error("Failed to add file commands:", e);
     } finally {
@@ -80,7 +116,7 @@
       const newItems: LaunchableItem[] = await invoke("remove_file_command", {
         path,
       });
-      fileCommands = newItems;
+      fileCommands = uniqueFileCommands(newItems);
     } catch (e) {
       console.error("Failed to remove file command:", e);
       // 如果出错，则从后端重新获取列表以回滚状态
@@ -113,7 +149,7 @@
       const newItems: LaunchableItem[] = await invoke("add_file_commands", {
         paths: selected,
       });
-      fileCommands = newItems;
+      fileCommands = uniqueFileCommands(newItems);
     } catch (e) {
       console.error("Failed to add file commands:", e);
     } finally {
@@ -167,6 +203,7 @@
   });
 
   onMount(() => {
+    loadPlatform();
     fetchFileCommands();
     listenDragDrop();
   });
