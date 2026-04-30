@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
+  import { platform } from "@tauri-apps/plugin-os";
   import { Switch } from "bits-ui";
   import { toast } from "svelte-sonner";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
@@ -27,6 +28,7 @@
   let installEverythingDialogOpen = $state(false);
   let everythingInstallCloseLockHeld = false;
   let excludeInput = $state("");
+  let currentPlatform = $state("");
   let status = $state<FileSearchStatus>({
     is_searching: false,
     last_result_count: 0,
@@ -38,6 +40,37 @@
     last_error: null,
   });
   const excludedPaths = $derived(config?.file_search_excluded_paths ?? []);
+  const isWindows = $derived(currentPlatform === "windows");
+  const backendDescription = $derived(
+    getBackendDescription(currentPlatform, status.backend),
+  );
+
+  function getBackendDescription(platformName: string, backend: string) {
+    if (platformName === "windows") {
+      return "Windows 可安装 Everything 获取实时索引；未安装或不可用时使用 Windows Search。";
+    }
+
+    if (platformName === "macos") {
+      return "macOS 使用 Spotlight 索引进行文件名搜索。";
+    }
+
+    if (platformName === "linux") {
+      return "Linux 使用 locate/plocate 数据库进行文件名搜索。";
+    }
+
+    return backend
+      ? `当前平台使用 ${backend} 进行文件名搜索。`
+      : "当前平台使用可用的系统文件搜索后端。";
+  }
+
+  function loadPlatform() {
+    try {
+      currentPlatform = platform();
+    } catch (error) {
+      console.error("Failed to detect platform:", error);
+      currentPlatform = "";
+    }
+  }
 
   async function loadConfig() {
     loading = true;
@@ -169,6 +202,7 @@
   }
 
   onMount(async () => {
+    loadPlatform();
     await Promise.all([loadConfig(), refreshStatus()]);
   });
 
@@ -282,11 +316,10 @@
               搜索后端
             </h4>
             <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-              Windows 可安装 Everything 获取实时索引；未安装或不可用时使用
-              Windows Search。
+              {backendDescription}
             </p>
           </div>
-          {#if status.everything_install_required}
+          {#if isWindows && status.everything_install_required}
             <button
               class="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-neutral-900 px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
               disabled={installingEverything}
@@ -315,26 +348,28 @@
                 : "不可用"}
             </span>
           </div>
-          <div
-            class="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-600 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-300"
-          >
-            <span
-              class="h-1.5 w-1.5 rounded-full {status.everything_installed
-                ? status.everything_ipc_available
-                  ? 'bg-emerald-500'
-                  : 'bg-amber-500'
-                : 'bg-neutral-300 dark:bg-neutral-600'}"
-            ></span>
-            <span>
-              Everything：{status.everything_installed
-                ? status.everything_ipc_available
-                  ? "已连接"
-                  : "已安装，等待后台启动"
-                : "未安装"}
-            </span>
-          </div>
+          {#if isWindows}
+            <div
+              class="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-600 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-300"
+            >
+              <span
+                class="h-1.5 w-1.5 rounded-full {status.everything_installed
+                  ? status.everything_ipc_available
+                    ? 'bg-emerald-500'
+                    : 'bg-amber-500'
+                  : 'bg-neutral-300 dark:bg-neutral-600'}"
+              ></span>
+              <span>
+                Everything：{status.everything_installed
+                  ? status.everything_ipc_available
+                    ? "已连接"
+                    : "已安装，等待后台启动"
+                  : "未安装"}
+              </span>
+            </div>
+          {/if}
         </div>
-        {#if status.everything_install_required}
+        {#if isWindows && status.everything_install_required}
           <p class="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
             当前会继续使用 Windows Search。安装 Everything
             后可获得更快的全盘文件名搜索。
@@ -348,19 +383,21 @@
   </div>
 {/if}
 
-<ConfirmDialog
-  bind:open={installEverythingDialogOpen}
-  title="安装 Everything 加速文件搜索"
-  description="Onin 会通过 winget 安装 Everything，并优先使用 Everything IPC 获取实时文件搜索结果。未安装时仍会继续使用 Windows Search。"
-  confirmLabel="安装"
-  cancelLabel="暂不安装"
-  variant="default"
-  loading={installingEverything}
-  closeOnConfirm={false}
-  onConfirm={installEverything}
-  onCancel={() => {
-    if (!installingEverything) {
-      installEverythingDialogOpen = false;
-    }
-  }}
-/>
+{#if isWindows}
+  <ConfirmDialog
+    bind:open={installEverythingDialogOpen}
+    title="安装 Everything 加速文件搜索"
+    description="Onin 会通过 winget 安装 Everything，并优先使用 Everything IPC 获取实时文件搜索结果。未安装时仍会继续使用 Windows Search。"
+    confirmLabel="安装"
+    cancelLabel="暂不安装"
+    variant="default"
+    loading={installingEverything}
+    closeOnConfirm={false}
+    onConfirm={installEverything}
+    onCancel={() => {
+      if (!installingEverything) {
+        installEverythingDialogOpen = false;
+      }
+    }}
+  />
+{/if}
