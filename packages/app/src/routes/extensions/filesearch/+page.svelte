@@ -74,6 +74,15 @@
     '"project plan"',
   ];
 
+  const isCjkSearchCharacter = (character: string) =>
+    /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\u3040-\u309f\u30a0-\u30ff\u31f0-\u31ff\uac00-\ud7af]/u.test(
+      character,
+    );
+
+  const isSearchQueryLongEnough = (query: string) =>
+    Array.from(query).length >= 2 ||
+    Array.from(query).some(isCjkSearchCharacter);
+
   const resetSearchResultState = () => {
     queuedSearch = null;
     results = [];
@@ -105,7 +114,7 @@
     clearSearchTimers();
 
     const query = value.trim();
-    if (query.length < 2) {
+    if (!isSearchQueryLongEnough(query)) {
       resetSearchResultState();
       isSearching = false;
       showSearchingIndicator = false;
@@ -134,7 +143,7 @@
   };
 
   const enqueueSearch = (query: string, version: number, offset: number) => {
-    if (query.length < 2) {
+    if (!isSearchQueryLongEnough(query)) {
       return;
     }
 
@@ -147,7 +156,7 @@
   const loadMoreResults = () => {
     const query = searchQuery.trim();
     if (
-      query.length < 2 ||
+      !isSearchQueryLongEnough(query) ||
       searchInFlight ||
       isLoadingMore ||
       !hasMoreResults
@@ -490,7 +499,7 @@
 
   {#if results.length === 0}
     <div class="flex flex-1 items-center justify-center overflow-hidden px-8">
-      {#if showSearchingIndicator && searchQuery.trim().length >= 2}
+      {#if showSearchingIndicator && isSearchQueryLongEnough(searchQuery.trim())}
         <div
           class="flex flex-col items-center justify-center gap-3 text-center text-sm text-neutral-500"
         >
@@ -510,8 +519,8 @@
           </div>
           <div class="space-y-1">
             <div class="font-medium text-neutral-700 dark:text-neutral-300">
-              {#if searchQuery.trim().length < 2}
-                输入至少 2 个字符开始搜索
+              {#if !isSearchQueryLongEnough(searchQuery.trim())}
+                中文、日文等可输入 1 个字符；英文需至少 2 个字符
               {:else}
                 没有匹配的文件或文件夹
               {/if}

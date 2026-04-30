@@ -140,7 +140,7 @@ pub(super) fn search_platform_files(
     let limit = limit.unwrap_or(DEFAULT_RESULT_LIMIT).clamp(1, 100);
     let offset = offset.unwrap_or(0).min(MAX_PAGE_OFFSET);
 
-    if query.chars().count() < 2 {
+    if !is_search_query_long_enough(&query) {
         return Ok(empty_search_response(offset, limit));
     }
 
@@ -190,6 +190,23 @@ fn empty_search_response(offset: usize, limit: usize) -> FileSearchResponse {
         offset,
         limit,
     }
+}
+
+fn is_search_query_long_enough(query: &str) -> bool {
+    query.chars().count() >= 2 || query.chars().any(is_cjk_search_character)
+}
+
+fn is_cjk_search_character(character: char) -> bool {
+    matches!(
+        character,
+        '\u{3400}'..='\u{4dbf}'
+            | '\u{4e00}'..='\u{9fff}'
+            | '\u{f900}'..='\u{faff}'
+            | '\u{3040}'..='\u{309f}'
+            | '\u{30a0}'..='\u{30ff}'
+            | '\u{31f0}'..='\u{31ff}'
+            | '\u{ac00}'..='\u{d7af}'
+    )
 }
 
 #[derive(Default)]
@@ -1193,7 +1210,8 @@ mod scoring_tests {
     use std::{cmp::Ordering, path::PathBuf};
 
     use super::{
-        compare_files, score_file_with_options, FileSearchOptions, ParsedTerms, PlatformFile,
+        compare_files, is_search_query_long_enough, score_file_with_options, FileSearchOptions,
+        ParsedTerms, PlatformFile,
     };
 
     fn file(path: &str, name: &str, parent: &str) -> PlatformFile {
@@ -1273,6 +1291,21 @@ mod scoring_tests {
             compare_files(&preferred, &other, &terms, &options),
             Ordering::Less
         );
+    }
+
+    #[test]
+    fn cjk_queries_can_search_with_one_character() {
+        assert!(is_search_query_long_enough("文"));
+        assert!(is_search_query_long_enough("あ"));
+        assert!(is_search_query_long_enough("ア"));
+        assert!(is_search_query_long_enough("한"));
+    }
+
+    #[test]
+    fn ascii_queries_still_need_two_characters() {
+        assert!(!is_search_query_long_enough("a"));
+        assert!(!is_search_query_long_enough("1"));
+        assert!(is_search_query_long_enough("ab"));
     }
 }
 
