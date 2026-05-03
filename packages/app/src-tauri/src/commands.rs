@@ -163,6 +163,7 @@ pub fn get_invoke_handler(
         extension::api::get_extensions,
         extension::api::toggle_extension,
         extension::api::get_emoji_data,
+        extension::api::get_color_conversion,
         // Keyboard simulation
         system_commands::simulate_paste,
         // Translator Extension

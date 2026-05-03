@@ -273,6 +273,22 @@
           goto("/extensions/clipboard");
           return;
         }
+        if (extensionId === "color") {
+          const effectiveText =
+            app.trigger_mode === "preview"
+              ? clipboard.state.attachedText || inputValue
+              : "";
+          inputValue = "";
+          clipboard.clearAttachments();
+          extensionPreviewItem = null;
+          extensionManager.clearPreview();
+          matchedCommands = [];
+          const query = effectiveText
+            ? `?q=${encodeURIComponent(effectiveText)}`
+            : "";
+          goto(`/extensions/color${query}`);
+          return;
+        }
         // 匹配指令：使用当前输入内容执行
         if (app.trigger_mode === "matched") {
           const effectiveText = clipboard.state.attachedText || inputValue;
@@ -390,6 +406,20 @@
         extensionManager.clearPreview();
         matchedCommands = [];
         goto("/extensions/emoji");
+        return;
+      }
+
+      if (extensionId === "color") {
+        const effectiveText = clipboard.state.attachedText || inputValue;
+        inputValue = "";
+        clipboard.clearAttachments();
+        extensionPreviewItem = null;
+        extensionManager.clearPreview();
+        matchedCommands = [];
+        const query = effectiveText
+          ? `?q=${encodeURIComponent(effectiveText)}`
+          : "";
+        goto(`/extensions/color${query}`);
         return;
       }
 

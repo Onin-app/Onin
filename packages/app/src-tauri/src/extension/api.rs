@@ -84,3 +84,8 @@ pub fn get_emoji_data(search_query: String) -> Option<EmojiGridData> {
 
     Some(EmojiGridData { groups })
 }
+
+#[command]
+pub fn get_color_conversion(input: String) -> Option<crate::extensions::color::ColorConversion> {
+    crate::extensions::color::convert_color_value(&input)
+}

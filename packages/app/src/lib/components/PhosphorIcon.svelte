@@ -24,6 +24,7 @@
     Prohibit,
     CaretDown,
     DownloadSimple,
+    Palette,
   } from "phosphor-svelte";
 
   interface PhosphorIconProps {
@@ -64,6 +65,7 @@
     caretDown: CaretDown,
     "caret-down": CaretDown,
     download: DownloadSimple,
+    palette: Palette,
   };
 
   const IconComponent = $derived(iconMap[icon] || Power);
