@@ -4,7 +4,7 @@
   import { page } from "$app/stores";
   import { invoke } from "@tauri-apps/api/core";
   import { toast } from "svelte-sonner";
-  import { Slider } from "bits-ui";
+  import ColorPicker, { ChromeVariant } from "svelte-awesome-color-picker";
   import { Copy, ClipboardText } from "phosphor-svelte";
   import AppScrollArea from "$lib/components/AppScrollArea.svelte";
   import ExtensionHeader from "$lib/components/ExtensionHeader.svelte";
@@ -94,10 +94,26 @@
   // ── State ──────────────────────────────────────────────────────────────────
   let query = $state("");
   let conversion = $state<ColorConversion | null>(null);
+  let pickerHex = $state("#ff5500");
   let headerRef: ExtensionHeader;
+  let loadRequestId = 0;
 
   const initialQuery = $derived($page.url.searchParams.get("q") || "#ff5500");
   const colorValue = $derived(conversion?.hex.slice(0, 7) || "#ff5500");
+  const swatches = [
+    "#EF4444",
+    "#F97316",
+    "#F59E0B",
+    "#22C55E",
+    "#14B8A6",
+    "#0EA5E9",
+    "#6366F1",
+    "#A855F7",
+    "#EC4899",
+    "#111827",
+    "#6B7280",
+    "#F9FAFB",
+  ];
 
   const previewTextColor = $derived.by(() => {
     if (!conversion) return "#ffffff";
@@ -178,25 +194,22 @@
     return [...map.entries()];
   });
 
-  const channelRows = $derived(
-    conversion
-      ? [
-          { key: "red" as const, label: "R", value: conversion.red },
-          { key: "green" as const, label: "G", value: conversion.green },
-          { key: "blue" as const, label: "B", value: conversion.blue },
-        ]
-      : [],
-  );
-
   // ── Actions ────────────────────────────────────────────────────────────────
-  async function loadColor(value: string) {
+  async function loadColor(value: string, syncPicker = true) {
+    const requestId = ++loadRequestId;
     query = value;
     try {
-      conversion = await invoke<ColorConversion | null>(
+      const next = await invoke<ColorConversion | null>(
         "get_color_conversion",
         { input: value },
       );
+      if (requestId !== loadRequestId) return;
+      conversion = next;
+      if (next && syncPicker) {
+        pickerHex = next.hex;
+      }
     } catch {
+      if (requestId !== loadRequestId) return;
       conversion = null;
     }
   }
@@ -233,16 +246,9 @@
     );
   }
 
-  function updateChannel(channel: "red" | "green" | "blue", value: number) {
-    if (!conversion) return;
-    const n = Math.round(Math.min(255, Math.max(0, value || 0)));
-    const next = {
-      red: conversion.red,
-      green: conversion.green,
-      blue: conversion.blue,
-      [channel]: n,
-    };
-    loadColor(`rgb(${next.red}, ${next.green}, ${next.blue})`);
+  function handlePickerInput(event: { hex: string | null }) {
+    if (!event.hex) return;
+    loadColor(event.hex, false);
   }
 
   onMount(() => {
@@ -279,6 +285,42 @@
           </div>
         </div>
 
+        <!-- Color picker -->
+        <div class="section picker-section">
+          <div class="section-head"><span>色盘</span></div>
+          <div class="picker-frame">
+            <ColorPicker
+              bind:hex={pickerHex}
+              components={ChromeVariant}
+              sliderDirection="horizontal"
+              isDialog={false}
+              isAlpha={true}
+              isTextInput={false}
+              {swatches}
+              onInput={handlePickerInput}
+              texts={{
+                label: {
+                  h: "色相",
+                  s: "饱和度",
+                  v: "明度",
+                  r: "红",
+                  g: "绿",
+                  b: "蓝",
+                  a: "透明度",
+                  hex: "十六进制颜色",
+                  withoutColor: "无颜色",
+                },
+                color: {
+                  rgb: "RGB",
+                  hsv: "HSV",
+                  hex: "HEX",
+                },
+                changeTo: "切换到 ",
+              }}
+            />
+          </div>
+        </div>
+
         <!-- Format rows -->
         <div class="section">
           <div class="section-head">
@@ -307,46 +349,6 @@
               {/each}
             </div>
           {/each}
-        </div>
-
-        <!-- RGB Channels -->
-        <div class="section">
-          <div class="section-head"><span>RGB 微调</span></div>
-          <div class="channels">
-            {#each channelRows as ch}
-              <div class="channel-row">
-                <span class="ch-label">{ch.label}</span>
-                <Slider.Root
-                  type="single"
-                  value={ch.value}
-                  min={0}
-                  max={255}
-                  step={1}
-                  disabled={!conversion}
-                  onValueChange={(v) => updateChannel(ch.key, v)}
-                  class="slider-root"
-                >
-                  <span class="slider-track"
-                    ><Slider.Range class="slider-fill" /></span
-                  >
-                  <Slider.Thumb index={0} class="slider-thumb" />
-                </Slider.Root>
-                <input
-                  type="number"
-                  min="0"
-                  max="255"
-                  value={ch.value}
-                  disabled={!conversion}
-                  class="ch-input"
-                  oninput={(e) =>
-                    updateChannel(
-                      ch.key,
-                      Number((e.target as HTMLInputElement).value),
-                    )}
-                />
-              </div>
-            {/each}
-          </div>
         </div>
       {:else}
         <div class="empty">无法识别颜色</div>
@@ -405,6 +407,42 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
+  }
+
+  .picker-section {
+    padding-bottom: 12px;
+  }
+
+  .picker-frame {
+    min-width: 0;
+    overflow: hidden;
+    border-radius: 8px;
+    --picker-width: 100%;
+    --picker-height: 148px;
+    --slider-width: 16px;
+    --picker-indicator-size: 14px;
+    --focus-color: rgb(23 23 23);
+    --cp-bg-color: transparent;
+    --cp-border-color: transparent;
+    --cp-text-color: rgb(38 38 38);
+    --cp-input-color: rgb(245 245 245);
+    --cp-button-hover-color: rgb(238 238 238);
+    --cp-swatch-grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+
+  :global(.dark) .picker-frame {
+    --focus-color: rgb(245 245 245);
+    --cp-text-color: rgb(220 220 220);
+    --cp-input-color: rgb(24 24 24);
+    --cp-button-hover-color: rgb(35 35 35);
+  }
+
+  .picker-frame :global(input[type="color"]) {
+    width: 100%;
+  }
+
+  .picker-frame :global(button) {
+    cursor: pointer;
   }
   :global(.dark) .section {
     border-color: rgb(38 38 38);
@@ -535,105 +573,6 @@
   :global(.dark) .btn-ghost:hover {
     background: rgb(35 35 35);
     color: rgb(210 210 210);
-  }
-
-  /* ── Channels ── */
-  .channels {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-  }
-
-  .channel-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    height: 26px;
-  }
-  .ch-label {
-    width: 14px;
-    flex-shrink: 0;
-    font-size: 10.5px;
-    font-weight: 800;
-    color: rgb(160 160 160);
-  }
-  :global(.dark) .ch-label {
-    color: rgb(90 90 90);
-  }
-
-  :global(.slider-root) {
-    position: relative;
-    display: flex;
-    flex: 1;
-    min-width: 0;
-    align-items: center;
-    touch-action: none;
-    user-select: none;
-  }
-  .slider-track {
-    position: relative;
-    height: 5px;
-    width: 100%;
-    flex-grow: 1;
-    cursor: pointer;
-    overflow: hidden;
-    border-radius: 999px;
-    background: rgb(229 229 229);
-  }
-  :global(.dark) .slider-track {
-    background: rgb(45 45 45);
-  }
-  :global(.slider-fill) {
-    position: absolute;
-    height: 100%;
-    background: rgb(30 30 30);
-  }
-  :global(.dark) :global(.slider-fill) {
-    background: rgb(180 180 180);
-  }
-  :global(.slider-thumb) {
-    display: block;
-    width: 13px;
-    height: 13px;
-    cursor: pointer;
-    border-radius: 999px;
-    border: 1px solid rgb(210 210 210);
-    background: white;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
-  }
-  :global(.dark) :global(.slider-thumb) {
-    border-color: rgb(70 70 70);
-    background: rgb(28 28 28);
-  }
-  :global(.slider-thumb:focus-visible) {
-    outline: 2px solid rgb(23 23 23);
-    outline-offset: 2px;
-  }
-
-  .ch-input {
-    width: 50px;
-    flex-shrink: 0;
-    border: 1px solid rgb(229 229 229);
-    background: rgb(250 250 250);
-    border-radius: 6px;
-    color: rgb(38 38 38);
-    padding: 2px 5px;
-    text-align: right;
-    font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
-    font-size: 11.5px;
-    transition: border-color 100ms ease;
-  }
-  .ch-input:focus {
-    border-color: rgb(155 155 155);
-    outline: none;
-  }
-  :global(.dark) .ch-input {
-    border-color: rgb(40 40 40);
-    background: rgb(18 18 18);
-    color: rgb(220 220 220);
-  }
-  :global(.dark) .ch-input:focus {
-    border-color: rgb(75 75 75);
   }
 
   /* ── Empty ── */
