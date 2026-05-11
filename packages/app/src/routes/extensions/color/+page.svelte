@@ -3,9 +3,10 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import { invoke } from "@tauri-apps/api/core";
+  import { listen, type UnlistenFn } from "@tauri-apps/api/event";
   import { toast } from "svelte-sonner";
   import ColorPicker, { ChromeVariant } from "svelte-awesome-color-picker";
-  import { Copy, ClipboardText } from "phosphor-svelte";
+  import { Copy, ClipboardText, Eyedropper } from "phosphor-svelte";
   import AppScrollArea from "$lib/components/AppScrollArea.svelte";
   import ExtensionHeader from "$lib/components/ExtensionHeader.svelte";
 
@@ -97,6 +98,7 @@
   let pickerHex = $state("#ff5500");
   let headerRef: ExtensionHeader;
   let loadRequestId = 0;
+  let isPicking = $state(false);
 
   const initialQuery = $derived($page.url.searchParams.get("q") || "#ff5500");
   const colorValue = $derived(conversion?.hex.slice(0, 7) || "#ff5500");
@@ -251,9 +253,43 @@
     loadColor(event.hex, false);
   }
 
+  async function startPicker() {
+    if (isPicking) return;
+    isPicking = true;
+
+    try {
+      await invoke("start_color_picker");
+    } catch (error) {
+      isPicking = false;
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(message || "取色失败");
+    }
+  }
+
   onMount(() => {
     loadColor(initialQuery);
     headerRef?.focus();
+
+    let unlisten: UnlistenFn | undefined;
+
+    // 监听 Rust 广播的取色结果
+    listen<ColorConversion | null>("color_picker_result", (event) => {
+      isPicking = false;
+
+      if (!event.payload) {
+        toast.info("已取消取色");
+        return;
+      }
+
+      loadColor(event.payload.hex);
+      toast.success(`${event.payload.hex} 已取色`);
+    }).then((fn) => {
+      unlisten = fn;
+    });
+
+    return () => {
+      unlisten?.();
+    };
   });
 </script>
 
@@ -287,7 +323,18 @@
 
         <!-- Color picker -->
         <div class="section picker-section">
-          <div class="section-head"><span>色盘</span></div>
+          <div class="section-head">
+            <span>色盘</span>
+            <button
+              class="btn-ghost"
+              onclick={startPicker}
+              disabled={isPicking}
+              title="从屏幕任意位置取色"
+            >
+              <Eyedropper class="icon" />
+              {isPicking ? "取色中…" : "取色"}
+            </button>
+          </div>
           <div class="picker-frame">
             <ColorPicker
               bind:hex={pickerHex}
@@ -462,6 +509,11 @@
     text-transform: uppercase;
     letter-spacing: 0.06em;
   }
+  .picker-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
 
   /* ── Group label ── */
   .group-label {
@@ -570,9 +622,21 @@
     background: rgb(240 240 240);
     color: rgb(30 30 30);
   }
+  .btn-ghost:disabled {
+    cursor: default;
+    opacity: 0.55;
+  }
+  .btn-ghost:disabled:hover {
+    background: transparent;
+    color: rgb(140 140 140);
+  }
   :global(.dark) .btn-ghost:hover {
     background: rgb(35 35 35);
     color: rgb(210 210 210);
+  }
+  :global(.dark) .btn-ghost:disabled:hover {
+    background: transparent;
+    color: rgb(140 140 140);
   }
 
   /* ── Empty ── */

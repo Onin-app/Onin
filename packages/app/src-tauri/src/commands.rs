@@ -164,6 +164,10 @@ pub fn get_invoke_handler(
         extension::api::toggle_extension,
         extension::api::get_emoji_data,
         extension::api::get_color_conversion,
+        extension::api::start_color_picker,
+        extension::api::get_color_picker_capture,
+        extension::api::get_color_picker_image,
+        extension::api::finish_color_picker,
         // Keyboard simulation
         system_commands::simulate_paste,
         // Translator Extension
