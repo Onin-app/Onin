@@ -10,6 +10,7 @@
    */
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
+  import { listen, type UnlistenFn } from "@tauri-apps/api/event";
   import { getCurrentWindow } from "@tauri-apps/api/window";
 
   // ── 截图数据结构 ────────────────────────────────────────────────────────────
@@ -28,8 +29,8 @@
   const CELL = 9;
   const GRID_PX = (GRID_RADIUS * 2 + 1) * CELL; // 135
   const LOUPE_W = GRID_PX + 20; // 155
-  const LABEL_H = 36;
-  const LOUPE_H = GRID_PX + LABEL_H + 16; // 187
+  const LABEL_H = 48;
+  const LOUPE_H = GRID_PX + LABEL_H + 16; // 199
   const OFFSET = 22;
   const MARGIN = 16;
 
@@ -38,8 +39,10 @@
   let canvas: HTMLCanvasElement;
   let ctx: CanvasRenderingContext2D | null = null;
 
-  /** 截图原始 Image（用于每帧绘制背景） */
-  let bgImage: HTMLImageElement | null = null;
+  /** 截图原始 ImageData（作为 ImageBitmap 不可用时的背景 fallback） */
+  let bgFrame: ImageData | null = null;
+  /** GPU 侧背景位图（用于每帧绘制背景） */
+  let bgBitmap: ImageBitmap | null = null;
   /** 截图物理像素 ImageData（用于颜色采样） */
   let imageData: ImageData | null = null;
   let capture: ColorPickerCapture | null = null;
@@ -50,7 +53,9 @@
   let currentRgb = { r: 0, g: 0, b: 0 };
 
   let done = false;
+  let loading = false;
   let rafId = 0;
+  let loadId = 0;
 
   // ── 颜色采样 ────────────────────────────────────────────────────────────────
 
@@ -77,10 +82,16 @@
   // ── 渲染 ────────────────────────────────────────────────────────────────────
 
   function draw() {
-    if (!ctx || !canvas || !bgImage || !imageData || !capture) return;
+    if (!ctx || !canvas || !imageData || !capture) return;
 
     // ① 绘制截图背景（铺满整个 canvas）
-    ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
+    if (bgBitmap) {
+      ctx.drawImage(bgBitmap, 0, 0, canvas.width, canvas.height);
+    } else if (bgFrame) {
+      ctx.putImageData(bgFrame, 0, 0);
+    } else {
+      return;
+    }
 
     // ② 采样当前颜色
     const color = samplePixel(mouseX, mouseY);
@@ -174,6 +185,8 @@
     // 颜色色块
     const swX = px + 12;
     const swY = labelY + 6;
+    const textX = swX + 26;
+    const textMaxW = LOUPE_W - textX + px - 12;
     ctx.fillStyle = currentHex;
     ctx.beginPath();
     ctx.roundRect(swX, swY, 18, 18, 4);
@@ -186,15 +199,17 @@
     ctx.fillStyle = "#fff";
     ctx.font = "600 12px ui-monospace, Menlo, Consolas, monospace";
     ctx.textBaseline = "middle";
-    ctx.fillText(currentHex, swX + 26, swY + 9);
+    ctx.fillText(currentHex, textX, swY + 9, textMaxW);
 
     // RGB 文字
     ctx.fillStyle = "rgba(255,255,255,0.45)";
-    ctx.font = "10px ui-monospace, Menlo, Consolas, monospace";
+    ctx.font = "9.5px ui-monospace, Menlo, Consolas, monospace";
+    ctx.textBaseline = "top";
     ctx.fillText(
       `rgb(${currentRgb.r}, ${currentRgb.g}, ${currentRgb.b})`,
       swX,
-      swY + 30,
+      swY + 24,
+      LOUPE_W - 24,
     );
   }
 
@@ -242,6 +257,7 @@
   function finish(hex: string | null) {
     if (done) return;
     done = true;
+    loadId += 1;
 
     if (rafId) {
       cancelAnimationFrame(rafId);
@@ -249,77 +265,160 @@
     }
 
     // Fire-and-forget：不等 IPC 返回，避免卡死
-    // Rust 端收到后会 spawn 异步任务关窗 + 恢复主窗口
+    // Rust 端收到后会 spawn 异步任务隐藏窗口 + 恢复主窗口
     invoke("finish_color_picker", { hex }).catch(() => {});
 
-    // 兜底：如果 Rust 端没能关窗（IPC 失败等），500ms 后自己关
+    // 兜底：如果 Rust 端没能隐藏窗口（IPC 失败等），500ms 后自己隐藏
     setTimeout(() => {
-      try {
-        window.close();
-      } catch {
-        /* ignore */
-      }
+      getCurrentWindow()
+        .hide()
+        .catch(() => {})
+        .finally(releaseCaptureResources);
     }, 500);
   }
 
+  function releaseCaptureResources() {
+    bgBitmap?.close();
+    bgBitmap = null;
+    bgFrame = null;
+    imageData = null;
+    capture = null;
+  }
+
+  function toClampedPixels(buffer: ArrayBuffer | Uint8Array) {
+    if (buffer instanceof ArrayBuffer) {
+      return new Uint8ClampedArray(buffer);
+    }
+    return new Uint8ClampedArray(
+      buffer.buffer,
+      buffer.byteOffset,
+      buffer.byteLength,
+    );
+  }
+
   async function init() {
+    if (loading) return;
+    loading = true;
+    done = false;
+    const currentLoadId = ++loadId;
+    releaseCaptureResources();
+
     try {
       capture = await invoke<ColorPickerCapture>("get_color_picker_capture");
     } catch {
-      finish(null);
+      loading = false;
       return;
     }
 
-    canvas.width = capture.logicalWidth;
-    canvas.height = capture.logicalHeight;
+    if (currentLoadId !== loadId || !capture) {
+      loading = false;
+      return;
+    }
+
+    canvas.width = Math.round(capture.logicalWidth);
+    canvas.height = Math.round(capture.logicalHeight);
     ctx = canvas.getContext("2d", { willReadFrequently: true });
 
     if (!ctx) {
+      loading = false;
+      console.error("[color-picker-overlay] canvas context unavailable");
       finish(null);
       return;
     }
 
-    // 离屏 canvas 提取物理像素 ImageData（用于精确采样）
-    const offscreen = document.createElement("canvas");
-    offscreen.width = capture.width;
-    offscreen.height = capture.height;
-    const offCtx = offscreen.getContext("2d", { willReadFrequently: true });
-    if (!offCtx) {
-      finish(null);
-      return;
-    }
-
-    const img = new Image();
-    img.onload = async () => {
-      try {
-        bgImage = img;
-        offCtx.drawImage(img, 0, 0, capture!.width, capture!.height);
-        imageData = offCtx.getImageData(0, 0, capture!.width, capture!.height);
-        mouseX = canvas.width / 2;
-        mouseY = canvas.height / 2;
-        draw();
-
-        await getCurrentWindow().show();
-      } catch (e) {
-        console.error("加载截图失败", e);
-        finish(null);
-      }
-    };
-    img.onerror = () => finish(null);
-
-    // 从 Rust 后端获取原生二进制 BMP 数据，彻底绕过 Chrome 的 base64 长度限制和本地文件权限墙
     try {
-      const buffer = await invoke<Uint8Array>("get_color_picker_image");
-      const blob = new Blob([buffer], { type: "image/bmp" });
-      img.src = URL.createObjectURL(blob);
+      const buffer = await invoke<ArrayBuffer | Uint8Array>(
+        "get_color_picker_image",
+      );
+      const pixels = toClampedPixels(buffer);
+      const expectedLength = capture.width * capture.height * 4;
+      if (pixels.byteLength !== expectedLength || pixels.byteLength % 4 !== 0) {
+        throw new Error(
+          `Invalid color picker image buffer: got ${pixels.byteLength}, expected ${expectedLength}`,
+        );
+      }
+      if (currentLoadId !== loadId) {
+        releaseCaptureResources();
+        loading = false;
+        return;
+      }
+
+      imageData = new ImageData(pixels, capture.width, capture.height);
+      try {
+        bgBitmap = await createImageBitmap(imageData);
+      } catch {
+        bgBitmap = null;
+      }
+
+      if (!bgBitmap && capture.scaleFactor === 1) {
+        bgFrame = imageData;
+      } else if (!bgBitmap) {
+        const source = document.createElement("canvas");
+        source.width = capture.width;
+        source.height = capture.height;
+        const sourceCtx = source.getContext("2d");
+        if (!sourceCtx) {
+          loading = false;
+          console.error(
+            "[color-picker-overlay] source canvas context unavailable",
+          );
+          finish(null);
+          return;
+        }
+        sourceCtx.putImageData(imageData, 0, 0);
+
+        const offscreen = document.createElement("canvas");
+        offscreen.width = canvas.width;
+        offscreen.height = canvas.height;
+        const offCtx = offscreen.getContext("2d", { willReadFrequently: true });
+        if (!offCtx) {
+          loading = false;
+          console.error(
+            "[color-picker-overlay] scaled canvas context unavailable",
+          );
+          finish(null);
+          return;
+        }
+        offCtx.drawImage(source, 0, 0, canvas.width, canvas.height);
+        bgFrame = offCtx.getImageData(0, 0, canvas.width, canvas.height);
+      }
+
+      if (currentLoadId !== loadId) {
+        releaseCaptureResources();
+        loading = false;
+        return;
+      }
+
+      mouseX = canvas.width / 2;
+      mouseY = canvas.height / 2;
+      draw();
+
+      const currentWindow = getCurrentWindow();
+      await currentWindow.show();
+      currentWindow.setFocus().catch(() => {});
+      loading = false;
     } catch (e) {
-      console.error("获取截图二进制失败", e);
+      console.error("加载截图像素失败", e);
+      loading = false;
       finish(null);
     }
   }
 
   onMount(() => {
+    let unlistenCaptureReady: UnlistenFn | undefined;
+
+    listen("color_picker_capture_ready", () => {
+      init();
+    }).then((fn) => {
+      unlistenCaptureReady = fn;
+    });
+
     init();
+
+    return () => {
+      unlistenCaptureReady?.();
+      releaseCaptureResources();
+    };
   });
 </script>
 

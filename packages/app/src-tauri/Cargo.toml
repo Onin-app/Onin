@@ -34,6 +34,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "registry"] }
 windows = { version = "0.57", features = [
   "Win32_UI_Shell",
   "Win32_UI_WindowsAndMessaging",
+  "Win32_Graphics_Dwm",
   "Win32_Graphics_Gdi",
   "Win32_Foundation",
   "Win32_System_Com",

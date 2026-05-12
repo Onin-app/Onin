@@ -262,6 +262,7 @@
     } catch (error) {
       isPicking = false;
       const message = error instanceof Error ? error.message : String(error);
+      console.error("[color-picker] start_color_picker failed", error);
       toast.error(message || "取色失败");
     }
   }
@@ -509,12 +510,6 @@
     text-transform: uppercase;
     letter-spacing: 0.06em;
   }
-  .picker-actions {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-  }
-
   /* ── Group label ── */
   .group-label {
     font-size: 10px;

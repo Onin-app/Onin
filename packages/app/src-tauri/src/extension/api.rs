@@ -103,11 +103,11 @@ pub fn get_color_picker_capture(
     crate::extensions::color_picker::get_color_picker_capture()
 }
 
-/// Overlay WebView 启动后调用，获取 BMP 二进制数据
+/// Overlay WebView 启动后调用，获取 RGBA 像素数据
 #[command]
 pub fn get_color_picker_image() -> Result<tauri::ipc::Response, String> {
     let capture = crate::extensions::color_picker::get_color_picker_capture()?;
-    Ok(tauri::ipc::Response::new(capture.bmp_data))
+    Ok(tauri::ipc::Response::new(capture.rgba_data))
 }
 
 /// 用户点击取色或取消后由 Overlay WebView 调用
@@ -129,19 +129,21 @@ pub async fn finish_color_picker(app: AppHandle, hex: Option<String>) -> Result<
     app.emit("color_picker_result", picked_color)
         .map_err(|e| e.to_string())?;
 
-    // 在后台异步关闭 Overlay 窗口并恢复主窗口
-    // 延迟 80ms 确保 IPC 响应已送达，避免 Overlay 窗口消息队列死锁
+    // 在后台异步恢复主窗口并隐藏 Overlay 窗口。
+    // 延迟 80ms 确保 IPC 响应已送达，避免操作当前窗口消息队列时卡住。
     let app_clone = app.clone();
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_millis(80)).await;
 
-        if let Some(overlay) = app_clone.get_webview_window("color-picker-overlay") {
-            let _ = overlay.close();
-        }
-
         if let Some(main) = app_clone.get_webview_window("main") {
             let _ = main.show();
             let _ = main.set_focus();
+        }
+
+        tokio::time::sleep(std::time::Duration::from_millis(32)).await;
+
+        if let Some(overlay) = app_clone.get_webview_window("color-picker-overlay") {
+            let _ = overlay.hide();
         }
     });
 

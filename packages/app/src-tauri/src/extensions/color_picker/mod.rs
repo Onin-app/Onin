@@ -18,9 +18,9 @@ pub struct ColorPickerCapture {
     pub logical_height: f64,
     /// 缩放系数（物理 / 逻辑）
     pub scale_factor: f64,
-    /// 原始 BMP 二进制数据（不传输给前端 JSON，仅供单独的二进制接口获取）
+    /// 原始 RGBA 像素数据（不传输给前端 JSON，仅供单独的二进制接口获取）
     #[serde(skip)]
-    pub bmp_data: Vec<u8>,
+    pub rgba_data: Vec<u8>,
 }
 
 // ── Windows ──────────────────────────────────────────────────────────────────
