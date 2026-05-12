@@ -15,16 +15,34 @@ pub static COLOR_MANIFEST: ExtensionManifest = ExtensionManifest {
     name: "颜色转换",
     description: "解析 Hex、RGB、HSL 颜色并转换格式",
     icon: "palette",
-    commands: &[ExtensionCommand {
-        code: "convert",
-        name: "颜色转换",
-        description: Some("解析 Hex、RGB、HSL 颜色并转换格式"),
-        icon: Some("palette"),
-        keywords: &[
-            "color", "colour", "颜色", "色值", "hex", "rgb", "rgba", "hsl", "hsla", "取色",
-        ],
-        matches: None,
-    }],
+    commands: &[
+        ExtensionCommand {
+            code: "convert",
+            name: "颜色转换",
+            description: Some("解析 Hex、RGB、HSL 颜色并转换格式"),
+            icon: Some("palette"),
+            keywords: &[
+                "color", "colour", "颜色", "色值", "hex", "rgb", "rgba", "hsl", "hsla",
+            ],
+            matches: None,
+        },
+        ExtensionCommand {
+            code: "pick",
+            name: "取色",
+            description: Some("从屏幕任意位置拾取颜色"),
+            icon: Some("eyedropper"),
+            keywords: &[
+                "取色",
+                "吸管",
+                "拾色",
+                "屏幕取色",
+                "picker",
+                "pick color",
+                "eyedropper",
+            ],
+            matches: None,
+        },
+    ],
 };
 
 pub struct ColorExtension;

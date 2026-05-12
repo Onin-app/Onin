@@ -24,6 +24,7 @@
   // Stores
   import { Theme, type LaunchableItem } from "$lib/type";
   import { theme, getTheme } from "$lib/utils/theme";
+  import { startColorPickerFlow } from "$lib/utils/colorPicker";
   import { escapeHandler } from "$lib/stores/escapeHandler";
   import {
     focusInputTrigger,
@@ -205,6 +206,22 @@
     matchedCommands = [];
   };
 
+  const resetLauncherState = () => {
+    inputValue = "";
+    clipboard.clearAttachments();
+    extensionPreviewItem = null;
+    extensionManager.clearPreview();
+    matchedCommands = [];
+    appListManager.resetToOriginList();
+  };
+
+  const startColorPickCommand = async () => {
+    await startColorPickerFlow({
+      beforeStart: resetLauncherState,
+      onCancel: requestInputFocusWithRetry,
+    });
+  };
+
   // 解析 Extension Action
   const parseExtensionAction = (
     action: string | undefined,
@@ -271,6 +288,10 @@
           extensionManager.clearPreview();
           matchedCommands = [];
           goto("/extensions/clipboard");
+          return;
+        }
+        if (extensionId === "color" && commandCode === "pick") {
+          await startColorPickCommand();
           return;
         }
         if (extensionId === "color") {
@@ -410,6 +431,12 @@
       }
 
       if (extensionId === "color") {
+        const commandCode = parts[2] || "";
+        if (commandCode === "pick") {
+          await startColorPickCommand();
+          return;
+        }
+
         const effectiveText = clipboard.state.attachedText || inputValue;
         inputValue = "";
         clipboard.clearAttachments();

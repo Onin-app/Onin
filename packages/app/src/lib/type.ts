@@ -28,6 +28,16 @@ export interface LaunchableItem {
   trigger_mode?: "matched" | "preview";
 }
 
+export interface ColorConversion {
+  hex: string;
+  rgb: string;
+  hsl: string;
+  red: number;
+  green: number;
+  blue: number;
+  alpha: number;
+}
+
 export interface CommandKeyword {
   name: string;
   disabled?: boolean;
