@@ -301,10 +301,13 @@
     loading = true;
     done = false;
     const currentLoadId = ++loadId;
+    const label = getCurrentWindow().label;
     releaseCaptureResources();
 
     try {
-      capture = await invoke<ColorPickerCapture>("get_color_picker_capture");
+      capture = await invoke<ColorPickerCapture>("get_color_picker_capture", {
+        label,
+      });
     } catch {
       loading = false;
       return;
@@ -329,6 +332,7 @@
     try {
       const buffer = await invoke<ArrayBuffer | Uint8Array>(
         "get_color_picker_image",
+        { label },
       );
       const pixels = toClampedPixels(buffer);
       const expectedLength = capture.width * capture.height * 4;

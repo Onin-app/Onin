@@ -31,13 +31,23 @@ pub async fn start_color_picker(app: AppHandle, restore_main_window: bool) -> Re
 }
 
 #[cfg(target_os = "windows")]
-pub fn get_color_picker_capture() -> Result<ColorPickerCapture, String> {
-    windows::get_color_picker_capture()
+pub fn get_color_picker_capture(label: Option<String>) -> Result<ColorPickerCapture, String> {
+    windows::get_color_picker_capture(label)
+}
+
+#[cfg(target_os = "windows")]
+pub fn get_color_picker_image(label: Option<String>) -> Result<Vec<u8>, String> {
+    windows::get_color_picker_image(label)
 }
 
 #[cfg(target_os = "windows")]
 pub fn clear_capture_cache() {
     windows::clear_capture_cache();
+}
+
+#[cfg(target_os = "windows")]
+pub fn active_overlay_labels() -> Vec<String> {
+    windows::active_overlay_labels()
 }
 
 #[cfg(target_os = "windows")]
@@ -53,12 +63,22 @@ pub async fn start_color_picker(_app: AppHandle, _restore_main_window: bool) -> 
 }
 
 #[cfg(target_os = "macos")]
-pub fn get_color_picker_capture() -> Result<ColorPickerCapture, String> {
+pub fn get_color_picker_capture(_label: Option<String>) -> Result<ColorPickerCapture, String> {
+    Err("macOS 取色暂未实现".to_string())
+}
+
+#[cfg(target_os = "macos")]
+pub fn get_color_picker_image(_label: Option<String>) -> Result<Vec<u8>, String> {
     Err("macOS 取色暂未实现".to_string())
 }
 
 #[cfg(target_os = "macos")]
 pub fn clear_capture_cache() {}
+
+#[cfg(target_os = "macos")]
+pub fn active_overlay_labels() -> Vec<String> {
+    vec!["color-picker-overlay".to_string()]
+}
 
 #[cfg(target_os = "macos")]
 pub fn should_restore_main_on_finish() -> bool {
@@ -73,12 +93,22 @@ pub async fn start_color_picker(_app: AppHandle, _restore_main_window: bool) -> 
 }
 
 #[cfg(target_os = "linux")]
-pub fn get_color_picker_capture() -> Result<ColorPickerCapture, String> {
+pub fn get_color_picker_capture(_label: Option<String>) -> Result<ColorPickerCapture, String> {
+    Err("Linux 取色暂未实现".to_string())
+}
+
+#[cfg(target_os = "linux")]
+pub fn get_color_picker_image(_label: Option<String>) -> Result<Vec<u8>, String> {
     Err("Linux 取色暂未实现".to_string())
 }
 
 #[cfg(target_os = "linux")]
 pub fn clear_capture_cache() {}
+
+#[cfg(target_os = "linux")]
+pub fn active_overlay_labels() -> Vec<String> {
+    vec!["color-picker-overlay".to_string()]
+}
 
 #[cfg(target_os = "linux")]
 pub fn should_restore_main_on_finish() -> bool {
@@ -93,12 +123,22 @@ pub async fn start_color_picker(_app: AppHandle, _restore_main_window: bool) -> 
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-pub fn get_color_picker_capture() -> Result<ColorPickerCapture, String> {
+pub fn get_color_picker_capture(_label: Option<String>) -> Result<ColorPickerCapture, String> {
+    Err("当前平台不支持取色".to_string())
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+pub fn get_color_picker_image(_label: Option<String>) -> Result<Vec<u8>, String> {
     Err("当前平台不支持取色".to_string())
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
 pub fn clear_capture_cache() {}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+pub fn active_overlay_labels() -> Vec<String> {
+    vec!["color-picker-overlay".to_string()]
+}
 
 #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
 pub fn should_restore_main_on_finish() -> bool {

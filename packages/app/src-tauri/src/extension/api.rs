@@ -103,15 +103,16 @@ pub async fn start_color_picker(
 /// Overlay WebView 启动后调用，获取截图数据
 #[command]
 pub fn get_color_picker_capture(
+    label: Option<String>,
 ) -> Result<crate::extensions::color_picker::ColorPickerCapture, String> {
-    crate::extensions::color_picker::get_color_picker_capture()
+    crate::extensions::color_picker::get_color_picker_capture(label)
 }
 
 /// Overlay WebView 启动后调用，获取 RGBA 像素数据
 #[command]
-pub fn get_color_picker_image() -> Result<tauri::ipc::Response, String> {
-    let capture = crate::extensions::color_picker::get_color_picker_capture()?;
-    Ok(tauri::ipc::Response::new(capture.rgba_data))
+pub fn get_color_picker_image(label: Option<String>) -> Result<tauri::ipc::Response, String> {
+    let image = crate::extensions::color_picker::get_color_picker_image(label)?;
+    Ok(tauri::ipc::Response::new(image))
 }
 
 /// 用户点击取色或取消后由 Overlay WebView 调用
@@ -123,6 +124,8 @@ pub fn get_color_picker_image() -> Result<tauri::ipc::Response, String> {
 /// 解决方案：先 emit 结果（IPC 立即返回），再用 spawn 异步延迟关窗。
 #[command]
 pub async fn finish_color_picker(app: AppHandle, hex: Option<String>) -> Result<(), String> {
+    let overlay_labels = crate::extensions::color_picker::active_overlay_labels();
+
     // 清理截图缓存
     crate::extensions::color_picker::clear_capture_cache();
 
@@ -150,8 +153,10 @@ pub async fn finish_color_picker(app: AppHandle, hex: Option<String>) -> Result<
 
         tokio::time::sleep(std::time::Duration::from_millis(32)).await;
 
-        if let Some(overlay) = app_clone.get_webview_window("color-picker-overlay") {
-            let _ = overlay.hide();
+        for label in overlay_labels {
+            if let Some(overlay) = app_clone.get_webview_window(&label) {
+                let _ = overlay.hide();
+            }
         }
     });
 

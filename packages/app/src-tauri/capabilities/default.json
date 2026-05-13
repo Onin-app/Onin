@@ -6,7 +6,7 @@
     "main",
     "translator-*",
     "google-translate-w-ui",
-    "color-picker-overlay",
+    "color-picker-overlay*",
     "toast-overlay"
   ],
   "permissions": [

@@ -1,16 +1,17 @@
 use super::ColorPickerCapture;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{LazyLock, Mutex};
 use std::time::Instant;
-use tauri::{Emitter, LogicalPosition, LogicalSize, Manager, WebviewUrl, WebviewWindowBuilder};
-use windows::Win32::Foundation::{HWND, RECT};
+use tauri::{Emitter, Manager, Monitor, WebviewUrl, WebviewWindowBuilder};
+use windows::Win32::Foundation::{HWND, POINT, RECT};
 use windows::Win32::Graphics::Dwm::DwmFlush;
 use windows::Win32::Graphics::Gdi::{
     BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDC, GetDIBits,
     ReleaseDC, SelectObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, SRCCOPY,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetWindowRect, IsWindowVisible, ShowWindow, SW_HIDE,
+    GetCursorPos, GetWindowRect, IsWindowVisible, ShowWindow, SW_HIDE,
 };
 
 const OVERLAY_LABEL: &str = "color-picker-overlay";
@@ -26,9 +27,29 @@ macro_rules! println {
 }
 
 /// 截图缓存，供 Overlay WebView 读取
-static CACHED_CAPTURE: LazyLock<Mutex<Option<ColorPickerCapture>>> =
-    LazyLock::new(|| Mutex::new(None));
+static CACHED_CAPTURES: LazyLock<Mutex<HashMap<String, ColorPickerCapture>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+static ACTIVE_OVERLAY_LABELS: LazyLock<Mutex<Vec<String>>> = LazyLock::new(|| Mutex::new(vec![]));
 static RESTORE_MAIN_ON_FINISH: AtomicBool = AtomicBool::new(true);
+
+struct OverlaySpec {
+    label: String,
+    position: tauri::PhysicalPosition<i32>,
+    size: tauri::PhysicalSize<u32>,
+    logical_width: f64,
+    logical_height: f64,
+    scale_factor: f64,
+}
+
+impl OverlaySpec {
+    fn contains_physical_point(&self, point: POINT) -> bool {
+        let left = self.position.x;
+        let top = self.position.y;
+        let right = left + self.size.width as i32;
+        let bottom = top + self.size.height as i32;
+        point.x >= left && point.x < right && point.y >= top && point.y < bottom
+    }
+}
 
 /// 启动取色流程（async 版本，避免阻塞事件循环）
 pub async fn start_color_picker(
@@ -61,7 +82,7 @@ pub async fn start_color_picker(
     );
 
     // 截图（在当前线程，避免 Windows 后台线程 GDI 截图黑屏）
-    let capture = capture_primary_screen(&app).map_err(|e| {
+    let captures = capture_all_screens(&app).map_err(|e| {
         println!("[color-picker] capture failed: {e}");
         // 截图失败，恢复主窗口
         if let Some(main) = app.get_webview_window("main") {
@@ -70,85 +91,131 @@ pub async fn start_color_picker(
         e
     })?;
 
-    let logical_width = capture.logical_width;
-    let logical_height = capture.logical_height;
+    if captures.is_empty() {
+        if let Some(main) = app.get_webview_window("main") {
+            let _ = main.show();
+        }
+        return Err("无法获取屏幕".to_string());
+    }
+
+    let mut overlay_specs: Vec<_> = captures
+        .iter()
+        .enumerate()
+        .map(|(index, (monitor, capture))| OverlaySpec {
+            label: overlay_label(index),
+            position: *monitor.position(),
+            size: *monitor.size(),
+            logical_width: capture.logical_width,
+            logical_height: capture.logical_height,
+            scale_factor: capture.scale_factor,
+        })
+        .collect();
+    let total_capture_bytes = captures
+        .iter()
+        .map(|(_, capture)| capture.rgba_data.len())
+        .sum::<usize>();
+
     println!(
-        "[color-picker] capture ready: {}x{} physical, {:.1}x{:.1} logical, scale {:.2}, bytes {}, elapsed {}ms",
-        capture.width,
-        capture.height,
-        logical_width,
-        logical_height,
-        capture.scale_factor,
-        capture.rgba_data.len(),
+        "[color-picker] captures ready: {} monitor(s), {} bytes, elapsed {}ms",
+        overlay_specs.len(),
+        total_capture_bytes,
         started.elapsed().as_millis()
     );
 
     // 写入缓存
     {
-        let mut cache = CACHED_CAPTURE
+        let mut cache = CACHED_CAPTURES
             .lock()
             .map_err(|_| "缓存锁定失败".to_string())?;
-        *cache = Some(capture);
+        cache.clear();
+        for (index, (_, capture)) in captures.into_iter().enumerate() {
+            cache.insert(overlay_label(index), capture);
+        }
+    }
+    {
+        let mut labels = ACTIVE_OVERLAY_LABELS
+            .lock()
+            .map_err(|_| "窗口状态锁定失败".to_string())?;
+        *labels = overlay_specs
+            .iter()
+            .map(|spec| spec.label.clone())
+            .collect();
     }
     println!("[color-picker] capture cached");
 
-    if let Some(overlay) = app.get_webview_window(OVERLAY_LABEL) {
-        println!("[color-picker] reusing overlay window");
-        let _ = overlay.set_position(LogicalPosition::new(0.0, 0.0));
-        let _ = overlay.set_size(LogicalSize::new(logical_width, logical_height));
-        let _ = overlay.set_always_on_top(true);
-        overlay
-            .emit("color_picker_capture_ready", ())
-            .map_err(|err| {
-                println!("[color-picker] emit capture_ready failed: {err}");
-                clear_capture_cache();
-                if let Some(main) = app.get_webview_window("main") {
-                    let _ = main.show();
-                }
-                err.to_string()
-            })?;
-        let overlay_clone = overlay.clone();
-        tauri::async_runtime::spawn(async move {
-            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-            let _ = overlay_clone.set_focus();
-        });
+    for spec in &mut overlay_specs {
+        if let Some(overlay) = app.get_webview_window(&spec.label) {
+            println!("[color-picker] reusing overlay window: {}", spec.label);
+            let _ = overlay.set_position(tauri::Position::Physical(spec.position));
+            let _ = overlay.set_size(tauri::Size::Physical(spec.size));
+            let _ = overlay.set_always_on_top(true);
+            overlay
+                .emit("color_picker_capture_ready", ())
+                .map_err(|err| {
+                    println!("[color-picker] emit capture_ready failed: {err}");
+                    clear_capture_cache();
+                    show_main_window(&app);
+                    err.to_string()
+                })?;
+            continue;
+        }
+
         println!(
-            "[color-picker] capture_ready emitted, total {}ms",
-            started.elapsed().as_millis()
+            "[color-picker] building overlay window on demand: {}",
+            spec.label
         );
-        return Ok(());
+        let overlay = WebviewWindowBuilder::new(
+            &app,
+            &spec.label,
+            WebviewUrl::App("/color-picker-overlay".into()),
+        )
+        .title("Color Picker")
+        .inner_size(spec.logical_width, spec.logical_height)
+        .position(
+            spec.position.x as f64 / spec.scale_factor,
+            spec.position.y as f64 / spec.scale_factor,
+        )
+        .decorations(false)
+        .transparent(false)
+        .visible(false) // 初始隐藏，等前端加载完图片再显示，彻底解决白屏黑屏闪烁
+        .always_on_top(true)
+        .resizable(false)
+        .skip_taskbar(true)
+        .focused(true)
+        .shadow(false)
+        .build()
+        .map_err(|err| {
+            println!("[color-picker] overlay build failed: {err}");
+            clear_capture_cache();
+            show_main_window(&app);
+            err.to_string()
+        })?;
+        let _ = overlay.set_position(tauri::Position::Physical(spec.position));
+        let _ = overlay.set_size(tauri::Size::Physical(spec.size));
+
+        attach_overlay_cleanup(app.clone(), &overlay);
     }
 
-    println!("[color-picker] building overlay window on demand");
-    let overlay = WebviewWindowBuilder::new(
-        &app,
-        OVERLAY_LABEL,
-        WebviewUrl::App("/color-picker-overlay".into()),
-    )
-    .title("Color Picker")
-    .inner_size(logical_width, logical_height)
-    .position(0.0, 0.0)
-    .decorations(false)
-    .transparent(false)
-    .visible(false) // 初始隐藏，等前端加载完图片再显示，彻底解决白屏黑屏闪烁
-    .always_on_top(true)
-    .resizable(false)
-    .skip_taskbar(true)
-    .focused(true)
-    .shadow(false)
-    .build()
-    .map_err(|err| {
-        println!("[color-picker] overlay build failed: {err}");
-        clear_capture_cache();
-        if let Some(main) = app.get_webview_window("main") {
-            let _ = main.show();
-        }
-        err.to_string()
-    })?;
+    let focused_spec = cursor_position()
+        .and_then(|point| {
+            overlay_specs
+                .iter()
+                .find(|spec| spec.contains_physical_point(point))
+        })
+        .or_else(|| overlay_specs.first());
 
-    attach_overlay_cleanup(app.clone(), &overlay);
+    if let Some(spec) = focused_spec {
+        if let Some(overlay) = app.get_webview_window(&spec.label) {
+            let overlay_clone = overlay.clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                let _ = overlay_clone.set_focus();
+            });
+        }
+    }
+
     println!(
-        "[color-picker] overlay built on demand, total {}ms",
+        "[color-picker] overlays ready, total {}ms",
         started.elapsed().as_millis()
     );
 
@@ -220,17 +287,14 @@ fn attach_overlay_cleanup(app: tauri::AppHandle, overlay: &tauri::WebviewWindow)
     overlay.on_window_event(move |event| {
         if let tauri::WindowEvent::Destroyed = event {
             let is_abnormal = {
-                CACHED_CAPTURE
+                CACHED_CAPTURES
                     .lock()
-                    .map(|cache| cache.is_some())
+                    .map(|cache| !cache.is_empty())
                     .unwrap_or(false)
             };
             if is_abnormal {
                 clear_capture_cache();
-                if let Some(main) = app.get_webview_window("main") {
-                    let _ = main.show();
-                    let _ = main.set_focus();
-                }
+                show_main_window(&app);
                 let _ = app.emit("color_picker_result", Option::<String>::None);
             }
         }
@@ -394,11 +458,20 @@ fn image_diff_score(previous: &[u8], next: &[u8]) -> u64 {
 }
 
 /// Overlay WebView 启动后调用，获取截图数据
-pub fn get_color_picker_capture() -> Result<ColorPickerCapture, String> {
-    let result = CACHED_CAPTURE
+pub fn get_color_picker_capture(label: Option<String>) -> Result<ColorPickerCapture, String> {
+    let requested_label = label.unwrap_or_else(|| OVERLAY_LABEL.to_string());
+    let result = CACHED_CAPTURES
         .lock()
         .map_err(|_| "缓存锁定失败".to_string())?
-        .clone()
+        .get(&requested_label)
+        .map(|capture| ColorPickerCapture {
+            width: capture.width,
+            height: capture.height,
+            logical_width: capture.logical_width,
+            logical_height: capture.logical_height,
+            scale_factor: capture.scale_factor,
+            rgba_data: Vec::new(),
+        })
         .ok_or_else(|| "截图缓存不存在".to_string());
     match &result {
         Ok(capture) => println!(
@@ -412,21 +485,78 @@ pub fn get_color_picker_capture() -> Result<ColorPickerCapture, String> {
     result
 }
 
+/// Overlay WebView 启动后调用，获取 RGBA 像素数据
+pub fn get_color_picker_image(label: Option<String>) -> Result<Vec<u8>, String> {
+    let requested_label = label.unwrap_or_else(|| OVERLAY_LABEL.to_string());
+    let result = CACHED_CAPTURES
+        .lock()
+        .map_err(|_| "缓存锁定失败".to_string())?
+        .get(&requested_label)
+        .map(|capture| capture.rgba_data.clone())
+        .ok_or_else(|| "截图缓存不存在".to_string());
+    match &result {
+        Ok(bytes) => println!(
+            "[color-picker] get image ok: label {}, bytes {}",
+            requested_label,
+            bytes.len()
+        ),
+        Err(err) => println!("[color-picker] get image failed: {err}"),
+    }
+    result
+}
+
 /// 清理截图缓存（由 api.rs finish 命令调用）
 pub fn clear_capture_cache() {
-    if let Ok(mut cache) = CACHED_CAPTURE.lock() {
-        *cache = None;
+    if let Ok(mut cache) = CACHED_CAPTURES.lock() {
+        cache.clear();
     }
 }
 
-/// 截取主屏幕并保留为 RGBA 像素数据
-fn capture_primary_screen(app: &tauri::AppHandle) -> Result<ColorPickerCapture, String> {
-    let started = Instant::now();
-    let monitor = app
-        .primary_monitor()
-        .map_err(|e| e.to_string())?
-        .ok_or_else(|| "无法获取主屏幕".to_string())?;
+pub fn active_overlay_labels() -> Vec<String> {
+    ACTIVE_OVERLAY_LABELS
+        .lock()
+        .map(|labels| labels.clone())
+        .unwrap_or_else(|_| vec![OVERLAY_LABEL.to_string()])
+}
 
+fn show_main_window(app: &tauri::AppHandle) {
+    if let Some(main) = app.get_webview_window("main") {
+        let _ = main.show();
+        let _ = main.set_focus();
+    }
+}
+
+fn overlay_label(index: usize) -> String {
+    if index == 0 {
+        OVERLAY_LABEL.to_string()
+    } else {
+        format!("{OVERLAY_LABEL}-{index}")
+    }
+}
+
+fn cursor_position() -> Option<POINT> {
+    let mut point = POINT::default();
+    unsafe { GetCursorPos(&mut point) }.ok()?;
+    Some(point)
+}
+
+/// 截取所有屏幕并保留为 RGBA 像素数据
+fn capture_all_screens(
+    app: &tauri::AppHandle,
+) -> Result<Vec<(Monitor, ColorPickerCapture)>, String> {
+    let monitors = app.available_monitors().map_err(|e| e.to_string())?;
+    monitors
+        .into_iter()
+        .map(|monitor| {
+            let capture = capture_monitor(&monitor)?;
+            Ok((monitor, capture))
+        })
+        .collect()
+}
+
+/// 截取指定屏幕并保留为 RGBA 像素数据
+fn capture_monitor(monitor: &Monitor) -> Result<ColorPickerCapture, String> {
+    let started = Instant::now();
     let size = monitor.size();
     let scale_factor = monitor.scale_factor();
     let width = size.width;
