@@ -219,6 +219,9 @@
     await startColorPickerFlow({
       beforeStart: resetLauncherState,
       onCancel: requestInputFocusWithRetry,
+      closeOnSuccess: false,
+      restoreMainWindow: false,
+      useToastOverlay: true,
     });
   };
 

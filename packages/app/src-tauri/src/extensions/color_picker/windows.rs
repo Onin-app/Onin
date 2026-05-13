@@ -1,4 +1,5 @@
 use super::ColorPickerCapture;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{LazyLock, Mutex};
 use std::time::Instant;
 use tauri::{Emitter, LogicalPosition, LogicalSize, Manager, WebviewUrl, WebviewWindowBuilder};
@@ -27,11 +28,16 @@ macro_rules! println {
 /// 截图缓存，供 Overlay WebView 读取
 static CACHED_CAPTURE: LazyLock<Mutex<Option<ColorPickerCapture>>> =
     LazyLock::new(|| Mutex::new(None));
+static RESTORE_MAIN_ON_FINISH: AtomicBool = AtomicBool::new(true);
 
 /// 启动取色流程（async 版本，避免阻塞事件循环）
-pub async fn start_color_picker(app: tauri::AppHandle) -> Result<(), String> {
+pub async fn start_color_picker(
+    app: tauri::AppHandle,
+    restore_main_window: bool,
+) -> Result<(), String> {
     let started = Instant::now();
     println!("[color-picker] start requested");
+    RESTORE_MAIN_ON_FINISH.store(restore_main_window, Ordering::Relaxed);
 
     let main_window = app.get_webview_window("main");
     let main_hwnd = main_window
@@ -147,6 +153,10 @@ pub async fn start_color_picker(app: tauri::AppHandle) -> Result<(), String> {
     );
 
     Ok(())
+}
+
+pub fn should_restore_main_on_finish() -> bool {
+    RESTORE_MAIN_ON_FINISH.load(Ordering::Relaxed)
 }
 
 fn hide_main_window_for_capture(main: &tauri::WebviewWindow) {

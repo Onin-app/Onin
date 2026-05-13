@@ -70,7 +70,11 @@
         "execute_command_by_name",
         async (event) => {
           if (event.payload === "extension:color:pick") {
-            await startColorPickerFlow();
+            await startColorPickerFlow({
+              closeOnSuccess: false,
+              restoreMainWindow: false,
+              useToastOverlay: true,
+            });
             return;
           }
 

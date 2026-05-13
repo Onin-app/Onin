@@ -258,7 +258,7 @@
     isPicking = true;
 
     try {
-      await invoke("start_color_picker");
+      await invoke("start_color_picker", { restoreMainWindow: true });
     } catch (error) {
       isPicking = false;
       const message = error instanceof Error ? error.message : String(error);

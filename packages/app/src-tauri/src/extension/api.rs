@@ -92,8 +92,12 @@ pub fn get_color_conversion(input: String) -> Option<crate::extensions::color::C
 
 /// 启动取色流程：截图主屏幕 → 隐藏主窗口 → 打开全屏 Overlay 窗口
 #[command]
-pub async fn start_color_picker(app: AppHandle) -> Result<(), String> {
-    crate::extensions::color_picker::start_color_picker(app).await
+pub async fn start_color_picker(
+    app: AppHandle,
+    restore_main_window: Option<bool>,
+) -> Result<(), String> {
+    crate::extensions::color_picker::start_color_picker(app, restore_main_window.unwrap_or(true))
+        .await
 }
 
 /// Overlay WebView 启动后调用，获取截图数据
@@ -124,6 +128,8 @@ pub async fn finish_color_picker(app: AppHandle, hex: Option<String>) -> Result<
 
     // 将 hex 转换为完整颜色信息
     let picked_color = hex.and_then(|value| crate::extensions::color::convert_color_value(&value));
+    let should_restore_main =
+        crate::extensions::color_picker::should_restore_main_on_finish() || picked_color.is_none();
 
     // 先广播结果 —— 此时 IPC 响应可以正常返回给 Overlay JS
     app.emit("color_picker_result", picked_color)
@@ -135,9 +141,11 @@ pub async fn finish_color_picker(app: AppHandle, hex: Option<String>) -> Result<
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_millis(80)).await;
 
-        if let Some(main) = app_clone.get_webview_window("main") {
-            let _ = main.show();
-            let _ = main.set_focus();
+        if should_restore_main {
+            if let Some(main) = app_clone.get_webview_window("main") {
+                let _ = main.show();
+                let _ = main.set_focus();
+            }
         }
 
         tokio::time::sleep(std::time::Duration::from_millis(32)).await;

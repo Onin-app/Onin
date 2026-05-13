@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { toast } from "svelte-sonner";
 import type { ColorConversion } from "$lib/type";
+import { showToastOverlay } from "$lib/utils/toastOverlay";
 
 let isPicking = false;
 
@@ -10,6 +11,8 @@ interface StartColorPickerFlowOptions {
   onCancel?: () => void;
   onSuccess?: (color: ColorConversion) => void | Promise<void>;
   closeOnSuccess?: boolean;
+  restoreMainWindow?: boolean;
+  useToastOverlay?: boolean;
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -27,11 +30,17 @@ function getErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
+function wait(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 export async function startColorPickerFlow({
   beforeStart,
   onCancel,
   onSuccess,
   closeOnSuccess = true,
+  restoreMainWindow = true,
+  useToastOverlay = false,
 }: StartColorPickerFlowOptions = {}) {
   if (isPicking) return;
 
@@ -64,10 +73,33 @@ export async function startColorPickerFlow({
           await invoke("plugin_clipboard_write_text", {
             options: { text: event.payload.hex },
           });
-          toast.success(`${event.payload.hex} 已复制`);
+          const message = `${event.payload.hex} 已复制`;
+          if (useToastOverlay) {
+            await wait(140);
+            await showToastOverlay(message, {
+              kind: "success",
+              duration: 1400,
+            }).catch((error) => {
+              console.error(
+                "[ColorPicker] Failed to show toast overlay:",
+                error,
+              );
+            });
+          } else {
+            toast.success(message);
+          }
         } catch (error) {
           console.error("[ColorPicker] Failed to copy picked color:", error);
-          toast.error(`${event.payload.hex} 已取色，复制失败`);
+          const message = `${event.payload.hex} 已取色，复制失败`;
+          if (useToastOverlay) {
+            await wait(140);
+            await showToastOverlay(message, {
+              kind: "error",
+              duration: 1800,
+            }).catch(() => toast.error(message));
+          } else {
+            toast.error(message);
+          }
         }
 
         await onSuccess?.(event.payload);
@@ -78,7 +110,7 @@ export async function startColorPickerFlow({
       },
     );
 
-    await invoke("start_color_picker");
+    await invoke("start_color_picker", { restoreMainWindow });
   } catch (error) {
     isPicking = false;
     cleanupListener();

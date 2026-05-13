@@ -26,8 +26,8 @@ pub struct ColorPickerCapture {
 // ── Windows ──────────────────────────────────────────────────────────────────
 
 #[cfg(target_os = "windows")]
-pub async fn start_color_picker(app: AppHandle) -> Result<(), String> {
-    windows::start_color_picker(app).await
+pub async fn start_color_picker(app: AppHandle, restore_main_window: bool) -> Result<(), String> {
+    windows::start_color_picker(app, restore_main_window).await
 }
 
 #[cfg(target_os = "windows")]
@@ -40,10 +40,15 @@ pub fn clear_capture_cache() {
     windows::clear_capture_cache();
 }
 
+#[cfg(target_os = "windows")]
+pub fn should_restore_main_on_finish() -> bool {
+    windows::should_restore_main_on_finish()
+}
+
 // ── macOS（未实现）──────────────────────────────────────────────────────────
 
 #[cfg(target_os = "macos")]
-pub async fn start_color_picker(_app: AppHandle) -> Result<(), String> {
+pub async fn start_color_picker(_app: AppHandle, _restore_main_window: bool) -> Result<(), String> {
     Err("macOS 取色暂未实现".to_string())
 }
 
@@ -54,11 +59,16 @@ pub fn get_color_picker_capture() -> Result<ColorPickerCapture, String> {
 
 #[cfg(target_os = "macos")]
 pub fn clear_capture_cache() {}
+
+#[cfg(target_os = "macos")]
+pub fn should_restore_main_on_finish() -> bool {
+    true
+}
 
 // ── Linux（未实现）──────────────────────────────────────────────────────────
 
 #[cfg(target_os = "linux")]
-pub async fn start_color_picker(_app: AppHandle) -> Result<(), String> {
+pub async fn start_color_picker(_app: AppHandle, _restore_main_window: bool) -> Result<(), String> {
     Err("Linux 取色暂未实现".to_string())
 }
 
@@ -69,11 +79,16 @@ pub fn get_color_picker_capture() -> Result<ColorPickerCapture, String> {
 
 #[cfg(target_os = "linux")]
 pub fn clear_capture_cache() {}
+
+#[cfg(target_os = "linux")]
+pub fn should_restore_main_on_finish() -> bool {
+    true
+}
 
 // ── 其他平台 ─────────────────────────────────────────────────────────────────
 
 #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-pub async fn start_color_picker(_app: AppHandle) -> Result<(), String> {
+pub async fn start_color_picker(_app: AppHandle, _restore_main_window: bool) -> Result<(), String> {
     Err("当前平台不支持取色".to_string())
 }
 
@@ -84,3 +99,8 @@ pub fn get_color_picker_capture() -> Result<ColorPickerCapture, String> {
 
 #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
 pub fn clear_capture_cache() {}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+pub fn should_restore_main_on_finish() -> bool {
+    true
+}

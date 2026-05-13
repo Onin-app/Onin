@@ -25,6 +25,7 @@ mod shortcut_manager;
 mod state;
 mod system_commands;
 mod telemetry;
+mod toast_overlay;
 mod tray_manager;
 mod unified_launch_manager;
 mod usage_tracker;

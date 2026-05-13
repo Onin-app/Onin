@@ -5,8 +5,8 @@
 
 use crate::{
     app_config, command_manager, extension, file_command_manager, file_search, plugin, plugin_api,
-    shortcut_manager, system_commands, tray_manager, unified_launch_manager, usage_tracker,
-    window_manager,
+    shortcut_manager, system_commands, toast_overlay, tray_manager, unified_launch_manager,
+    usage_tracker, window_manager,
 };
 
 /// 生成包含所有 Tauri 命令的 invoke handler
@@ -21,6 +21,7 @@ pub fn get_invoke_handler(
         window_manager::acquire_window_close_lock,
         window_manager::release_window_close_lock,
         window_manager::close_main_window,
+        toast_overlay::show_toast_overlay,
         // Tray manager
         tray_manager::set_tray_visibility,
         tray_manager::is_tray_visible,
