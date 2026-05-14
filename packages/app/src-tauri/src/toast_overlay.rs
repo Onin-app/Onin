@@ -1,10 +1,14 @@
 use serde::Serialize;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::{Emitter, LogicalPosition, Manager, WebviewUrl, WebviewWindowBuilder};
 
 const TOAST_OVERLAY_LABEL: &str = "toast-overlay";
 const TOAST_WIDTH: f64 = 420.0;
 const TOAST_HEIGHT: f64 = 112.0;
 const TOAST_TOP_MARGIN: f64 = 76.0;
+const TOAST_HIDE_PADDING_MS: u64 = 420;
+
+static TOAST_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -26,6 +30,7 @@ pub async fn show_toast_overlay(
         kind: kind.unwrap_or_else(|| "success".to_string()),
         duration: duration.unwrap_or(1400),
     };
+    let sequence = TOAST_SEQUENCE.fetch_add(1, Ordering::Relaxed) + 1;
 
     let position = toast_position(&app).await;
 
@@ -33,12 +38,14 @@ pub async fn show_toast_overlay(
         if let Some((x, y)) = position {
             let _ = window.set_position(LogicalPosition::new(x, y));
         }
+        let _ = window.set_ignore_cursor_events(true);
         let _ = window.show();
         let window_clone = window.clone();
         tauri::async_runtime::spawn(async move {
             tokio::time::sleep(std::time::Duration::from_millis(80)).await;
             let _ = window_clone.emit("toast_overlay_show", payload);
         });
+        schedule_overlay_hide(window, sequence, duration.unwrap_or(1400));
         return Ok(());
     }
 
@@ -63,13 +70,28 @@ pub async fn show_toast_overlay(
     }
     .build()
     .map_err(|err| err.to_string())?;
+    let _ = window.set_ignore_cursor_events(true);
     let window_clone = window.clone();
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         let _ = window_clone.show();
     });
+    schedule_overlay_hide(window, sequence, duration.unwrap_or(1400));
 
     Ok(())
+}
+
+fn schedule_overlay_hide(window: tauri::WebviewWindow, sequence: u64, duration: u64) {
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_millis(
+            duration + TOAST_HIDE_PADDING_MS,
+        ))
+        .await;
+
+        if TOAST_SEQUENCE.load(Ordering::Relaxed) == sequence {
+            let _ = window.hide();
+        }
+    });
 }
 
 fn toast_query(payload: &ToastOverlayPayload) -> String {

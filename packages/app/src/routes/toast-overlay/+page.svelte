@@ -12,16 +12,15 @@
   }
 
   const TOAST_ID = "toast-overlay";
+  const SONNER_AUTO_DISMISS_MS = 60_000;
   let hideTimer: number | undefined;
 
   function showToast(payload: ToastOverlayPayload) {
     window.clearTimeout(hideTimer);
 
-    toast.dismiss(TOAST_ID);
-
     const options = {
       id: TOAST_ID,
-      duration: payload.duration || 1400,
+      duration: Math.max(SONNER_AUTO_DISMISS_MS, payload.duration || 1400),
     };
     switch (payload.kind) {
       case "success":
@@ -45,7 +44,7 @@
       () => {
         toast.dismiss(TOAST_ID);
         getCurrentWindow()
-          .close()
+          .hide()
           .catch(() => {});
       },
       (payload.duration || 1400) + 420,
