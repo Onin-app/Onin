@@ -1,17 +1,23 @@
 use super::ColorPickerCapture;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{LazyLock, Mutex};
-use std::time::Instant;
-use tauri::{Emitter, Manager, Monitor, WebviewUrl, WebviewWindowBuilder};
+use std::time::{Duration, Instant};
+use tauri::{Emitter, EventTarget, Manager, Monitor, WebviewUrl, WebviewWindowBuilder};
 use windows::Win32::Foundation::{HWND, POINT, RECT};
 use windows::Win32::Graphics::Dwm::DwmFlush;
 use windows::Win32::Graphics::Gdi::{
     BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDC, GetDIBits,
     ReleaseDC, SelectObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, SRCCOPY,
 };
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    GetAsyncKeyState, VIRTUAL_KEY, VK_DOWN, VK_ESCAPE, VK_LEFT, VK_RETURN, VK_RIGHT, VK_SHIFT,
+    VK_UP,
+};
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetCursorPos, GetWindowRect, IsWindowVisible, ShowWindow, SW_HIDE,
+    BringWindowToTop, GetCursorPos, GetWindowRect, IsWindowVisible, SetForegroundWindow,
+    ShowWindow, SW_HIDE,
 };
 
 const OVERLAY_LABEL: &str = "color-picker-overlay";
@@ -30,8 +36,20 @@ macro_rules! println {
 static CACHED_CAPTURES: LazyLock<Mutex<HashMap<String, ColorPickerCapture>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 static ACTIVE_OVERLAY_LABELS: LazyLock<Mutex<Vec<String>>> = LazyLock::new(|| Mutex::new(vec![]));
+static ACTIVE_OVERLAY_SPECS: LazyLock<Mutex<Vec<OverlaySpec>>> =
+    LazyLock::new(|| Mutex::new(vec![]));
 static RESTORE_MAIN_ON_FINISH: AtomicBool = AtomicBool::new(true);
+static KEYBOARD_POLL_ACTIVE: AtomicBool = AtomicBool::new(false);
 
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ColorPickerKeyboardEvent {
+    target_label: String,
+    key: &'static str,
+    shift_key: bool,
+}
+
+#[derive(Clone)]
 struct OverlaySpec {
     label: String,
     position: tauri::PhysicalPosition<i32>,
@@ -141,6 +159,12 @@ pub async fn start_color_picker(
             .map(|spec| spec.label.clone())
             .collect();
     }
+    {
+        let mut specs = ACTIVE_OVERLAY_SPECS
+            .lock()
+            .map_err(|_| "窗口状态锁定失败".to_string())?;
+        *specs = overlay_specs.clone();
+    }
     println!("[color-picker] capture cached");
 
     for spec in &mut overlay_specs {
@@ -205,11 +229,13 @@ pub async fn start_color_picker(
         .or_else(|| overlay_specs.first());
 
     if let Some(spec) = focused_spec {
+        start_keyboard_polling(app.clone());
+
         if let Some(overlay) = app.get_webview_window(&spec.label) {
             let overlay_clone = overlay.clone();
             tauri::async_runtime::spawn(async move {
                 tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-                let _ = overlay_clone.set_focus();
+                focus_overlay_window(&overlay_clone);
             });
         }
     }
@@ -224,6 +250,118 @@ pub async fn start_color_picker(
 
 pub fn should_restore_main_on_finish() -> bool {
     RESTORE_MAIN_ON_FINISH.load(Ordering::Relaxed)
+}
+
+pub fn focus_color_picker_overlay(app: &tauri::AppHandle, label: Option<String>) {
+    let target_label = label.unwrap_or_else(|| OVERLAY_LABEL.to_string());
+    if let Some(overlay) = app.get_webview_window(&target_label) {
+        focus_overlay_window(&overlay);
+    }
+}
+
+fn focus_overlay_window(overlay: &tauri::WebviewWindow) {
+    let _ = overlay.set_focus();
+
+    if let Ok(hwnd) = overlay.hwnd() {
+        unsafe {
+            let native_hwnd = HWND(hwnd.0 as isize);
+            let _ = BringWindowToTop(native_hwnd);
+            let _ = SetForegroundWindow(native_hwnd);
+        }
+    }
+}
+
+fn start_keyboard_polling(app: tauri::AppHandle) {
+    if KEYBOARD_POLL_ACTIVE
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return;
+    }
+
+    tauri::async_runtime::spawn(async move {
+        let mut last_escape = false;
+        let mut last_enter = false;
+        let mut last_arrow_emit = Instant::now()
+            .checked_sub(Duration::from_millis(120))
+            .unwrap_or_else(Instant::now);
+
+        while KEYBOARD_POLL_ACTIVE.load(Ordering::SeqCst) {
+            let shift_key = key_down(VK_SHIFT);
+            let escape = key_down(VK_ESCAPE);
+            let enter = key_down(VK_RETURN);
+
+            if escape && !last_escape {
+                emit_keyboard_event(&app, "Escape", shift_key);
+            }
+            if enter && !last_enter {
+                emit_keyboard_event(&app, "Enter", shift_key);
+            }
+
+            let now = Instant::now();
+            if now.duration_since(last_arrow_emit) >= Duration::from_millis(24) {
+                if key_down(VK_UP) {
+                    emit_keyboard_event(&app, "ArrowUp", shift_key);
+                    last_arrow_emit = now;
+                }
+                if key_down(VK_DOWN) {
+                    emit_keyboard_event(&app, "ArrowDown", shift_key);
+                    last_arrow_emit = now;
+                }
+                if key_down(VK_LEFT) {
+                    emit_keyboard_event(&app, "ArrowLeft", shift_key);
+                    last_arrow_emit = now;
+                }
+                if key_down(VK_RIGHT) {
+                    emit_keyboard_event(&app, "ArrowRight", shift_key);
+                    last_arrow_emit = now;
+                }
+            }
+
+            last_escape = escape;
+            last_enter = enter;
+            tokio::time::sleep(Duration::from_millis(12)).await;
+        }
+    });
+}
+
+fn stop_keyboard_polling() {
+    KEYBOARD_POLL_ACTIVE.store(false, Ordering::SeqCst);
+}
+
+fn emit_keyboard_event(app: &tauri::AppHandle, key: &'static str, shift_key: bool) {
+    let target_label = current_keyboard_target_label();
+    let _ = app.emit_to(
+        EventTarget::webview_window(target_label.clone()),
+        "color_picker_keyboard",
+        ColorPickerKeyboardEvent {
+            target_label,
+            key,
+            shift_key,
+        },
+    );
+}
+
+fn key_down(key: VIRTUAL_KEY) -> bool {
+    unsafe { GetAsyncKeyState(key.0 as i32) < 0 }
+}
+
+fn current_keyboard_target_label() -> String {
+    let Some(point) = cursor_position() else {
+        return OVERLAY_LABEL.to_string();
+    };
+
+    ACTIVE_OVERLAY_SPECS
+        .lock()
+        .ok()
+        .and_then(|specs| {
+            specs
+                .iter()
+                .find(|spec| spec.contains_physical_point(point))
+                .or_else(|| specs.first())
+                .map(|spec| spec.label.clone())
+        })
+        .unwrap_or_else(|| OVERLAY_LABEL.to_string())
 }
 
 fn hide_main_window_for_capture(main: &tauri::WebviewWindow) {
@@ -507,8 +645,12 @@ pub fn get_color_picker_image(label: Option<String>) -> Result<Vec<u8>, String> 
 
 /// 清理截图缓存（由 api.rs finish 命令调用）
 pub fn clear_capture_cache() {
+    stop_keyboard_polling();
     if let Ok(mut cache) = CACHED_CAPTURES.lock() {
         cache.clear();
+    }
+    if let Ok(mut specs) = ACTIVE_OVERLAY_SPECS.lock() {
+        specs.clear();
     }
 }
 

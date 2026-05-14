@@ -123,6 +123,12 @@ pub fn get_color_picker_image(label: Option<String>) -> Result<tauri::ipc::Respo
     Ok(tauri::ipc::Response::new(image))
 }
 
+/// Overlay WebView 显示后调用，确保键盘事件进入取色窗口
+#[command]
+pub fn focus_color_picker_overlay(app: AppHandle, label: Option<String>) {
+    crate::extensions::color_picker::focus_color_picker_overlay(&app, label);
+}
+
 /// 用户点击取色或取消后由 Overlay WebView 调用
 /// - hex: Some(value) 表示已取色，None 表示已取消
 ///
@@ -139,8 +145,7 @@ pub async fn finish_color_picker(app: AppHandle, hex: Option<String>) -> Result<
 
     // 将 hex 转换为完整颜色信息
     let picked_color = hex.and_then(|value| crate::extensions::color::convert_color_value(&value));
-    let should_restore_main =
-        crate::extensions::color_picker::should_restore_main_on_finish() || picked_color.is_none();
+    let should_restore_main = crate::extensions::color_picker::should_restore_main_on_finish();
 
     // 先广播结果 —— 此时 IPC 响应可以正常返回给 Overlay JS
     app.emit("color_picker_result", picked_color)

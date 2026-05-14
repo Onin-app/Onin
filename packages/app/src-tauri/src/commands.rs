@@ -168,6 +168,7 @@ pub fn get_invoke_handler(
         extension::api::start_color_picker,
         extension::api::get_color_picker_capture,
         extension::api::get_color_picker_image,
+        extension::api::focus_color_picker_overlay,
         extension::api::finish_color_picker,
         // Keyboard simulation
         system_commands::simulate_paste,

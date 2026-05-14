@@ -55,6 +55,11 @@ pub fn should_restore_main_on_finish() -> bool {
     windows::should_restore_main_on_finish()
 }
 
+#[cfg(target_os = "windows")]
+pub fn focus_color_picker_overlay(app: &AppHandle, label: Option<String>) {
+    windows::focus_color_picker_overlay(app, label);
+}
+
 // ── macOS（未实现）──────────────────────────────────────────────────────────
 
 #[cfg(target_os = "macos")]
@@ -84,6 +89,9 @@ pub fn active_overlay_labels() -> Vec<String> {
 pub fn should_restore_main_on_finish() -> bool {
     true
 }
+
+#[cfg(target_os = "macos")]
+pub fn focus_color_picker_overlay(_app: &AppHandle, _label: Option<String>) {}
 
 // ── Linux（未实现）──────────────────────────────────────────────────────────
 
@@ -115,6 +123,9 @@ pub fn should_restore_main_on_finish() -> bool {
     true
 }
 
+#[cfg(target_os = "linux")]
+pub fn focus_color_picker_overlay(_app: &AppHandle, _label: Option<String>) {}
+
 // ── 其他平台 ─────────────────────────────────────────────────────────────────
 
 #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
@@ -144,3 +155,6 @@ pub fn active_overlay_labels() -> Vec<String> {
 pub fn should_restore_main_on_finish() -> bool {
     true
 }
+
+#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+pub fn focus_color_picker_overlay(_app: &AppHandle, _label: Option<String>) {}

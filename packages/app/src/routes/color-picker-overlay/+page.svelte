@@ -8,7 +8,7 @@
    * - 左键点击 → 取色并返回 hex
    * - Esc / 右键 → 取消
    */
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { listen, type UnlistenFn } from "@tauri-apps/api/event";
   import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -23,6 +23,12 @@
     scaleFactor: number;
   }
 
+  interface ColorPickerKeyboardEvent {
+    targetLabel: string;
+    key: string;
+    shiftKey: boolean;
+  }
+
   // ── 放大镜配置 ──────────────────────────────────────────────────────────────
 
   const GRID_RADIUS = 7;
@@ -33,6 +39,8 @@
   const LOUPE_H = GRID_PX + LABEL_H + 16; // 199
   const OFFSET = 22;
   const MARGIN = 16;
+  const KEYBOARD_STEP = 1;
+  const KEYBOARD_FAST_STEP = 10;
 
   // ── 状态 ────────────────────────────────────────────────────────────────────
 
@@ -229,9 +237,19 @@
     scheduleRedraw();
   }
 
+  function moveCursor(dx: number, dy: number) {
+    if (!canvas) return;
+
+    mouseX = Math.max(0, Math.min(canvas.width - 1, mouseX + dx));
+    mouseY = Math.max(0, Math.min(canvas.height - 1, mouseY + dy));
+    scheduleRedraw();
+  }
+
   function onPointerDown(e: PointerEvent) {
     e.preventDefault();
     e.stopPropagation();
+    canvas?.focus();
+
     if (e.button === 0) {
       finish(currentHex);
     } else {
@@ -245,11 +263,41 @@
     finish(null);
   }
 
-  function onKeyDown(e: KeyboardEvent) {
-    if (e.key === "Escape") {
-      e.preventDefault();
+  function handleKeyboardAction(key: string, shiftKey: boolean) {
+    if (key === "Escape") {
       finish(null);
+      return;
     }
+
+    if (key === "Enter") {
+      finish(samplePixel(mouseX, mouseY).hex);
+      return;
+    }
+
+    const step = shiftKey ? KEYBOARD_FAST_STEP : KEYBOARD_STEP;
+    switch (key) {
+      case "ArrowUp":
+        moveCursor(0, -step);
+        break;
+      case "ArrowDown":
+        moveCursor(0, step);
+        break;
+      case "ArrowLeft":
+        moveCursor(-step, 0);
+        break;
+      case "ArrowRight":
+        moveCursor(step, 0);
+        break;
+    }
+  }
+
+  function onKeyDown(e: KeyboardEvent) {
+    if (e.key !== "Escape" && e.key !== "Enter" && !e.key.startsWith("Arrow")) {
+      return;
+    }
+
+    e.preventDefault();
+    handleKeyboardAction(e.key, e.shiftKey);
   }
 
   // ── 结束取色 ────────────────────────────────────────────────────────────────
@@ -399,7 +447,10 @@
 
       const currentWindow = getCurrentWindow();
       await currentWindow.show();
-      currentWindow.setFocus().catch(() => {});
+      await currentWindow.setFocus().catch(() => {});
+      await invoke("focus_color_picker_overlay", { label }).catch(() => {});
+      await tick();
+      canvas?.focus();
       loading = false;
     } catch (e) {
       console.error("加载截图像素失败", e);
@@ -410,6 +461,7 @@
 
   onMount(() => {
     let unlistenCaptureReady: UnlistenFn | undefined;
+    let unlistenKeyboard: UnlistenFn | undefined;
 
     listen("color_picker_capture_ready", () => {
       init();
@@ -417,10 +469,19 @@
       unlistenCaptureReady = fn;
     });
 
+    listen<ColorPickerKeyboardEvent>("color_picker_keyboard", (event) => {
+      if (done || event.payload.targetLabel !== getCurrentWindow().label)
+        return;
+      handleKeyboardAction(event.payload.key, event.payload.shiftKey);
+    }).then((fn) => {
+      unlistenKeyboard = fn;
+    });
+
     init();
 
     return () => {
       unlistenCaptureReady?.();
+      unlistenKeyboard?.();
       releaseCaptureResources();
     };
   });
@@ -431,8 +492,10 @@
 <canvas
   bind:this={canvas}
   class="overlay-canvas"
+  tabindex="0"
   onpointermove={onPointerMove}
   onpointerdown={onPointerDown}
+  onkeydown={onKeyDown}
 ></canvas>
 
 <style>
