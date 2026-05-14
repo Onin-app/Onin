@@ -86,8 +86,16 @@ pub fn get_emoji_data(search_query: String) -> Option<EmojiGridData> {
 }
 
 #[command]
-pub fn get_color_conversion(input: String) -> Option<crate::extensions::color::ColorConversion> {
-    crate::extensions::color::convert_color_value(&input)
+pub fn get_color_conversion(
+    input: String,
+    parse_mode: Option<String>,
+) -> Option<crate::extensions::color::ColorConversion> {
+    let mode = match parse_mode.as_deref() {
+        Some("full") => crate::extensions::color::ColorParseMode::Full,
+        _ => crate::extensions::color::ColorParseMode::Launcher,
+    };
+
+    crate::extensions::color::convert_color_value_with_mode(&input, mode)
 }
 
 /// 启动取色流程：截图主屏幕 → 隐藏主窗口 → 打开全屏 Overlay 窗口

@@ -99,9 +99,10 @@
   let headerRef: ExtensionHeader;
   let loadRequestId = 0;
   let isPicking = $state(false);
+  let lastLoadedUrlQuery = "";
 
   const initialQuery = $derived($page.url.searchParams.get("q") || "#ff5500");
-  const colorValue = $derived(conversion?.hex.slice(0, 7) || "#ff5500");
+  const colorValue = $derived(conversion?.hex || "#ff5500");
   const swatches = [
     "#EF4444",
     "#F97316",
@@ -134,17 +135,9 @@
     const [H, S, V] = rgbToHsv(r, g, b);
     const [Hw, W, Bl] = rgbToHwb(r, g, b);
     const [L, C, lH] = rgbToOklch(r, g, b);
-    const hexFull =
-      a < 0.999
-        ? `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}${Math.round(
-            a * 255,
-          )
-            .toString(16)
-            .padStart(2, "0")}`.toUpperCase()
-        : hex;
 
     return [
-      { group: "Web 标准", label: "HEX", value: hexFull },
+      { group: "Web 标准", label: "HEX", value: hex },
       { group: "Web 标准", label: "RGB", value: rgb },
       { group: "Web 标准", label: "HSL", value: hsl },
       {
@@ -203,7 +196,7 @@
     try {
       const next = await invoke<ColorConversion | null>(
         "get_color_conversion",
-        { input: value },
+        { input: value, parseMode: "full" },
       );
       if (requestId !== loadRequestId) return;
       conversion = next;
@@ -267,8 +260,13 @@
     }
   }
 
-  onMount(() => {
+  $effect(() => {
+    if (initialQuery === lastLoadedUrlQuery) return;
+    lastLoadedUrlQuery = initialQuery;
     loadColor(initialQuery);
+  });
+
+  onMount(() => {
     headerRef?.focus();
 
     let unlisten: UnlistenFn | undefined;
@@ -419,7 +417,24 @@
     position: relative;
     height: 108px;
     border-radius: 12px;
-    background: var(--c);
+    background-image:
+      linear-gradient(var(--c), var(--c)),
+      linear-gradient(45deg, rgb(214 214 214) 25%, transparent 25%),
+      linear-gradient(-45deg, rgb(214 214 214) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, rgb(214 214 214) 75%),
+      linear-gradient(-45deg, transparent 75%, rgb(214 214 214) 75%);
+    background-position:
+      0 0,
+      0 0,
+      0 8px,
+      8px -8px,
+      -8px 0;
+    background-size:
+      auto,
+      16px 16px,
+      16px 16px,
+      16px 16px,
+      16px 16px;
     color: var(--ct);
     overflow: hidden;
     flex-shrink: 0;
