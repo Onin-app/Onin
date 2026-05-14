@@ -559,6 +559,14 @@ impl Extension for ColorExtension {
         }
     }
 
+    fn execute_command(&self, command_code: &str, input: &str) -> ExtensionResult {
+        match command_code {
+            "convert" => self.execute(input),
+            "pick" => ExtensionResult::error("取色命令需要由前端交互流程处理".to_string()),
+            _ => ExtensionResult::error(format!("未知命令: {}", command_code)),
+        }
+    }
+
     fn preview(&self, input: &str) -> Option<ExtensionPreview> {
         let color = parse_color(input, ColorParseMode::Launcher)?;
         let hex = color.hex();
@@ -620,6 +628,24 @@ mod tests {
                 .hsl(),
             "hsl(20, 100%, 50%)"
         );
+    }
+
+    #[test]
+    fn dispatches_declared_commands_explicitly() {
+        let convert = COLOR_EXTENSION.execute_command("convert", "#ff5500");
+        assert!(convert.success);
+        assert_eq!(convert.copyable.as_deref(), Some("#FF5500"));
+
+        let pick = COLOR_EXTENSION.execute_command("pick", "");
+        assert!(!pick.success);
+        assert_eq!(
+            pick.error.as_deref(),
+            Some("取色命令需要由前端交互流程处理")
+        );
+
+        let unknown = COLOR_EXTENSION.execute_command("unknown", "");
+        assert!(!unknown.success);
+        assert_eq!(unknown.error.as_deref(), Some("未知命令: unknown"));
     }
 
     #[test]
