@@ -54,11 +54,6 @@ impl crate::extension::registry::Extension for TranslatorExtension {
         &TRANSLATOR_MANIFEST
     }
 
-    /// 实时输入匹配：任何非空文本都可以翻译
-    fn custom_matches(&self, input: &str) -> Option<bool> {
-        Some(!input.trim().is_empty())
-    }
-
     fn execute(&self, input: &str) -> ExtensionResult {
         let text_to_translate = input.trim().to_string();
 
@@ -89,21 +84,7 @@ impl crate::extension::registry::Extension for TranslatorExtension {
         }
     }
 
-    fn preview(&self, input: &str) -> Option<ExtensionPreview> {
-        let trimmed = input.trim();
-        if trimmed.is_empty() {
-            return None;
-        }
-
-        Some(ExtensionPreview {
-            extension_id: "translator".to_string(),
-            command_code: "open".to_string(),
-            title: format!("翻译: {}", trimmed),
-            description: "打开翻译窗口".to_string(),
-            icon: "translate".to_string(),
-            copyable: trimmed.to_string(),
-            view_type: crate::extension::types::PreviewViewType::Single,
-            grid_data: None,
-        })
+    fn preview(&self, _input: &str) -> Option<ExtensionPreview> {
+        None
     }
 }
