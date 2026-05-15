@@ -96,6 +96,26 @@
     }
   };
 
+  const saveToggleShortcut = async () => {
+    try {
+      await invoke("set_toggle_shortcut", { shortcutStr: shortcut });
+      toast.success("快捷键已保存");
+    } catch (error) {
+      console.error("Failed to set toggle shortcut:", error);
+      toast.error("保存快捷键失败");
+    }
+  };
+
+  const saveDetachWindowShortcut = async () => {
+    try {
+      await detachWindowShortcut.setShortcut($detachWindowShortcut);
+      toast.success("快捷键已保存");
+    } catch (error) {
+      console.error("Failed to set detach window shortcut:", error);
+      toast.error("保存快捷键失败");
+    }
+  };
+
   const handleClearUsageStats = async () => {
     if (!confirm("确定要清除所有使用记录吗？此操作不可恢复。")) {
       return;
@@ -226,8 +246,7 @@
           {#snippet content()}
             <ShortcutInput
               bind:value={shortcut}
-              onSave={() =>
-                invoke("set_toggle_shortcut", { shortcutStr: shortcut })}
+              onSave={saveToggleShortcut}
               showPresets={true}
             />
           {/snippet}
@@ -236,8 +255,7 @@
           {#snippet content()}
             <ShortcutInput
               bind:value={$detachWindowShortcut}
-              onSave={() =>
-                detachWindowShortcut.setShortcut($detachWindowShortcut)}
+              onSave={saveDetachWindowShortcut}
               showPresets={false}
             />
           {/snippet}
