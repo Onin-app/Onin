@@ -191,6 +191,8 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.release.outputs.tag }}
 
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-latest'
@@ -219,6 +221,22 @@ jobs:
 
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Verify app version
+        shell: bash
+        run: |
+          APP_VERSION=$(node -p "require('./packages/app/package.json').version")
+          TAURI_VERSION=$(node -p "require('./packages/app/src-tauri/tauri.conf.json').version")
+          CARGO_VERSION=$(grep -m1 '^version = ' packages/app/src-tauri/Cargo.toml | sed -E 's/version = \"([^\"]+)\"/\1/')
+
+          echo "Expected version: ${{ needs.release.outputs.version }}"
+          echo "package.json: $APP_VERSION"
+          echo "tauri.conf.json: $TAURI_VERSION"
+          echo "Cargo.toml: $CARGO_VERSION"
+
+          test "$APP_VERSION" = "${{ needs.release.outputs.version }}"
+          test "$TAURI_VERSION" = "${{ needs.release.outputs.version }}"
+          test "$CARGO_VERSION" = "${{ needs.release.outputs.version }}"
 
       - name: Build inject script
         run: pnpm build:inject

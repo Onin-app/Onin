@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { openExternalLink } from "$lib/utils/link";
   import { Star, Download, Package, GithubLogo } from "phosphor-svelte";
   import { Dialog } from "bits-ui";
   import AppScrollArea from "$lib/components/AppScrollArea.svelte";
@@ -53,18 +54,12 @@
   // 处理 markdown 中的链接点击
   async function handleMarkdownClick(event: MouseEvent) {
     const target = event.target as HTMLElement;
+    const anchor = target.closest("a");
 
-    if (target.tagName === "A") {
-      event.preventDefault();
-      const href = target.getAttribute("href");
-
+    if (anchor) {
+      const href = anchor.getAttribute("href");
       if (href) {
-        try {
-          const { openUrl } = await import("@tauri-apps/plugin-opener");
-          await openUrl(href);
-        } catch (e) {
-          console.error("Failed to open link:", e);
-        }
+        await openExternalLink(href, event);
       }
     }
   }
@@ -299,6 +294,8 @@
                 target="_blank"
                 rel="noopener noreferrer"
                 class="flex items-center gap-2 text-sm text-blue-600 hover:underline dark:text-blue-400"
+                onclick={(e) =>
+                  detail?.repository && openExternalLink(detail.repository, e)}
               >
                 <GithubLogo class="h-4 w-4" />
                 查看源码
