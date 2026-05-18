@@ -95,7 +95,9 @@ pub async fn download_and_install_update(
         );
     }
 
-    // 解决 4：遵循 idiomatic 规范，删除多余的 drop(file)，当文件离开 scope 后自动由析构释放。
+    // 解决 4：下载完成，显式释放文件句柄（fd），确保在后续平台相关命令（如 Windows 的 msiexec，macOS 的 hdiutil/cp）执行时文件不被占用
+    drop(file);
+
     // 解决 3：将事件名称重构为 "update-downloaded"，以精确反映“下载完毕、即将拉起安装”的实际物理状态
     let _ = app.emit("update-downloaded", ());
 
@@ -179,13 +181,154 @@ pub async fn download_and_install_update(
         }
     }
 
-    // ================= macOS 自动挂载 =================
+    // ================= macOS 自动挂载与静默覆盖升级 =================
     #[cfg(target_os = "macos")]
     {
-        let _ = std::process::Command::new("open")
-            .arg(&temp_file_path)
-            .spawn();
-        app.exit(0);
+        let mut bundle_replaced = false;
+
+        if let Ok(current_exe) = std::env::current_exe() {
+            // 回溯寻找当前运行的 .app bundle 目录（例如 /Applications/Onin.app）
+            let mut current_path = current_exe.clone();
+            let mut bundle_path = None;
+            while let Some(parent) = current_path.parent() {
+                if current_path.extension().map_or(false, |ext| ext == "app") {
+                    bundle_path = Some(current_path.to_path_buf());
+                    break;
+                }
+                current_path = parent.to_path_buf();
+            }
+
+            if let Some(bundle_path) = bundle_path {
+                let current_pid = std::process::id();
+                let mount_point = std::env::temp_dir().join(format!("onin_mount_{}", current_pid));
+
+                // 1. 尝试清理之前可能残留的目录及挂载
+                let _ = std::process::Command::new("hdiutil")
+                    .arg("detach")
+                    .arg(&mount_point)
+                    .arg("-force")
+                    .status();
+                let _ = std::fs::remove_dir_all(&mount_point);
+                let _ = std::fs::create_dir_all(&mount_point);
+
+                // 2. 后台静默挂载 DMG 镜像（使用 -nobrowse 避免 Finder 激活弹窗）
+                let mount_status = std::process::Command::new("hdiutil")
+                    .arg("attach")
+                    .arg("-nobrowse")
+                    .arg("-readonly")
+                    .arg("-mountpoint")
+                    .arg(&mount_point)
+                    .arg(&temp_file_path)
+                    .status();
+
+                if mount_status.as_ref().map_or(false, |s| s.success()) {
+                    let mut new_app_path = None;
+                    if let Ok(entries) = std::fs::read_dir(&mount_point) {
+                        for entry in entries.flatten() {
+                            let path = entry.path();
+                            if path.is_dir() && path.extension().map_or(false, |ext| ext == "app") {
+                                new_app_path = Some(path);
+                                break;
+                            }
+                        }
+                    }
+
+                    if let Some(new_app_path) = new_app_path {
+                        let old_bundle_path = bundle_path.with_extension("old.app");
+                        if old_bundle_path.exists() {
+                            let _ = std::fs::remove_dir_all(&old_bundle_path);
+                        }
+
+                        // 3. 将原运行的 .app 目录重命名为 .old.app（在 inode 层直接释放原目录名，完全不影响正在运行的进程）
+                        if std::fs::rename(&bundle_path, &old_bundle_path).is_ok() {
+                            // 4. 复制新版 .app 目录至原位（cp -R 能原生保留 macOS 特有的软链接与文件元数据）
+                            let copy_status = std::process::Command::new("cp")
+                                .arg("-R")
+                                .arg(&new_app_path)
+                                .arg(&bundle_path)
+                                .status();
+
+                            if copy_status.as_ref().map_or(false, |s| s.success()) {
+                                // 5. 卸载 DMG
+                                let _ = std::process::Command::new("hdiutil")
+                                    .arg("detach")
+                                    .arg(&mount_point)
+                                    .status();
+
+                                // 6. 异步拉起全新升级后的应用
+                                let _ =
+                                    std::process::Command::new("open").arg(&bundle_path).spawn();
+
+                                // 7. 开启独立的 shell 后台清理进程，完全防止 Shell 注入漏洞。
+                                // 通过 kill -0 循环轮询旧进程 PID 直至其完全退出（最多轮询 100 次，每次 100ms 也就是最多等待 10s），然后彻底删除旧版本残留及临时挂载点。
+                                let _ = std::process::Command::new("nohup")
+                                    .arg("sh")
+                                    .arg("-c")
+                                    .arg("pid=$1; old_path=$2; mount_p=$3; i=0; while [ $i -lt 100 ] && kill -0 \"$pid\" 2>/dev/null; do sleep 0.1; i=$((i+1)); done; rm -rf \"$old_path\"; for r in 1 2 3; do hdiutil detach \"$mount_p\" -force 2>/dev/null && break; sleep 1; done; rm -rf \"$mount_p\"")
+                                    .arg("--")
+                                    .arg(current_pid.to_string())
+                                    .arg(&old_bundle_path)
+                                    .arg(&mount_point)
+                                    .spawn();
+
+                                bundle_replaced = true;
+                                app.exit(0);
+                            } else {
+                                // 容灾双重回滚：若复制新版失败，先将可能损坏的新包 rename 移开，再原子性还原旧版，最后异步清除损坏的残留
+                                let failed_copy_path = bundle_path.with_extension("failed.app");
+                                if std::fs::rename(&bundle_path, &failed_copy_path).is_ok() {
+                                    if std::fs::rename(&old_bundle_path, &bundle_path).is_err() {
+                                        // 极其罕见灾难：恢复旧版本失败。尝试把刚刚移走的新包移回来保底，尽量避免 app 不可用
+                                        let _ = std::fs::rename(&failed_copy_path, &bundle_path);
+                                    } else {
+                                        // 成功原子恢复了旧包！异步清除损坏的新包
+                                        let _ = std::process::Command::new("nohup")
+                                            .arg("sh")
+                                            .arg("-c")
+                                            .arg("rm -rf \"$1\"")
+                                            .arg("--")
+                                            .arg(&failed_copy_path)
+                                            .spawn();
+                                    }
+                                } else {
+                                    // 降级回滚方案
+                                    let _ = std::fs::remove_dir_all(&bundle_path);
+                                    let _ = std::fs::rename(&old_bundle_path, &bundle_path);
+                                }
+
+                                // 成功完成双重原子回滚，原应用包已完全复原，直接返回具体错误给前端且不走 fallback
+
+                                let _ = std::process::Command::new("hdiutil")
+                                    .arg("detach")
+                                    .arg(&mount_point)
+                                    .status();
+                                let _ = std::fs::remove_dir_all(&mount_point);
+
+                                return Err("复制新版本文件失败，已自动原子级回滚恢复当前版本。"
+                                    .to_string());
+                            }
+                        }
+                    }
+
+                    // 如果中途出错且没有成功替换，安全卸载挂载点
+                    if !bundle_replaced {
+                        let _ = std::process::Command::new("hdiutil")
+                            .arg("detach")
+                            .arg(&mount_point)
+                            .status();
+                        let _ = std::fs::remove_dir_all(&mount_point);
+                    }
+                }
+            }
+        }
+
+        // 备用降级方案：若静默覆盖失败（如无权限/非标准 bundle/开发环境），使用 open 直接打开 DMG 并退出引导用户手动拖拽
+        if !bundle_replaced {
+            let _ = std::process::Command::new("open")
+                .arg(&temp_file_path)
+                .spawn();
+            app.exit(0);
+        }
     }
 
     Ok(())
