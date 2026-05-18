@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from "svelte";
   import { listen, type UnlistenFn } from "@tauri-apps/api/event";
   import { invoke } from "@tauri-apps/api/core";
+  import { openExternalLink } from "$lib/utils/link";
   import { marked } from "marked";
   import { X, ArrowCircleUp, CloudArrowDown, Warning } from "phosphor-svelte";
 
@@ -122,6 +123,18 @@
     }
   });
 
+  // 处理更新日志中的链接点击，在系统默认浏览器中打开
+  async function handleNotesClick(event: MouseEvent) {
+    const target = event.target as HTMLElement;
+    const anchor = target.closest("a");
+    if (anchor) {
+      const href = anchor.getAttribute("href");
+      if (href && (href.startsWith("http://") || href.startsWith("https://"))) {
+        await openExternalLink(href, event);
+      }
+    }
+  }
+
   async function handleStartUpdate() {
     if (downloading) return;
     downloading = true;
@@ -237,8 +250,11 @@
       <!-- 中间内容：更新日志 / 进度条 -->
       <div class="my-5 min-h-0 flex-1">
         {#if !downloading}
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
             class="border-neutral-150 max-h-56 overflow-y-auto rounded-xl border bg-neutral-50/50 p-4 text-sm text-neutral-600 dark:border-neutral-800/60 dark:bg-neutral-950/40 dark:text-neutral-300"
+            onclick={handleNotesClick}
           >
             <div
               class="prose prose-xs dark:prose-invert prose-p:my-1 max-w-none"

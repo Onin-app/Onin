@@ -8,6 +8,8 @@
   } from "phosphor-svelte";
   import type { MarketplacePlugin } from "$lib/types/marketplace";
   import { downloadAndInstallPlugin } from "$lib/api/marketplace";
+  import { invoke } from "@tauri-apps/api/core";
+  import { openExternalLink } from "$lib/utils/link";
   import {
     comparePluginVersions,
     formatPluginVersion,
@@ -154,7 +156,10 @@
           target="_blank"
           rel="noopener noreferrer"
           class="shrink-0 rounded p-1 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-          onclick={(e) => e.stopPropagation()}
+          onclick={(e) => {
+            e.stopPropagation();
+            plugin.repository && openExternalLink(plugin.repository, e);
+          }}
           aria-label="查看 GitHub"
         >
           <GithubLogo class="h-4 w-4" />
