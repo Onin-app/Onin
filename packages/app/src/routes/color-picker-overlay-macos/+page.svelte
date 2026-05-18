@@ -296,13 +296,33 @@
     capture = null;
   }
 
-  function toClampedPixels(buffer: ArrayBuffer | Uint8Array) {
-    if (buffer instanceof ArrayBuffer) return new Uint8ClampedArray(buffer);
-    return new Uint8ClampedArray(
-      buffer.buffer,
-      buffer.byteOffset,
-      buffer.byteLength,
-    );
+  function toClampedPixels(buffer: any): Uint8ClampedArray {
+    if (!buffer) {
+      return new Uint8ClampedArray(0);
+    }
+    if (buffer instanceof Uint8ClampedArray) {
+      return buffer;
+    }
+    if (buffer instanceof ArrayBuffer) {
+      return new Uint8ClampedArray(buffer);
+    }
+    if (buffer.buffer && buffer.buffer instanceof ArrayBuffer) {
+      return new Uint8ClampedArray(
+        buffer.buffer,
+        buffer.byteOffset ?? 0,
+        buffer.byteLength ?? 0,
+      );
+    }
+    if (
+      Array.isArray(buffer) ||
+      (typeof buffer === "object" && typeof buffer.length === "number")
+    ) {
+      return new Uint8ClampedArray(buffer);
+    }
+    if (buffer.data) {
+      return toClampedPixels(buffer.data);
+    }
+    return new Uint8ClampedArray(buffer);
   }
 
   async function init() {
