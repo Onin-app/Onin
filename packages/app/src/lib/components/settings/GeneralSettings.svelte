@@ -10,6 +10,7 @@
   import { Theme, type SortMode, type AppConfig } from "$lib/type";
   import { detachWindowShortcut } from "$lib/stores/shortcuts";
 
+  import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import SetItem from "./SetItem.svelte";
   import ShortcutInput from "./ShortcutInput.svelte";
 
@@ -30,6 +31,8 @@
   let marketplaceApiUrl = $state<string>("");
   let disabledExtensionIds = $state<string[]>([]);
   let appVersion = $state<string>(import.meta.env.PACKAGE_VERSION || "未知");
+  let clearUsageStatsDialogOpen = $state<boolean>(false);
+  let clearingUsageStats = $state<boolean>(false);
 
   const sortModeOptions: {
     value: SortMode;
@@ -119,15 +122,22 @@
   };
 
   const handleClearUsageStats = async () => {
-    if (!confirm("确定要清除所有使用记录吗？此操作不可恢复。")) {
-      return;
-    }
+    clearUsageStatsDialogOpen = true;
+  };
+
+  const confirmClearUsageStats = async () => {
+    if (clearingUsageStats) return;
+
+    clearingUsageStats = true;
     try {
       await invoke("clear_usage_stats");
+      clearUsageStatsDialogOpen = false;
       toast.success("使用记录已清除");
     } catch (error) {
       console.error("Failed to clear usage stats:", error);
       toast.error("清除失败：" + String(error));
+    } finally {
+      clearingUsageStats = false;
     }
   };
 
@@ -482,3 +492,19 @@
     </section>
   </main>
 </AppScrollArea>
+
+<ConfirmDialog
+  bind:open={clearUsageStatsDialogOpen}
+  title="清除使用记录"
+  description="清除后会重置指令使用频率和最近使用数据，此操作不可恢复。"
+  confirmLabel="清除"
+  cancelLabel="取消"
+  loading={clearingUsageStats}
+  closeOnConfirm={false}
+  onConfirm={confirmClearUsageStats}
+  onCancel={() => {
+    if (!clearingUsageStats) {
+      clearUsageStatsDialogOpen = false;
+    }
+  }}
+/>
