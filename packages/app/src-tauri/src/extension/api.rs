@@ -84,3 +84,94 @@ pub fn get_emoji_data(search_query: String) -> Option<EmojiGridData> {
 
     Some(EmojiGridData { groups })
 }
+
+#[command]
+pub fn get_color_conversion(
+    input: String,
+    parse_mode: Option<String>,
+) -> Option<crate::extensions::color::ColorConversion> {
+    let mode = match parse_mode.as_deref() {
+        Some("full") => crate::extensions::color::ColorParseMode::Full,
+        _ => crate::extensions::color::ColorParseMode::Launcher,
+    };
+
+    crate::extensions::color::convert_color_value_with_mode(&input, mode)
+}
+
+/// 启动取色流程：截图主屏幕 → 隐藏主窗口 → 打开全屏 Overlay 窗口
+#[command]
+pub async fn start_color_picker(
+    app: AppHandle,
+    restore_main_window: Option<bool>,
+) -> Result<(), String> {
+    crate::extensions::color_picker::start_color_picker(app, restore_main_window.unwrap_or(true))
+        .await
+}
+
+/// Overlay WebView 启动后调用，获取截图数据
+#[command]
+pub fn get_color_picker_capture(
+    label: Option<String>,
+) -> Result<crate::extensions::color_picker::ColorPickerCapture, String> {
+    crate::extensions::color_picker::get_color_picker_capture(label)
+}
+
+/// Overlay WebView 启动后调用，获取 RGBA 像素数据
+#[command]
+pub fn get_color_picker_image(label: Option<String>) -> Result<tauri::ipc::Response, String> {
+    let image = crate::extensions::color_picker::get_color_picker_image(label)?;
+    Ok(tauri::ipc::Response::new(image))
+}
+
+/// Overlay WebView 显示后调用，确保键盘事件进入取色窗口
+#[command]
+pub fn focus_color_picker_overlay(app: AppHandle, label: Option<String>) {
+    crate::extensions::color_picker::focus_color_picker_overlay(&app, label);
+}
+
+/// 用户点击取色或取消后由 Overlay WebView 调用
+/// - hex: Some(value) 表示已取色，None 表示已取消
+///
+/// # 死锁避免
+/// 该命令由 Overlay 窗口自身的 IPC 调用触发。若在此同步关闭 Overlay 窗口，
+/// 会导致：关窗需要向该窗口消息队列发消息 → 消息队列正在等 IPC 响应 → 死锁。
+/// 解决方案：先 emit 结果（IPC 立即返回），再用 spawn 异步延迟关窗。
+#[command]
+pub async fn finish_color_picker(app: AppHandle, hex: Option<String>) -> Result<(), String> {
+    let overlay_labels = crate::extensions::color_picker::active_overlay_labels();
+
+    // 清理截图缓存
+    crate::extensions::color_picker::clear_capture_cache();
+
+    // 将 hex 转换为完整颜色信息
+    let picked_color = hex.and_then(|value| crate::extensions::color::convert_color_value(&value));
+    let should_restore_main = crate::extensions::color_picker::should_restore_main_on_finish();
+
+    // 先广播结果 —— 此时 IPC 响应可以正常返回给 Overlay JS
+    app.emit("color_picker_result", picked_color)
+        .map_err(|e| e.to_string())?;
+
+    // 在后台异步恢复主窗口并隐藏 Overlay 窗口。
+    // 延迟 80ms 确保 IPC 响应已送达，避免操作当前窗口消息队列时卡住。
+    let app_clone = app.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_millis(80)).await;
+
+        if should_restore_main {
+            if let Some(main) = app_clone.get_webview_window("main") {
+                let _ = main.show();
+                let _ = main.set_focus();
+            }
+        }
+
+        tokio::time::sleep(std::time::Duration::from_millis(32)).await;
+
+        for label in overlay_labels {
+            if let Some(overlay) = app_clone.get_webview_window(&label) {
+                let _ = overlay.hide();
+            }
+        }
+    });
+
+    Ok(())
+}

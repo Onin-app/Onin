@@ -174,7 +174,9 @@
     ) {
       value = previousShortcut;
     }
-    onSave();
+    if (value !== previousShortcut) {
+      onSave();
+    }
   };
 
   const setPresetShortcut = (shortcut: string) => {

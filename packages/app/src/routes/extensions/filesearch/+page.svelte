@@ -2,6 +2,7 @@
   import { onDestroy, onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { invoke } from "@tauri-apps/api/core";
+  import { platform } from "@tauri-apps/plugin-os";
   import { toast } from "svelte-sonner";
   import AppScrollArea from "$lib/components/AppScrollArea.svelte";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
@@ -64,6 +65,7 @@
   let loadMoreObserver: IntersectionObserver | null = null;
   let listPaneWidth = $state(40);
   let isResizingPane = $state(false);
+  let currentPlatform = $state("");
 
   const selectedItem = $derived(results[selectedIndex] ?? null);
   const detailQueryExamples = [
@@ -91,6 +93,34 @@
     isLoadingMore = false;
   };
 
+  const normalizePathKey = (path: string) => {
+    const trimmedPath = path.trim();
+    return currentPlatform === "windows"
+      ? trimmedPath.replaceAll("/", "\\").toLowerCase()
+      : trimmedPath;
+  };
+
+  const getFileSearchResultKey = (item: LaunchableItem) =>
+    normalizePathKey(item.path);
+
+  const uniqueFileSearchResults = (items: LaunchableItem[]) => {
+    const seen = new Set<string>();
+    return items.filter((item) => {
+      const key = getFileSearchResultKey(item);
+      if (seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    });
+  };
+
+  const mergeFileSearchResults = (
+    currentItems: LaunchableItem[],
+    nextItems: LaunchableItem[],
+  ) => uniqueFileSearchResults([...currentItems, ...nextItems]);
+
   const handleBack = () => {
     goto("/");
   };
@@ -103,6 +133,15 @@
     if (loadingTimer) {
       clearTimeout(loadingTimer);
       loadingTimer = null;
+    }
+  };
+
+  const loadPlatform = () => {
+    try {
+      currentPlatform = platform();
+    } catch (error) {
+      console.error("Failed to detect platform:", error);
+      currentPlatform = "";
     }
   };
 
@@ -190,8 +229,8 @@
       ) {
         results =
           currentSearch.offset === 0
-            ? response.items
-            : [...results, ...response.items];
+            ? uniqueFileSearchResults(response.items)
+            : mergeFileSearchResults(results, response.items);
         hasMoreResults = response.has_more;
         isSearching = false;
         isLoadingMore = false;
@@ -414,6 +453,7 @@
   };
 
   onMount(async () => {
+    loadPlatform();
     await refreshStatus();
     headerRef?.focus();
     window.addEventListener("mousemove", handlePaneResize);

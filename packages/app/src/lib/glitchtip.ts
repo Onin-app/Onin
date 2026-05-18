@@ -4,11 +4,38 @@ const GLITCHTIP_DSN = import.meta.env.VITE_GLITCHTIP_DSN?.trim();
 const GLITCHTIP_ENVIRONMENT =
   import.meta.env.VITE_GLITCHTIP_ENVIRONMENT ||
   (import.meta.env.DEV ? "development" : "production");
+const GLITCHTIP_ENABLE_DEV =
+  import.meta.env.VITE_GLITCHTIP_ENABLE_DEV === "true";
 
 let initialized = false;
 
+function isTauriRuntime(): boolean {
+  return Boolean(
+    (
+      window as unknown as {
+        __TAURI_INTERNALS__?: unknown;
+        __TAURI__?: unknown;
+      }
+    ).__TAURI_INTERNALS__ ||
+      (
+        window as unknown as {
+          __TAURI_INTERNALS__?: unknown;
+          __TAURI__?: unknown;
+        }
+      ).__TAURI__,
+  );
+}
+
 export async function initGlitchTip(): Promise<void> {
   if (initialized || typeof window === "undefined") {
+    return;
+  }
+
+  if (import.meta.env.DEV && !GLITCHTIP_ENABLE_DEV) {
+    return;
+  }
+
+  if (!isTauriRuntime()) {
     return;
   }
 

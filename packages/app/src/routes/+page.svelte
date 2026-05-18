@@ -24,6 +24,7 @@
   // Stores
   import { Theme, type LaunchableItem } from "$lib/type";
   import { theme, getTheme } from "$lib/utils/theme";
+  import { startColorPickerFlow } from "$lib/utils/colorPicker";
   import { escapeHandler } from "$lib/stores/escapeHandler";
   import {
     focusInputTrigger,
@@ -205,6 +206,25 @@
     matchedCommands = [];
   };
 
+  const resetLauncherState = () => {
+    inputValue = "";
+    clipboard.clearAttachments();
+    extensionPreviewItem = null;
+    extensionManager.clearPreview();
+    matchedCommands = [];
+    appListManager.resetToOriginList();
+  };
+
+  const startColorPickCommand = async () => {
+    await startColorPickerFlow({
+      beforeStart: resetLauncherState,
+      onCancel: requestInputFocusWithRetry,
+      closeOnSuccess: false,
+      restoreMainWindow: false,
+      useToastOverlay: true,
+    });
+  };
+
   // 解析 Extension Action
   const parseExtensionAction = (
     action: string | undefined,
@@ -271,6 +291,26 @@
           extensionManager.clearPreview();
           matchedCommands = [];
           goto("/extensions/clipboard");
+          return;
+        }
+        if (extensionId === "color" && commandCode === "pick") {
+          await startColorPickCommand();
+          return;
+        }
+        if (extensionId === "color") {
+          const effectiveText =
+            app.trigger_mode === "preview"
+              ? clipboard.state.attachedText || inputValue
+              : "";
+          inputValue = "";
+          clipboard.clearAttachments();
+          extensionPreviewItem = null;
+          extensionManager.clearPreview();
+          matchedCommands = [];
+          const query = effectiveText
+            ? `?q=${encodeURIComponent(effectiveText)}`
+            : "";
+          goto(`/extensions/color${query}`);
           return;
         }
         // 匹配指令：使用当前输入内容执行
@@ -390,6 +430,26 @@
         extensionManager.clearPreview();
         matchedCommands = [];
         goto("/extensions/emoji");
+        return;
+      }
+
+      if (extensionId === "color") {
+        const commandCode = parts[2] || "";
+        if (commandCode === "pick") {
+          await startColorPickCommand();
+          return;
+        }
+
+        const effectiveText = clipboard.state.attachedText || inputValue;
+        inputValue = "";
+        clipboard.clearAttachments();
+        extensionPreviewItem = null;
+        extensionManager.clearPreview();
+        matchedCommands = [];
+        const query = effectiveText
+          ? `?q=${encodeURIComponent(effectiveText)}`
+          : "";
+        goto(`/extensions/color${query}`);
         return;
       }
 

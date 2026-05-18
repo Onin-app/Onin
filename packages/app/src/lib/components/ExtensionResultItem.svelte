@@ -32,6 +32,10 @@
         ? "preview"
         : "function",
   );
+
+  const colorSwatch = $derived(
+    /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(title) ? title : null,
+  );
 </script>
 
 <button
@@ -108,6 +112,13 @@
 
     <!-- 第一行：计算结果 -->
     <div class="flex items-center gap-2 overflow-hidden pr-24">
+      {#if colorSwatch}
+        <span
+          class="h-4 w-4 shrink-0 rounded border border-neutral-300 shadow-sm dark:border-neutral-500"
+          style={`background-color: ${colorSwatch}`}
+          aria-hidden="true"
+        ></span>
+      {/if}
       <span class="truncate font-medium text-blue-600 dark:text-blue-400"
         >{title}</span
       >

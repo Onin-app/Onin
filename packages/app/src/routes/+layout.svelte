@@ -9,6 +9,7 @@
   import { page } from "$app/state";
   import { setupPluginConsoleListener } from "$lib/plugin-console";
   import { Toaster, toast } from "svelte-sonner";
+  import { startColorPickerFlow } from "$lib/utils/colorPicker";
   import WindowResizer from "$lib/components/WindowResizer.svelte";
 
   // Setup plugin console listener to forward plugin console output to webview devtools
@@ -67,7 +68,16 @@
 
       const unlistenCommand = await listen<string>(
         "execute_command_by_name",
-        (event) => {
+        async (event) => {
+          if (event.payload === "extension:color:pick") {
+            await startColorPickerFlow({
+              closeOnSuccess: false,
+              restoreMainWindow: false,
+              useToastOverlay: true,
+            });
+            return;
+          }
+
           invoke("execute_command", { name: event.payload });
         },
       );

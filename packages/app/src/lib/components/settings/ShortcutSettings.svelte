@@ -4,6 +4,7 @@
   import { onMount } from "svelte";
   import ShortcutInput from "./ShortcutInput.svelte";
   import { invoke } from "@tauri-apps/api/core";
+  import { toast } from "svelte-sonner";
   import {
     CaretUpDown,
     Check,
@@ -68,8 +69,10 @@
         });
         shortcuts.splice(index, 1);
         shortcuts = [...shortcuts];
+        toast.success("快捷键已删除");
       } catch (error) {
         console.error("Failed to remove shortcut:", error);
+        toast.error("删除快捷键失败");
       }
     } else {
       shortcuts.splice(index, 1);
@@ -77,14 +80,19 @@
     }
   }
 
-  async function saveShortcut(shortcut: Shortcut) {
+  async function saveShortcut(
+    shortcut: Shortcut,
+    successMessage = "快捷键已保存",
+  ) {
     if (!shortcut.shortcut || !shortcut.command_name) {
       return;
     }
     try {
       await invoke("add_shortcut", { shortcut });
+      toast.success(successMessage);
     } catch (error) {
       console.error("Failed to add shortcut:", error);
+      toast.error("保存快捷键失败");
     }
   }
 </script>
@@ -150,10 +158,19 @@
                       if (!o) searchValue = "";
                     }}
                     onValueChange={(value) => {
-                      saveShortcut({
-                        shortcut: shortcutInfo.shortcut,
-                        command_name: value,
-                      });
+                      const command = commands.find(
+                        (item) => item.name === value,
+                      );
+                      shortcutInfo.command_name = value;
+                      shortcutInfo.command_title = command?.title;
+                      saveShortcut(
+                        {
+                          shortcut: shortcutInfo.shortcut,
+                          command_name: value,
+                          command_title: command?.title,
+                        },
+                        "快捷键指令已保存",
+                      );
                       searchValue = "";
                     }}
                   >

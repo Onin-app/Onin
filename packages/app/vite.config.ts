@@ -1,18 +1,20 @@
 import { resolve } from "node:path";
+import { readFileSync } from "node:fs";
 import { defineConfig } from "vite";
 import { sveltekit } from "@sveltejs/kit/vite";
 import tailwindcss from "@tailwindcss/vite";
 
 const host = process.env.TAURI_DEV_HOST;
+const packageJson = JSON.parse(
+  readFileSync(resolve(__dirname, "package.json"), "utf-8"),
+) as { version?: string };
 
 // https://vitejs.dev/config/
 export default defineConfig({
   envDir: resolve(__dirname, "../.."),
   plugins: [sveltekit(), tailwindcss()],
   define: {
-    "import.meta.env.PACKAGE_VERSION": JSON.stringify(
-      process.env.npm_package_version,
-    ),
+    "import.meta.env.PACKAGE_VERSION": JSON.stringify(packageJson.version),
   },
   build: {
     sourcemap: true,

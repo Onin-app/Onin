@@ -7,6 +7,22 @@ use tokio::sync::Mutex; // Use the async-aware Mutex from Tokio
 
 const FILE_COMMANDS_FILENAME: &str = "file_commands.json";
 
+fn normalize_file_command_path_key(path: &str) -> String {
+    #[cfg(target_os = "windows")]
+    {
+        path.trim().replace('/', "\\").to_lowercase()
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        path.trim().to_string()
+    }
+}
+
+fn dedupe_file_commands(items: &mut Vec<LaunchableItem>) {
+    let mut seen = HashSet::new();
+    items.retain(|item| seen.insert(normalize_file_command_path_key(&item.path)));
+}
+
 #[derive(Debug)]
 pub struct FileCommandManager {
     // Change to an Option to support lazy loading.
@@ -36,7 +52,7 @@ impl FileCommandManager {
         let mut guard = self.file_commands.lock().await;
         if guard.is_none() {
             let storage_path = self.get_storage_path();
-            let items = if storage_path.exists() {
+            let mut items = if storage_path.exists() {
                 match tokio::fs::read_to_string(storage_path).await {
                     Ok(content) => serde_json::from_str(&content).unwrap_or_default(),
                     Err(_) => vec![], // File exists but is unreadable
@@ -44,6 +60,7 @@ impl FileCommandManager {
             } else {
                 vec![] // No file, start with empty list
             };
+            dedupe_file_commands(&mut items);
             *guard = Some(items);
         }
     }
@@ -81,14 +98,19 @@ impl FileCommandManager {
             // We can unwrap safely because ensure_loaded guarantees it's Some.
             let items = items_guard.as_mut().unwrap();
 
-            let mut existing_paths: HashSet<String> =
-                items.iter().map(|item| item.path.clone()).collect();
+            dedupe_file_commands(items);
+
+            let mut existing_paths: HashSet<String> = items
+                .iter()
+                .map(|item| normalize_file_command_path_key(&item.path))
+                .collect();
 
             for path_str in paths {
                 let path = Path::new(&path_str);
-                if path.exists() && !existing_paths.contains(&path_str) {
+                let path_key = normalize_file_command_path_key(&path_str);
+                if path.exists() && !existing_paths.contains(&path_key) {
                     if let Some(item) = self.create_item_from_path(path).await {
-                        existing_paths.insert(item.path.clone());
+                        existing_paths.insert(normalize_file_command_path_key(&item.path));
                         items.push(item);
                     }
                 }
@@ -112,7 +134,8 @@ impl FileCommandManager {
             let mut items_guard = self.file_commands.lock().await;
             let items = items_guard.as_mut().unwrap();
             // 根据路径过滤掉要删除的项
-            items.retain(|item| item.path != path_to_remove);
+            let path_to_remove = normalize_file_command_path_key(path_to_remove);
+            items.retain(|item| normalize_file_command_path_key(&item.path) != path_to_remove);
             items.clone()
         }; // `items_guard` is dropped here.
 

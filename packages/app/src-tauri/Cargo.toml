@@ -33,7 +33,9 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "registry"] }
 windows = { version = "0.57", features = [
   "Win32_UI_Shell",
+  "Win32_UI_Input_KeyboardAndMouse",
   "Win32_UI_WindowsAndMessaging",
+  "Win32_Graphics_Dwm",
   "Win32_Graphics_Gdi",
   "Win32_Foundation",
   "Win32_System_Com",
@@ -88,7 +90,7 @@ winreg = "0.55"
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
 objc2-foundation = { version = "0.3", features = ["NSString", "NSData", "NSObject", "NSDictionary", "NSNotification", "std"] }
-objc2-app-kit = { version = "0.3", features = ["NSWorkspace", "NSImage", "NSBitmapImageRep", "NSGraphicsContext", "NSOpenPanel", "NSSavePanel", "NSWindow", "NSResponder", "NSApplication", "NSRunningApplication"] }
+objc2-app-kit = { version = "0.3", features = ["NSWorkspace", "NSImage", "NSBitmapImageRep", "NSGraphicsContext", "NSOpenPanel", "NSSavePanel", "NSWindow", "NSResponder", "NSApplication", "NSRunningApplication", "NSView", "NSScreen"] }
 core-graphics = "0.25.0"
 
 [target.'cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))'.dependencies]

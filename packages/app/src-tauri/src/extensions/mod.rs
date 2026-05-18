@@ -4,6 +4,8 @@
 
 pub mod calculator;
 pub mod clipboard;
+pub mod color;
+pub mod color_picker;
 pub mod emoji;
 pub mod filesearch;
 pub mod translator;
