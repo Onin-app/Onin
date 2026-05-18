@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
+  import { getVersion } from "@tauri-apps/api/app";
   import { invoke } from "@tauri-apps/api/core";
   import { Tabs, Switch, Button, Slider } from "bits-ui";
   import AppScrollArea from "$lib/components/AppScrollArea.svelte";
@@ -28,6 +29,7 @@
   let enableUsageTracking = $state<boolean>(true);
   let marketplaceApiUrl = $state<string>("");
   let disabledExtensionIds = $state<string[]>([]);
+  let appVersion = $state<string>(import.meta.env.PACKAGE_VERSION || "未知");
 
   const sortModeOptions: {
     value: SortMode;
@@ -166,6 +168,12 @@
     } catch (e) {
       console.error("Failed to get app config:", e);
       toast.error("加载应用配置失败，请重启应用");
+    }
+
+    try {
+      appVersion = await getVersion();
+    } catch (e) {
+      console.error("Failed to get app version:", e);
     }
   });
 
@@ -447,6 +455,27 @@
             >
               打开数据目录
             </Button.Root>
+          {/snippet}
+        </SetItem>
+      </div>
+    </section>
+
+    <section class="mb-6">
+      <h2
+        class="mb-3 px-1 text-xs font-semibold tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
+      >
+        关于
+      </h2>
+      <div
+        class="overflow-hidden rounded-xl border border-neutral-200 bg-white px-4 dark:border-neutral-800 dark:bg-neutral-900"
+      >
+        <SetItem title="当前版本">
+          {#snippet content()}
+            <span
+              class="rounded-md bg-neutral-100 px-2 py-1 font-mono text-xs font-medium text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+            >
+              v{appVersion}
+            </span>
           {/snippet}
         </SetItem>
       </div>
