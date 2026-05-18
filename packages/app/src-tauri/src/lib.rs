@@ -28,6 +28,7 @@ mod telemetry;
 mod toast_overlay;
 mod tray_manager;
 mod unified_launch_manager;
+pub mod updater;
 mod usage_tracker;
 mod window_manager;
 
@@ -80,8 +81,15 @@ pub fn run() {
     let close_window_shortcut =
         Shortcut::from_str(window_manager::CLOSE_WINDOW_SHORTCUT_STR).unwrap();
 
+    let client = reqwest::Client::new();
+    let cancel_token = std::sync::Arc::new(tokio::sync::Mutex::new(
+        None::<tokio::sync::oneshot::Sender<()>>,
+    ));
+
     // 构建并运行 Tauri 应用
     let app = state::setup_managed_state(tauri::Builder::default())
+        .manage(client)
+        .manage(updater::UpdateCancelToken(cancel_token))
         // 插件
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_clipboard_manager::init())

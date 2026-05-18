@@ -188,8 +188,9 @@ pub fn get_invoke_handler(
         crate::ai_manager::commands::validate_ai_provider,
         crate::ai_manager::commands::list_ai_models,
         crate::ai_manager::commands::get_ai_capabilities,
-        greet,
         open_file_or_folder_dialog,
+        crate::updater::download_and_install_update,
+        crate::updater::cancel_update,
     ]
 }
 

@@ -11,6 +11,9 @@
   import { detachWindowShortcut } from "$lib/stores/shortcuts";
 
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
+  import UpdateDialog from "$lib/components/UpdateDialog.svelte";
+  import { platform } from "@tauri-apps/plugin-os";
+  import { UPDATE_CONFIG } from "$lib/constants";
   import SetItem from "./SetItem.svelte";
   import ShortcutInput from "./ShortcutInput.svelte";
 
@@ -186,6 +189,84 @@
       console.error("Failed to get app version:", e);
     }
   });
+
+  let checkingUpdate = $state(false);
+  let updateDialogOpen = $state(false);
+  let latestVersion = $state("");
+  let releaseNotes = $state("");
+  let downloadUrl = $state("");
+
+  function isNewerVersion(current: string, latest: string) {
+    const cur = current.replace(/^v/, "").split(".").map(Number);
+    const lat = latest.replace(/^v/, "").split(".").map(Number);
+
+    for (let i = 0; i < Math.max(cur.length, lat.length); i++) {
+      const c = cur[i] || 0;
+      const l = lat[i] || 0;
+      if (l > c) return true;
+      if (l < c) return false;
+    }
+    return false;
+  }
+
+  async function checkUpdate(silent: boolean = false) {
+    if (checkingUpdate) return;
+    checkingUpdate = true;
+
+    try {
+      const response = await fetch(UPDATE_CONFIG.LATEST_RELEASE_URL);
+      if (!response.ok) {
+        throw new Error("网络错误");
+      }
+      const data = await response.json();
+      const tagName = data.tag_name || "";
+
+      if (isNewerVersion(appVersion, tagName)) {
+        let osPlatform = "windows";
+        try {
+          osPlatform = await platform();
+        } catch (e) {
+          console.error("Failed to get platform", e);
+        }
+
+        let matchedAsset = null;
+        if (osPlatform === "windows") {
+          matchedAsset = data.assets.find((asset: any) =>
+            asset.name.endsWith(".msi"),
+          );
+        } else if (osPlatform === "linux") {
+          matchedAsset =
+            data.assets.find((asset: any) =>
+              asset.name.endsWith(".AppImage"),
+            ) || data.assets.find((asset: any) => asset.name.endsWith(".deb"));
+        } else if (osPlatform === "macos") {
+          matchedAsset = data.assets.find((asset: any) =>
+            asset.name.endsWith(".dmg"),
+          );
+        }
+
+        if (matchedAsset) {
+          latestVersion = tagName.replace(/^v/, "");
+          releaseNotes = data.body || "";
+          downloadUrl = matchedAsset.browser_download_url;
+          updateDialogOpen = true;
+        } else if (!silent) {
+          toast.warning(
+            `检测到新版本 ${tagName}，但未找到适用于您平台的安装包。`,
+          );
+        }
+      } else if (!silent) {
+        toast.success("当前已是最新版本");
+      }
+    } catch (e) {
+      console.error("检查更新失败", e);
+      if (!silent) {
+        toast.error("检查更新失败，请稍后重试");
+      }
+    } finally {
+      checkingUpdate = false;
+    }
+  }
 
   onDestroy(unsubscribe);
 </script>
@@ -481,11 +562,20 @@
       >
         <SetItem title="当前版本">
           {#snippet content()}
-            <span
-              class="rounded-md bg-neutral-100 px-2 py-1 font-mono text-xs font-medium text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
-            >
-              v{appVersion}
-            </span>
+            <div class="flex items-center gap-3">
+              <span
+                class="rounded-md bg-neutral-100 px-2 py-1 font-mono text-xs font-medium text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+              >
+                v{appVersion}
+              </span>
+              <Button.Root
+                class="inline-flex h-8 items-center justify-center rounded-md border border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-900 shadow-sm transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:ring-1 focus-visible:ring-neutral-950 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-50 dark:hover:bg-neutral-800 dark:hover:text-neutral-50 dark:focus-visible:ring-neutral-300"
+                onclick={() => checkUpdate(false)}
+                disabled={checkingUpdate}
+              >
+                {checkingUpdate ? "检查中..." : "检查更新"}
+              </Button.Root>
+            </div>
           {/snippet}
         </SetItem>
       </div>
@@ -506,5 +596,19 @@
     if (!clearingUsageStats) {
       clearUsageStatsDialogOpen = false;
     }
+  }}
+/>
+
+<UpdateDialog
+  bind:open={updateDialogOpen}
+  currentVersion={appVersion}
+  {latestVersion}
+  {releaseNotes}
+  {downloadUrl}
+  onClose={() => {
+    latestVersion = "";
+    releaseNotes = "";
+    downloadUrl = "";
+    checkingUpdate = false;
   }}
 />
