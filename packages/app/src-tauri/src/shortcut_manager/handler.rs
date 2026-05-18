@@ -106,10 +106,26 @@ fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::
             }
         }
     } else if let Some(window) = app.get_webview_window("main") {
+        let was_visible = window.is_visible().unwrap_or(false);
+        if !was_visible {
+            crate::focus_manager::capture_previous_foreground(app);
+            // We do NOT show/focus the window yet to avoid flashing the home page.
+            // The frontend Svelte code will complete the route navigation, then call show_main_window_cmd to show/focus the window.
+        } else {
+            crate::focus_manager::focus_webview_window(&window);
+        }
         if let Err(e) = window.emit("execute_command_by_name", &app_shortcut.command_name) {
             eprintln!("Error emitting command: {}", e);
         }
     } else if let Some(window) = app.get_window("main") {
+        let was_visible = window.is_visible().unwrap_or(false);
+        if !was_visible {
+            crate::focus_manager::capture_previous_foreground(app);
+            // We do NOT show/focus the window yet to avoid flashing the home page.
+            // The frontend Svelte code will complete the route navigation, then call show_main_window_cmd to show/focus the window.
+        } else {
+            crate::focus_manager::focus_window(&window);
+        }
         if let Err(e) = window.emit("execute_command_by_name", &app_shortcut.command_name) {
             eprintln!("Error emitting command (fallback): {}", e);
         }

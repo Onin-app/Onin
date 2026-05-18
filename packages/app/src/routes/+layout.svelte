@@ -7,6 +7,7 @@
   import { get } from "svelte/store";
   import { invoke } from "@tauri-apps/api/core";
   import { page } from "$app/state";
+  import { goto } from "$app/navigation";
   import { setupPluginConsoleListener } from "$lib/plugin-console";
   import { Toaster, toast } from "svelte-sonner";
   import { startColorPickerFlow } from "$lib/utils/colorPicker";
@@ -69,7 +70,9 @@
       const unlistenCommand = await listen<string>(
         "execute_command_by_name",
         async (event) => {
-          if (event.payload === "extension:color:pick") {
+          const commandName = event.payload;
+
+          if (commandName === "extension:color:pick") {
             await startColorPickerFlow({
               closeOnSuccess: false,
               restoreMainWindow: false,
@@ -78,7 +81,33 @@
             return;
           }
 
-          invoke("execute_command", { name: event.payload });
+          // Handle page routing for global shortcuts of extensions
+          if (commandName === "extension:clipboard:history") {
+            goto("/extensions/clipboard").then(() => {
+              invoke("show_main_window_cmd");
+            });
+            return;
+          }
+          if (commandName === "extension:emoji:search") {
+            goto("/extensions/emoji").then(() => {
+              invoke("show_main_window_cmd");
+            });
+            return;
+          }
+          if (commandName === "extension:file_search:search") {
+            goto("/extensions/filesearch").then(() => {
+              invoke("show_main_window_cmd");
+            });
+            return;
+          }
+          if (commandName === "extension:color:convert") {
+            goto("/extensions/color").then(() => {
+              invoke("show_main_window_cmd");
+            });
+            return;
+          }
+
+          invoke("execute_command", { name: commandName });
         },
       );
 

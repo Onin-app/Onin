@@ -21,6 +21,7 @@ pub fn get_invoke_handler(
         window_manager::acquire_window_close_lock,
         window_manager::release_window_close_lock,
         window_manager::close_main_window,
+        window_manager::show_main_window_cmd,
         toast_overlay::show_toast_overlay,
         // Tray manager
         tray_manager::set_tray_visibility,

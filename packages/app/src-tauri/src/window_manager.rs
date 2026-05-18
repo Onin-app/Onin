@@ -80,6 +80,12 @@ pub fn show_main_window(app: &AppHandle) {
     }
 }
 
+/// 暴露给前端的显示主窗口命令
+#[tauri::command]
+pub fn show_main_window_cmd(app: tauri::AppHandle) {
+    show_main_window(&app);
+}
+
 // ============================================================================
 // 辅助函数
 // ============================================================================
