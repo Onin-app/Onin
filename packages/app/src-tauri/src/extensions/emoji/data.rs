@@ -96,3 +96,79 @@ pub fn search_emojis(query: &str) -> Vec<EmojiGroup> {
         })
         .collect()
 }
+
+// ============================================================================
+// 测试
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_all_groups_returns_all() {
+        let groups = get_all_groups();
+        assert!(!groups.is_empty());
+        assert!(groups.iter().any(|g| g.slug == "smileys_emotion"));
+        assert!(groups.iter().any(|g| g.slug == "people_body"));
+    }
+
+    #[test]
+    fn test_search_by_name_partial() {
+        let groups = search_emojis("heart");
+        assert!(!groups.is_empty());
+        let all_hearts: Vec<&EmojiItem> = groups.iter().flat_map(|g| g.emojis.iter()).collect();
+        assert!(all_hearts.iter().any(|e| e.name.contains("heart")));
+    }
+
+    #[test]
+    fn test_search_by_tag() {
+        let groups = search_emojis("love");
+        assert!(!groups.is_empty());
+        let all: Vec<&EmojiItem> = groups.iter().flat_map(|g| g.emojis.iter()).collect();
+        assert!(all
+            .iter()
+            .any(|e| e.name.contains("heart") || e.tags.iter().any(|t| t == "love")));
+    }
+
+    #[test]
+    fn test_search_multi_word_all_match() {
+        let groups = search_emojis("crying face");
+        assert!(!groups.is_empty());
+        let all: Vec<&EmojiItem> = groups.iter().flat_map(|g| g.emojis.iter()).collect();
+        assert!(all
+            .iter()
+            .any(|e| e.name.contains("crying") && e.name.contains("face")));
+    }
+
+    #[test]
+    fn test_search_case_insensitive() {
+        let groups = search_emojis("HEART");
+        assert!(!groups.is_empty());
+        let groups_lower = search_emojis("heart");
+        assert_eq!(
+            groups.iter().flat_map(|g| g.emojis.iter()).count(),
+            groups_lower.iter().flat_map(|g| g.emojis.iter()).count()
+        );
+    }
+
+    #[test]
+    fn test_search_no_match_returns_empty() {
+        let groups = search_emojis("xyznonexistent12345");
+        assert!(groups.is_empty() || groups.iter().all(|g| g.emojis.is_empty()));
+    }
+
+    #[test]
+    fn test_search_empty_query_returns_all() {
+        let all = get_all_groups();
+        let searched = search_emojis("");
+        assert_eq!(all.len(), searched.len());
+    }
+
+    #[test]
+    fn test_search_whitespace_query() {
+        let all = get_all_groups();
+        let searched = search_emojis("  ");
+        assert_eq!(all.len(), searched.len());
+    }
+}

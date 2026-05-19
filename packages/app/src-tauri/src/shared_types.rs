@@ -207,3 +207,193 @@ pub struct DynamicCommand {
     /// Timestamp when the command was created (milliseconds since epoch)
     pub created_at: u64,
 }
+
+// ============================================================================
+// 测试
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ==================== Default 实现 ====================
+
+    #[test]
+    fn test_item_source_default() {
+        assert_eq!(ItemSource::default(), ItemSource::FileCommand);
+    }
+
+    #[test]
+    fn test_item_type_default() {
+        assert_eq!(ItemType::default(), ItemType::File);
+    }
+
+    #[test]
+    fn test_icon_type_default() {
+        assert_eq!(IconType::default(), IconType::Base64);
+    }
+
+    // ==================== Serde 序列化/反序列化 ====================
+
+    #[test]
+    fn test_item_source_roundtrip() {
+        let cases = vec![
+            ItemSource::Application,
+            ItemSource::Custom,
+            ItemSource::Command,
+            ItemSource::FileCommand,
+            ItemSource::FileSearch,
+            ItemSource::Plugin,
+            ItemSource::Extension,
+        ];
+        for source in cases {
+            let json = serde_json::to_string(&source).unwrap();
+            let deserialized: ItemSource = serde_json::from_str(&json).unwrap();
+            assert_eq!(source, deserialized);
+        }
+    }
+
+    #[test]
+    fn test_item_type_roundtrip() {
+        let cases = vec![ItemType::App, ItemType::Folder, ItemType::File];
+        for t in cases {
+            let json = serde_json::to_string(&t).unwrap();
+            let deserialized: ItemType = serde_json::from_str(&json).unwrap();
+            assert_eq!(t, deserialized);
+        }
+    }
+
+    #[test]
+    fn test_icon_type_roundtrip() {
+        let cases = vec![IconType::Base64, IconType::Iconfont, IconType::Url];
+        for t in cases {
+            let json = serde_json::to_string(&t).unwrap();
+            let deserialized: IconType = serde_json::from_str(&json).unwrap();
+            assert_eq!(t, deserialized);
+        }
+    }
+
+    #[test]
+    fn test_shortcut_roundtrip() {
+        let s = Shortcut {
+            shortcut: "Ctrl+K".into(),
+            command_name: "test".into(),
+            command_title: Some("Test".into()),
+        };
+        let json = serde_json::to_string(&s).unwrap();
+        let deserialized: Shortcut = serde_json::from_str(&json).unwrap();
+        assert_eq!(s, deserialized);
+    }
+
+    #[test]
+    fn test_shortcut_without_title() {
+        let s = Shortcut {
+            shortcut: "Ctrl+K".into(),
+            command_name: "test".into(),
+            command_title: None,
+        };
+        let json = serde_json::to_string(&s).unwrap();
+        let deserialized: Shortcut = serde_json::from_str(&json).unwrap();
+        assert_eq!(s, deserialized);
+    }
+
+    #[test]
+    fn test_command_keyword_partial_eq() {
+        let a = CommandKeyword {
+            name: "hello".into(),
+            disabled: None,
+            is_default: None,
+        };
+        let b = CommandKeyword {
+            name: "hello".into(),
+            disabled: None,
+            is_default: None,
+        };
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn test_command_keyword_not_equal() {
+        let a = CommandKeyword {
+            name: "hello".into(),
+            disabled: None,
+            is_default: None,
+        };
+        let b = CommandKeyword {
+            name: "world".into(),
+            disabled: None,
+            is_default: None,
+        };
+        assert_ne!(a, b);
+    }
+
+    // ==================== LaunchableItem 默认值 ====================
+
+    #[test]
+    fn test_launchable_item_requires_confirmation_default() {
+        let item: LaunchableItem = serde_json::from_str(
+            r#"{"name":"test","keywords":[],"path":"/","icon":"","icon_type":"Base64","item_type":"File","source":"FileCommand"}"#,
+        )
+        .unwrap();
+        assert!(!item.requires_confirmation);
+        assert_eq!(item.name, "test");
+    }
+
+    // ==================== CommandAction debug ====================
+
+    #[test]
+    fn test_command_action_system() {
+        let a = CommandAction::System("shutdown".into());
+        assert!(matches!(a, CommandAction::System(ref cmd) if cmd == "shutdown"));
+    }
+
+    #[test]
+    fn test_command_action_extension() {
+        let a = CommandAction::Extension {
+            extension_id: "emoji".into(),
+            command_code: "search".into(),
+        };
+        assert!(
+            matches!(a, CommandAction::Extension { ref extension_id, ref command_code } if extension_id == "emoji" && command_code == "search")
+        );
+    }
+
+    #[test]
+    fn test_command_action_plugin_command() {
+        let a = CommandAction::PluginCommand {
+            plugin_id: "plugin-1".into(),
+            command_code: "cmd-1".into(),
+        };
+        assert!(
+            matches!(a, CommandAction::PluginCommand { ref plugin_id, ref command_code } if plugin_id == "plugin-1" && command_code == "cmd-1")
+        );
+    }
+
+    // ==================== 非法 JSON 反序列化 ====================
+
+    #[test]
+    fn test_shortcut_deserialize_missing_required() {
+        let result: Result<Shortcut, _> = serde_json::from_str(r#"{"shortcut": "Ctrl+K"}"#);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_shortcut_deserialize_wrong_type() {
+        let result: Result<Shortcut, _> =
+            serde_json::from_str(r#"{"shortcut": 42, "command_name": "test"}"#);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_command_match_deserialize_invalid_json() {
+        let result: Result<CommandMatch, _> = serde_json::from_str(r#"not valid json"#);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_command_keyword_deserialize_unknown_field_ok() {
+        let result: Result<CommandKeyword, _> =
+            serde_json::from_str(r#"{"name": "test", "unknown_field": "value"}"#);
+        assert!(result.is_ok());
+    }
+}
