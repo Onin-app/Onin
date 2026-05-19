@@ -21,8 +21,8 @@
   "license": "GPL-3.0",
   "dependencies": {
     "@formkit/auto-animate": "^0.9.0",
-    "@tailwindcss/vite": "^4.0.0",
     "@sentry/browser": "^10.49.0",
+    "@tailwindcss/vite": "^4.0.0",
     "@tauri-apps/api": "~2.8.0",
     "@tauri-apps/plugin-autostart": "~2",
     "@tauri-apps/plugin-dialog": "~2.3.0",
@@ -51,7 +51,9 @@
     "@tailwindcss/typography": "^0.5.19",
     "@tauri-apps/cli": "^2.6.0",
     "@types/pinyin": "^2.10.2",
+    "@vitest/coverage-v8": "^3.0.0",
     "conventional-changelog-conventionalcommits": "^8.0.0",
+    "jsdom": "^29.1.1",
     "phosphor-svelte": "^3.0.1",
     "prettier": "^3.6.2",
     "prettier-plugin-svelte": "^3.4.0",
@@ -61,7 +63,6 @@
     "svelte-check": "^4.2.2",
     "typescript": "~5.8.3",
     "vite": "^8.0.0",
-    "vitest": "^3.0.0",
-    "@vitest/coverage-v8": "^3.0.0"
+    "vitest": "^3.0.0"
   }
 }

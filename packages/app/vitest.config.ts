@@ -1,16 +1,25 @@
 import { defineConfig } from 'vitest/config';
 import { resolve } from 'node:path';
+import { svelte } from '@sveltejs/vite-plugin-svelte';
 
 export default defineConfig({
+  plugins: [
+    svelte({
+      compilerOptions: {
+        dev: true,
+      },
+    }),
+  ],
   resolve: {
     alias: {
       $lib: resolve(__dirname, 'src/lib'),
       $app: resolve(__dirname, 'src/mocks/sveltekit'),
     },
+    conditions: ['browser'],
   },
   test: {
     globals: true,
-    environment: 'node',
+    environment: 'jsdom',
     include: ['src/**/*.test.ts'],
     setupFiles: ['src/lib/mocks/vitest-setup.ts'],
     coverage: {
