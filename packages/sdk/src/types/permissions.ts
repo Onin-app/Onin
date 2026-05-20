@@ -63,7 +63,7 @@ export interface CommandPermission {
  * File system permission configuration
  * @interface FileSystemPermission
  */
-interface FileSystemPermission {
+export interface FileSystemPermission {
   /** Whether file system permission is enabled */
   enable: boolean;
   /** Whether file reading is allowed */
@@ -80,7 +80,7 @@ interface FileSystemPermission {
  * Dialog permission configuration
  * @interface DialogPermission
  */
-interface DialogPermission {
+export interface DialogPermission {
   /** Whether dialog permission is enabled */
   enable: boolean;
   /** Whether message dialogs are allowed */
@@ -95,7 +95,7 @@ interface DialogPermission {
  * Clipboard permission configuration
  * @interface ClipboardPermission
  */
-interface ClipboardPermission {
+export interface ClipboardPermission {
   /** Whether clipboard permission is enabled */
   enable: boolean;
   /** Whether text reading is allowed */
