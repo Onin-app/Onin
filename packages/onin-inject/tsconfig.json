@@ -9,7 +9,7 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "types": ["svelte"]
+    "types": ["svelte", "vitest"]
   },
   "include": ["src/**/*.ts", "src/**/*.svelte"]
 }
