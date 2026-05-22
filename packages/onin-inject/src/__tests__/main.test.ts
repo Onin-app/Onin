@@ -1,14 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type { mount } from 'svelte';
 
 const mockShow = vi.fn();
 
 // 模拟 Svelte 和 Toast 组件
 vi.mock('svelte', () => ({
-  mount: vi.fn((component, options) => {
-    return {
-      show: mockShow,
-    };
-  }),
+  mount: vi.fn(
+    (
+      component: Parameters<typeof mount>[0],
+      options: Parameters<typeof mount>[1],
+    ) => {
+      return {
+        show: mockShow,
+      };
+    },
+  ),
 }));
 
 vi.mock('../components/Toast.svelte', () => ({

@@ -102,7 +102,7 @@ export function useExtensionManager() {
   /**
    * 获取 Extension 预览作为 LaunchableItem（用于 displayList）
    */
-  function getPreviewAsItem(): LaunchableItem | null {
+  function getPreviewAsItem() {
     if (!currentPreview) return null;
     return previewToLaunchableItem(currentPreview);
   }
