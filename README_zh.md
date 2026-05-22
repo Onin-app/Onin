@@ -40,7 +40,8 @@ Onin 不仅仅是一个启动器，更是一个平台。通过强大的 **插件
 ```bash
 xattr -cr /Applications/Onin.app
 ```
-*(注意：请先将应用移动到您的 `应用程序` 文件夹，或根据实际路径调整命令)*
+
+_(注意：请先将应用移动到您的 `应用程序` 文件夹，或根据实际路径调整命令)_
 
 ### ✨ 核心特性
 
@@ -48,6 +49,7 @@ xattr -cr /Applications/Onin.app
 - 🔌 **无限扩展** — 支持任意 Web 技术开发插件（React、Vue、Svelte 等）
 - 🎨 **精美设计** — 现代化界面，流畅动画体验
 - ⌨️ **键盘优先** — 所有操作仅需指尖轻触
+- 🔄 **多端云同步** — 支持 WebDAV 协议极简配置备份，实现开机自启拉取与退出自动上传
 - 🛠️ **开发友好** — 简单易用的 SDK，轻松构建自定义扩展
 
 ---
@@ -102,6 +104,7 @@ packages/
 | 主题     | 链接                                                                     |
 | -------- | ------------------------------------------------------------------------ |
 | API 文档 | [API.md](packages/app/docs/API.md)                                       |
+| 数据同步 | [SYNC_GUIDE.md](packages/app/docs/SYNC_GUIDE.md)                         |
 | 插件系统 | [PLUGIN_COMMAND_USAGE.md](packages/app/docs/PLUGIN_COMMAND_USAGE.md)     |
 | 窗口管理 | [WINDOW_LIFECYCLE_FINAL.md](packages/app/docs/WINDOW_LIFECYCLE_FINAL.md) |
 | SDK 指南 | [SDK README](packages/sdk/README.md)                                     |
