@@ -194,6 +194,25 @@ fn spawn_async_init_tasks(app_handle: tauri::AppHandle) {
         if let Err(e) = plugin_api::scheduler::init_scheduler(&app_handle).await {
             eprintln!("[ERROR] Failed to initialize scheduler: {}", e);
         }
+
+        // 6. 检查并执行 WebDAV 自动拉取同步
+        let webdav_config = {
+            let state = app_handle.state::<app_config::AppConfigState>();
+            let x = match state.0.lock() {
+                Ok(lock) => lock.webdav.clone(),
+                Err(_) => app_config::WebDavConfig::default(),
+            };
+            x
+        };
+
+        if webdav_config.enabled && webdav_config.sync_on_startup {
+            println!("[sync] 检测到开机自动同步已启用，正在执行自动拉取同步...");
+            match crate::sync::trigger_webdav_sync(app_handle.clone(), "restore".to_string()).await
+            {
+                Ok(_) => println!("[sync] 开机自动同步成功！"),
+                Err(e) => eprintln!("[sync] 开机自动同步失败: {}", e),
+            }
+        }
     });
 }
 

@@ -5,7 +5,7 @@
 
 use crate::{
     app_config, command_manager, extension, file_command_manager, file_search, plugin, plugin_api,
-    shortcut_manager, system_commands, toast_overlay, tray_manager, unified_launch_manager,
+    shortcut_manager, sync, system_commands, toast_overlay, tray_manager, unified_launch_manager,
     usage_tracker, window_manager,
 };
 
@@ -155,6 +155,10 @@ pub fn get_invoke_handler(
         // App config
         app_config::get_app_config,
         app_config::update_app_config,
+        // WebDAV Sync
+        sync::test_webdav_connection,
+        sync::check_cloud_backup,
+        sync::trigger_webdav_sync,
         // Usage tracker
         usage_tracker::record_command_usage,
         usage_tracker::get_usage_stats,

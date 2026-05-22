@@ -1,4 +1,5 @@
 use std::str::FromStr;
+use tauri::Manager;
 use tauri_plugin_global_shortcut::{Shortcut, ShortcutState};
 
 use tracing_subscriber;
@@ -23,6 +24,7 @@ mod setup;
 pub mod shared_types;
 mod shortcut_manager;
 mod state;
+pub mod sync;
 mod system_commands;
 mod telemetry;
 mod toast_overlay;
@@ -114,16 +116,42 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
-    app.run(|_app_handle, _event| {
-        #[cfg(target_os = "macos")]
-        match _event {
-            tauri::RunEvent::Reopen { .. } => {
-                window_manager::show_main_window(_app_handle);
+    app.run(|_app_handle, _event| match _event {
+        tauri::RunEvent::ExitRequested { api, .. } => {
+            let webdav_config = {
+                let state = _app_handle.state::<crate::app_config::AppConfigState>();
+                let x = match state.0.lock() {
+                    Ok(lock) => lock.webdav.clone(),
+                    Err(_) => crate::app_config::WebDavConfig::default(),
+                };
+                x
+            };
+
+            if webdav_config.enabled && webdav_config.sync_on_exit {
+                println!("[sync] 检测到退出自动备份已启用，正在执行自动上传备份...");
+                api.prevent_exit();
+
+                let app_handle_clone = _app_handle.clone();
+                tauri::async_runtime::block_on(async move {
+                    match crate::sync::trigger_webdav_sync(app_handle_clone, "backup".to_string())
+                        .await
+                    {
+                        Ok(_) => println!("[sync] 退出自动备份成功！"),
+                        Err(e) => eprintln!("[sync] 退出自动备份失败: {}", e),
+                    }
+                });
+
+                _app_handle.exit(0);
             }
-            tauri::RunEvent::Resumed => {
-                window_manager::show_main_window(_app_handle);
-            }
-            _ => {}
         }
+        #[cfg(target_os = "macos")]
+        tauri::RunEvent::Reopen { .. } => {
+            window_manager::show_main_window(_app_handle);
+        }
+        #[cfg(target_os = "macos")]
+        tauri::RunEvent::Resumed => {
+            window_manager::show_main_window(_app_handle);
+        }
+        _ => {}
     });
 }

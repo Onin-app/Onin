@@ -109,6 +109,15 @@ export interface CommandUsageStats {
   last_used: number;
 }
 
+export interface WebDavConfig {
+  enabled: boolean;
+  base_url: string;
+  username: string;
+  password: string;
+  sync_on_startup: boolean;
+  sync_on_exit: boolean;
+}
+
 export interface AppConfig {
   auto_paste_time_limit: number;
   auto_clear_time_limit: number;
@@ -118,4 +127,5 @@ export interface AppConfig {
   disabled_extension_ids?: string[];
   file_search_excluded_paths?: string[];
   file_search_include_hidden?: boolean;
+  webdav?: WebDavConfig;
 }
