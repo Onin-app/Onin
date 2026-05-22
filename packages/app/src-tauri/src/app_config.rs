@@ -21,6 +21,35 @@ impl Default for SortMode {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct WebDavConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub base_url: String,
+    #[serde(default)]
+    pub username: String,
+    #[serde(default)]
+    pub password: String,
+    #[serde(default)]
+    pub sync_on_startup: bool,
+    #[serde(default)]
+    pub sync_on_exit: bool,
+}
+
+impl Default for WebDavConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            base_url: String::new(),
+            username: String::new(),
+            password: String::new(),
+            sync_on_startup: false,
+            sync_on_exit: false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
     /// 自动粘贴时间限制（秒），0 表示不限制
@@ -54,6 +83,10 @@ pub struct AppConfig {
     /// 文件搜索是否包含隐藏文件
     #[serde(default)]
     pub file_search_include_hidden: bool,
+
+    /// WebDAV 同步配置
+    #[serde(default)]
+    pub webdav: WebDavConfig,
 }
 
 fn default_auto_paste_time_limit() -> u64 {
@@ -83,6 +116,7 @@ impl Default for AppConfig {
             disabled_extension_ids: Vec::new(),
             file_search_excluded_paths: Vec::new(),
             file_search_include_hidden: false,
+            webdav: WebDavConfig::default(),
         }
     }
 }

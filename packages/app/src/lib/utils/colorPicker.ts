@@ -117,3 +117,8 @@ export async function startColorPickerFlow({
     toast.error(getErrorMessage(error, "取色失败"));
   }
 }
+
+// Exported for testing only
+export function resetColorPickerState() {
+  isPicking = false;
+}

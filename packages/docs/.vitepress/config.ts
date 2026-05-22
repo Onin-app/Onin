@@ -77,7 +77,7 @@ export default defineConfig({
     },
 
     footer: {
-      message: '基于 MIT 协议发布',
+      message: '基于 GPL-3.0 协议发布',
       copyright: 'Copyright © 2024 Onin Team',
     },
 

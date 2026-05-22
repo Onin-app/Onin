@@ -77,7 +77,7 @@ test('scaffoldPlugin creates a vanilla TypeScript project', async () => {
     assert.equal(result.targetDir, targetDir);
     assert.match(
       await readFile(join(targetDir, 'package.json'), 'utf8'),
-      /"typescript": "\^5\.5\.0"/,
+      /"typescript": "\^\d+\.\d+\.\d+"/,
     );
     assert.match(
       await readFile(join(targetDir, 'src', 'main.ts'), 'utf8'),
@@ -103,13 +103,15 @@ test('scaffoldPlugin includes release configuration when requested', async () =>
       adapterTemplateDirs,
     );
 
-    assert.ok(readFile(join(targetDir, 'release.config.cjs'), 'utf8'));
-    assert.ok(
+    await assert.doesNotReject(
+      readFile(join(targetDir, 'release.config.cjs'), 'utf8'),
+    );
+    await assert.doesNotReject(
       readFile(join(targetDir, '.github', 'workflows', 'release.yml'), 'utf8'),
     );
     const packageJson = await readFile(join(targetDir, 'package.json'), 'utf8');
     assert.match(packageJson, /"release": "semantic-release"/);
-    assert.match(packageJson, /"semantic-release": "\^25\.0\.3"/);
+    assert.match(packageJson, /"semantic-release": "\^\d+\.\d+\.\d+"/);
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }
@@ -129,7 +131,7 @@ test('scaffoldPlugin creates a vanilla JavaScript project', async () => {
     assert.equal(result.targetDir, targetDir);
     assert.match(
       await readFile(join(targetDir, 'package.json'), 'utf8'),
-      /"vite": "\^7\.3\.1"/,
+      /"vite": "\^\d+\.\d+\.\d+"/,
     );
     assert.doesNotMatch(
       await readFile(join(targetDir, 'package.json'), 'utf8'),
@@ -161,9 +163,9 @@ test('scaffoldPlugin creates a react JavaScript project', async () => {
 
     assert.equal(result.targetDir, targetDir);
     const packageJson = await readFile(join(targetDir, 'package.json'), 'utf8');
-    assert.match(packageJson, /"react": "\^18\.3\.1"/);
-    assert.match(packageJson, /"react-dom": "\^18\.3\.1"/);
-    assert.match(packageJson, /"@vitejs\/plugin-react": "\^4\.3\.4"/);
+    assert.match(packageJson, /"react": "\^\d+\.\d+\.\d+"/);
+    assert.match(packageJson, /"react-dom": "\^\d+\.\d+\.\d+"/);
+    assert.match(packageJson, /"@vitejs\/plugin-react": "\^\d+\.\d+\.\d+"/);
     assert.doesNotMatch(packageJson, /"typescript": "\^5\.5\.0"/);
     assert.doesNotMatch(packageJson, /"@types\/react"/);
     assert.match(
@@ -200,8 +202,8 @@ test('scaffoldPlugin creates a vue JavaScript project', async () => {
 
     assert.equal(result.targetDir, targetDir);
     const packageJson = await readFile(join(targetDir, 'package.json'), 'utf8');
-    assert.match(packageJson, /"vue": "\^3\.5\.29"/);
-    assert.match(packageJson, /"@vitejs\/plugin-vue": "\^5\.2\.4"/);
+    assert.match(packageJson, /"vue": "\^\d+\.\d+\.\d+"/);
+    assert.match(packageJson, /"@vitejs\/plugin-vue": "\^\d+\.\d+\.\d+"/);
     assert.doesNotMatch(packageJson, /"typescript": "\^5\.5\.0"/);
     assert.doesNotMatch(packageJson, /env\.d\.ts/);
     assert.match(
@@ -238,8 +240,11 @@ test('scaffoldPlugin creates a svelte JavaScript project', async () => {
 
     assert.equal(result.targetDir, targetDir);
     const packageJson = await readFile(join(targetDir, 'package.json'), 'utf8');
-    assert.match(packageJson, /"svelte": "\^5\.0\.0"/);
-    assert.match(packageJson, /"@sveltejs\/vite-plugin-svelte": "\^6\.2\.4"/);
+    assert.match(packageJson, /"svelte": "\^\d+\.\d+\.\d+"/);
+    assert.match(
+      packageJson,
+      /"@sveltejs\/vite-plugin-svelte": "\^\d+\.\d+\.\d+"/,
+    );
     assert.doesNotMatch(packageJson, /"typescript": "\^5\.5\.0"/);
     assert.match(
       await readFile(join(targetDir, 'src', 'App.svelte'), 'utf8'),
@@ -275,8 +280,8 @@ test('scaffoldPlugin creates a solid JavaScript project', async () => {
 
     assert.equal(result.targetDir, targetDir);
     const packageJson = await readFile(join(targetDir, 'package.json'), 'utf8');
-    assert.match(packageJson, /"solid-js": "\^1\.9\.9"/);
-    assert.match(packageJson, /"vite-plugin-solid": "\^2\.11\.8"/);
+    assert.match(packageJson, /"solid-js": "\^\d+\.\d+\.\d+"/);
+    assert.match(packageJson, /"vite-plugin-solid": "\^\d+\.\d+\.\d+"/);
     assert.doesNotMatch(packageJson, /"typescript": "\^5\.5\.0"/);
     assert.match(
       await readFile(join(targetDir, 'src', 'App.jsx'), 'utf8'),

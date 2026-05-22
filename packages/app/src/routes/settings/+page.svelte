@@ -12,6 +12,7 @@
     PlugsConnected,
     Sparkle,
     PuzzlePiece,
+    Cloud,
   } from "phosphor-svelte";
 
   import GeneralSettings from "$lib/components/settings/GeneralSettings.svelte";
@@ -20,6 +21,7 @@
   import ShortcutSettings from "$lib/components/settings/ShortcutSettings.svelte";
   import AISettings from "$lib/components/settings/AISettings.svelte";
   import ExtensionSettings from "$lib/components/settings/ExtensionSettings.svelte";
+  import SyncSettings from "$lib/components/settings/SyncSettings.svelte";
   import { escapeHandler } from "$lib/stores/escapeHandler";
 
   interface SettingItem {
@@ -31,7 +33,8 @@
       | typeof CommandSettings
       | typeof ShortcutSettings
       | typeof AISettings
-      | typeof ExtensionSettings;
+      | typeof ExtensionSettings
+      | typeof SyncSettings;
     icon: any;
   }
 
@@ -71,6 +74,12 @@
       id: "ai",
       component: AISettings,
       icon: Sparkle,
+    },
+    {
+      name: "数据同步",
+      id: "sync",
+      component: SyncSettings,
+      icon: Cloud,
     },
   ];
 

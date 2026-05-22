@@ -25,3 +25,6 @@ packages/docs/.vitepress/cache
 packages/docs/.vitepress/dist
 
 .agent/*
+# Testing
+coverage
+

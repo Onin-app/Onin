@@ -5,7 +5,7 @@
     <b>The extensible, command-centric launcher for pro users.</b>
   </p>
   <p>
-    <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" />
+    <img src="https://img.shields.io/badge/license-GPL--3.0-blue.svg" alt="License" />
     <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-yellowgreen" alt="Platform" />
   </p>
   <p>
@@ -110,4 +110,4 @@ packages/
 
 ## 📄 License
 
-[MIT](LICENSE)
+[GPL-3.0](LICENSE)

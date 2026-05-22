@@ -253,3 +253,93 @@ pub struct ExtensionPreview {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub grid_data: Option<EmojiGridData>,
 }
+
+// ============================================================================
+// 测试
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ==================== ExtensionResult 构造 ====================
+
+    #[test]
+    fn test_calculation_result() {
+        let r = ExtensionResult::calculation("42".into());
+        assert!(r.success);
+        assert_eq!(r.value.as_ref().unwrap(), "42");
+        assert_eq!(r.copyable.as_ref().unwrap(), "42");
+        assert!(matches!(r.result_type, ExtensionResultType::Calculation));
+        assert!(r.subtitle.is_none());
+        assert!(r.error.is_none());
+    }
+
+    #[test]
+    fn test_conversion_result() {
+        let r = ExtensionResult::conversion("1000 m".into());
+        assert!(r.success);
+        assert_eq!(r.value.as_ref().unwrap(), "1000 m");
+        assert_eq!(r.copyable.as_ref().unwrap(), "1000 m");
+        assert!(matches!(r.result_type, ExtensionResultType::Conversion));
+    }
+
+    #[test]
+    fn test_datetime_result() {
+        let r = ExtensionResult::datetime("1月23日".into());
+        assert!(r.success);
+        assert_eq!(r.value.as_ref().unwrap(), "1月23日");
+        assert_eq!(r.copyable.as_ref().unwrap(), "1月23日");
+        assert!(matches!(r.result_type, ExtensionResultType::DateTime));
+    }
+
+    #[test]
+    fn test_currency_result_with_date() {
+        let r = ExtensionResult::currency("7.24 CNY".into(), Some("2026-01-01".into()));
+        assert!(r.success);
+        assert_eq!(r.value.as_ref().unwrap(), "7.24 CNY");
+        assert_eq!(r.copyable.as_ref().unwrap(), "7.24 CNY");
+        assert!(matches!(r.result_type, ExtensionResultType::Currency));
+        assert_eq!(r.subtitle.as_ref().unwrap(), "2026-01-01");
+    }
+
+    #[test]
+    fn test_currency_result_without_date() {
+        let r = ExtensionResult::currency("7.24 CNY".into(), None);
+        assert!(r.success);
+        assert!(r.subtitle.is_none());
+    }
+
+    #[test]
+    fn test_error_result() {
+        let r = ExtensionResult::error("something went wrong".into());
+        assert!(!r.success);
+        assert!(r.value.is_none());
+        assert!(r.copyable.is_none());
+        assert!(matches!(r.result_type, ExtensionResultType::Error));
+        assert_eq!(r.error.as_ref().unwrap(), "something went wrong");
+    }
+
+    // ==================== PreviewViewType 默认值 ====================
+
+    #[test]
+    fn test_preview_view_type_default() {
+        let v: PreviewViewType = Default::default();
+        assert!(matches!(v, PreviewViewType::Single));
+    }
+
+    // ==================== ExtensionManifest 构造 ====================
+
+    #[test]
+    fn test_manifest_defaults() {
+        let m = ExtensionManifest {
+            id: "test",
+            name: "Test",
+            description: "A test manifest",
+            icon: "test-icon",
+            commands: &[],
+        };
+        assert_eq!(m.id, "test");
+        assert!(m.commands.is_empty());
+    }
+}

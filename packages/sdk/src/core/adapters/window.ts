@@ -27,12 +27,16 @@ export class WindowModeAdapter extends BaseAdapter {
     this.runtimePromise = new Promise((resolve) => {
       this.runtimeResolve = resolve;
     });
+    // 立即初始化以开始探测运行时与监听事件
+    this.initialize();
   }
 
   initialize(): void {
     if (typeof window === 'undefined') {
       return;
     }
+
+    this.initialized = true;
 
     // 尝试从全局变量或 URL 获取运行时信息
     this.tryInitializeRuntime();
@@ -58,6 +62,9 @@ export class WindowModeAdapter extends BaseAdapter {
    * 尝试监听 Tauri 事件（带重试机制）
    */
   private tryListenTauriEvents(attempt = 1, maxAttempts = 10): void {
+    if (typeof window === 'undefined' || !this.initialized) {
+      return;
+    }
     const tauri = (window as any).__TAURI__;
 
     if (!tauri?.event?.listen) {
