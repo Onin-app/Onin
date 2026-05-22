@@ -127,3 +127,81 @@ pub fn unpack_zip_to_app_data(zip_path: &Path, app_data_dir: &Path) -> Result<()
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_is_blacklisted() {
+        assert!(is_blacklisted("plugin_data/window_states.json"));
+        assert!(is_blacklisted("plugin_data\\window_states.json"));
+        assert!(is_blacklisted("logs/app.log"));
+        assert!(is_blacklisted("extensions/clipboard/cache.bin"));
+
+        assert!(!is_blacklisted("app_config.json"));
+        assert!(!is_blacklisted("plugins/hello/main.js"));
+    }
+
+    #[test]
+    fn test_zip_pack_and_unpack_with_blacklist() {
+        let src_dir = tempdir().unwrap();
+        let src_path = src_dir.path();
+
+        // 1. 创建普通文件
+        let normal_file = src_path.join("app_config.json");
+        fs::write(&normal_file, "{}").unwrap();
+
+        // 创建子目录中的普通文件
+        let plugin_dir = src_path.join("plugins").join("my_plugin");
+        fs::create_dir_all(&plugin_dir).unwrap();
+        let plugin_file = plugin_dir.join("config.json");
+        fs::write(&plugin_file, "plugin-data").unwrap();
+
+        // 2. 创建属于黑名单的文件/目录
+        let window_states_dir = src_path.join("plugin_data");
+        fs::create_dir_all(&window_states_dir).unwrap();
+        fs::write(window_states_dir.join("window_states.json"), "states").unwrap();
+
+        let log_dir = src_path.join("logs");
+        fs::create_dir_all(&log_dir).unwrap();
+        fs::write(log_dir.join("onin.log"), "logs").unwrap();
+
+        let clipboard_dir = src_path.join("extensions").join("clipboard");
+        fs::create_dir_all(&clipboard_dir).unwrap();
+        fs::write(clipboard_dir.join("history.json"), "clipboard").unwrap();
+
+        // 3. 打包
+        let dest_dir = tempdir().unwrap();
+        let zip_path = dest_dir.path().join("backup.zip");
+        pack_app_data_to_zip(src_path, &zip_path).unwrap();
+
+        // 4. 解包到新的临时目录
+        let unpack_dir = tempdir().unwrap();
+        let unpack_path = unpack_dir.path();
+        unpack_zip_to_app_data(&zip_path, unpack_path).unwrap();
+
+        // 5. 校验结果
+        // 普通文件应该存在且内容正确
+        assert!(unpack_path.join("app_config.json").exists());
+        assert_eq!(
+            fs::read_to_string(unpack_path.join("app_config.json")).unwrap(),
+            "{}"
+        );
+
+        assert!(unpack_path.join("plugins/my_plugin/config.json").exists());
+        assert_eq!(
+            fs::read_to_string(unpack_path.join("plugins/my_plugin/config.json")).unwrap(),
+            "plugin-data"
+        );
+
+        // 黑名单中的文件和目录应该被排除，不应存在
+        assert!(!unpack_path.join("plugin_data/window_states.json").exists());
+        assert!(!unpack_path.join("logs/onin.log").exists());
+        assert!(!unpack_path
+            .join("extensions/clipboard/history.json")
+            .exists());
+    }
+}

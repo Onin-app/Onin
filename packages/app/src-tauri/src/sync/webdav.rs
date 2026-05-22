@@ -159,3 +159,67 @@ impl WebDavClient {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_webdav_client_new_and_url_normalization() {
+        // 测试基础 URL 缺少斜杠时会被自动补齐
+        let client_no_slash = WebDavClient::new(
+            "https://dav.jianguoyun.com/dav".to_string(),
+            "user".to_string(),
+            "pass".to_string(),
+        );
+        assert_eq!(client_no_slash.base_url, "https://dav.jianguoyun.com/dav/");
+
+        // 测试基础 URL 已经有斜杠时不会重复补充
+        let client_with_slash = WebDavClient::new(
+            "https://dav.jianguoyun.com/dav/".to_string(),
+            "user".to_string(),
+            "pass".to_string(),
+        );
+        assert_eq!(
+            client_with_slash.base_url,
+            "https://dav.jianguoyun.com/dav/"
+        );
+    }
+
+    #[test]
+    fn test_get_full_url() {
+        let client = WebDavClient::new(
+            "https://example.com/dav".to_string(),
+            "user".to_string(),
+            "pass".to_string(),
+        );
+
+        // 测试拼接普通子路径
+        assert_eq!(
+            client.get_full_url("onin_backup.zip"),
+            "https://example.com/dav/onin_backup.zip"
+        );
+
+        // 测试拼接带斜杠开头的子路径，确保双斜杠被修剪
+        assert_eq!(
+            client.get_full_url("/onin/last_sync.json"),
+            "https://example.com/dav/onin/last_sync.json"
+        );
+
+        // 测试空子路径
+        assert_eq!(client.get_full_url(""), "https://example.com/dav/");
+    }
+
+    #[test]
+    fn test_get_auth_header() {
+        let client = WebDavClient::new(
+            "https://example.com/dav".to_string(),
+            "user".to_string(),
+            "pass".to_string(),
+        );
+
+        let header = client.get_auth_header();
+        // "user:pass" 的 base64 是 "dXNlcjpwYXNz"
+        assert_eq!(header.to_str().unwrap(), "Basic dXNlcjpwYXNz");
+    }
+}
