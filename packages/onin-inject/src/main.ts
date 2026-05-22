@@ -120,7 +120,7 @@ function initRuntime() {
     const urlParams = new URLSearchParams(window.location.search);
     window.__ONIN_RUNTIME__ = {
       mode: (urlParams.get('mode') as any) || 'inline',
-      pluginId: window.__PLUGIN_ID__ || 'unknown',
+      pluginId: window.__PLUGIN_ID__,
       version: 'dev-fallback',
       mainWindowLabel: 'main',
     };

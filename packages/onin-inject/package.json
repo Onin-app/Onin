@@ -7,16 +7,22 @@
   "scripts": {
     "dev": "vite build --watch",
     "build": "vite build",
-    "check": "svelte-check --tsconfig ./tsconfig.json"
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest --coverage"
   },
   "dependencies": {
     "svelte-sonner": "^1.0.7"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "jsdom": "^29.1.1",
     "svelte": "^5.34.7",
     "svelte-check": "^4.2.2",
     "typescript": "~5.8.3",
-    "vite": "^8.0.0"
+    "vite": "^8.0.0",
+    "vitest": "^3.2.4"
   }
 }
