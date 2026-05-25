@@ -270,18 +270,22 @@ jobs:
           echo "Collected assets successfully:"
           ls -la dist/
 
-      - name: Setup Aliyun ossutil 🛠️
-        # 使用 GitHub 市场上最流行的官方 ossutil 跨平台安装配置器
-        # 支持 Windows, macOS, Linux，完美避开任何 Actions 仓库加载失败的风险
-        uses: manyuanrong/setup-ossutil@v2.0
+      - name: Upload to Aliyun OSS 🚀
+        # 使用纯 JavaScript 实现的阿里云 OSS 自动上传 Action
+        # 无需下载任何原生 CLI 二进制工具，从原理上 100% 根治了 macOS (Unknown system error -8) 及 Windows (Unable to locate executable) 等一切平台架构兼容硬伤！
+        # ⚠️ 请确保在 GitHub 仓库中配置了对应的 Secrets:
+        # - OSS_ACCESS_KEY_ID
+        # - OSS_ACCESS_KEY_SECRET
+        # - OSS_REGION (例如: oss-cn-beijing)
+        # - OSS_BUCKET
+        uses: tiyee/aliyun-oss-auto-upload@v2.0.7
         with:
-          endpoint: ${{ secrets.OSS_ENDPOINT }} # 例如: oss-cn-beijing.aliyuncs.com
+          region: ${{ secrets.OSS_REGION }}
           access-key-id: ${{ secrets.OSS_ACCESS_KEY_ID }}
           access-key-secret: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
-
-      - name: Upload to Aliyun OSS 🚀
-        # 调用官方 Go 语言原生 ossutil 工具进行超高速并发上传，不限速，不误报
-        run: ossutil cp -r dist/ oss://${{ secrets.OSS_BUCKET }}/releases/v${{ needs.release.outputs.version }}/
+          bucket: ${{ secrets.OSS_BUCKET }}
+          local-folder: dist
+          remote-dir: releases/v${{ needs.release.outputs.version }}
 
       # 💡 提示：若您使用的是腾讯云 COS，可使用如下官方 Action 替换上方阿里云步骤：
       # - name: Upload to Tencent Cloud COS 🚀
