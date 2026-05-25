@@ -202,7 +202,7 @@ import { ref, computed, onMounted } from 'vue';
 
 // 企业级国内云对象存储 (OSS) 基准地址配置
 // 您可在此处将其修改为您的阿里云 OSS、腾讯云 COS、华为云 OBS 或任意配置了 CDN 的云存储域名
-const OSS_BASE_URL = 'https://download.onin.run';
+const OSS_BASE_URL = 'https://onin-app.oss-cn-beijing.aliyuncs.com';
 
 // 状态变量
 const downloadSource = ref('github'); // 'github' | 'oss'
