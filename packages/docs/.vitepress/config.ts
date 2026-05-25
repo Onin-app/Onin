@@ -11,6 +11,7 @@ export default defineConfig({
     siteTitle: 'Onin',
 
     nav: [
+      { text: '下载', link: '/download' },
       { text: '用户指南', link: '/guide/' },
       { text: '插件开发', link: '/plugin-dev/' },
       { text: 'SDK API', link: '/sdk/' },
