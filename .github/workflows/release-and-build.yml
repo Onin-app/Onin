@@ -180,7 +180,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, ubuntu-latest, windows-latest]
+        platform: [macos-latest, macos-13, ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.platform }}
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
