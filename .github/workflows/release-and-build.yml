@@ -182,6 +182,8 @@ jobs:
       matrix:
         platform: [macos-latest, ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.platform }}
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Debug outputs
         run: |
@@ -320,6 +322,10 @@ jobs:
           SENTRY_ORG: ${{ secrets.GLITCHTIP_ORG }}
           SENTRY_PROJECT: ${{ secrets.GLITCHTIP_PROJECT }}
         run: |
+          if [ -z "$SENTRY_URL" ] || [ -z "$SENTRY_AUTH_TOKEN" ]; then
+            echo "⚠️ GlitchTip/Sentry URL or Auth Token is not configured. Skipping sourcemap upload."
+            exit 0
+          fi
           # Use the modern artifact bundle flow supported by GlitchTip 4.2+.
           npx @sentry/cli@3.4.0 sourcemaps inject packages/app/build/_app/immutable
           npx @sentry/cli@3.4.0 sourcemaps upload packages/app/build/_app/immutable
