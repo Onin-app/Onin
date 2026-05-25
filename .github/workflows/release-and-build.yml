@@ -287,7 +287,7 @@ jobs:
           access-key-secret: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
           bucket: ${{ secrets.OSS_BUCKET }}
           local-folder: dist
-          remote-dir: releases/v${{ needs.release.outputs.version }}
+          remote-dir: releases/v${{ needs.release.outputs.version }}/
 
       # 💡 提示：若您使用的是腾讯云 COS，可使用如下官方 Action 替换上方阿里云步骤：
       # - name: Upload to Tencent Cloud COS 🚀
