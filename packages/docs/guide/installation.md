@@ -17,11 +17,13 @@
 
 除上述 **[智能下载页面](/download)** 之外，您也可以前往 [GitHub Releases](https://github.com/b-yp/Onin/releases) 手动下载。
 
-| 平台                  | 适用架构              | 安装包文件名               |
-| --------------------- | --------------------- | -------------------------- |
-| **Windows**           | Intel/AMD 64位 (x64)  | `Onin_x.x.x_x64-setup.exe` |
-| **macOS (苹果芯片)**  | Apple Silicon (ARM64) | `Onin_x.x.x_aarch64.dmg`   |
-| **macOS (Intel芯片)** | Intel 处理器 (x64)    | `Onin_x.x.x_x64.dmg`       |
+| 平台                      | 适用架构                    | 安装包文件名                |
+| ------------------------- | --------------------------- | --------------------------- |
+| **Windows**               | Intel/AMD 64位 (x64)        | `Onin_x.x.x_x64-setup.exe`  |
+| **macOS (苹果芯片)**      | Apple Silicon (ARM64)       | `Onin_x.x.x_aarch64.dmg`    |
+| **macOS (Intel芯片)**     | Intel 处理器 (x64)          | `Onin_x.x.x_x64.dmg`        |
+| **Linux (Ubuntu/Debian)** | Debian/Ubuntu 系统 (x64)    | `onin_x.x.x_amd64.deb`      |
+| **Linux (通用)**          | 绝大多数 Linux 发行版 (x64) | `onin_x.x.x_amd64.AppImage` |
 
 ## Windows 安装
 
@@ -42,6 +44,26 @@ xattr -cr /Applications/Onin.app
 ```
 
 然后重新双击打开即可。
+
+## Linux 安装
+
+### Debian / Ubuntu (.deb)
+
+在终端执行以下命令进行安装：
+
+```bash
+sudo dpkg -i onin_x.x.x_amd64.deb
+sudo apt-get install -f # 修复可能的依赖问题
+```
+
+### 通用 Linux (.AppImage)
+
+赋予执行权限后即可直接运行：
+
+```bash
+chmod +x onin_x.x.x_amd64.AppImage
+./onin_x.x.x_amd64.AppImage
+```
 
 ## 设置开机自启
 
