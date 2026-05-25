@@ -8,6 +8,8 @@ fn main() {
         "VITE_GLITCHTIP_ENVIRONMENT",
         "GLITCHTIP_DSN_NATIVE",
         "GLITCHTIP_ENVIRONMENT",
+        "APTABASE_KEY",
+        "VITE_APTABASE_KEY",
     ] {
         println!("cargo:rerun-if-env-changed={key}");
     }
@@ -29,6 +31,8 @@ fn main() {
                         | "VITE_GLITCHTIP_ENVIRONMENT"
                         | "GLITCHTIP_DSN_NATIVE"
                         | "GLITCHTIP_ENVIRONMENT"
+                        | "APTABASE_KEY"
+                        | "VITE_APTABASE_KEY"
                 ) && env::var(&key).is_err()
                 {
                     println!("cargo:rustc-env={key}={value}");

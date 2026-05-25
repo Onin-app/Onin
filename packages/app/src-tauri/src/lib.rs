@@ -68,14 +68,25 @@ fn create_shortcut_handler(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // 初始化并进入 Tokio 运行时上下文，防止依赖异步运行时的插件（如 Aptabase/reqwest）因缺少 reactor 而崩溃
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let _guard = rt.enter();
+
     let _glitchtip = telemetry::init_glitchtip();
 
     // 初始化日志
     use tracing_subscriber::layer::SubscriberExt;
     use tracing_subscriber::util::SubscriberInitExt;
 
+    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info,tauri_plugin_aptabase=warn"));
+
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer().with_span_events(FmtSpan::FULL))
+        .with(env_filter)
         .with(sentry_tracing::layer())
         .init();
 
@@ -88,6 +99,12 @@ pub fn run() {
         None::<tokio::sync::oneshot::Sender<()>>,
     ));
 
+    // 读取 Aptabase 统计服务的 App Key，如果未设置则使用占位符以确保正常编译
+    let aptabase_key = option_env!("APTABASE_KEY")
+        .or(option_env!("VITE_APTABASE_KEY"))
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or("A-EU-0000000000");
+
     // 构建并运行 Tauri 应用
     let app = state::setup_managed_state(tauri::Builder::default())
         .manage(client)
@@ -97,6 +114,7 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(tauri_plugin_aptabase::Builder::new(aptabase_key).build())
         .plugin(
             tauri_plugin_autostart::Builder::new()
                 .args(["--autostarted"])
