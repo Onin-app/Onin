@@ -258,6 +258,59 @@ jobs:
           prerelease: false
           includeUpdaterJson: true
 
+      - name: Collect release assets 📦
+        shell: bash
+        run: |
+          mkdir -p dist
+          # 动态检索并统一拷贝各平台的发布二进制包
+          find packages/app/src-tauri/target/release/bundle/nsis/ -name "*.exe" -exec cp {} dist/ \; 2>/dev/null || true
+          find packages/app/src-tauri/target/release/bundle/dmg/ -name "*.dmg" -exec cp {} dist/ \; 2>/dev/null || true
+          find packages/app/src-tauri/target/release/bundle/appimage/ -name "*.AppImage" -exec cp {} dist/ \; 2>/dev/null || true
+          find packages/app/src-tauri/target/release/bundle/deb/ -name "*.deb" -exec cp {} dist/ \; 2>/dev/null || true
+          echo "Collected assets successfully:"
+          ls -la dist/
+
+      - name: Upload to Aliyun OSS 🚀
+        # 阿里云官方 OSS 上传 Action (默认配置，极速直连)
+        # ⚠️ 请确保在 GitHub 仓库中配置了对应的 Secrets:
+        # - OSS_ACCESS_KEY_ID
+        # - OSS_ACCESS_KEY_SECRET
+        # - OSS_REGION (例如: oss-cn-hangzhou)
+        # - OSS_BUCKET
+        uses: aliyun/oss-action@v1.0.2
+        with:
+          key-id: ${{ secrets.OSS_ACCESS_KEY_ID }}
+          key-secret: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
+          region: ${{ secrets.OSS_REGION }}
+          bucket: ${{ secrets.OSS_BUCKET }}
+          assets: dist/**
+          target-dir: releases/v${{ needs.release.outputs.version }}/
+
+      # 💡 提示：若您使用的是腾讯云 COS，可使用如下官方 Action 替换上方阿里云步骤：
+      # - name: Upload to Tencent Cloud COS 🚀
+      #   uses: tencentcloudact/cos-action@v1
+      #   with:
+      #     secret_id: ${{ secrets.COS_SECRET_ID }}
+      #     secret_key: ${{ secrets.COS_SECRET_KEY }}
+      #     bucket: ${{ secrets.COS_BUCKET }}
+      #     region: ${{ secrets.COS_REGION }}
+      #     cos_dir: 'releases/v${{ needs.release.outputs.version }}/'
+      #     local_path: 'dist'
+
+      # 💡 提示：若您使用的是 AWS S3 兼容的对象存储（如 Cloudflare R2 等），可使用如下 Action：
+      # - name: Upload to Cloudflare R2 🚀
+      #   uses: jakejarvis/s3-sync-action@master
+      #   with:
+      #     args: --follow-symlinks --delete
+      #   env:
+      #     AWS_S3_BUCKET: ${{ secrets.R2_BUCKET }}
+      #     AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      #     AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      #     AWS_REGION: 'auto'
+      #     AWS_S3_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      #     SOURCE_DIR: 'dist'
+      #     DEST_DIR: 'releases/v${{ needs.release.outputs.version }}'
+
       - name: Upload frontend sourcemaps to GlitchTip
         if: matrix.platform == 'ubuntu-latest'
         env:
