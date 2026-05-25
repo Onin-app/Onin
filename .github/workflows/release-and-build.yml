@@ -270,21 +270,18 @@ jobs:
           echo "Collected assets successfully:"
           ls -la dist/
 
-      - name: Upload to Aliyun OSS 🚀
-        # 阿里云官方 OSS 上传 Action (默认配置，极速直连)
-        # ⚠️ 请确保在 GitHub 仓库中配置了对应的 Secrets:
-        # - OSS_ACCESS_KEY_ID
-        # - OSS_ACCESS_KEY_SECRET
-        # - OSS_REGION (例如: oss-cn-hangzhou)
-        # - OSS_BUCKET
-        uses: aliyun/oss-action@v1.0.2
+      - name: Setup Aliyun ossutil 🛠️
+        # 使用 GitHub 市场上最流行的官方 ossutil 跨平台安装配置器
+        # 支持 Windows, macOS, Linux，完美避开任何 Actions 仓库加载失败的风险
+        uses: manyuanrong/setup-ossutil@v2.0
         with:
-          key-id: ${{ secrets.OSS_ACCESS_KEY_ID }}
-          key-secret: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
-          region: ${{ secrets.OSS_REGION }}
-          bucket: ${{ secrets.OSS_BUCKET }}
-          assets: dist/**
-          target-dir: releases/v${{ needs.release.outputs.version }}/
+          endpoint: ${{ secrets.OSS_ENDPOINT }} # 例如: oss-cn-beijing.aliyuncs.com
+          access-key-id: ${{ secrets.OSS_ACCESS_KEY_ID }}
+          access-key-secret: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
+
+      - name: Upload to Aliyun OSS 🚀
+        # 调用官方 Go 语言原生 ossutil 工具进行超高速并发上传，不限速，不误报
+        run: ossutil cp -r dist/ oss://${{ secrets.OSS_BUCKET }}/releases/v${{ needs.release.outputs.version }}/
 
       # 💡 提示：若您使用的是腾讯云 COS，可使用如下官方 Action 替换上方阿里云步骤：
       # - name: Upload to Tencent Cloud COS 🚀
