@@ -16,6 +16,18 @@
   // Setup plugin console listener to forward plugin console output to webview devtools
   setupPluginConsoleListener();
 
+  // 简易且完全兼容 Tauri v2 的 Aptabase 统计上报实现，规避不兼容 Tauri v2 的 @aptabase/tauri npm 包
+  async function trackEvent(
+    name: string,
+    props?: Record<string, string | number>,
+  ) {
+    try {
+      await invoke("plugin:aptabase|track_event", { name, props });
+    } catch (err) {
+      console.error("[Aptabase] 追踪事件失败:", err);
+    }
+  }
+
   interface ToastPayload {
     message: string;
     kind: "default" | "success" | "error" | "warning" | "info";
@@ -36,6 +48,9 @@
   // This onMount block sets up a single, persistent listener for the 'esc_key_pressed' event.
   // It will live for the entire duration of the app, avoiding setup/teardown during page navigation.
   onMount(() => {
+    // 跟踪应用启动事件，用以统计日活/用户数
+    trackEvent("app_started");
+
     const listenersPromise = (async () => {
       // Restore Listener:
       // Listen to "escape_pressed" (standardized event)

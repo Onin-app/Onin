@@ -4173,6 +4173,7 @@ dependencies = [
  "serde_json",
  "tauri",
  "tauri-build",
+ "tauri-plugin-aptabase",
  "tauri-plugin-autostart",
  "tauri-plugin-clipboard-manager",
  "tauri-plugin-dialog",
@@ -6305,6 +6306,25 @@ dependencies = [
  "tauri-utils",
  "toml 0.9.5",
  "walkdir",
+]
+
+[[package]]
+name = "tauri-plugin-aptabase"
+version = "1.0.0"
+source = "git+https://github.com/aptabase/tauri-plugin-aptabase#de6df6b8671568aad53eabaf4b49207a3d6c5622"
+dependencies = [
+ "futures",
+ "log",
+ "os_info",
+ "rand 0.9.2",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sys-locale",
+ "tauri",
+ "tauri-plugin",
+ "time",
+ "tokio",
 ]
 
 [[package]]

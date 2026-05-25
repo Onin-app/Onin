@@ -32,7 +32,8 @@
     "notification:allow-permission-state",
     "core:webview:allow-internal-toggle-devtools",
     "core:webview:allow-create-webview-window",
-    "os:default"
+    "os:default",
+    "aptabase:allow-track-event"
   ],
   "remote": {
     "urls": ["http://localhost:*", "http://127.0.0.1:*"]
