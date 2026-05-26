@@ -116,6 +116,7 @@ export interface WebDavConfig {
   password: string;
   sync_on_startup: boolean;
   sync_on_exit: boolean;
+  folder_name?: string;
 }
 
 export interface AppConfig {

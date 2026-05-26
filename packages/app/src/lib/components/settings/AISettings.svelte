@@ -20,6 +20,7 @@
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import MCPSettings from "$lib/components/settings/MCPSettings.svelte";
   import SkillsSettings from "$lib/components/settings/SkillsSettings.svelte";
+  import PasswordInput from "$lib/components/PasswordInput.svelte";
 
   type TabId = "providers" | "mcp" | "skills";
   const tabs: { id: TabId; label: string; icon: any }[] = [
@@ -626,12 +627,11 @@
                 >
                   API 密钥
                 </label>
-                <input
+                <PasswordInput
                   id="api-key-input"
-                  type="password"
                   bind:value={editForm.api_key}
                   placeholder="sk-..."
-                  class="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:focus:border-neutral-100"
+                  class="h-10 w-full rounded-lg bg-white dark:bg-neutral-800"
                 />
                 {#if selectedRemoteProvider?.apiKeyUrl}
                   <p

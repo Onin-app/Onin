@@ -37,11 +37,20 @@ pub async fn test_webdav_connection(config: WebDavConfig) -> Result<(), String> 
 pub async fn check_cloud_backup(config: WebDavConfig) -> Result<Option<LastSyncInfo>, String> {
     let client = get_webdav_client(&config)?;
 
-    // 我们先尝试创建一次 /onin/ 根目录，保证目录存在，这也是安全的
-    let _ = client.create_directory("onin").await;
+    let folder = config
+        .folder_name
+        .as_deref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .unwrap_or("onin");
+
+    // 我们先尝试创建一次云端根目录，保证目录存在，这也是安全的
+    let _ = client.create_directory(folder).await;
+
+    let last_sync_path = format!("{}/last_sync.json", folder);
 
     // 拉取 last_sync.json 验证
-    match client.download_file("onin/last_sync.json").await {
+    match client.download_file(&last_sync_path).await {
         Ok(Some(bytes)) => {
             let info: LastSyncInfo = serde_json::from_slice(&bytes)
                 .map_err(|e| format!("解析云端同步元数据失败: {}", e))?;
@@ -86,8 +95,18 @@ pub async fn trigger_webdav_sync(
 
     let temp_zip_path = cache_dir.join("onin_backup_temp.zip");
 
-    // 确保云端 /onin/ 目录存在
-    let _ = client.create_directory("onin").await;
+    let folder = config
+        .folder_name
+        .as_deref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .unwrap_or("onin");
+
+    let backup_path = format!("{}/onin_backup.zip", folder);
+    let last_sync_path = format!("{}/last_sync.json", folder);
+
+    // 确保云端目录存在
+    let _ = client.create_directory(folder).await;
 
     if mode == "backup" {
         println!("[sync] 开始打包本地数据...");
@@ -99,9 +118,7 @@ pub async fn trigger_webdav_sync(
             std::fs::read(&temp_zip_path).map_err(|e| format!("读取临时备份包失败: {}", e))?;
 
         println!("[sync] 上传备份包到云端...");
-        client
-            .upload_file("onin/onin_backup.zip", zip_bytes)
-            .await?;
+        client.upload_file(&backup_path, zip_bytes).await?;
 
         // C. 生成并写入本地与云端的同步信息 last_sync.json
         let sync_time = chrono::Utc::now().to_rfc3339();
@@ -115,9 +132,7 @@ pub async fn trigger_webdav_sync(
         let info_bytes = serde_json::to_vec_pretty(&sync_info)
             .map_err(|e| format!("序列化同步元数据失败: {}", e))?;
 
-        client
-            .upload_file("onin/last_sync.json", info_bytes)
-            .await?;
+        client.upload_file(&last_sync_path, info_bytes).await?;
 
         // 清理临时 ZIP
         let _ = std::fs::remove_file(&temp_zip_path);
@@ -127,7 +142,7 @@ pub async fn trigger_webdav_sync(
     } else if mode == "restore" {
         println!("[sync] 从云端下载备份包...");
         // A. 下载云端备份包到本地临时文件
-        match client.download_file("onin/onin_backup.zip").await? {
+        match client.download_file(&backup_path).await? {
             Some(zip_bytes) => {
                 std::fs::write(&temp_zip_path, zip_bytes)
                     .map_err(|e| format!("保存云端备份包失败: {}", e))?;
@@ -155,7 +170,7 @@ pub async fn trigger_webdav_sync(
                 println!("[sync] 恢复全部完成！");
 
                 // 获取最新的云端同步信息
-                if let Ok(Some(bytes)) = client.download_file("onin/last_sync.json").await {
+                if let Ok(Some(bytes)) = client.download_file(&last_sync_path).await {
                     if let Ok(info) = serde_json::from_slice::<LastSyncInfo>(&bytes) {
                         return Ok(Some(info));
                     }
