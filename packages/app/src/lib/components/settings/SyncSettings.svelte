@@ -15,6 +15,7 @@
   } from "phosphor-svelte";
   import type { AppConfig, WebDavConfig } from "$lib/type";
   import SetItem from "./SetItem.svelte";
+  import PasswordInput from "$lib/components/PasswordInput.svelte";
 
   // 云端备份元数据接口
   interface LastSyncInfo {
@@ -268,12 +269,11 @@
             description="出于安全考虑，推荐使用网盘生成的应用独立密码"
           >
             {#snippet content()}
-              <input
-                type="password"
+              <PasswordInput
                 bind:value={password}
                 onchange={updateConfig}
                 placeholder="应用授权密钥"
-                class="h-8 w-64 rounded-md border border-neutral-200 bg-transparent px-3 text-sm placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-hidden dark:border-neutral-700 dark:focus:border-neutral-100"
+                class="h-8 w-64 rounded-md bg-transparent"
               />
             {/snippet}
           </SetItem>
