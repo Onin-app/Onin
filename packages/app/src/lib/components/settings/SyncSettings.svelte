@@ -28,6 +28,7 @@
   let baseUrl = $state<string>("");
   let username = $state<string>("");
   let password = $state<string>("");
+  let folderName = $state<string>("");
   let syncOnStartup = $state<boolean>(false);
   let syncOnExit = $state<boolean>(false);
 
@@ -59,6 +60,7 @@
         baseUrl = config.webdav.base_url;
         username = config.webdav.username;
         password = config.webdav.password;
+        folderName = config.webdav.folder_name || "";
         syncOnStartup = config.webdav.sync_on_startup;
         syncOnExit = config.webdav.sync_on_exit;
       }
@@ -77,6 +79,7 @@
       password,
       sync_on_startup: syncOnStartup,
       sync_on_exit: syncOnExit,
+      folder_name: folderName,
     };
   };
 
@@ -274,6 +277,22 @@
                 onchange={updateConfig}
                 placeholder="应用授权密钥"
                 class="h-8 w-64 rounded-md bg-transparent"
+              />
+            {/snippet}
+          </SetItem>
+
+          <!-- 云端同步目录 -->
+          <SetItem
+            title="云端同步目录"
+            description="支持自定义单级目录名称（如 onin-work, onin-home）实现不同电脑配置隔离，默认使用 onin"
+          >
+            {#snippet content()}
+              <input
+                type="text"
+                bind:value={folderName}
+                onchange={updateConfig}
+                placeholder="onin"
+                class="h-8 w-64 rounded-md border border-neutral-200 bg-transparent px-3 text-sm placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-hidden dark:border-neutral-700 dark:focus:border-neutral-100"
               />
             {/snippet}
           </SetItem>

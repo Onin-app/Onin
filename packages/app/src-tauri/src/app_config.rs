@@ -35,6 +35,8 @@ pub struct WebDavConfig {
     pub sync_on_startup: bool,
     #[serde(default)]
     pub sync_on_exit: bool,
+    #[serde(default)]
+    pub folder_name: Option<String>,
 }
 
 impl Default for WebDavConfig {
@@ -46,6 +48,7 @@ impl Default for WebDavConfig {
             password: String::new(),
             sync_on_startup: false,
             sync_on_exit: false,
+            folder_name: None,
         }
     }
 }
