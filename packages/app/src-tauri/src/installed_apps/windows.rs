@@ -266,7 +266,7 @@ fn panic_message(payload: Box<dyn std::any::Any + Send>) -> String {
 }
 
 fn app_from_shortcut(shortcut_path: PathBuf) -> Result<Option<AppInfo>, String> {
-    let shell_link = match ShellLink::open(&shortcut_path) {
+    let shell_link = match ShellLink::open(&shortcut_path, lnk::encoding::WINDOWS_1252) {
         Ok(link) => link,
         Err(e) => {
             tracing::warn!("Failed to open shortcut {:?}: {:?}", shortcut_path, e);
@@ -361,10 +361,10 @@ fn should_filter_shortcut_with_link(link: &ShellLink) -> bool {
 // 保持同步，因为会在 spawn_blocking 内部调用
 fn extract_target_from_lnk_with_link(link: &ShellLink) -> Option<String> {
     let link_info = link.link_info().as_ref()?;
-    let local_path = link_info.local_base_path().clone()?;
+    let local_path = link_info.local_base_path()?;
 
-    if Path::new(&local_path).exists() {
-        Some(local_path)
+    if Path::new(local_path).exists() {
+        Some(local_path.to_string())
     } else {
         None
     }
@@ -374,7 +374,7 @@ fn extract_target_from_lnk_with_link(link: &ShellLink) -> Option<String> {
 // 保持同步，因为会在 spawn_blocking 内部调用
 fn extract_icon_from_shortcut_with_link(link: &ShellLink, target_path: &str) -> Option<String> {
     // 尝试获取快捷方式的图标路径
-    if let Some(icon_location) = link.icon_location() {
+    if let Some(icon_location) = link.string_data().icon_location().as_ref() {
         let path = icon_location.to_string();
         if Path::new(&path).exists() {
             if let Some(ext) = Path::new(&path).extension().and_then(|s| s.to_str()) {
