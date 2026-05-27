@@ -104,13 +104,14 @@ pub struct ClipboardMonitor {
 }
 
 impl ClipboardMonitor {
-    pub fn new(app: AppHandle, history: ClipboardHistory) -> Self {
-        Self {
-            ctx: ClipboardContext::new().unwrap(),
+    pub fn new(app: AppHandle, history: ClipboardHistory) -> Result<Self, String> {
+        let ctx = ClipboardContext::new().map_err(|e| e.to_string())?;
+        Ok(Self {
+            ctx,
             app_handle: app,
             last_content_hash: String::new(),
             history,
-        }
+        })
     }
 
     fn process_image(&mut self, current_hash: &mut String, new_item: &mut Option<ClipboardItem>) {
@@ -234,18 +235,25 @@ pub fn init(app: &AppHandle) {
     let app_for_thread = app.clone();
     let history_for_thread = history.clone();
 
-    std::thread::spawn(move || {
-        let monitor = ClipboardMonitor::new(app_for_thread, history_for_thread);
-        match ClipboardWatcherContext::new() {
-            Ok(mut watcher) => {
-                let _shutdown = watcher.add_handler(monitor).get_shutdown_channel();
-                watcher.start_watch();
-            }
+    std::thread::spawn(
+        move || match ClipboardMonitor::new(app_for_thread, history_for_thread) {
+            Ok(monitor) => match ClipboardWatcherContext::new() {
+                Ok(mut watcher) => {
+                    let _shutdown = watcher.add_handler(monitor).get_shutdown_channel();
+                    watcher.start_watch();
+                }
+                Err(e) => {
+                    eprintln!(
+                        "[Clipboard Extension] Failed to initialize clipboard watcher: {}",
+                        e
+                    );
+                }
+            },
             Err(e) => {
-                eprintln!("Failed to initialize clipboard watcher: {}", e);
+                eprintln!("[Clipboard Extension] Failed to initialize clipboard monitor (no display?): {}", e);
             }
-        }
-    });
+        },
+    );
 }
 
 fn now_ts() -> u64 {
