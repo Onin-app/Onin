@@ -268,6 +268,8 @@ jobs:
           VITE_GLITCHTIP_ENVIRONMENT: production
           GLITCHTIP_DSN_NATIVE: ${{ secrets.GLITCHTIP_DSN_NATIVE }}
           GLITCHTIP_ENVIRONMENT: production
+          APTABASE_KEY: ${{ secrets.APTABASE_KEY }}
+          VITE_APTABASE_KEY: ${{ secrets.VITE_APTABASE_KEY }}
         with:
           projectPath: packages/app
           tagName: ${{ needs.release.outputs.tag }}
