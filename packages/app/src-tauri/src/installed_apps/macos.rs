@@ -8,7 +8,7 @@ use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use tauri::async_runtime;
-use tracing::{error, info};
+use tracing::{info, warn};
 
 fn get_app_icon(app_path: &str) -> Option<String> {
     info!("[ICON] Processing app: {}", app_path);
@@ -16,7 +16,7 @@ fn get_app_icon(app_path: &str) -> Option<String> {
     let info_plist = match Value::from_file(&info_plist_path) {
         Ok(plist) => plist,
         Err(e) => {
-            error!("[ICON] Failed to read Info.plist for {}: {}", app_path, e);
+            warn!("[ICON] Failed to read Info.plist for {}: {}", app_path, e);
             return None;
         }
     };
@@ -88,7 +88,7 @@ fn get_app_icon(app_path: &str) -> Option<String> {
             path.clone()
         }
         None => {
-            error!("[ICON] No usable icon file found for {}", app_path);
+            warn!("[ICON] No usable icon file found for {}", app_path);
             return None;
         }
     };
@@ -98,7 +98,7 @@ fn get_app_icon(app_path: &str) -> Option<String> {
     let mut file = match File::open(&final_icon_path) {
         Ok(f) => f,
         Err(e) => {
-            error!(
+            warn!(
                 "[ICON] Failed to open icon file {:?}: {}",
                 final_icon_path, e
             );
@@ -108,7 +108,7 @@ fn get_app_icon(app_path: &str) -> Option<String> {
     let icon_family = match IconFamily::read(&mut file) {
         Ok(family) => family,
         Err(e) => {
-            error!(
+            warn!(
                 "[ICON] Failed to read icon family from {:?}: {}",
                 final_icon_path, e
             );
@@ -141,7 +141,7 @@ fn get_app_icon(app_path: &str) -> Option<String> {
     let image = match icns::Image::read_png(&icon_element.data[..]) {
         Ok(img) => img,
         Err(e) => {
-            error!(
+            warn!(
                 "[ICON] Failed to read png from icon element for {:?}: {}",
                 final_icon_path, e
             );
@@ -150,7 +150,7 @@ fn get_app_icon(app_path: &str) -> Option<String> {
     };
     let mut png_data = Vec::new();
     if let Err(e) = image.write_png(&mut png_data) {
-        error!(
+        warn!(
             "[ICON] Failed to write png data for {:?}: {}",
             final_icon_path, e
         );
