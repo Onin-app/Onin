@@ -317,7 +317,7 @@ async fn get_apps_from_shortcuts() -> Result<Vec<AppInfo>, String> {
             match catch_unwind(AssertUnwindSafe(|| app_from_shortcut(shortcut_path))) {
                 Ok(result) => result,
                 Err(payload) => {
-                    tracing::error!(
+                    tracing::warn!(
                         "get_apps_from_shortcuts: panic while processing shortcut {:?}: {}",
                         shortcut_path_for_log,
                         panic_message(payload)
