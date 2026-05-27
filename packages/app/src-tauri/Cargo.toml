@@ -73,7 +73,7 @@ tauri-plugin-notification = "2"
 uuid = { version = "1.0", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 reqwest = { version = "0.12", features = ["json", "blocking", "stream"] }
-sentry = "0.46.2"
+sentry = { version = "0.46.2", default-features = false, features = ["backtrace", "panic", "contexts", "ureq", "native-tls"] }
 sentry-tracing = "0.46.2"
 
 url = "2.5"
