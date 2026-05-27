@@ -90,6 +90,10 @@ pub struct AppConfig {
     /// WebDAV 同步配置
     #[serde(default)]
     pub webdav: WebDavConfig,
+
+    /// 是否在启动时自动检查更新
+    #[serde(default = "default_auto_check_update")]
+    pub auto_check_update: bool,
 }
 
 fn default_auto_paste_time_limit() -> u64 {
@@ -108,6 +112,10 @@ fn default_marketplace_api_url() -> Option<String> {
     Some("https://onin.baiyapeng.cc".to_string())
 }
 
+fn default_auto_check_update() -> bool {
+    true // 默认开启
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
@@ -120,6 +128,7 @@ impl Default for AppConfig {
             file_search_excluded_paths: Vec::new(),
             file_search_include_hidden: false,
             webdav: WebDavConfig::default(),
+            auto_check_update: default_auto_check_update(),
         }
     }
 }

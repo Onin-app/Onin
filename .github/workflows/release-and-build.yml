@@ -180,7 +180,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, macos-13, ubuntu-latest, windows-latest]
+        include:
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+            args: '--target aarch64-apple-darwin'
+          - platform: macos-latest
+            target: x86_64-apple-darwin
+            args: '--target x86_64-apple-darwin'
+          - platform: ubuntu-latest
+            target: ''
+            args: ''
+          - platform: windows-latest
+            target: ''
+            args: ''
     runs-on: ${{ matrix.platform }}
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -216,10 +228,15 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install Rust target
+        if: matrix.target != ''
+        run: rustup target add ${{ matrix.target }}
+
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './packages/app/src-tauri -> target'
+          prefix-key: "v0-rust-${{ matrix.target || 'default' }}"
 
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
@@ -251,6 +268,8 @@ jobs:
           VITE_GLITCHTIP_ENVIRONMENT: production
           GLITCHTIP_DSN_NATIVE: ${{ secrets.GLITCHTIP_DSN_NATIVE }}
           GLITCHTIP_ENVIRONMENT: production
+          APTABASE_KEY: ${{ secrets.APTABASE_KEY }}
+          VITE_APTABASE_KEY: ${{ secrets.VITE_APTABASE_KEY }}
         with:
           projectPath: packages/app
           tagName: ${{ needs.release.outputs.tag }}
@@ -259,16 +278,17 @@ jobs:
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
+          args: ${{ matrix.args }}
 
       - name: Collect release assets 📦
         shell: bash
         run: |
           mkdir -p dist
           # 动态检索并统一拷贝各平台的发布二进制包
-          find packages/app/src-tauri/target/release/bundle/nsis/ -name "*.exe" -exec cp {} dist/ \; 2>/dev/null || true
-          find packages/app/src-tauri/target/release/bundle/dmg/ -name "*.dmg" -exec cp {} dist/ \; 2>/dev/null || true
-          find packages/app/src-tauri/target/release/bundle/appimage/ -name "*.AppImage" -exec cp {} dist/ \; 2>/dev/null || true
-          find packages/app/src-tauri/target/release/bundle/deb/ -name "*.deb" -exec cp {} dist/ \; 2>/dev/null || true
+          find packages/app/src-tauri/target/ -path "*/bundle/*" -name "*.exe" -exec cp {} dist/ \; 2>/dev/null || true
+          find packages/app/src-tauri/target/ -path "*/bundle/*" -name "*.dmg" -exec cp {} dist/ \; 2>/dev/null || true
+          find packages/app/src-tauri/target/ -path "*/bundle/*" -name "*.AppImage" -exec cp {} dist/ \; 2>/dev/null || true
+          find packages/app/src-tauri/target/ -path "*/bundle/*" -name "*.deb" -exec cp {} dist/ \; 2>/dev/null || true
           echo "Collected assets successfully:"
           ls -la dist/
 
