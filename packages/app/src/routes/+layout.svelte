@@ -12,6 +12,17 @@
   import { Toaster, toast } from "svelte-sonner";
   import { startColorPickerFlow } from "$lib/utils/colorPicker";
   import WindowResizer from "$lib/components/WindowResizer.svelte";
+  import UpdateDialog from "$lib/components/UpdateDialog.svelte";
+  import type { AppConfig } from "$lib/type";
+  import {
+    updateDialogOpen,
+    appVersion,
+    latestVersion,
+    releaseNotes,
+    downloadUrl,
+    checkUpdate,
+    closeUpdateDialog,
+  } from "$lib/stores/update";
 
   // Setup plugin console listener to forward plugin console output to webview devtools
   setupPluginConsoleListener();
@@ -160,8 +171,35 @@
       };
     })();
 
+    let autoUpdateIntervalId: ReturnType<typeof setInterval> | null = null;
+
+    // 加载配置判定是否执行自动检查更新
+    const setupAutoCheckUpdate = async () => {
+      try {
+        const config = await invoke<AppConfig>("get_app_config");
+        if (config.auto_check_update ?? true) {
+          // 启动后延迟 2 秒，避免阻塞窗口首屏密集渲染
+          setTimeout(() => {
+            checkUpdate(true);
+          }, 2000);
+
+          // 注册每 12 小时的后台轮询检测 (12 * 60 * 60 * 1000 = 43200000ms)
+          autoUpdateIntervalId = setInterval(() => {
+            checkUpdate(true);
+          }, 43200000);
+        }
+      } catch (err) {
+        console.error("加载自动检查更新配置失败:", err);
+      }
+    };
+
+    setupAutoCheckUpdate();
+
     // The returned cleanup function will only run if the entire layout is destroyed.
     return () => {
+      if (autoUpdateIntervalId) {
+        clearInterval(autoUpdateIntervalId);
+      }
       listenersPromise.then(
         ({ unlisten, unlistenVisibility, unlistenCommand, unlistenToast }) => {
           unlisten();
@@ -180,3 +218,12 @@
 
 <WindowResizer />
 <Toaster richColors position="top-center" />
+
+<UpdateDialog
+  bind:open={$updateDialogOpen}
+  currentVersion={$appVersion}
+  latestVersion={$latestVersion}
+  releaseNotes={$releaseNotes}
+  downloadUrl={$downloadUrl}
+  onClose={closeUpdateDialog}
+/>

@@ -129,4 +129,5 @@ export interface AppConfig {
   file_search_excluded_paths?: string[];
   file_search_include_hidden?: boolean;
   webdav?: WebDavConfig;
+  auto_check_update?: boolean;
 }

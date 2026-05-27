@@ -11,11 +11,14 @@
   import { detachWindowShortcut } from "$lib/stores/shortcuts";
 
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
-  import UpdateDialog from "$lib/components/UpdateDialog.svelte";
-  import { platform } from "@tauri-apps/plugin-os";
-  import { UPDATE_CONFIG } from "$lib/constants";
   import SetItem from "./SetItem.svelte";
   import ShortcutInput from "./ShortcutInput.svelte";
+  import {
+    checkingUpdate,
+    checkUpdate,
+    hasNewVersion,
+    latestVersion,
+  } from "$lib/stores/update";
 
   const themeList: { value: Theme; label: string }[] = [
     { value: Theme.SYSTEM, label: "跟随系统" },
@@ -26,6 +29,7 @@
   let currentTheme = $state<Theme>(Theme.DARK);
   let autostartEnabled = $state<boolean>(false);
   let trayIconEnabled = $state<boolean>(false);
+  let autoCheckUpdate = $state<boolean>(true);
   let shortcut = $state<string>("");
   let autoPasteTimeLimit = $state<number>(5);
   let autoClearTimeLimit = $state<number>(0);
@@ -95,6 +99,7 @@
           enable_usage_tracking: enableUsageTracking,
           marketplace_api_url: marketplaceApiUrl || undefined,
           disabled_extension_ids: disabledExtensionIds,
+          auto_check_update: autoCheckUpdate,
         },
       });
       toast.success("配置已保存");
@@ -178,6 +183,7 @@
       enableUsageTracking = config.enable_usage_tracking;
       marketplaceApiUrl = config.marketplace_api_url || "";
       disabledExtensionIds = config.disabled_extension_ids || [];
+      autoCheckUpdate = config.auto_check_update ?? true;
     } catch (e) {
       console.error("Failed to get app config:", e);
       toast.error("加载应用配置失败，请重启应用");
@@ -189,84 +195,6 @@
       console.error("Failed to get app version:", e);
     }
   });
-
-  let checkingUpdate = $state(false);
-  let updateDialogOpen = $state(false);
-  let latestVersion = $state("");
-  let releaseNotes = $state("");
-  let downloadUrl = $state("");
-
-  function isNewerVersion(current: string, latest: string) {
-    const cur = current.replace(/^v/, "").split(".").map(Number);
-    const lat = latest.replace(/^v/, "").split(".").map(Number);
-
-    for (let i = 0; i < Math.max(cur.length, lat.length); i++) {
-      const c = cur[i] || 0;
-      const l = lat[i] || 0;
-      if (l > c) return true;
-      if (l < c) return false;
-    }
-    return false;
-  }
-
-  async function checkUpdate(silent: boolean = false) {
-    if (checkingUpdate) return;
-    checkingUpdate = true;
-
-    try {
-      const response = await fetch(UPDATE_CONFIG.LATEST_RELEASE_URL);
-      if (!response.ok) {
-        throw new Error("网络错误");
-      }
-      const data = await response.json();
-      const tagName = data.tag_name || "";
-
-      if (isNewerVersion(appVersion, tagName)) {
-        let osPlatform = "windows";
-        try {
-          osPlatform = await platform();
-        } catch (e) {
-          console.error("Failed to get platform", e);
-        }
-
-        let matchedAsset = null;
-        if (osPlatform === "windows") {
-          matchedAsset = data.assets.find((asset: any) =>
-            asset.name.endsWith(".msi"),
-          );
-        } else if (osPlatform === "linux") {
-          matchedAsset =
-            data.assets.find((asset: any) =>
-              asset.name.endsWith(".AppImage"),
-            ) || data.assets.find((asset: any) => asset.name.endsWith(".deb"));
-        } else if (osPlatform === "macos") {
-          matchedAsset = data.assets.find((asset: any) =>
-            asset.name.endsWith(".dmg"),
-          );
-        }
-
-        if (matchedAsset) {
-          latestVersion = tagName.replace(/^v/, "");
-          releaseNotes = data.body || "";
-          downloadUrl = matchedAsset.browser_download_url;
-          updateDialogOpen = true;
-        } else if (!silent) {
-          toast.warning(
-            `检测到新版本 ${tagName}，但未找到适用于您平台的安装包。`,
-          );
-        }
-      } else if (!silent) {
-        toast.success("当前已是最新版本");
-      }
-    } catch (e) {
-      console.error("检查更新失败", e);
-      if (!silent) {
-        toast.error("检查更新失败，请稍后重试");
-      }
-    } finally {
-      checkingUpdate = false;
-    }
-  }
 
   onDestroy(unsubscribe);
 </script>
@@ -333,6 +261,22 @@
             <Switch.Root
               bind:checked={trayIconEnabled}
               onCheckedChange={handleTrayIconToggle}
+              class="peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:ring-offset-2 focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-neutral-900 data-[state=unchecked]:bg-neutral-200 dark:focus-visible:ring-neutral-300 dark:data-[state=checked]:bg-neutral-50 dark:data-[state=unchecked]:bg-neutral-700"
+            >
+              <Switch.Thumb
+                class="pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0 dark:bg-neutral-950"
+              />
+            </Switch.Root>
+          {/snippet}
+        </SetItem>
+        <SetItem
+          title="自动检查更新"
+          description="启动应用时及后台自动检测最新版本"
+        >
+          {#snippet content()}
+            <Switch.Root
+              bind:checked={autoCheckUpdate}
+              onCheckedChange={updateConfig}
               class="peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:ring-offset-2 focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-neutral-900 data-[state=unchecked]:bg-neutral-200 dark:focus-visible:ring-neutral-300 dark:data-[state=checked]:bg-neutral-50 dark:data-[state=unchecked]:bg-neutral-700"
             >
               <Switch.Thumb
@@ -568,12 +512,27 @@
               >
                 v{appVersion}
               </span>
+              {#if $hasNewVersion}
+                <!-- 最新版本胶囊微章，高对比高颜值 -->
+                <span
+                  class="animate-pulse rounded-full bg-violet-100 px-2.5 py-0.5 font-sans text-[10px] font-bold text-violet-600 dark:bg-violet-950/60 dark:text-violet-400"
+                >
+                  新版可升: v{$latestVersion}
+                </span>
+              {/if}
               <Button.Root
-                class="inline-flex h-8 items-center justify-center rounded-md border border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-900 shadow-sm transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:ring-1 focus-visible:ring-neutral-950 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-50 dark:hover:bg-neutral-800 dark:hover:text-neutral-50 dark:focus-visible:ring-neutral-300"
+                class="inline-flex h-8 items-center justify-center rounded-md text-xs font-semibold shadow-sm transition-all focus-visible:ring-1 focus-visible:ring-neutral-950 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50 dark:focus-visible:ring-neutral-300
+                  {$hasNewVersion
+                  ? 'border-0 bg-gradient-to-r from-violet-600 to-indigo-600 px-4 text-white shadow-md shadow-violet-500/15 hover:from-violet-500 hover:to-indigo-500'
+                  : 'border border-neutral-200 bg-white px-3 text-neutral-900 hover:bg-neutral-100 hover:text-neutral-900 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-50 dark:hover:bg-neutral-800 dark:hover:text-neutral-50'}"
                 onclick={() => checkUpdate(false)}
-                disabled={checkingUpdate}
+                disabled={$checkingUpdate}
               >
-                {checkingUpdate ? "检查中..." : "检查更新"}
+                {$checkingUpdate
+                  ? "检查中..."
+                  : $hasNewVersion
+                    ? "立即升级"
+                    : "检查更新"}
               </Button.Root>
             </div>
           {/snippet}
@@ -596,19 +555,5 @@
     if (!clearingUsageStats) {
       clearUsageStatsDialogOpen = false;
     }
-  }}
-/>
-
-<UpdateDialog
-  bind:open={updateDialogOpen}
-  currentVersion={appVersion}
-  {latestVersion}
-  {releaseNotes}
-  {downloadUrl}
-  onClose={() => {
-    latestVersion = "";
-    releaseNotes = "";
-    downloadUrl = "";
-    checkingUpdate = false;
   }}
 />

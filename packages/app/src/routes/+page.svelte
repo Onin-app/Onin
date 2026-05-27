@@ -31,6 +31,7 @@
     requestInputFocusWithRetry,
   } from "$lib/stores/focusInput";
   import { detachWindowShortcut } from "$lib/stores/shortcuts";
+  import { hasNewVersion, latestVersion, appVersion } from "$lib/stores/update";
 
   // Composables
   import { usePluginManager } from "$lib/composables/usePluginManager.svelte";
@@ -630,7 +631,7 @@
         <Tooltip.Provider delayDuration={1000}>
           <Tooltip.Root>
             <Tooltip.Trigger
-              class="flex-shrink-0 cursor-pointer transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-108 hover:rotate-6 active:scale-95"
+              class="relative flex-shrink-0 cursor-pointer transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-108 hover:rotate-6 active:scale-95"
               onclick={handleToSettings}
               aria-label="打开设置"
             >
@@ -639,13 +640,28 @@
                 class="h-10 w-10 filter transition-all duration-300 hover:drop-shadow-[0_0_8px_rgba(99,102,241,0.55)] dark:hover:drop-shadow-[0_0_10px_rgba(165,180,252,0.6)]"
                 alt="Onin logo"
               />
+              {#if $hasNewVersion}
+                <!-- 精致微章：呼吸灯紫色小红点，表示有新版本 -->
+                <span class="absolute -top-0.5 -right-0.5 flex h-3 w-3">
+                  <span
+                    class="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-400 opacity-75"
+                  ></span>
+                  <span
+                    class="relative inline-flex h-3 w-3 rounded-full bg-violet-500"
+                  ></span>
+                </span>
+              {/if}
             </Tooltip.Trigger>
             <Tooltip.Content
               side="right"
               sideOffset={8}
               class="text-xxs data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 z-50 rounded-md border border-neutral-800 bg-neutral-900 px-2.5 py-1 font-semibold whitespace-nowrap text-neutral-200 shadow-md duration-150 select-none dark:border-neutral-200 dark:bg-white dark:text-neutral-800"
             >
-              打开设置 (Settings)
+              {#if $hasNewVersion && $latestVersion}
+                发现新版本 v{$latestVersion} (当前 v{$appVersion})！点击查看更新
+              {:else}
+                打开设置 (Settings)
+              {/if}
             </Tooltip.Content>
           </Tooltip.Root>
         </Tooltip.Provider>
