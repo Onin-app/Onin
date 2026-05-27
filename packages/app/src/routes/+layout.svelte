@@ -6,6 +6,7 @@
   import { detachWindowShortcut } from "$lib/stores/shortcuts";
   import { get } from "svelte/store";
   import { invoke } from "@tauri-apps/api/core";
+  import { getCurrentWindow } from "@tauri-apps/api/window";
   import { page } from "$app/state";
   import { goto } from "$app/navigation";
   import { setupPluginConsoleListener } from "$lib/plugin-console";
@@ -31,11 +32,58 @@
   async function trackEvent(
     name: string,
     props?: Record<string, string | number>,
-  ) {
+  ): Promise<boolean> {
     try {
       await invoke("plugin:aptabase|track_event", { name, props });
+      return true;
     } catch (err) {
       console.error("[Aptabase] 追踪事件失败:", err);
+      return false;
+    }
+  }
+
+  // 竞态锁变量：防止 onMount 与 visibility 并发触发重复上报结算
+  let isTrackingActive = false;
+
+  // 核心：基于次日结算机制的活跃与频次心跳统计
+  async function checkAndTrackActive() {
+    if (isTrackingActive) return;
+    isTrackingActive = true;
+
+    try {
+      const now = new Date();
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      const lastActiveDate = localStorage.getItem("onin_last_active_date");
+
+      if (lastActiveDate !== todayStr) {
+        // 1. 跨天了，需要结账上报前一天的打开次数
+        const savedCount = localStorage.getItem("onin_today_open_count");
+
+        // 偏执型类型防守：既防范了被外部篡改或空值导致 parseInt 得到 NaN 的崩溃风险，又完美保留了数字 0 的客观语义
+        const parsedCount = savedCount !== null ? parseInt(savedCount, 10) : 1;
+        const previousDayOpens = isNaN(parsedCount) ? 1 : parsedCount;
+
+        // 发送结算上报，合并昨日唤醒频次
+        const success = await trackEvent("app_started", {
+          trigger: "active_wake",
+          previous_day_opens: previousDayOpens,
+        });
+
+        // 2. 只有上报成功后才更新本地标记并清空计数；若失败（如断网），本地保留原数据供下一次唤醒时重试结算
+        if (success) {
+          localStorage.setItem("onin_last_active_date", todayStr);
+          localStorage.setItem("onin_today_open_count", "1");
+        }
+      } else {
+        // 3. 同一天内的后续唤醒，不发网络请求，仅在本地累加计数
+        const currentCount = localStorage.getItem("onin_today_open_count");
+        const newCount = currentCount ? parseInt(currentCount, 10) + 1 : 1;
+        localStorage.setItem("onin_today_open_count", String(newCount));
+      }
+    } catch (err) {
+      console.error("[Aptabase] 活跃心跳统计失败:", err);
+    } finally {
+      isTrackingActive = false;
     }
   }
 
@@ -59,8 +107,14 @@
   // This onMount block sets up a single, persistent listener for the 'esc_key_pressed' event.
   // It will live for the entire duration of the app, avoiding setup/teardown during page navigation.
   onMount(() => {
-    // 跟踪应用启动事件，用以统计日活/用户数
-    trackEvent("app_started");
+    // 首次冷启动时，如果窗口处于可见状态，才上报跨天活跃统计，避开静默后台开机自启
+    getCurrentWindow()
+      .isVisible()
+      .then((visible) => {
+        if (visible) {
+          checkAndTrackActive();
+        }
+      });
 
     const listenersPromise = (async () => {
       // Restore Listener:
@@ -89,6 +143,10 @@
           // When window becomes visible, check if we are on the main page.
           if (event.payload && page.route.id === "/") {
             requestInputFocus();
+          }
+          if (event.payload) {
+            // 当窗口重新变为可见时（唤醒时），触发每日活跃结算或本地累加
+            checkAndTrackActive();
           }
         },
       );
