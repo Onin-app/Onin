@@ -733,7 +733,7 @@
             viewportClass="h-full w-full overflow-x-hidden"
           >
             <div class="app-list overflow-hidden">
-              <div use:animate>
+              <div>
                 {#each displayList as app, index ((app.action || "") + app.path + app.name + index)}
                   {#if app.path.startsWith("extension:")}
                     <!-- Extension 预览项（如计算器结果） -->
