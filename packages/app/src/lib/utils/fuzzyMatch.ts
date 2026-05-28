@@ -1,6 +1,36 @@
 import pinyin from "pinyin";
 import type { LaunchableItem } from "$lib/type";
 
+// 引入全局拼音缓存，避免高频重复转换
+const pinyinCache = new Map<string, { result: string; initials: string }>();
+
+/**
+ * 获取拼音转换数据（优先从缓存中获取）
+ */
+const getPinyinData = (name: string): { result: string; initials: string } => {
+  let cached = pinyinCache.get(name);
+  if (!cached) {
+    const pinyinResult = pinyin(name, {
+      style: pinyin.STYLE_NORMAL,
+      heteronym: false,
+    })
+      .flat()
+      .join("")
+      .toLowerCase();
+
+    const pinyinInitials = pinyin(name, {
+      style: pinyin.STYLE_FIRST_LETTER,
+    })
+      .flat()
+      .join("")
+      .toLowerCase();
+
+    cached = { result: pinyinResult, initials: pinyinInitials };
+    pinyinCache.set(name, cached);
+  }
+  return cached;
+};
+
 /**
  * 计算匹配分数
  * 分数越高，匹配越精确
@@ -44,25 +74,9 @@ const calculateMatchScore = (query: string, item: LaunchableItem): number => {
 
   // 拼音匹配
   if (maxScore === 0) {
-    const pinyinResult = pinyin(item.name, {
-      style: pinyin.STYLE_NORMAL,
-      heteronym: false,
-    })
-      .flat()
-      .join("")
-      .toLowerCase();
+    const { result, initials } = getPinyinData(item.name);
 
-    const pinyinInitials = pinyin(item.name, {
-      style: pinyin.STYLE_FIRST_LETTER,
-    })
-      .flat()
-      .join("")
-      .toLowerCase();
-
-    if (
-      pinyinResult.includes(lowerQuery) ||
-      pinyinInitials.includes(lowerQuery)
-    ) {
+    if (result.includes(lowerQuery) || initials.includes(lowerQuery)) {
       maxScore = 20;
     }
   }
