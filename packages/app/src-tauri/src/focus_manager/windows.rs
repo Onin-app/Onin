@@ -58,25 +58,23 @@ pub fn restore_previous_foreground(app: &AppHandle) {
 }
 
 pub fn focus_webview_window(window: &WebviewWindow) {
+    let _ = window.unminimize();
+    let _ = window.show();
+
     if let Ok(hwnd) = window.hwnd() {
         let isize_hwnd = hwnd.0 as isize;
         force_set_foreground_window(isize_hwnd);
     }
-
-    let _ = window.unminimize();
-    let _ = window.show();
-    let _ = window.set_focus();
 }
 
 pub fn focus_window(window: &Window) {
+    let _ = window.unminimize();
+    let _ = window.show();
+
     if let Ok(hwnd) = window.hwnd() {
         let isize_hwnd = hwnd.0 as isize;
         force_set_foreground_window(isize_hwnd);
     }
-
-    let _ = window.unminimize();
-    let _ = window.show();
-    let _ = window.set_focus();
 }
 
 /// 强制将指定窗口带到前台，处理 Windows 的防抢焦点限制。

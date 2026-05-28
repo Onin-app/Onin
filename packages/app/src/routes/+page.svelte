@@ -546,7 +546,9 @@
     // 初始启动时，窗口默认可见但可能不会触发 window_visibility 事件，所以在此主动请求一次焦点
     // 并且向后端发送命令激进地获取前台权限
     await invoke("force_focus");
-    requestInputFocusWithRetry();
+    if (!plugin.state.showPluginInline) {
+      requestInputFocusWithRetry();
+    }
 
     // 监听窗口显示事件
     const unlistenWindowShow = await listen<boolean>(
@@ -556,7 +558,9 @@
           await clipboard.autoPasteClipboard();
           updateMatchedCommands();
           await updateExtensionManagerPreview(); // 更新 Extension 预览（如计算器）
-          requestInputFocusWithRetry();
+          if (!plugin.state.showPluginInline) {
+            requestInputFocusWithRetry();
+          }
         }
 
         // 转发可见性事件给插件
