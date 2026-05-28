@@ -137,11 +137,24 @@
     invoke("close_main_window");
   };
 
+  let extensionPreviewTimer: any = null;
+
   const handleInput = async (value: string) => {
     inputValue = value;
     appListManager.handleInput(value);
     updateMatchedCommands();
-    await updateExtensionManagerPreview();
+    updateExtensionManagerPreviewDebounced();
+  };
+
+  // 更新 Extension 预览（带防抖，适用于高频打字）
+  const updateExtensionManagerPreviewDebounced = () => {
+    if (extensionPreviewTimer) {
+      clearTimeout(extensionPreviewTimer);
+    }
+    extensionPreviewTimer = setTimeout(async () => {
+      await updateExtensionManagerPreview();
+      extensionPreviewTimer = null;
+    }, 50);
   };
 
   // 更新 Extension 预览（计算器等）
@@ -616,6 +629,10 @@
     removeWindowEscapeListener?.();
 
     plugin.setModeSwitchConfirmHandler(null);
+
+    if (extensionPreviewTimer) {
+      clearTimeout(extensionPreviewTimer);
+    }
   });
 </script>
 
