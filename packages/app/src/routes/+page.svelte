@@ -137,11 +137,24 @@
     invoke("close_main_window");
   };
 
+  let extensionPreviewTimer: any = null;
+
   const handleInput = async (value: string) => {
     inputValue = value;
     appListManager.handleInput(value);
     updateMatchedCommands();
-    await updateExtensionManagerPreview();
+    updateExtensionManagerPreviewDebounced();
+  };
+
+  // 更新 Extension 预览（带防抖，适用于高频打字）
+  const updateExtensionManagerPreviewDebounced = () => {
+    if (extensionPreviewTimer) {
+      clearTimeout(extensionPreviewTimer);
+    }
+    extensionPreviewTimer = setTimeout(async () => {
+      await updateExtensionManagerPreview();
+      extensionPreviewTimer = null;
+    }, 50);
   };
 
   // 更新 Extension 预览（计算器等）
@@ -546,17 +559,23 @@
     // 初始启动时，窗口默认可见但可能不会触发 window_visibility 事件，所以在此主动请求一次焦点
     // 并且向后端发送命令激进地获取前台权限
     await invoke("force_focus");
-    requestInputFocusWithRetry();
+    if (!plugin.state.showPluginInline) {
+      requestInputFocusWithRetry();
+    }
 
     // 监听窗口显示事件
     const unlistenWindowShow = await listen<boolean>(
       "window_visibility",
       async (event) => {
         if (event.payload) {
-          await clipboard.autoPasteClipboard();
+          await clipboard.autoPasteClipboard(
+            appListManager.state.appConfig.auto_paste_time_limit,
+          );
           updateMatchedCommands();
           await updateExtensionManagerPreview(); // 更新 Extension 预览（如计算器）
-          requestInputFocusWithRetry();
+          if (!plugin.state.showPluginInline) {
+            requestInputFocusWithRetry();
+          }
         }
 
         // 转发可见性事件给插件
@@ -612,6 +631,10 @@
     removeWindowEscapeListener?.();
 
     plugin.setModeSwitchConfirmHandler(null);
+
+    if (extensionPreviewTimer) {
+      clearTimeout(extensionPreviewTimer);
+    }
   });
 </script>
 
@@ -729,7 +752,7 @@
             viewportClass="h-full w-full overflow-x-hidden"
           >
             <div class="app-list overflow-hidden">
-              <div use:animate>
+              <div>
                 {#each displayList as app, index ((app.action || "") + app.path + app.name + index)}
                   {#if app.path.startsWith("extension:")}
                     <!-- Extension 预览项（如计算器结果） -->

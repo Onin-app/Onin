@@ -14,7 +14,9 @@ use super::generators;
 pub fn get_commands_file_path(app: &AppHandle) -> PathBuf {
     let path = app.path().app_data_dir().unwrap();
     if !path.exists() {
-        fs::create_dir_all(&path).unwrap();
+        if let Err(e) = fs::create_dir_all(&path) {
+            tracing::error!("Failed to create app_data_dir for commands: {:?}", e);
+        }
     }
     path.join("commands.json")
 }
@@ -188,5 +190,7 @@ async fn merge_commands(app: &AppHandle, saved_commands: Vec<Command>) -> Vec<Co
 pub fn save_commands(app: &AppHandle, commands: &[Command]) {
     let path = get_commands_file_path(app);
     let json = serde_json::to_string_pretty(commands).unwrap();
-    fs::write(path, json).unwrap();
+    if let Err(e) = fs::write(path, json) {
+        tracing::error!("Failed to write commands.json: {:?}", e);
+    }
 }

@@ -58,7 +58,12 @@ pub struct CommandMatchInput {
 pub fn get_dynamic_commands_file_path(app: &AppHandle) -> PathBuf {
     let path = app.path().app_data_dir().unwrap();
     if !path.exists() {
-        fs::create_dir_all(&path).unwrap();
+        if let Err(e) = fs::create_dir_all(&path) {
+            tracing::error!(
+                "Failed to create app_data_dir for dynamic commands: {:?}",
+                e
+            );
+        }
     }
     path.join("dynamic_commands.json")
 }
@@ -80,7 +85,9 @@ pub fn load_dynamic_commands(app: &AppHandle) -> DynamicCommandsStore {
 pub fn save_dynamic_commands(app: &AppHandle, store: &DynamicCommandsStore) {
     let path = get_dynamic_commands_file_path(app);
     let json = serde_json::to_string_pretty(store).unwrap();
-    fs::write(path, json).unwrap();
+    if let Err(e) = fs::write(path, json) {
+        tracing::error!("Failed to write dynamic_commands.json: {:?}", e);
+    }
 }
 
 /// 获取当前时间戳（毫秒）

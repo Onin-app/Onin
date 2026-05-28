@@ -32,8 +32,19 @@ export function requestInputFocusWithRetry(maxRetries = 15, intervalMs = 50) {
 
     requestInputFocus();
 
-    // 如果焦点已经进入 Webview，或者超时，则停止轮询
-    if (document.hasFocus() || retries >= maxRetries) {
+    const activeEl =
+      typeof document !== "undefined" ? document.activeElement : null;
+    const isInputFocused =
+      activeEl &&
+      (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA");
+
+    // 如果焦点已经进入 Webview 内部的输入框，或者超时，则停止轮询
+    if (
+      (typeof document !== "undefined" &&
+        document.hasFocus() &&
+        isInputFocused) ||
+      retries >= maxRetries
+    ) {
       return;
     }
 

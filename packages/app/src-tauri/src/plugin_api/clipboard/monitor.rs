@@ -41,9 +41,9 @@ pub fn start_clipboard_monitor(app: AppHandle) {
 
         impl ClipboardManager {
             #[allow(dead_code)]
-            pub fn new() -> Self {
-                let ctx = ClipboardContext::new().unwrap();
-                ClipboardManager { ctx }
+            pub fn new() -> Result<Self, String> {
+                let ctx = ClipboardContext::new().map_err(|e| e.to_string())?;
+                Ok(ClipboardManager { ctx })
             }
         }
 
@@ -53,10 +53,23 @@ pub fn start_clipboard_monitor(app: AppHandle) {
             }
         }
 
-        let manager = ClipboardManager::new();
-        let mut watcher = ClipboardWatcherContext::new().unwrap();
-        watcher.add_handler(manager);
-        watcher.start_watch();
+        match ClipboardManager::new() {
+            Ok(manager) => match ClipboardWatcherContext::new() {
+                Ok(mut watcher) => {
+                    watcher.add_handler(manager);
+                    watcher.start_watch();
+                }
+                Err(e) => {
+                    eprintln!("[Plugin API] Failed to initialize clipboard watcher: {}", e);
+                }
+            },
+            Err(e) => {
+                eprintln!(
+                    "[Plugin API] Failed to initialize clipboard manager (no display?): {}",
+                    e
+                );
+            }
+        }
     });
 
     // 启动定时清空检查线程

@@ -6,7 +6,8 @@ use num_cpus;
 use regex::Regex;
 use std::{
     collections::HashMap,
-    io::Cursor,
+    fs::File,
+    io::{Cursor, Read},
     panic::{catch_unwind, AssertUnwindSafe},
     path::{Path, PathBuf},
     process::Command,
@@ -265,8 +266,51 @@ fn panic_message(payload: Box<dyn std::any::Any + Send>) -> String {
     }
 }
 
+fn is_valid_lnk_file(path: &Path) -> bool {
+    let mut file = match File::open(path) {
+        Ok(f) => f,
+        Err(_) => return false,
+    };
+
+    let mut header = [0u8; 20];
+    if file.read_exact(&mut header).is_err() {
+        return false;
+    }
+
+    // 1. Check HeaderSize: 0x0000004C (Little Endian: [0x4C, 0x00, 0x00, 0x00])
+    if header[0..4] != [0x4C, 0x00, 0x00, 0x00] {
+        return false;
+    }
+
+    // 2. Check LinkCLSID: 00021401-0000-0000-C000-000000000046
+    // Bytes representation: [01 14 02 00 00 00 00 00 C0 00 00 00 00 00 00 46]
+    let expected_clsid = [
+        0x01, 0x14, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x46,
+    ];
+    if header[4..20] != expected_clsid {
+        return false;
+    }
+
+    true
+}
+
 fn app_from_shortcut(shortcut_path: PathBuf) -> Result<Option<AppInfo>, String> {
-    let shell_link = match ShellLink::open(&shortcut_path) {
+    // 设计说明：
+    // 由于 `lnk` 库目前仅公开了 `ShellLink::open` 这一个文件读取和解析接口，
+    // 未提供直接从内存字节/自定义 Reader 解析的公开 API。为了在调用 `ShellLink::open` 前完成防 panic 的预校验，
+    // 我们必须在 `is_valid_lnk_file` 中先打开并读取前 20 字节。
+    // 虽存在二次文件打开，但在 Windows 的系统文件缓存（File Cache）机制下，第二次打开与读取是极速的纯内存操作，
+    // 对启动扫描的性能没有实质影响。
+    if !is_valid_lnk_file(&shortcut_path) {
+        tracing::warn!(
+            "Skipping invalid or corrupted shortcut: {:?}",
+            shortcut_path
+        );
+        return Ok(None);
+    }
+
+    let shell_link = match ShellLink::open(&shortcut_path, lnk::encoding::WINDOWS_1252) {
         Ok(link) => link,
         Err(e) => {
             tracing::warn!("Failed to open shortcut {:?}: {:?}", shortcut_path, e);
@@ -317,7 +361,7 @@ async fn get_apps_from_shortcuts() -> Result<Vec<AppInfo>, String> {
             match catch_unwind(AssertUnwindSafe(|| app_from_shortcut(shortcut_path))) {
                 Ok(result) => result,
                 Err(payload) => {
-                    tracing::error!(
+                    tracing::warn!(
                         "get_apps_from_shortcuts: panic while processing shortcut {:?}: {}",
                         shortcut_path_for_log,
                         panic_message(payload)
@@ -361,10 +405,10 @@ fn should_filter_shortcut_with_link(link: &ShellLink) -> bool {
 // 保持同步，因为会在 spawn_blocking 内部调用
 fn extract_target_from_lnk_with_link(link: &ShellLink) -> Option<String> {
     let link_info = link.link_info().as_ref()?;
-    let local_path = link_info.local_base_path().clone()?;
+    let local_path = link_info.local_base_path()?;
 
-    if Path::new(&local_path).exists() {
-        Some(local_path)
+    if Path::new(local_path).exists() {
+        Some(local_path.to_string())
     } else {
         None
     }
@@ -374,7 +418,7 @@ fn extract_target_from_lnk_with_link(link: &ShellLink) -> Option<String> {
 // 保持同步，因为会在 spawn_blocking 内部调用
 fn extract_icon_from_shortcut_with_link(link: &ShellLink, target_path: &str) -> Option<String> {
     // 尝试获取快捷方式的图标路径
-    if let Some(icon_location) = link.icon_location() {
+    if let Some(icon_location) = link.string_data().icon_location().as_ref() {
         let path = icon_location.to_string();
         if Path::new(&path).exists() {
             if let Some(ext) = Path::new(&path).extension().and_then(|s| s.to_str()) {
@@ -747,4 +791,98 @@ fn extract_icon_from_exe_or_image(
     }
 
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_is_valid_lnk_file_non_existent() {
+        let path = PathBuf::from("this_file_does_not_exist.lnk");
+        assert!(!is_valid_lnk_file(&path));
+    }
+
+    #[test]
+    fn test_is_valid_lnk_file_too_small() {
+        let mut file = NamedTempFile::new().unwrap();
+        // size 10 bytes (minimum required is 20)
+        file.write_all(b"1234567890").unwrap();
+        assert!(!is_valid_lnk_file(file.path()));
+    }
+
+    #[test]
+    fn test_is_valid_lnk_file_invalid_header_size() {
+        let mut file = NamedTempFile::new().unwrap();
+        let mut header = [0u8; 20];
+        // Wrong HeaderSize: [0x4D, 0x00, 0x00, 0x00]
+        header[0..4].copy_from_slice(&[0x4D, 0x00, 0x00, 0x00]);
+        // Correct LinkCLSID
+        header[4..20].copy_from_slice(&[
+            0x01, 0x14, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x46,
+        ]);
+        file.write_all(&header).unwrap();
+        assert!(!is_valid_lnk_file(file.path()));
+    }
+
+    #[test]
+    fn test_is_valid_lnk_file_invalid_clsid() {
+        let mut file = NamedTempFile::new().unwrap();
+        let mut header = [0u8; 20];
+        // Correct HeaderSize
+        header[0..4].copy_from_slice(&[0x4C, 0x00, 0x00, 0x00]);
+        // Incorrect LinkCLSID
+        header[4..20].copy_from_slice(&[
+            0x99, 0x14, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x46,
+        ]);
+        file.write_all(&header).unwrap();
+        assert!(!is_valid_lnk_file(file.path()));
+    }
+
+    #[test]
+    fn test_is_valid_lnk_file_valid() {
+        let mut file = NamedTempFile::new().unwrap();
+        let mut header = [0u8; 20];
+        // Correct HeaderSize
+        header[0..4].copy_from_slice(&[0x4C, 0x00, 0x00, 0x00]);
+        // Correct LinkCLSID
+        header[4..20].copy_from_slice(&[
+            0x01, 0x14, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x46,
+        ]);
+        file.write_all(&header).unwrap();
+        assert!(is_valid_lnk_file(file.path()));
+    }
+
+    #[test]
+    fn test_app_from_shortcut_guard_invalid_file() {
+        // Test 1: Non-existent file
+        let non_existent_path = PathBuf::from("this_file_does_not_exist_at_all.lnk");
+        let res = app_from_shortcut(non_existent_path);
+        assert!(res.is_ok());
+        assert!(res.unwrap().is_none());
+
+        // Test 2: File is too small (e.g. 10 bytes)
+        let mut too_small_file = NamedTempFile::new().unwrap();
+        too_small_file.write_all(b"1234567890").unwrap();
+        let res = app_from_shortcut(too_small_file.path().to_path_buf());
+        assert!(res.is_ok());
+        assert!(res.unwrap().is_none());
+
+        // Test 3: Corrupted header (e.g. matching the Sentry crash pattern with size 1556 bytes)
+        let mut corrupted_file = NamedTempFile::new().unwrap();
+        let mut content = vec![0u8; 1556];
+        // Header contains invalid values mimicking Sentry crash where offset starts out of bounds
+        content[0..4].copy_from_slice(&[0x5C, 0x43, 0x44, 0x45]); // '\CDE'
+        corrupted_file.write_all(&content).unwrap();
+
+        // Should return Ok(None) safely instead of panicking
+        let res = app_from_shortcut(corrupted_file.path().to_path_buf());
+        assert!(res.is_ok());
+        assert!(res.unwrap().is_none());
+    }
 }

@@ -79,7 +79,7 @@
           }
 
           // 移除所有 inline 的事件监听属性 (on*) 以及 javascript: 伪协议
-          const attrs = Array.from(el.attributes);
+          const attrs = Array.from(el.attributes || []);
           for (const attr of attrs) {
             const attrName = attr.name.toLowerCase();
             if (attrName.startsWith("on")) {
@@ -96,7 +96,7 @@
         }
 
         // 使用 Array.from 浅拷贝快照进行迭代，完美避开由于子节点被移除导致的索引偏移问题
-        const children = Array.from(node.childNodes);
+        const children = Array.from(node.childNodes || []);
         for (const child of children) {
           clean(child);
         }

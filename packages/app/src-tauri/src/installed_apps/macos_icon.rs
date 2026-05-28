@@ -6,7 +6,7 @@ use objc2::msg_send;
 use objc2::AllocAnyThread;
 use objc2_app_kit::{NSBitmapImageFileType, NSBitmapImageRep, NSGraphicsContext, NSWorkspace};
 use objc2_foundation::{NSDictionary, NSString};
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 /// Extract the system-associated icon for any file using NSWorkspace.iconForFile
 pub fn extract_icon_from_file(file_path: &str) -> Option<String> {
@@ -46,7 +46,7 @@ pub fn extract_icon_from_file(file_path: &str) -> Option<String> {
         let bitmap_rep = match bitmap_rep {
             Some(rep) => rep,
             None => {
-                error!(
+                warn!(
                     "[ICON] Failed to create bitmap representation for: {}",
                     file_path
                 );
@@ -59,7 +59,7 @@ pub fn extract_icon_from_file(file_path: &str) -> Option<String> {
         let context = match context {
             Some(ctx) => ctx,
             None => {
-                error!(
+                warn!(
                     "[ICON] Failed to create graphics context for: {}",
                     file_path
                 );
@@ -99,7 +99,7 @@ pub fn extract_icon_from_file(file_path: &str) -> Option<String> {
         let png_data = match png_data {
             Some(data) => data,
             None => {
-                error!("[ICON] Failed to create PNG data for: {}", file_path);
+                warn!("[ICON] Failed to create PNG data for: {}", file_path);
                 return None;
             }
         };
@@ -107,7 +107,7 @@ pub fn extract_icon_from_file(file_path: &str) -> Option<String> {
         // Get bytes from NSData using msg_send!
         let length: usize = msg_send![&*png_data, length];
         if length == 0 {
-            error!("[ICON] PNG data has zero length for: {}", file_path);
+            warn!("[ICON] PNG data has zero length for: {}", file_path);
             return None;
         }
 

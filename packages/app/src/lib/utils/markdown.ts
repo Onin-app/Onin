@@ -118,7 +118,7 @@ export function sanitizeHtml(html: string): string {
         }
 
         // 移除所有 inline 的事件监听属性 (on*) 以及 javascript: 伪协议
-        const attrs = Array.from(el.attributes);
+        const attrs = Array.from(el.attributes || []);
         for (const attr of attrs) {
           const attrName = attr.name.toLowerCase();
           if (attrName.startsWith("on")) {
@@ -134,7 +134,7 @@ export function sanitizeHtml(html: string): string {
         }
       }
 
-      const children = Array.from(node.childNodes);
+      const children = Array.from(node.childNodes || []);
       for (const child of children) {
         clean(child);
       }
