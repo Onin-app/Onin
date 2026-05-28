@@ -568,7 +568,9 @@
       "window_visibility",
       async (event) => {
         if (event.payload) {
-          await clipboard.autoPasteClipboard();
+          await clipboard.autoPasteClipboard(
+            appListManager.state.appConfig.auto_paste_time_limit,
+          );
           updateMatchedCommands();
           await updateExtensionManagerPreview(); // 更新 Extension 预览（如计算器）
           if (!plugin.state.showPluginInline) {

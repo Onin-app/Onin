@@ -20,7 +20,7 @@ export interface ClipboardManagerReturn {
   handlePaste: (e: ClipboardEvent) => Promise<void>;
   handleDrop: (e: DragEvent) => void;
   handleDragOver: (e: DragEvent) => void;
-  autoPasteClipboard: () => Promise<void>;
+  autoPasteClipboard: (cachedTimeLimit?: number) => Promise<void>;
   clearAttachments: () => void;
   removeFile: (index: number) => void;
   editTextAttachment: (onEdit: (text: string) => void) => void;
@@ -96,7 +96,7 @@ export function useClipboardManager(): ClipboardManagerReturn {
     e.preventDefault();
   };
 
-  const autoPasteClipboard = async () => {
+  const autoPasteClipboard = async (cachedTimeLimit?: number) => {
     try {
       const clipboardContent = await invoke<{
         text?: string;
@@ -104,10 +104,11 @@ export function useClipboardManager(): ClipboardManagerReturn {
         timestamp?: number;
       }>("get_clipboard_content");
 
-      const config = await invoke<{ auto_paste_time_limit: number }>(
-        "get_app_config",
-      );
-      const timeLimit = config.auto_paste_time_limit;
+      const timeLimit =
+        cachedTimeLimit !== undefined
+          ? cachedTimeLimit
+          : (await invoke<{ auto_paste_time_limit: number }>("get_app_config"))
+              .auto_paste_time_limit;
 
       if (timeLimit > 0) {
         if (!clipboardContent.timestamp) {
