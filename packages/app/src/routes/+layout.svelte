@@ -166,6 +166,12 @@
           }
 
           // Handle page routing for global shortcuts of extensions
+          if (commandName === "extension:ai:chat") {
+            goto("/extensions/ai").then(() => {
+              invoke("show_main_window_cmd");
+            });
+            return;
+          }
           if (commandName === "extension:clipboard:history") {
             goto("/extensions/clipboard").then(() => {
               invoke("show_main_window_cmd");

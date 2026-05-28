@@ -43,6 +43,9 @@ pub fn setup_shortcuts(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     // 设置默认快捷键（如果用户从未设置过）
     let has_toggle_window = shortcuts.iter().any(|s| s.command_name == "toggle_window");
     let has_detach_window = shortcuts.iter().any(|s| s.command_name == "detach_window");
+    let has_ai_chat = shortcuts
+        .iter()
+        .any(|s| s.command_name == "extension:ai:chat");
 
     // 默认显示/隐藏窗口快捷键
     if !has_toggle_window {
@@ -62,8 +65,17 @@ pub fn setup_shortcuts(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
+    // 默认 AI 快捷键
+    if !has_ai_chat {
+        shortcuts.push(AppShortcut {
+            shortcut: "alt+A".to_string(),
+            command_name: "extension:ai:chat".to_string(),
+            command_title: Some("AI 问答".to_string()),
+        });
+    }
+
     // 保存更新后的快捷键
-    if !has_toggle_window || !has_detach_window {
+    if !has_toggle_window || !has_detach_window || !has_ai_chat {
         storage::save_shortcuts_to_disk(&app.handle(), &shortcuts);
     }
 
