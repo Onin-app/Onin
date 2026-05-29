@@ -10,6 +10,7 @@ use tokio::sync::RwLock;
 
 pub mod commands;
 pub mod config;
+pub mod history;
 pub mod provider;
 pub mod providers;
 
@@ -20,30 +21,35 @@ pub struct AIManager {
     config: RwLock<AIConfig>,
     active_provider: RwLock<Option<Arc<dyn AIProvider>>>,
     app_handle: AppHandle,
+    history_manager: std::sync::Mutex<self::history::HistoryManager>,
+    app_data_dir: PathBuf,
 }
 
 impl AIManager {
     pub fn new(app_handle: AppHandle) -> Self {
+        let data_dir = app_handle
+            .path()
+            .app_data_dir()
+            .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default());
+        let history_manager = self::history::HistoryManager::new(data_dir.clone());
+
         Self {
             config: RwLock::new(AIConfig::default()),
             active_provider: RwLock::new(None),
             app_handle,
+            history_manager: std::sync::Mutex::new(history_manager),
+            app_data_dir: data_dir,
         }
     }
 
     /// Get AI config file path
-    fn get_config_path(&self) -> Result<PathBuf, String> {
-        let data_dir = self
-            .app_handle
-            .path()
-            .app_data_dir()
-            .map_err(|e| e.to_string())?;
-        Ok(data_dir.join("ai_config.json"))
+    fn get_config_path(&self) -> PathBuf {
+        self.app_data_dir.join("ai_config.json")
     }
 
     /// Load configuration from file
     pub async fn load_config(&self) -> Result<AIConfig, String> {
-        let config_path = self.get_config_path()?;
+        let config_path = self.get_config_path();
 
         if !config_path.exists() {
             // If config file doesn't exist, return default config
@@ -61,7 +67,7 @@ impl AIManager {
 
     /// Save configuration to file
     fn save_config(&self, config: &AIConfig) -> Result<(), String> {
-        let config_path = self.get_config_path()?;
+        let config_path = self.get_config_path();
 
         let content = serde_json::to_string_pretty(config)
             .map_err(|e| format!("Failed to serialize AI config: {}", e))?;
@@ -192,5 +198,30 @@ impl AIManager {
     pub async fn get_capabilities(&self) -> Option<self::provider::ProviderCapabilities> {
         let provider_lock = self.active_provider.read().await;
         provider_lock.as_ref().map(|p| p.capabilities())
+    }
+
+    pub fn load_index(&self) -> Result<Vec<self::history::ChatSessionMeta>, String> {
+        let history = self.history_manager.lock().map_err(|e| e.to_string())?;
+        history.load_index()
+    }
+
+    pub fn get_session(&self, id: &str) -> Result<self::history::ChatSession, String> {
+        let history = self.history_manager.lock().map_err(|e| e.to_string())?;
+        history.get_session(id)
+    }
+
+    pub fn save_session(&self, session: self::history::ChatSession) -> Result<(), String> {
+        let history = self.history_manager.lock().map_err(|e| e.to_string())?;
+        history.save_session(session)
+    }
+
+    pub fn delete_session(&self, id: &str) -> Result<(), String> {
+        let history = self.history_manager.lock().map_err(|e| e.to_string())?;
+        history.delete_session(id)
+    }
+
+    pub fn clear_all_sessions(&self) -> Result<(), String> {
+        let history = self.history_manager.lock().map_err(|e| e.to_string())?;
+        history.clear_all_sessions()
     }
 }

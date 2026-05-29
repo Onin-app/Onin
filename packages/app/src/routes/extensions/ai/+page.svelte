@@ -12,7 +12,9 @@
     Gear,
     Warning,
     Spinner,
-    ArrowCounterClockwise,
+    Clock,
+    Plus,
+    Trash,
   } from "phosphor-svelte";
   import {
     IncremarkContent,
@@ -23,10 +25,20 @@
   import { get } from "svelte/store";
   import { theme as globalTheme, getTheme } from "$lib/utils/theme";
   import { Theme } from "$lib/type";
+  import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
 
   interface Message {
     role: "user" | "assistant";
     contentText: string;
+  }
+
+  interface ChatSessionMeta {
+    id: string;
+    title: string;
+    provider_name: string;
+    model_name: string;
+    created_at: number;
+    updated_at: number;
   }
 
   // 状态变量
@@ -36,6 +48,19 @@
   let isConfigured = $state<boolean | null>(null); // null = 检查中, true = 已配置, false = 未配置
   let activeProviderName = $state("");
   let activeModelName = $state("");
+
+  // 历史记录状态
+  let sessions = $state<ChatSessionMeta[]>([]);
+  let currentSessionId = $state<string>("");
+  let currentSessionTitle = $state<string>("");
+  let currentSessionCreatedAt = $state<number>(0);
+  let showHistory = $state(false);
+
+  // 确认对话框状态
+  let confirmDialogOpen = $state(false);
+  let confirmDialogTitle = $state("");
+  let confirmDialogDescription = $state("");
+  let pendingAction = $state<(() => void | Promise<void>) | null>(null);
 
   // 动态确定 ThemeProvider 主题 (与 globalTheme 强力同步，杜绝延迟)
   const currentGlobalTheme = get(globalTheme);
@@ -52,18 +77,62 @@
     return unsubscribe;
   });
 
+  // 辅助函数：生成简易 UUID
+  function generateUUID() {
+    if (
+      typeof crypto !== "undefined" &&
+      typeof crypto.randomUUID === "function"
+    ) {
+      return crypto.randomUUID();
+    }
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
+      /[xy]/g,
+      function (c) {
+        const r = (Math.random() * 16) | 0;
+        const v = c === "x" ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      },
+    );
+  }
+
+  // 辅助函数：格式化时间戳
+  function formatTime(timestamp: number): string {
+    const now = Date.now();
+    const diff = now - timestamp;
+    if (diff < 60000) return "刚刚";
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 60) return `${minutes} 分钟前`;
+    const hours = Math.floor(diff / 3600000);
+    if (hours < 24) return `${hours} 小时前`;
+    const days = Math.floor(diff / 86400000);
+    if (days === 1) return "昨天";
+    if (days < 7) return `${days} 天前`;
+    const date = new Date(timestamp);
+    return `${date.getMonth() + 1}/${date.getDate()}`;
+  }
+
   // 接收从 URL 传来的 query 参数
   onMount(async () => {
     // 检查 AI 提供商配置
     await checkAIConfig();
 
-    // 如果已配置，检查 URL 参数并进行首轮自动提问
+    // 如果已配置，加载历史记录
     if (isConfigured) {
+      await loadSessions();
+
       const params = new URLSearchParams(window.location.search);
       const queryText = params.get("q");
       if (queryText) {
+        initNewSession();
         inputValue = queryText;
         await handleSend();
+      } else {
+        // 如果有历史会话，默认加载最新一条会话以保持状态
+        if (sessions.length > 0) {
+          await selectSession(sessions[0].id);
+        } else {
+          initNewSession();
+        }
       }
     }
   });
@@ -97,10 +166,140 @@
     }
   }
 
-  // 一键清空对话
-  function clearChat() {
+  // 加载会话元数据列表
+  async function loadSessions() {
+    try {
+      sessions = await invoke<ChatSessionMeta[]>("get_ai_sessions_index");
+    } catch (e) {
+      console.error("[AI Extension] Failed to load sessions:", e);
+    }
+  }
+
+  // 初始化一个全新的会话
+  function initNewSession() {
     if (isGenerating) return;
+    currentSessionId = generateUUID();
+    currentSessionTitle = "";
+    currentSessionCreatedAt = Date.now();
     messages = [];
+    showHistory = false;
+  }
+
+  // 选择并读取历史会话
+  async function selectSession(id: string) {
+    if (isGenerating) {
+      toast.error("AI 正在思考中，请先等待回答结束");
+      return;
+    }
+    try {
+      const session = await invoke<any>("get_ai_session", { id });
+      currentSessionId = session.id;
+      currentSessionTitle = session.title;
+      currentSessionCreatedAt = session.created_at;
+      messages = session.messages.map((m: any) => ({
+        role: m.role,
+        contentText: m.content,
+      }));
+      showHistory = false;
+    } catch (e) {
+      console.error("[AI Extension] Failed to load session:", e);
+      toast.error("加载对话历史失败");
+    }
+  }
+
+  // 保存当前会话到本地文件
+  async function saveCurrentSession(reloadIndex = true) {
+    if (!currentSessionId || messages.length === 0) return;
+
+    if (!currentSessionTitle) {
+      const firstUserMsg = messages.find((m) => m.role === "user");
+      if (firstUserMsg) {
+        const text = firstUserMsg.contentText.trim();
+        currentSessionTitle =
+          text.slice(0, 15) + (text.length > 15 ? "..." : "");
+      } else {
+        currentSessionTitle = "新对话";
+      }
+    }
+
+    try {
+      const session = {
+        id: currentSessionId,
+        title: currentSessionTitle,
+        provider_name: activeProviderName,
+        model_name: activeModelName,
+        created_at: currentSessionCreatedAt || Date.now(),
+        updated_at: Date.now(),
+        messages: messages.map((m) => ({
+          role: m.role,
+          content: m.contentText,
+        })),
+      };
+      await invoke("save_ai_session", { session });
+      if (reloadIndex) {
+        await loadSessions();
+      }
+    } catch (e) {
+      console.error("[AI Extension] Failed to save session:", e);
+    }
+  }
+
+  // 删除单条会话
+  function deleteSession(id: string, event: Event) {
+    event.stopPropagation();
+    if (isGenerating && id === currentSessionId) {
+      toast.error("当前会话正在回答中，无法删除");
+      return;
+    }
+
+    const session = sessions.find((s) => s.id === id);
+    const sessionTitle = session?.title || "未命名对话";
+
+    confirmDialogTitle = "确认删除对话";
+    confirmDialogDescription = `确定要删除对话“${sessionTitle}”吗？此操作无法撤销。`;
+    pendingAction = async () => {
+      try {
+        await invoke("delete_ai_session", { id });
+        toast.success("会话已删除");
+        await loadSessions();
+
+        if (id === currentSessionId) {
+          if (sessions.length > 0) {
+            await selectSession(sessions[0].id);
+          } else {
+            initNewSession();
+          }
+        }
+      } catch (e) {
+        console.error("[AI Extension] Failed to delete session:", e);
+        toast.error("删除会话失败");
+      }
+    };
+    confirmDialogOpen = true;
+  }
+
+  // 一键清空所有历史记录
+  function clearAllSessions() {
+    if (isGenerating) {
+      toast.error("AI 正在思考中，无法清空历史");
+      return;
+    }
+    confirmDialogTitle = "确认清空历史记录";
+    confirmDialogDescription =
+      "确定要清空所有的历史对话记录吗？此操作无法撤销。";
+    pendingAction = async () => {
+      try {
+        await invoke("clear_all_ai_sessions");
+        toast.success("所有会话历史已清空");
+        sessions = [];
+        initNewSession();
+        showHistory = false;
+      } catch (e) {
+        console.error("[AI Extension] Failed to clear all sessions:", e);
+        toast.error("清空历史记录失败");
+      }
+    };
+    confirmDialogOpen = true;
   }
 
   // 发送消息与流式响应逻辑
@@ -118,6 +317,9 @@
     messages = [...messages, { role: "assistant", contentText: "" }];
     isGenerating = true;
 
+    // 先触发一次本地紧急保存，确保即使中途退出也能保存用户的问题
+    await saveCurrentSession(false);
+
     // 生成流式事件 ID
     const eventId = `ai-stream-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
@@ -130,24 +332,29 @@
     // 注册流式区块监听
     const unlistenChunk = await listen<string>(eventId, (event) => {
       messages[aiMsgIndex].contentText += event.payload;
-      messages = [...messages]; // 触发响应式更新
+      messages = [...messages]; // 触发 Svelte 响应式更新
     });
 
     // 注册完成监听
-    const unlistenDone = await listen(eventId + "_done", () => {
+    const unlistenDone = await listen(eventId + "_done", async () => {
       isGenerating = false;
       cleanup();
+      await saveCurrentSession(); // 流生成结束，进行最终完整持久化
     });
 
     // 注册错误监听
-    const unlistenError = await listen<string>(eventId + "_error", (event) => {
-      messages[aiMsgIndex].contentText +=
-        `\n\n⚠️ **流传输中断**: ${event.payload}`;
-      messages = [...messages];
-      isGenerating = false;
-      cleanup();
-      toast.error(`AI 响应错误: ${event.payload}`);
-    });
+    const unlistenError = await listen<string>(
+      eventId + "_error",
+      async (event) => {
+        messages[aiMsgIndex].contentText +=
+          `\n\n⚠️ **流传输中断**: ${event.payload}`;
+        messages = [...messages];
+        isGenerating = false;
+        cleanup();
+        toast.error(`AI 响应错误: ${event.payload}`);
+        await saveCurrentSession(); // 报错也保存状态
+      },
+    );
 
     function cleanup() {
       unlistenChunk();
@@ -169,6 +376,7 @@
       isGenerating = false;
       cleanup();
       toast.error(`请求失败: ${err}`);
+      await saveCurrentSession();
     }
   }
 
@@ -214,17 +422,27 @@
 
     <!-- 顶栏操作区 -->
     <div class="flex items-center gap-2">
-      {#if messages.length > 0}
-        <!-- 采用 bits-ui Button.Root 构建清空对话键 -->
-        <Button.Root
-          class="flex h-8 items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-2.5 text-xs text-neutral-600 transition-colors hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800"
-          onclick={clearChat}
-          disabled={isGenerating}
-        >
-          <ArrowCounterClockwise size={13} />
-          清空对话
-        </Button.Root>
-      {/if}
+      <!-- 历史记录按钮 -->
+      <Button.Root
+        class="flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-200 bg-white text-neutral-600 transition-colors hover:bg-neutral-100 active:scale-95 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 {showHistory
+          ? 'border-neutral-300 bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800'
+          : ''}"
+        onclick={() => (showHistory = !showHistory)}
+        aria-label="历史对话"
+      >
+        <Clock size={15} />
+      </Button.Root>
+
+      <!-- 新建对话按钮 -->
+      <Button.Root
+        class="flex h-8 items-center gap-1 rounded-lg border border-neutral-200 bg-white px-2.5 text-xs text-neutral-600 transition-colors hover:bg-neutral-100 active:scale-95 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800"
+        onclick={initNewSession}
+        disabled={isGenerating}
+      >
+        <Plus size={13} weight="bold" />
+        新对话
+      </Button.Root>
+
       <!-- 采用 bits-ui Button.Root 构建设置键 -->
       <Button.Root
         class="flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-200 bg-white text-neutral-600 transition-colors hover:bg-neutral-100 active:scale-95 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800"
@@ -238,6 +456,100 @@
 
   <!-- 主体内容 -->
   <div class="relative flex-1 overflow-hidden">
+    <!-- 历史记录侧边栏 -->
+    <!-- 遮罩层 -->
+    <button
+      class="absolute inset-0 z-30 cursor-default border-none bg-neutral-950/15 backdrop-blur-[2px] transition-all duration-300 outline-none {showHistory
+        ? 'pointer-events-auto opacity-100'
+        : 'pointer-events-none opacity-0'}"
+      onclick={() => (showHistory = false)}
+      aria-label="关闭历史记录"
+    ></button>
+
+    <!-- 侧滑栏：采用毛玻璃特效和微光边框 -->
+    <aside
+      class="absolute top-0 bottom-0 left-0 z-40 flex w-72 flex-col border-r border-neutral-200/80 bg-white/95 shadow-2xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] dark:border-neutral-800/80 dark:bg-neutral-950/95 {showHistory
+        ? 'translate-x-0'
+        : '-translate-x-full'}"
+    >
+      <!-- 侧边栏头部 -->
+      <div
+        class="flex items-center justify-between border-b border-neutral-200/50 p-4 dark:border-neutral-800/50"
+      >
+        <span
+          class="text-xs font-semibold text-neutral-500 dark:text-neutral-400"
+          >历史对话记录</span
+        >
+        {#if sessions.length > 0}
+          <button
+            class="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-neutral-400 hover:bg-neutral-100 hover:text-red-500 dark:hover:bg-neutral-900"
+            onclick={clearAllSessions}
+          >
+            <Trash size={10} />
+            全部清空
+          </button>
+        {/if}
+      </div>
+
+      <!-- 历史会话列表 -->
+      <div class="scrollbar-thin flex-1 space-y-1 overflow-y-auto p-2">
+        {#if sessions.length === 0}
+          <div
+            class="flex h-40 flex-col items-center justify-center text-center text-xs text-neutral-400 select-none"
+          >
+            <Clock size={20} class="mb-2 text-neutral-300" />
+            暂无历史对话记录
+          </div>
+        {:else}
+          {#each sessions as session (session.id)}
+            <div
+              role="button"
+              tabindex="0"
+              class="group relative flex w-full cursor-pointer flex-col gap-1 rounded-lg px-3 py-2.5 text-left transition-all hover:bg-neutral-100 active:scale-98 dark:hover:bg-neutral-900/60 {currentSessionId ===
+              session.id
+                ? 'border-l-2 border-neutral-900 bg-neutral-100/80 dark:border-neutral-100 dark:bg-neutral-900/80'
+                : ''}"
+              onclick={() => selectSession(session.id)}
+              onkeydown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  selectSession(session.id);
+                }
+              }}
+            >
+              <!-- 标题与删除按钮 -->
+              <div class="flex items-start justify-between gap-2">
+                <span
+                  class="line-clamp-1 text-xs font-medium text-neutral-800 group-hover:pr-6 dark:text-neutral-200"
+                >
+                  {session.title || "未命名对话"}
+                </span>
+                <!-- 悬浮删除键 -->
+                <button
+                  class="absolute top-2.5 right-2 hidden rounded p-1 text-neutral-400 group-hover:block hover:bg-neutral-200 hover:text-red-500 dark:hover:bg-neutral-800"
+                  onclick={(e) => deleteSession(session.id, e)}
+                  aria-label="删除会话"
+                >
+                  <Trash size={12} />
+                </button>
+              </div>
+              <!-- 详情小标 -->
+              <div
+                class="flex items-center gap-1.5 text-[9px] text-neutral-400"
+              >
+                <span
+                  class="py-0.2 rounded bg-neutral-200/50 px-1 font-mono dark:bg-neutral-800"
+                  >{session.model_name}</span
+                >
+                <span>•</span>
+                <span>{formatTime(session.updated_at)}</span>
+              </div>
+            </div>
+          {/each}
+        {/if}
+      </div>
+    </aside>
+
     {#if isConfigured === null}
       <!-- 检查 AI 配置中 -->
       <div
@@ -403,6 +715,21 @@
   {/if}
 </div>
 
+<ConfirmDialog
+  bind:open={confirmDialogOpen}
+  title={confirmDialogTitle}
+  description={confirmDialogDescription}
+  onConfirm={async () => {
+    if (pendingAction) {
+      await pendingAction();
+      pendingAction = null;
+    }
+  }}
+  onCancel={() => {
+    pendingAction = null;
+  }}
+/>
+
 <style>
   /* 隐藏滚动条但保留滚动功能 */
   :global(.app-scroll-area) {
@@ -425,5 +752,20 @@
   }
   :global(.incremark-code .language) {
     color: #94a3b8 !important;
+  }
+
+  /* 自定义侧边栏滚动条以显得极为精致 */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 4px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 99px;
+  }
+  :global(.dark) .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
   }
 </style>

@@ -1,4 +1,5 @@
 use super::config::AIConfig;
+use crate::ai_manager::history::{ChatSession, ChatSessionMeta};
 use crate::ai_manager::provider::ChatRequest;
 use crate::ai_manager::AIManager;
 use std::sync::Arc;
@@ -87,4 +88,40 @@ pub async fn get_ai_capabilities(
     ai_manager: State<'_, Arc<AIManager>>,
 ) -> Result<Option<crate::ai_manager::provider::ProviderCapabilities>, String> {
     Ok(ai_manager.get_capabilities().await)
+}
+
+#[command]
+pub async fn get_ai_sessions_index(
+    ai_manager: State<'_, Arc<AIManager>>,
+) -> Result<Vec<ChatSessionMeta>, String> {
+    ai_manager.load_index()
+}
+
+#[command]
+pub async fn get_ai_session(
+    ai_manager: State<'_, Arc<AIManager>>,
+    id: String,
+) -> Result<ChatSession, String> {
+    ai_manager.get_session(&id)
+}
+
+#[command]
+pub async fn save_ai_session(
+    ai_manager: State<'_, Arc<AIManager>>,
+    session: ChatSession,
+) -> Result<(), String> {
+    ai_manager.save_session(session)
+}
+
+#[command]
+pub async fn delete_ai_session(
+    ai_manager: State<'_, Arc<AIManager>>,
+    id: String,
+) -> Result<(), String> {
+    ai_manager.delete_session(&id)
+}
+
+#[command]
+pub async fn clear_all_ai_sessions(ai_manager: State<'_, Arc<AIManager>>) -> Result<(), String> {
+    ai_manager.clear_all_sessions()
 }
