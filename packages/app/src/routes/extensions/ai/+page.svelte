@@ -48,6 +48,8 @@
   let isConfigured = $state<boolean | null>(null); // null = 检查中, true = 已配置, false = 未配置
   let activeProviderName = $state("");
   let activeModelName = $state("");
+  let activeEventId = $state("");
+  let currentCleanup = $state<(() => void) | null>(null);
 
   // 历史记录状态
   let sessions = $state<ChatSessionMeta[]>([]);
@@ -135,6 +137,13 @@
         }
       }
     }
+  });
+
+  onDestroy(() => {
+    if (currentCleanup) {
+      currentCleanup();
+    }
+    activeEventId = "";
   });
 
   // 检查 AI 配置
@@ -320,8 +329,9 @@
     // 先触发一次本地紧急保存，确保即使中途退出也能保存用户的问题
     await saveCurrentSession(false);
 
-    // 生成流式事件 ID
+    // 生成流式事件 ID并记录
     const eventId = `ai-stream-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    activeEventId = eventId;
 
     // 格式化为后端 AIManager 能解析 of ChatMessage[]
     const chatMessages = messages.slice(0, aiMsgIndex).map((msg) => ({
@@ -337,8 +347,8 @@
 
     // 注册完成监听
     const unlistenDone = await listen(eventId + "_done", async () => {
+      if (currentCleanup) currentCleanup();
       isGenerating = false;
-      cleanup();
       await saveCurrentSession(); // 流生成结束，进行最终完整持久化
     });
 
@@ -349,18 +359,20 @@
         messages[aiMsgIndex].contentText +=
           `\n\n⚠️ **流传输中断**: ${event.payload}`;
         messages = [...messages];
+        if (currentCleanup) currentCleanup();
         isGenerating = false;
-        cleanup();
         toast.error(`AI 响应错误: ${event.payload}`);
         await saveCurrentSession(); // 报错也保存状态
       },
     );
 
-    function cleanup() {
+    currentCleanup = () => {
       unlistenChunk();
       unlistenDone();
       unlistenError();
-    }
+      currentCleanup = null;
+      activeEventId = "";
+    };
 
     try {
       const request = {
@@ -373,10 +385,48 @@
     } catch (err: any) {
       messages[aiMsgIndex].contentText = `⚠️ **请求发起失败**: ${err}`;
       messages = [...messages];
+      if (currentCleanup) currentCleanup();
       isGenerating = false;
-      cleanup();
       toast.error(`请求失败: ${err}`);
       await saveCurrentSession();
+    }
+  }
+
+  // 中止当前 AI 流式生成任务
+  async function handleStopGeneration() {
+    if (!isGenerating || !activeEventId) return;
+
+    try {
+      // 调用后端终止接口
+      await invoke("abort_ai_stream", { eventId: activeEventId });
+
+      // 🐞 竞态检查：流可能已自然结束
+      if (!isGenerating) return;
+
+      // 手动触发前端监听清理
+      if (currentCleanup) {
+        currentCleanup();
+      }
+
+      // 在最后一条消息追加中止说明
+      const lastMsgIndex = messages.length - 1;
+      if (lastMsgIndex >= 0 && messages[lastMsgIndex].role === "assistant") {
+        messages[lastMsgIndex].contentText +=
+          "\n\n⚠️ **流传输已由用户手动中止**";
+        messages = [...messages];
+      }
+
+      isGenerating = false;
+      toast.success("已中止生成");
+      await saveCurrentSession();
+    } catch (e) {
+      console.error("[AI Extension] Failed to abort AI stream:", e);
+      // ⚠️ 保证在异常抛出时重置状态，避免永久卡死生成态
+      if (currentCleanup) {
+        currentCleanup();
+      }
+      isGenerating = false;
+      toast.error("中止生成失败");
     }
   }
 
@@ -697,18 +747,26 @@
             disabled={isGenerating}
             class="h-9 flex-1 border-none bg-transparent px-3 text-sm text-neutral-900 outline-none placeholder:text-neutral-400 focus:ring-0 focus:outline-none focus-visible:outline-none active:outline-none disabled:cursor-not-allowed disabled:opacity-50 dark:text-neutral-100 dark:placeholder:text-neutral-500"
           />
-          <!-- 采用 bits-ui Button.Root 构建发送提交键 -->
-          <Button.Root
-            type="submit"
-            disabled={!inputValue.trim() || isGenerating}
-            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-neutral-900 text-neutral-50 shadow-sm transition-all hover:bg-neutral-900/90 active:scale-95 disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-400 dark:bg-neutral-50 dark:text-neutral-900 dark:hover:bg-neutral-50/90 dark:disabled:bg-neutral-800 dark:disabled:text-neutral-600"
-          >
-            {#if isGenerating}
-              <Spinner class="h-4 w-4 animate-spin" />
-            {:else}
+          <!-- 采用 bits-ui Button.Root 构建发送提交键 / 中止键 -->
+          {#if isGenerating}
+            <Button.Root
+              type="button"
+              onclick={handleStopGeneration}
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-500 text-white shadow-sm transition-all hover:bg-red-600 active:scale-95 dark:bg-red-600 dark:hover:bg-red-700"
+              aria-label="停止生成"
+            >
+              <div class="h-3 w-3 rounded-xs bg-white"></div>
+            </Button.Root>
+          {:else}
+            <Button.Root
+              type="submit"
+              disabled={!inputValue.trim()}
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-neutral-900 text-neutral-50 shadow-sm transition-all hover:bg-neutral-900/90 active:scale-95 disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-400 dark:bg-neutral-50 dark:text-neutral-900 dark:hover:bg-neutral-50/90 dark:disabled:bg-neutral-800 dark:disabled:text-neutral-600"
+              aria-label="发送消息"
+            >
               <PaperPlaneTilt size={16} weight="bold" />
-            {/if}
-          </Button.Root>
+            </Button.Root>
+          {/if}
         </form>
       </div>
     </div>

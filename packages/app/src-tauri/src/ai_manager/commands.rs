@@ -43,25 +43,44 @@ pub async fn plugin_ai_stream(
 
     use futures::StreamExt;
 
+    let ai_manager_clone = ai_manager.inner().clone();
+    let event_id_clone = event_id.clone();
+
     // Spawn a task to handle the stream so we don't block the command handler
     // We can't return the stream directly from a command easily in Tauri v1/v2 without specialized plugins or valid return types
     // So we emit events.
-    tauri::async_runtime::spawn(async move {
+    let handle = tauri::async_runtime::spawn(async move {
         while let Some(chunk_result) = stream.next().await {
             match chunk_result {
                 Ok(content) => {
-                    let _ = app.emit(&event_id, content);
+                    let _ = app.emit(&event_id_clone, content);
                 }
                 Err(e) => {
-                    let _ = app.emit(&format!("{}_error", event_id), e.to_string());
+                    let _ = app.emit(&format!("{}_error", event_id_clone), e.to_string());
                     break;
                 }
             }
         }
-        let _ = app.emit(&format!("{}_done", event_id), ());
+        let _ = app.emit(&format!("{}_done", event_id_clone), ());
+
+        // Clean up from active_streams
+        let mut streams = ai_manager_clone.active_streams.lock().unwrap();
+        streams.remove(&event_id_clone);
     });
 
+    // Save JoinHandle to active_streams
+    let mut streams = ai_manager.active_streams.lock().unwrap();
+    streams.insert(event_id, handle);
+
     Ok(())
+}
+
+#[command]
+pub async fn abort_ai_stream(
+    ai_manager: State<'_, Arc<AIManager>>,
+    event_id: String,
+) -> Result<bool, String> {
+    Ok(ai_manager.abort_stream(&event_id))
 }
 
 #[command]

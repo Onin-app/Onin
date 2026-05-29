@@ -23,6 +23,8 @@ pub struct AIManager {
     app_handle: AppHandle,
     history_manager: std::sync::Mutex<self::history::HistoryManager>,
     app_data_dir: PathBuf,
+    pub active_streams:
+        std::sync::Mutex<std::collections::HashMap<String, tauri::async_runtime::JoinHandle<()>>>,
 }
 
 impl AIManager {
@@ -39,6 +41,7 @@ impl AIManager {
             app_handle,
             history_manager: std::sync::Mutex::new(history_manager),
             app_data_dir: data_dir,
+            active_streams: std::sync::Mutex::new(std::collections::HashMap::new()),
         }
     }
 
@@ -223,5 +226,16 @@ impl AIManager {
     pub fn clear_all_sessions(&self) -> Result<(), String> {
         let history = self.history_manager.lock().map_err(|e| e.to_string())?;
         history.clear_all_sessions()
+    }
+
+    /// Abort an ongoing stream task by its event ID
+    pub fn abort_stream(&self, event_id: &str) -> bool {
+        let mut streams = self.active_streams.lock().unwrap();
+        if let Some(handle) = streams.remove(event_id) {
+            handle.abort();
+            true
+        } else {
+            false
+        }
     }
 }
