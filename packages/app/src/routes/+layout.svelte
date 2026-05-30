@@ -107,6 +107,13 @@
   // This onMount block sets up a single, persistent listener for the 'esc_key_pressed' event.
   // It will live for the entire duration of the app, avoiding setup/teardown during page navigation.
   onMount(() => {
+    // 检测是否是 macOS (精确排除 iOS 的 like Mac 干扰)
+    const isMac =
+      /Mac/.test(navigator.userAgent) && !/like Mac/.test(navigator.userAgent);
+    if (isMac) {
+      document.documentElement.classList.add("platform-macos");
+    }
+
     // 首次冷启动时，如果窗口处于可见状态，才上报跨天活跃统计，避开静默后台开机自启
     getCurrentWindow()
       .isVisible()
