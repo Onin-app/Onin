@@ -135,5 +135,9 @@
     oninput={(e) => onInput(e.currentTarget.value)}
     onpaste={onPaste}
     onkeydown={handleKeydown}
+    autocorrect="off"
+    autocapitalize="off"
+    spellcheck="false"
+    autocomplete="off"
   />
 </div>

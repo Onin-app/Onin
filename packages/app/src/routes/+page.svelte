@@ -288,6 +288,22 @@
           goto("/extensions/filesearch");
           return;
         }
+        // AI Extension
+        if (extensionId === "ai") {
+          const effectiveText = clipboard.state.attachedText || inputValue;
+          inputValue = "";
+          clipboard.clearAttachments();
+          extensionPreviewItem = null;
+          extensionManager.clearPreview();
+          matchedCommands = [];
+          appListManager.resetToOriginList();
+          if (commandCode === "action" && effectiveText) {
+            goto(`/extensions/ai?q=${encodeURIComponent(effectiveText)}`);
+          } else {
+            goto("/extensions/ai");
+          }
+          return;
+        }
         // Emoji Extension 特殊处理：导航到独立页面
         if (extensionId === "emoji") {
           inputValue = "";

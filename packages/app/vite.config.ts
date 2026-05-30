@@ -19,6 +19,19 @@ export default defineConfig({
   build: {
     sourcemap: true,
   },
+  resolve: {
+    alias: [
+      // TODO: @incremark/svelte@1.0.2 has a packaging bug that preserves raw `.svelte.ts` extensions in compiled ESM output.
+      // Once the upstream package is updated to fix this issue (or our PR is merged), this alias workaround can be safely removed.
+      {
+        find: /^(.*)\.svelte\.ts$/,
+        replacement: "$1.svelte.js",
+      },
+    ],
+  },
+  optimizeDeps: {
+    exclude: ["@incremark/svelte"],
+  },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

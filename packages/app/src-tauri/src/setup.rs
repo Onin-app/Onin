@@ -47,6 +47,9 @@ pub fn on_app_setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     // Initialize File Search Extension
     crate::extensions::filesearch::init(app.handle());
 
+    // Initialize AI Extension
+    crate::extensions::ai::init(app.handle());
+
     // Initialize file search index in the background after startup.
     crate::file_search::init(app.handle().clone());
 
@@ -254,7 +257,21 @@ fn setup_desktop_features(app: &mut App) -> Result<(), Box<dyn std::error::Error
     }
 
     #[cfg(target_os = "macos")]
-    window_manager::setup_activation_observer(&app.handle());
+    {
+        match app.get_webview_window("main") {
+            Some(window) => {
+                if let Err(err) = window.set_shadow(true) {
+                    eprintln!("[window_manager] 无法为主窗口启用原生阴影: {:?}", err);
+                } else {
+                    println!("[window_manager] 成功为主窗口启用了原生阴影");
+                }
+            }
+            None => {
+                eprintln!("[window_manager] 错误: 找不到主窗口 \"main\"，无法启用原生阴影");
+            }
+        }
+        window_manager::setup_activation_observer(&app.handle());
+    }
 
     Ok(())
 }

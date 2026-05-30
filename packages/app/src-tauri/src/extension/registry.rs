@@ -50,6 +50,7 @@ pub fn get_all_extensions() -> Vec<&'static dyn Extension> {
         &extensions::filesearch::FILE_SEARCH_EXTENSION,
         &extensions::web::WEB_EXTENSION,
         &extensions::translator::TRANSLATOR_EXTENSION,
+        &extensions::ai::AI_EXTENSION,
     ]
 }
 

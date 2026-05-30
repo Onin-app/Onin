@@ -93,6 +93,16 @@
   onMount(() => {
     // Register this page's ESC handler
     escapeHandler.set(handleEsc);
+
+    // 解析 query 参数，自动激活对应的设置面板
+    const urlParams = new URLSearchParams(window.location.search);
+    const tab = urlParams.get("tab");
+    if (tab) {
+      const matched = settings.find((s) => s.id === tab);
+      if (matched) {
+        activeSetting = matched;
+      }
+    }
   });
 
   onDestroy(() => {
