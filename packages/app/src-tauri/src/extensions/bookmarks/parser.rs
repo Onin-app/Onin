@@ -452,7 +452,7 @@ fn parse_firefox_bookmarks(path: &Path) -> Result<Vec<BookmarkItem>, Box<dyn std
 // 浏览器路径探测工具 (Firefox / Safari 兼容)
 // ============================================================================
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 fn get_home_dir() -> Option<PathBuf> {
     if let Ok(home) = std::env::var("HOME") {
         Some(PathBuf::from(home))
@@ -487,6 +487,16 @@ fn get_browser_bookmark_path(browser_name: &str) -> Vec<PathBuf> {
                 }
             }
             _ => {}
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        if let Some(home) = get_home_dir() {
+            match browser_name {
+                "Firefox" => paths.push(home.join(".mozilla/firefox")),
+                _ => {}
+            }
         }
     }
 
