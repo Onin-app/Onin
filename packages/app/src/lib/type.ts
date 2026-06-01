@@ -99,6 +99,7 @@ export interface Shortcut {
   command_name: string;
   command_title?: string;
   readonly?: boolean;
+  originalShortcut?: string;
 }
 
 export type SortMode = "smart" | "frequency" | "recent" | "default";
