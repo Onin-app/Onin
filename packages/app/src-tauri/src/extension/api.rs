@@ -85,6 +85,41 @@ pub fn get_emoji_data(search_query: String) -> Option<EmojiGridData> {
     Some(EmojiGridData { groups })
 }
 
+/// 获取浏览器书签数据，支持按关键词搜索和按浏览器源过滤，并支持强制刷新缓存
+#[command]
+pub async fn get_bookmarks_data(
+    search_query: String,
+    browser_filter: String,
+    force_reload: Option<bool>,
+) -> Vec<crate::extensions::bookmarks::parser::BookmarkItem> {
+    use crate::extensions::bookmarks::parser::get_bookmarks;
+
+    let all_bookmarks = get_bookmarks(force_reload.unwrap_or(false));
+    let query = search_query.trim().to_lowercase();
+    let filter = browser_filter.trim().to_lowercase();
+
+    all_bookmarks
+        .into_iter()
+        .filter(|item| {
+            // 浏览器类型过滤 (如 "chrome", "safari", "edge", "brave", "arc")
+            if !filter.is_empty() && filter != "all" {
+                if item.browser.to_lowercase() != filter {
+                    return false;
+                }
+            }
+
+            // 搜索过滤（标题或网址包含搜索词）
+            if !query.is_empty() {
+                let title_match = item.title.to_lowercase().contains(&query);
+                let url_match = item.url.to_lowercase().contains(&query);
+                title_match || url_match
+            } else {
+                true
+            }
+        })
+        .collect()
+}
+
 #[command]
 pub fn get_color_conversion(
     input: String,

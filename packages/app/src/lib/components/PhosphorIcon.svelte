@@ -25,6 +25,13 @@
     CaretDown,
     DownloadSimple,
     Palette,
+    GoogleLogo,
+    Compass,
+    Browser,
+    ShieldCheck,
+    Sparkle,
+    Bookmark,
+    BookmarkSimple,
   } from "phosphor-svelte";
 
   interface PhosphorIconProps {
@@ -66,6 +73,13 @@
     "caret-down": CaretDown,
     download: DownloadSimple,
     palette: Palette,
+    googleLogo: GoogleLogo,
+    compass: Compass,
+    browser: Browser,
+    shieldCheck: ShieldCheck,
+    sparkle: Sparkle,
+    bookmark: Bookmark,
+    bookmarkSimple: BookmarkSimple,
   };
 
   const IconComponent = $derived(iconMap[icon] || Power);

@@ -3,6 +3,7 @@
 //! 包含所有内置扩展的实现
 
 pub mod ai;
+pub mod bookmarks;
 pub mod calculator;
 pub mod clipboard;
 pub mod color;

@@ -314,6 +314,24 @@
           goto("/extensions/emoji");
           return;
         }
+        // Bookmarks Extension 特殊处理：导航到独立页面
+        if (extensionId === "bookmarks") {
+          // 区分匹配指令和功能指令：功能指令默认不传递搜索参数，仅匹配指令才传递
+          const effectiveText =
+            app.trigger_mode === "matched" || app.trigger_mode === "preview"
+              ? clipboard.state.attachedText || inputValue
+              : "";
+          inputValue = "";
+          clipboard.clearAttachments();
+          extensionPreviewItem = null;
+          extensionManager.clearPreview();
+          matchedCommands = [];
+          const query = effectiveText
+            ? `?q=${encodeURIComponent(effectiveText)}`
+            : "";
+          goto(`/extensions/bookmarks${query}`);
+          return;
+        }
         // Clipboard Extension
         if (extensionId === "clipboard") {
           inputValue = "";
