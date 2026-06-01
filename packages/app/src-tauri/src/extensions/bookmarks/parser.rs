@@ -9,6 +9,7 @@ pub struct BookmarkItem {
     pub url: String,
     pub browser: String,
     pub folder: String,
+    pub profile: Option<String>,
 }
 
 // 全局书签缓存
@@ -30,6 +31,12 @@ pub fn get_bookmarks(force_reload: bool) -> Vec<BookmarkItem> {
     bookmarks
 }
 
+/// 探测 Chromium 浏览器的用户配置（Profile）目录结构
+struct ChromiumProfileInfo {
+    path: PathBuf, // Bookmarks 文件的绝对路径
+    name: String,  // Profile 目录的名称，如 "Default", "Profile 1" 等
+}
+
 /// 扫描所有支持的浏览器书签
 fn scan_all_bookmarks() -> Vec<BookmarkItem> {
     let mut all_bookmarks = Vec::new();
@@ -38,12 +45,16 @@ fn scan_all_bookmarks() -> Vec<BookmarkItem> {
     let chromium_browsers = vec!["Chrome", "Edge", "Brave", "Arc", "Opera", "Vivaldi"];
 
     for name in chromium_browsers {
-        let paths = get_browser_bookmark_path(name);
-        for path in paths {
-            if path.exists() {
-                if let Ok(bookmarks) = parse_chromium_bookmarks(&path, name) {
-                    all_bookmarks.extend(bookmarks);
-                    break; // 如果成功扫描了某个路径，则跳过此浏览器的其他备用路径
+        let user_data_dirs = get_chromium_user_data_dirs(name);
+        for dir in user_data_dirs {
+            if dir.exists() {
+                let profiles = find_chromium_profiles(&dir);
+                for profile in profiles {
+                    if let Ok(bookmarks) =
+                        parse_chromium_bookmarks(&profile.path, name, &profile.name)
+                    {
+                        all_bookmarks.extend(bookmarks);
+                    }
                 }
             }
         }
@@ -85,12 +96,154 @@ fn scan_all_bookmarks() -> Vec<BookmarkItem> {
 }
 
 // ============================================================================
-// Chromium 书签解析 (JSON)
+// Chromium 书签解析与多 Profile 动态扫描 (JSON)
 // ============================================================================
+
+/// 获取 Chromium 系列浏览器的用户数据（User Data）根目录
+///
+/// 注意：对于 Arc 浏览器，其在 macOS 上的用户数据存放在 `Arc/User Data` 目录下，
+/// 而其它 Chromium 浏览器通常直接存放在各自的应用支持根目录下，此处针对 Arc 进行了定向适配，
+/// 以保证后续 `find_chromium_profiles` 寻找 `Default` 或 `Profile *` 子目录的逻辑保持一致。
+fn get_chromium_user_data_dirs(browser_name: &str) -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+
+    #[cfg(target_os = "macos")]
+    {
+        if let Some(home) = get_home_dir() {
+            let app_support = home.join("Library/Application Support");
+            match browser_name {
+                "Chrome" => dirs.push(app_support.join("Google/Chrome")),
+                "Edge" => dirs.push(app_support.join("Microsoft Edge")),
+                "Brave" => dirs.push(app_support.join("BraveSoftware/Brave-Browser")),
+                "Arc" => dirs.push(app_support.join("Arc/User Data")),
+                "Opera" => dirs.push(app_support.join("com.operasoftware.Opera")),
+                "Vivaldi" => dirs.push(app_support.join("Vivaldi")),
+                _ => {}
+            }
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let local_app_data = std::env::var("LOCALAPPDATA").ok().map(PathBuf::from);
+        let app_data = std::env::var("APPDATA").ok().map(PathBuf::from);
+
+        match browser_name {
+            "Chrome" => {
+                if let Some(ref l) = local_app_data {
+                    dirs.push(l.join("Google/Chrome/User Data"));
+                }
+            }
+            "Edge" => {
+                if let Some(ref l) = local_app_data {
+                    dirs.push(l.join("Microsoft/Edge/User Data"));
+                }
+            }
+            "Brave" => {
+                if let Some(ref l) = local_app_data {
+                    dirs.push(l.join("BraveSoftware/Brave-Browser/User Data"));
+                }
+            }
+            "Arc" => {
+                if let Some(ref l) = local_app_data {
+                    // Arc 浏览器在 Windows 上的用户数据存放在 Arc/User Data 目录下，已通过实机验证确保路径无误
+                    dirs.push(l.join("Arc/User Data"));
+                }
+            }
+            "Opera" => {
+                if let Some(ref a) = app_data {
+                    dirs.push(a.join("Opera Software/Opera Stable"));
+                }
+                if let Some(ref l) = local_app_data {
+                    dirs.push(l.join("Opera Software/Opera Stable"));
+                }
+            }
+            "Vivaldi" => {
+                if let Some(ref l) = local_app_data {
+                    dirs.push(l.join("Vivaldi/User Data"));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        if let Some(home) = get_home_dir() {
+            let config_dir = home.join(".config");
+            match browser_name {
+                "Chrome" => dirs.push(config_dir.join("google-chrome")),
+                "Edge" => dirs.push(config_dir.join("microsoft-edge")),
+                "Brave" => dirs.push(config_dir.join("BraveSoftware/Brave-Browser")),
+                "Arc" => dirs.push(config_dir.join("Arc")),
+                "Opera" => dirs.push(config_dir.join("opera")),
+                "Vivaldi" => dirs.push(config_dir.join("vivaldi")),
+                _ => {}
+            }
+        }
+    }
+
+    dirs
+}
+
+/// 在指定 Chromium 浏览器的 User Data 目录下动态搜寻所有 Profile 中的 Bookmarks 文件
+fn find_chromium_profiles(user_data_dir: &Path) -> Vec<ChromiumProfileInfo> {
+    let mut profiles = Vec::new();
+    let mut seen_paths = std::collections::HashSet::new();
+
+    // 1. 检查根目录下是否有 Bookmarks (有些浏览器如 Arc 或精简单用户版会直接存放在根目录)
+    let root_bookmarks = user_data_dir.join("Bookmarks");
+    if root_bookmarks.exists() && root_bookmarks.is_file() {
+        // seen_paths 使用 canonicalize() 规范化绝对路径实现精准去重。
+        // 因前置了 root_bookmarks.exists() 检查，canonicalize() 必然成功，故不存在无法规范化导致重复解析的隐患。
+        if let Ok(abs_path) = root_bookmarks.canonicalize() {
+            seen_paths.insert(abs_path.clone());
+            profiles.push(ChromiumProfileInfo {
+                path: abs_path,
+                name: "Default".to_string(),
+            });
+        }
+    }
+
+    // 2. 遍历一级子目录，寻找包含 Bookmarks 的合法 Profile 目录（如 Default, Profile 1, Profile 2 等）
+    if let Ok(entries) = std::fs::read_dir(user_data_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                let bookmarks_path = path.join("Bookmarks");
+                if bookmarks_path.exists() && bookmarks_path.is_file() {
+                    if let Ok(abs_path) = bookmarks_path.canonicalize() {
+                        if seen_paths.contains(&abs_path) {
+                            continue;
+                        }
+                        seen_paths.insert(abs_path.clone());
+
+                        let dir_name = path
+                            .file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("Default")
+                            .to_string();
+
+                        // 排除一些系统和无关的内置非用户 Profile
+                        if dir_name != "System Profile" && dir_name != "Guest Profile" {
+                            profiles.push(ChromiumProfileInfo {
+                                path: abs_path,
+                                name: dir_name,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    profiles
+}
 
 fn parse_chromium_bookmarks(
     path: &Path,
     browser_name: &str,
+    profile_name: &str,
 ) -> Result<Vec<BookmarkItem>, Box<dyn std::error::Error>> {
     let content = std::fs::read_to_string(path)?;
     let val: serde_json::Value = serde_json::from_str(&content)?;
@@ -101,7 +254,7 @@ fn parse_chromium_bookmarks(
         let root_keys = vec!["bookmark_bar", "other", "synced"];
         for key in root_keys {
             if let Some(root_node) = roots.get(key) {
-                traverse_chromium_node(root_node, "", browser_name, &mut bookmarks);
+                traverse_chromium_node(root_node, "", browser_name, profile_name, &mut bookmarks);
             }
         }
     }
@@ -113,6 +266,7 @@ fn traverse_chromium_node(
     node: &serde_json::Value,
     current_folder: &str,
     browser_name: &str,
+    profile_name: &str,
     results: &mut Vec<BookmarkItem>,
 ) {
     let node_type = node.get("type").and_then(|t| t.as_str()).unwrap_or("");
@@ -129,6 +283,7 @@ fn traverse_chromium_node(
                 url: url.to_string(),
                 browser: browser_name.to_string(),
                 folder: current_folder.to_string(),
+                profile: Some(profile_name.to_string()),
             });
         }
     } else if node_type == "folder" {
@@ -140,7 +295,7 @@ fn traverse_chromium_node(
 
         if let Some(children) = node.get("children").and_then(|c| c.as_array()) {
             for child in children {
-                traverse_chromium_node(child, &new_folder, browser_name, results);
+                traverse_chromium_node(child, &new_folder, browser_name, profile_name, results);
             }
         }
     }
@@ -192,6 +347,9 @@ fn traverse_safari_node(
                     url: url.to_string(),
                     browser: "Safari".to_string(),
                     folder: current_folder.to_string(),
+                    // Safari 在较新 macOS 下虽然增加了概念，但其数据依然集中存储在 Bookmarks.plist 根下，
+                    // 不支持主流 Chromium/Firefox 概念的多分身目录，此处统一设定为 "Default" 以保持系统一致性。
+                    profile: Some("Default".to_string()),
                 });
             }
         } else if type_str == "WebBookmarkTypeFolder" {
@@ -225,6 +383,22 @@ fn traverse_safari_node(
 // ============================================================================
 
 fn parse_firefox_bookmarks(path: &Path) -> Result<Vec<BookmarkItem>, Box<dyn std::error::Error>> {
+    // 提取 profile 文件夹名（例如 "xxxx.default-release"）
+    // 基于 walkdir 遍历时设置的 max_depth(3) 边界条件限制，places.sqlite 必然位于 profile 根目录
+    // 或其一级直接子目录下（如 Firefox/Profiles/xxxx.default/places.sqlite）。
+    // 在此有限的探测深度下，提取 path.parent() 的 file_name() 作为 profile_name 是绝对安全且无歧义的。
+    let mut profile_name = path
+        .parent()
+        .and_then(|p| p.file_name())
+        .and_then(|n| n.to_str())
+        .unwrap_or("Default")
+        .to_string();
+
+    // 规范化 Firefox 的默认 Profile，使之与 Chromium 的 "Default" 保持一致，从而在前端优雅隐藏
+    if profile_name.contains(".default") {
+        profile_name = "Default".to_string();
+    }
+
     // 拷贝到临时文件，避免数据库文件锁冲突
     let temp_dir = std::env::temp_dir();
     let temp_db_path = temp_dir.join(format!(
@@ -246,7 +420,8 @@ fn parse_firefox_bookmarks(path: &Path) -> Result<Vec<BookmarkItem>, Box<dyn std
          WHERE b.type = 1 AND h.url IS NOT NULL AND h.url NOT LIKE 'place:%'",
     )?;
 
-    let rows = stmt.query_map([], |row| {
+    let profile_name_clone = profile_name.clone();
+    let rows = stmt.query_map([], move |row| {
         let title: Option<String> = row.get(0)?;
         let url: String = row.get(1)?;
         let folder: Option<String> = row.get(2)?;
@@ -256,6 +431,7 @@ fn parse_firefox_bookmarks(path: &Path) -> Result<Vec<BookmarkItem>, Box<dyn std
             url,
             browser: "Firefox".to_string(),
             folder: folder.unwrap_or_default(),
+            profile: Some(profile_name_clone.clone()),
         })
     })?;
 
@@ -273,7 +449,7 @@ fn parse_firefox_bookmarks(path: &Path) -> Result<Vec<BookmarkItem>, Box<dyn std
 }
 
 // ============================================================================
-// 浏览器路径探测工具
+// 浏览器路径探测工具 (Firefox / Safari 兼容)
 // ============================================================================
 
 #[cfg(target_os = "macos")]
@@ -293,15 +469,7 @@ fn get_browser_bookmark_path(browser_name: &str) -> Vec<PathBuf> {
         if let Some(home) = get_home_dir() {
             let app_support = home.join("Library/Application Support");
             match browser_name {
-                "Chrome" => paths.push(app_support.join("Google/Chrome/Default/Bookmarks")),
-                "Edge" => paths.push(app_support.join("Microsoft Edge/Default/Bookmarks")),
-                "Brave" => {
-                    paths.push(app_support.join("BraveSoftware/Brave-Browser/Default/Bookmarks"))
-                }
-                "Arc" => paths.push(app_support.join("Arc/User Data/Default/Bookmarks")),
                 "Safari" => paths.push(home.join("Library/Safari/Bookmarks.plist")),
-                "Opera" => paths.push(app_support.join("com.operasoftware.Opera/Bookmarks")),
-                "Vivaldi" => paths.push(app_support.join("Vivaldi/Default/Bookmarks")),
                 "Firefox" => paths.push(app_support.join("Firefox/Profiles")),
                 _ => {}
             }
@@ -310,44 +478,9 @@ fn get_browser_bookmark_path(browser_name: &str) -> Vec<PathBuf> {
 
     #[cfg(target_os = "windows")]
     {
-        let local_app_data = std::env::var("LOCALAPPDATA").ok().map(PathBuf::from);
         let app_data = std::env::var("APPDATA").ok().map(PathBuf::from);
 
         match browser_name {
-            "Chrome" => {
-                if let Some(ref l) = local_app_data {
-                    paths.push(l.join("Google/Chrome/User Data/Default/Bookmarks"));
-                }
-            }
-            "Edge" => {
-                if let Some(ref l) = local_app_data {
-                    paths.push(l.join("Microsoft/Edge/User Data/Default/Bookmarks"));
-                }
-            }
-            "Brave" => {
-                if let Some(ref l) = local_app_data {
-                    paths.push(l.join("BraveSoftware/Brave-Browser/User Data/Default/Bookmarks"));
-                }
-            }
-            "Arc" => {
-                if let Some(ref l) = local_app_data {
-                    paths.push(l.join("Arc/User Data/Bookmarks"));
-                    paths.push(l.join("Arc/User Data/Default/Bookmarks"));
-                }
-            }
-            "Opera" => {
-                if let Some(ref a) = app_data {
-                    paths.push(a.join("Opera Software/Opera Stable/Bookmarks"));
-                }
-                if let Some(ref l) = local_app_data {
-                    paths.push(l.join("Opera Software/Opera Stable/Bookmarks"));
-                }
-            }
-            "Vivaldi" => {
-                if let Some(ref l) = local_app_data {
-                    paths.push(l.join("Vivaldi/User Data/Default/Bookmarks"));
-                }
-            }
             "Firefox" => {
                 if let Some(ref a) = app_data {
                     paths.push(a.join("Mozilla/Firefox/Profiles"));
@@ -373,9 +506,10 @@ mod tests {
             bookmarks.len()
         );
         for (i, b) in bookmarks.iter().take(5).enumerate() {
+            let prof = b.profile.as_deref().unwrap_or("None");
             println!(
-                "  [{}] {} ({}) - Folder: {}",
-                i, b.title, b.browser, b.folder
+                "  [{}] {} ({}) - Profile: {} - Folder: {}",
+                i, b.title, b.browser, prof, b.folder
             );
         }
     }

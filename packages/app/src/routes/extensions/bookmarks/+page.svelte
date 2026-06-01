@@ -18,6 +18,7 @@
     url: string;
     browser: string;
     folder: string;
+    profile?: string | null;
   }
 
   let searchQuery = $state("");
@@ -446,13 +447,24 @@
                   >
                     {item.title || "无标题书签"}
                   </span>
-                  {#if item.folder}
-                    <span
-                      class="flex-shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
-                    >
-                      {item.folder}
-                    </span>
-                  {/if}
+                  <!-- 文件夹与配置文件标签 -->
+                  <div class="flex flex-shrink-0 items-center gap-1.5">
+                    {#if item.folder}
+                      <span
+                        class="rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
+                      >
+                        {item.folder}
+                      </span>
+                    {/if}
+                    {#if item.profile && item.profile !== "Default"}
+                      <span
+                        class="rounded border border-violet-100 bg-violet-50/60 px-1.5 py-0.5 text-[10px] font-medium text-violet-500 dark:border-violet-900/40 dark:bg-violet-950/30 dark:text-violet-400"
+                        title="浏览器配置文件: {item.profile}"
+                      >
+                        {item.profile}
+                      </span>
+                    {/if}
+                  </div>
                 </div>
                 <div
                   class="mt-1 truncate font-mono text-xs text-neutral-400 dark:text-neutral-500"
