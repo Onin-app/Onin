@@ -22,70 +22,145 @@
 
   let searchQuery = $state("");
   let selectedBrowser = $state("all"); // "all", "chrome", "safari", "edge", "brave", "arc"
-  let bookmarks = $state<BookmarkItem[]>([]);
+  let allBookmarks = $state<BookmarkItem[]>([]);
   let selectedIndex = $state(0);
   let isLoading = $state(true);
   let headerRef = $state<ExtensionHeader>(null!);
   let isRefreshingBookmarks = $state(false);
 
-  // 浏览器类型选项列表
-  const browsers = [
-    { id: "all", name: "全部", icon: "bookmark" },
-    {
-      id: "chrome",
+  // 核心书签过滤纯函数：提取高内聚的过滤算法，杜绝逻辑重复，同时向前端衍生和同步时序判断提供统一支撑
+  function filterBookmarksList(
+    list: BookmarkItem[],
+    query: string,
+    filter: string,
+  ): BookmarkItem[] {
+    const q = query.trim().toLowerCase();
+    const f = filter.trim().toLowerCase();
+
+    return list.filter((item) => {
+      // 浏览器过滤
+      if (f !== "all" && item.browser.toLowerCase() !== f) {
+        return false;
+      }
+      // 搜索词过滤
+      if (q) {
+        const titleMatch = item.title.toLowerCase().includes(q);
+        const urlMatch = item.url.toLowerCase().includes(q);
+        return titleMatch || urlMatch;
+      }
+      return true;
+    });
+  }
+
+  // 在前端进行极速的响应式过滤，实现 0 延迟切换 Tab 和模糊搜索。
+  // 通过限制最多渲染 100 条数据，彻底消除了过量 DOM 重绘导致的点击卡顿和卡肉感。
+  let filteredBookmarks = $derived.by(() => {
+    return filterBookmarksList(
+      allBookmarks,
+      searchQuery,
+      selectedBrowser,
+    ).slice(0, 100);
+  });
+
+  // 支持的浏览器配置映射
+  const BROWSER_CONFIGS: Record<
+    string,
+    { name: string; icon: string; color: string }
+  > = {
+    chrome: {
       name: "Chrome",
       icon: "googleLogo",
       color: "text-blue-500 dark:text-blue-400",
     },
-    {
-      id: "safari",
+    safari: {
       name: "Safari",
       icon: "compass",
       color: "text-sky-500 dark:text-sky-400",
     },
-    {
-      id: "edge",
+    edge: {
       name: "Edge",
       icon: "browser",
       color: "text-teal-500 dark:text-teal-400",
     },
-    {
-      id: "brave",
+    brave: {
       name: "Brave",
       icon: "shieldCheck",
       color: "text-orange-500 dark:text-orange-400",
     },
-    {
-      id: "arc",
+    arc: {
       name: "Arc",
       icon: "sparkle",
       color: "text-violet-500 dark:text-violet-400",
     },
-  ];
+    firefox: {
+      name: "Firefox",
+      icon: "globe",
+      color: "text-orange-600 dark:text-orange-500",
+    },
+    opera: {
+      name: "Opera",
+      icon: "appWindow",
+      color: "text-red-500 dark:text-red-400",
+    },
+    vivaldi: {
+      name: "Vivaldi",
+      icon: "globe",
+      color: "text-rose-500 dark:text-rose-400",
+    },
+  };
+
+  // 动态活跃浏览器列表，通过 allBookmarks 响应式衍生得出，不仅杜绝了重复扫描，而且保证了任何时候 Tab 栏绝对实时、不过时！
+  let activeBrowsers = $derived.by(() => {
+    // 提取所有在书签中真实存在的浏览器名称，并去重
+    const detected = Array.from(
+      new Set(allBookmarks.map((b) => b.browser.toLowerCase())),
+    );
+    detected.sort();
+
+    const dynamicBrowsers = detected.map((id) => {
+      const config = BROWSER_CONFIGS[id] || {
+        name: id.charAt(0).toUpperCase() + id.slice(1),
+        icon: "bookmark",
+        color: "text-neutral-500",
+      };
+      return {
+        id,
+        name: config.name,
+        icon: config.icon,
+        color: config.color,
+      };
+    });
+
+    return [{ id: "all", name: "全部", icon: "bookmark" }, ...dynamicBrowsers];
+  });
 
   // 从 URL 参数获取初始搜索值
   const initialQuery = $derived($page.url.searchParams.get("q") || "");
 
-  // 从后端获取书签数据
-  async function fetchBookmarks(
-    query: string,
-    filter: string,
-    force: boolean = false,
-  ) {
+  // 从后端一次性获取全量书签数据，交由前端在内存中快速过滤
+  async function loadAllBookmarks(force: boolean = false) {
     try {
       isLoading = true;
       const data = await invoke<BookmarkItem[]>("get_bookmarks_data", {
-        searchQuery: query,
-        browserFilter: filter,
+        searchQuery: "",
+        browserFilter: "all",
         forceReload: force,
       });
-      bookmarks = data || [];
+      allBookmarks = data || [];
+
+      // 模拟过滤得到准确的当前长度，通过统一函数调用避免重复过滤逻辑，且切断 $derived 异步 Tick 时序依赖
+      const currentFilteredCount = filterBookmarksList(
+        allBookmarks,
+        searchQuery,
+        selectedBrowser,
+      ).slice(0, 100).length;
+
       // 重置选中索引，防止越界
-      if (selectedIndex >= bookmarks.length) {
-        selectedIndex = Math.max(0, bookmarks.length - 1);
+      if (selectedIndex >= currentFilteredCount) {
+        selectedIndex = Math.max(0, currentFilteredCount - 1);
       }
     } catch (error) {
-      console.error("[Bookmarks] Failed to fetch bookmarks:", error);
+      console.error("[Bookmarks] Failed to load bookmarks:", error);
     } finally {
       isLoading = false;
     }
@@ -96,7 +171,7 @@
     if (isRefreshingBookmarks) return;
     try {
       isRefreshingBookmarks = true;
-      await fetchBookmarks(searchQuery, selectedBrowser, true);
+      await loadAllBookmarks(true);
       toast.success("已成功同步最新书签");
     } catch (e) {
       console.error("[Bookmarks] Failed to refresh bookmarks:", e);
@@ -111,13 +186,13 @@
   function selectBrowser(browserId: string) {
     selectedBrowser = browserId;
     selectedIndex = 0;
-    fetchBookmarks(searchQuery, browserId);
+    // 数据在前端过滤，瞬时更新，无需调用后端 API
   }
 
   // 处理搜索输入
-  const handleSearch = (value: string) => {
+  const handleSearch = (_value: string) => {
     selectedIndex = 0;
-    fetchBookmarks(value, selectedBrowser);
+    // 搜索词已双向绑定至 searchQuery，此处仅需重置选中索引，自动触发前端极速响应式过滤
   };
 
   // 返回主页面
@@ -132,22 +207,24 @@
       return;
     }
 
-    if (bookmarks.length === 0) return;
+    if (filteredBookmarks.length === 0) return;
 
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      selectedIndex = (selectedIndex + 1) % bookmarks.length;
+      selectedIndex = (selectedIndex + 1) % filteredBookmarks.length;
       scrollToSelected();
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      selectedIndex = (selectedIndex - 1 + bookmarks.length) % bookmarks.length;
+      selectedIndex =
+        (selectedIndex - 1 + filteredBookmarks.length) %
+        filteredBookmarks.length;
       scrollToSelected();
     } else if (e.key === "Enter") {
       e.preventDefault();
-      openBookmark(bookmarks[selectedIndex]);
+      openBookmark(filteredBookmarks[selectedIndex]);
     } else if (e.key === "c" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
-      copyBookmarkUrl(bookmarks[selectedIndex]);
+      copyBookmarkUrl(filteredBookmarks[selectedIndex]);
     }
   };
 
@@ -190,23 +267,13 @@
   // 获取浏览器对应的图标名称
   function getBrowserIcon(browserName: string): string {
     const lower = browserName.toLowerCase();
-    if (lower.includes("chrome")) return "googleLogo";
-    if (lower.includes("safari")) return "compass";
-    if (lower.includes("edge")) return "browser";
-    if (lower.includes("brave")) return "shieldCheck";
-    if (lower.includes("arc")) return "sparkle";
-    return "bookmark";
+    return BROWSER_CONFIGS[lower]?.icon || "bookmark";
   }
 
   // 获取浏览器图标的特有颜色
   function getBrowserColorClass(browserName: string): string {
     const lower = browserName.toLowerCase();
-    if (lower.includes("chrome")) return "text-blue-500 dark:text-blue-400";
-    if (lower.includes("safari")) return "text-sky-500 dark:text-sky-400";
-    if (lower.includes("edge")) return "text-teal-500 dark:text-teal-400";
-    if (lower.includes("brave")) return "text-orange-500 dark:text-orange-400";
-    if (lower.includes("arc")) return "text-violet-500 dark:text-violet-400";
-    return "text-neutral-500";
+    return BROWSER_CONFIGS[lower]?.color || "text-neutral-500";
   }
 
   // 根据 URL 获取高分辨率站点 Favicon 图标
@@ -220,11 +287,11 @@
     }
   }
 
-  onMount(() => {
+  onMount(async () => {
     // 使用 URL 参数初始化搜索值
     searchQuery = initialQuery;
-    // 每次进入页面时强制进行一次扫描，保证初始数据最新
-    fetchBookmarks(searchQuery, selectedBrowser, true);
+    // 每次进入页面时强制进行一次全量扫描，保证初始数据最新
+    await loadAllBookmarks(true);
 
     // 自动聚焦头部输入框
     headerRef?.focus();
@@ -262,7 +329,7 @@
   <div
     class="flex flex-shrink-0 gap-1 border-b border-neutral-200/50 px-4 py-2 dark:border-neutral-700/50"
   >
-    {#each browsers as browser (browser.id)}
+    {#each activeBrowsers as browser (browser.id)}
       <button
         class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 focus:outline-none {selectedBrowser ===
         browser.id
@@ -278,7 +345,7 @@
 
   <!-- 内容展示区域 -->
   <div class="flex-1 overflow-hidden">
-    {#if isLoading && bookmarks.length === 0}
+    {#if isLoading && filteredBookmarks.length === 0}
       <div
         class="flex h-full items-center justify-center text-sm text-neutral-500"
       >
@@ -289,7 +356,7 @@
           <span>读取书签中...</span>
         </div>
       </div>
-    {:else if bookmarks.length === 0}
+    {:else if filteredBookmarks.length === 0}
       <div class="flex h-full items-center justify-center px-6">
         <div
           class="flex max-w-sm flex-col items-center gap-4 text-center text-sm text-neutral-500"
@@ -312,7 +379,7 @@
     {:else}
       <AppScrollArea class="h-full w-full" viewportClass="h-full w-full p-2">
         <div class="flex flex-col gap-1.5">
-          {#each bookmarks as item, index (item.url + index)}
+          {#each filteredBookmarks as item, index (item.url + index)}
             <button
               id="bookmark-item-{index}"
               class="group flex w-full items-center gap-3.5 rounded-xl border border-transparent px-3 py-2.5 text-left text-sm transition-all duration-150 {selectedIndex ===
