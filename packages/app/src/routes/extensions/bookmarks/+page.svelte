@@ -27,6 +27,7 @@
   let isLoading = $state(true);
   let headerRef = $state<ExtensionHeader>(null!);
   let isRefreshingBookmarks = $state(false);
+  let isMac = $state(false);
 
   // 核心书签过滤纯函数：提取高内聚的过滤算法，杜绝逻辑重复，同时向前端衍生和同步时序判断提供统一支撑
   function filterBookmarksList(
@@ -131,7 +132,10 @@
       };
     });
 
-    return [{ id: "all", name: "全部", icon: "bookmark" }, ...dynamicBrowsers];
+    return [
+      { id: "all", name: "全部", icon: "bookmark", color: "text-neutral-500" },
+      ...dynamicBrowsers,
+    ];
   });
 
   // 从 URL 参数获取初始搜索值
@@ -223,6 +227,15 @@
       e.preventDefault();
       openBookmark(filteredBookmarks[selectedIndex]);
     } else if (e.key === "c" && (e.metaKey || e.ctrlKey)) {
+      // 如果输入框内有选中的文本，允许默认的复制行为，不进行拦截
+      const activeEl = document.activeElement as HTMLInputElement;
+      if (
+        activeEl &&
+        (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA") &&
+        activeEl.selectionStart !== activeEl.selectionEnd
+      ) {
+        return;
+      }
       e.preventDefault();
       copyBookmarkUrl(filteredBookmarks[selectedIndex]);
     }
@@ -288,6 +301,7 @@
   }
 
   onMount(async () => {
+    isMac = /macintosh|mac os x/i.test(navigator.userAgent);
     // 使用 URL 参数初始化搜索值
     searchQuery = initialQuery;
     // 每次进入页面时强制进行一次全量扫描，保证初始数据最新
@@ -448,20 +462,41 @@
                 </div>
               </div>
 
-              <!-- 快捷指令提示 -->
+              <!-- 快捷指令提示：精细化键帽与平台自适应设计 -->
               {#if selectedIndex === index}
                 <div
-                  class="text-xxs animate-in fade-in flex flex-shrink-0 items-center gap-1.5 font-semibold text-neutral-400 duration-200 dark:text-neutral-500"
+                  class="animate-in fade-in text-xxs flex flex-shrink-0 items-center gap-1.5 font-normal text-neutral-400/80 duration-200 dark:text-neutral-500"
                 >
                   <kbd
-                    class="dark:bg-neutral-850 rounded border border-neutral-300 bg-neutral-50 px-1 py-0.5 dark:border-neutral-600"
+                    class="rounded border border-neutral-200 bg-neutral-100 px-1.5 py-0.5 font-mono text-[9px] text-neutral-500 shadow-[0_1px_0_rgba(0,0,0,0.05)] dark:border-neutral-700/60 dark:bg-neutral-800 dark:text-neutral-400"
                     >Enter</kbd
                   >
-                  打开
-                  <kbd
-                    class="dark:bg-neutral-850 rounded border border-neutral-300 bg-neutral-50 px-1 py-0.5 dark:border-neutral-600"
-                    >⌘C</kbd
-                  > 复制
+                  <span class="scale-90 opacity-80">打开</span>
+
+                  <span class="text-neutral-300 dark:text-neutral-700">|</span>
+
+                  <div class="flex items-center gap-0.5">
+                    {#if isMac}
+                      <kbd
+                        class="rounded border border-neutral-200 bg-neutral-100 px-1.5 py-0.5 font-mono text-[9px] text-neutral-500 shadow-[0_1px_0_rgba(0,0,0,0.05)] dark:border-neutral-700/60 dark:bg-neutral-800 dark:text-neutral-400"
+                        >⌘</kbd
+                      >
+                      <kbd
+                        class="rounded border border-neutral-200 bg-neutral-100 px-1.5 py-0.5 font-mono text-[9px] text-neutral-500 shadow-[0_1px_0_rgba(0,0,0,0.05)] dark:border-neutral-700/60 dark:bg-neutral-800 dark:text-neutral-400"
+                        >C</kbd
+                      >
+                    {:else}
+                      <kbd
+                        class="rounded border border-neutral-200 bg-neutral-100 px-1.5 py-0.5 font-mono text-[9px] text-neutral-500 shadow-[0_1px_0_rgba(0,0,0,0.05)] dark:border-neutral-700/60 dark:bg-neutral-800 dark:text-neutral-400"
+                        >Ctrl</kbd
+                      >
+                      <kbd
+                        class="rounded border border-neutral-200 bg-neutral-100 px-1.5 py-0.5 font-mono text-[9px] text-neutral-500 shadow-[0_1px_0_rgba(0,0,0,0.05)] dark:border-neutral-700/60 dark:bg-neutral-800 dark:text-neutral-400"
+                        >C</kbd
+                      >
+                    {/if}
+                  </div>
+                  <span class="scale-90 opacity-80">复制</span>
                 </div>
               {/if}
             </button>
