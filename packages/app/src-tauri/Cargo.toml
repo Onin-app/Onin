@@ -66,6 +66,7 @@ tauri-plugin-dialog = "2"
 tauri-plugin-clipboard-manager = "2"
 once_cell = "1.19.0"
 plist = "1.6.1"
+rusqlite = { version = "0.31", features = ["bundled"] }
 icns = "0.3.0"
 widestring = "0.5.1"
 deno_core = "0.355.0"

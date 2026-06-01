@@ -43,7 +43,7 @@
   };
 
   const handleKeyDown = (e: KeyboardEvent) => {
-    // Forward navigation keys to parent (arrow keys, Enter, Backspace)
+    // Forward navigation keys and strictly whitelisted custom shortcuts (Ctrl+C / Cmd+C) to parent
     if (
       [
         "ArrowUp",
@@ -52,7 +52,9 @@
         "ArrowRight",
         "Enter",
         "Backspace",
-      ].includes(e.key)
+      ].includes(e.key) ||
+      // 仅限特定快捷键白名单：复制操作 Ctrl+C 或 Cmd+C
+      (e.key.toLowerCase() === "c" && (e.ctrlKey || e.metaKey))
     ) {
       onKeyDown?.(e);
     }

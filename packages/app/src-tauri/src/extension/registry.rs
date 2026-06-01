@@ -44,6 +44,7 @@ pub trait Extension: Send + Sync {
 pub fn get_all_extensions() -> Vec<&'static dyn Extension> {
     vec![
         &extensions::calculator::CALCULATOR_EXTENSION,
+        &extensions::bookmarks::BOOKMARKS_EXTENSION,
         &extensions::color::COLOR_EXTENSION,
         &extensions::emoji::EMOJI_EXTENSION,
         &extensions::clipboard::CLIPBOARD_EXTENSION,

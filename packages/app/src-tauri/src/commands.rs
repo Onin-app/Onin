@@ -169,6 +169,7 @@ pub fn get_invoke_handler(
         extension::api::get_extensions,
         extension::api::toggle_extension,
         extension::api::get_emoji_data,
+        extension::api::get_bookmarks_data,
         extension::api::get_color_conversion,
         extension::api::start_color_picker,
         extension::api::get_color_picker_capture,
