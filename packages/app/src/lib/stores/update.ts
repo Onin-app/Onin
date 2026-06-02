@@ -3,6 +3,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { platform } from "@tauri-apps/plugin-os";
 import { UPDATE_CONFIG } from "$lib/constants";
 import { toast } from "svelte-sonner";
+import { trackEvent } from "$lib/tracking";
 
 // 全局响应式状态
 export const checkingUpdate = writable(false);
@@ -13,7 +14,8 @@ export const releaseNotes = writable("");
 export const downloadUrl = writable("");
 export const appVersion = writable("未知");
 
-const CACHE_KEY = "onin_last_notified_version";
+const CACHE_KEY_NOTIFIED = "onin_last_notified_version";
+const CACHE_KEY_CHECKED_STATE = "onin_last_checked_version_state";
 
 // 初始化当前应用版本号
 async function initVersion() {
@@ -83,20 +85,31 @@ export async function checkUpdate(silent: boolean = false) {
         matchedAsset = assets.find((asset: any) => asset.name.endsWith(".dmg"));
       }
 
+      const cleanLatestVersion = tagName.replace(/^v/, "");
+      const lastNotified = localStorage.getItem(CACHE_KEY_NOTIFIED);
+      const lastCheckedState = localStorage.getItem(CACHE_KEY_CHECKED_STATE);
+      const currentCheckedState = `${cleanLatestVersion}_${!!matchedAsset}`;
+
+      // 每个版本与资产状态组合仅上报一次，避免轮询/重复检测造成冗余
+      if (lastCheckedState !== currentCheckedState) {
+        trackEvent("update_found", {
+          current_version: currentVer,
+          latest_version: cleanLatestVersion,
+          has_asset: !!matchedAsset,
+        });
+        localStorage.setItem(CACHE_KEY_CHECKED_STATE, currentCheckedState);
+      }
+
       if (matchedAsset) {
-        const cleanLatestVersion = tagName.replace(/^v/, "");
         latestVersion.set(cleanLatestVersion);
         releaseNotes.set(data.body || "");
         downloadUrl.set(matchedAsset.browser_download_url);
         hasNewVersion.set(true);
 
         if (silent) {
-          // 静默检测发现新版本，执行防打扰 Toast 提示逻辑
-          const lastNotified = localStorage.getItem(CACHE_KEY);
           if (lastNotified !== cleanLatestVersion) {
-            // 用 svelte-sonner 弹出一个支持交互并且持久挂载的 Toast 提示
             toast.info(`发现新版本 v${cleanLatestVersion}！`, {
-              duration: 10000, // 提示展示 10 秒
+              duration: 10000,
               action: {
                 label: "立即查看",
                 onClick: () => {
@@ -104,12 +117,11 @@ export async function checkUpdate(silent: boolean = false) {
                 },
               },
             });
-            // 写入缓存，防止相同版本频繁弹 Toast 干扰操作
-            localStorage.setItem(CACHE_KEY, cleanLatestVersion);
+            localStorage.setItem(CACHE_KEY_NOTIFIED, cleanLatestVersion);
           }
         } else {
-          // 手动点击检查，直接展开精美的详细下载升级弹窗
           updateDialogOpen.set(true);
+          localStorage.setItem(CACHE_KEY_NOTIFIED, cleanLatestVersion);
         }
       } else if (!silent) {
         toast.warning(

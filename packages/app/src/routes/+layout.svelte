@@ -25,67 +25,15 @@
     closeUpdateDialog,
   } from "$lib/stores/update";
 
+  import {
+    trackAppStarted,
+    trackDailyActive,
+    trackEvent,
+    accumulateCommandStat,
+  } from "$lib/tracking";
+
   // Setup plugin console listener to forward plugin console output to webview devtools
   setupPluginConsoleListener();
-
-  // 简易且完全兼容 Tauri v2 的 Aptabase 统计上报实现，规避不兼容 Tauri v2 的 @aptabase/tauri npm 包
-  async function trackEvent(
-    name: string,
-    props?: Record<string, string | number>,
-  ): Promise<boolean> {
-    try {
-      await invoke("plugin:aptabase|track_event", { name, props });
-      return true;
-    } catch (err) {
-      console.error("[Aptabase] 追踪事件失败:", err);
-      return false;
-    }
-  }
-
-  // 竞态锁变量：防止 onMount 与 visibility 并发触发重复上报结算
-  let isTrackingActive = false;
-
-  // 核心：基于次日结算机制的活跃与频次心跳统计
-  async function checkAndTrackActive() {
-    if (isTrackingActive) return;
-    isTrackingActive = true;
-
-    try {
-      const now = new Date();
-      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-      const lastActiveDate = localStorage.getItem("onin_last_active_date");
-
-      if (lastActiveDate !== todayStr) {
-        // 1. 跨天了，需要结账上报前一天的打开次数
-        const savedCount = localStorage.getItem("onin_today_open_count");
-
-        // 偏执型类型防守：既防范了被外部篡改或空值导致 parseInt 得到 NaN 的崩溃风险，又完美保留了数字 0 的客观语义
-        const parsedCount = savedCount !== null ? parseInt(savedCount, 10) : 1;
-        const previousDayOpens = isNaN(parsedCount) ? 1 : parsedCount;
-
-        // 发送结算上报，合并昨日唤醒频次
-        const success = await trackEvent("app_started", {
-          trigger: "active_wake",
-          previous_day_opens: previousDayOpens,
-        });
-
-        // 2. 只有上报成功后才更新本地标记并清空计数；若失败（如断网），本地保留原数据供下一次唤醒时重试结算
-        if (success) {
-          localStorage.setItem("onin_last_active_date", todayStr);
-          localStorage.setItem("onin_today_open_count", "1");
-        }
-      } else {
-        // 3. 同一天内的后续唤醒，不发网络请求，仅在本地累加计数
-        const currentCount = localStorage.getItem("onin_today_open_count");
-        const newCount = currentCount ? parseInt(currentCount, 10) + 1 : 1;
-        localStorage.setItem("onin_today_open_count", String(newCount));
-      }
-    } catch (err) {
-      console.error("[Aptabase] 活跃心跳统计失败:", err);
-    } finally {
-      isTrackingActive = false;
-    }
-  }
 
   interface ToastPayload {
     message: string;
@@ -114,13 +62,16 @@
       document.documentElement.classList.add("platform-macos");
     }
 
-    // 首次冷启动时，如果窗口处于可见状态，才上报跨天活跃统计，避开静默后台开机自启
+    // 首次冷启动时，不论是否可见都触发 app_started 并携带可见状态，仅在窗口可见时执行昨日心跳结算，避免因静默开机自启丢失冷启动和升级事件
     getCurrentWindow()
       .isVisible()
       .then((visible) => {
-        if (visible) {
-          checkAndTrackActive();
-        }
+        (async () => {
+          await trackAppStarted(visible);
+          if (visible) {
+            await trackDailyActive();
+          }
+        })();
       });
 
     const listenersPromise = (async () => {
@@ -152,8 +103,8 @@
             requestInputFocus();
           }
           if (event.payload) {
-            // 当窗口重新变为可见时（唤醒时），触发每日活跃结算或本地累加
-            checkAndTrackActive();
+            // 窗口重新变为可见时（唤醒时），触发每日活跃心跳
+            trackDailyActive();
           }
         },
       );
@@ -162,6 +113,9 @@
         "execute_command_by_name",
         async (event) => {
           const commandName = event.payload;
+
+          // 全局快捷键触发的命令，统一以 Hotkey 作为来源类型计入日活命令统计
+          accumulateCommandStat("Hotkey");
 
           if (commandName === "extension:color:pick") {
             await startColorPickerFlow({
@@ -234,11 +188,45 @@
         },
       );
 
+      interface PluginInstalledPayload {
+        plugin_id: string;
+        version: string;
+        overwrite: boolean;
+      }
+
+      interface PluginUninstalledPayload {
+        plugin_id: string;
+        plugin_name: string | null;
+      }
+
+      const unlistenPluginInstalled = await listen<PluginInstalledPayload>(
+        "plugin-installed",
+        (event) => {
+          trackEvent("plugin_installed", {
+            plugin_id: event.payload.plugin_id,
+            version: event.payload.version,
+            overwrite: event.payload.overwrite,
+          });
+        },
+      );
+
+      const unlistenPluginUninstalled = await listen<PluginUninstalledPayload>(
+        "plugin-uninstalled",
+        (event) => {
+          trackEvent("plugin_uninstalled", {
+            plugin_id: event.payload.plugin_id,
+            plugin_name: event.payload.plugin_name || "unknown",
+          });
+        },
+      );
+
       return {
         unlisten,
         unlistenVisibility,
         unlistenCommand,
         unlistenToast,
+        unlistenPluginInstalled,
+        unlistenPluginUninstalled,
       };
     })();
 
@@ -271,14 +259,27 @@
       if (autoUpdateIntervalId) {
         clearInterval(autoUpdateIntervalId);
       }
-      listenersPromise.then(
-        ({ unlisten, unlistenVisibility, unlistenCommand, unlistenToast }) => {
-          unlisten();
-          unlistenVisibility();
-          unlistenCommand();
-          unlistenToast();
-        },
-      );
+      listenersPromise
+        .then(
+          ({
+            unlisten,
+            unlistenVisibility,
+            unlistenCommand,
+            unlistenToast,
+            unlistenPluginInstalled,
+            unlistenPluginUninstalled,
+          }) => {
+            unlisten();
+            unlistenVisibility();
+            unlistenCommand();
+            unlistenToast();
+            unlistenPluginInstalled();
+            unlistenPluginUninstalled();
+          },
+        )
+        .catch((err) => {
+          console.error("Failed to cleanup layout listeners:", err);
+        });
     };
   });
 
