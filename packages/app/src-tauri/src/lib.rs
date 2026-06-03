@@ -9,6 +9,7 @@ pub mod ai_manager;
 mod app_config;
 mod command_manager;
 mod commands;
+pub mod data_manager;
 mod extension;
 mod extensions;
 mod file_command_manager;

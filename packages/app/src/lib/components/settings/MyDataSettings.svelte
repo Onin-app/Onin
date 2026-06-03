@@ -1,0 +1,420 @@
+<script lang="ts">
+  import { onMount } from "svelte";
+  import { invoke, convertFileSrc } from "@tauri-apps/api/core";
+  import { Button } from "bits-ui";
+  import { toast } from "svelte-sonner";
+  import {
+    Database,
+    FolderOpen,
+    Copy,
+    FileCode,
+    Cpu,
+    Plugs,
+    PuzzlePiece,
+    ArrowClockwise,
+  } from "phosphor-svelte";
+  import AppScrollArea from "$lib/components/AppScrollArea.svelte";
+
+  interface AppDataFileInfo {
+    id: string;
+    name: string;
+    category: string; // "main" | "plugin" | "extension"
+    rel_path: string;
+    absolute_path: string;
+    size_bytes: number;
+    is_json: boolean;
+    is_image: boolean;
+    is_text: boolean;
+  }
+
+  let dataDirPath = $state<string>("加载中...");
+  let filesList = $state<AppDataFileInfo[]>([]);
+  let loadingList = $state<boolean>(true);
+
+  let selectedFile = $state<AppDataFileInfo | null>(null);
+  let selectedFileContent = $state<string>("");
+  let selectedFileDisplay = $state<string>(""); // 脱敏后的展示内容
+  let imageUrl = $state<string>(""); // 图片文件的本地展示 URL
+  let loadingContent = $state<boolean>(false);
+
+  // 格式化文件大小
+  const formatSize = (bytes: number) => {
+    if (bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  };
+
+  // 敏感字段脱敏处理
+  const maskSensitiveData = (obj: any): any => {
+    if (typeof obj !== "object" || obj === null) {
+      return obj;
+    }
+    if (Array.isArray(obj)) {
+      return obj.map(maskSensitiveData);
+    }
+    const newObj: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      const lowerKey = key.toLowerCase();
+      if (
+        typeof value === "string" &&
+        (lowerKey.includes("key") ||
+          lowerKey.includes("password") ||
+          lowerKey.includes("secret") ||
+          lowerKey.includes("token"))
+      ) {
+        // 脱敏策略：保留前后 4 个字符，中间用星号遮蔽，若不够长则直接全遮蔽
+        if (value.length <= 8) {
+          newObj[key] = "••••••••";
+        } else {
+          newObj[key] = value.slice(0, 4) + "••••" + value.slice(-4);
+        }
+      } else {
+        newObj[key] = maskSensitiveData(value);
+      }
+    }
+    return newObj;
+  };
+
+  // 初始化加载数据路径和文件列表
+  const loadDataInfo = async () => {
+    loadingList = true;
+    try {
+      dataDirPath = await invoke<string>("get_app_data_dir_path");
+      filesList = await invoke<AppDataFileInfo[]>("list_app_data_files");
+    } catch (e) {
+      console.error(e);
+      toast.error("加载数据目录信息失败：" + String(e));
+    } finally {
+      loadingList = false;
+    }
+  };
+
+  // 打开系统数据目录
+  const handleOpenDataDir = async () => {
+    try {
+      await invoke("open_app_data_dir");
+    } catch (e) {
+      toast.error("打开文件夹失败：" + String(e));
+    }
+  };
+
+  // 选择并读取文件内容
+  const handleSelectFile = async (file: AppDataFileInfo) => {
+    selectedFile = file;
+    loadingContent = true;
+    selectedFileContent = "";
+    selectedFileDisplay = "";
+    imageUrl = "";
+
+    // 1. 如果是图片文件，直接用 convertFileSrc 显示
+    if (file.is_image) {
+      try {
+        imageUrl = convertFileSrc(file.absolute_path);
+      } catch (e) {
+        toast.error("转换图片路径失败：" + String(e));
+      } finally {
+        loadingContent = false;
+      }
+      return;
+    }
+
+    // 2. 如果不是文本文件，直接停止加载，在 UI 上显示二进制不可预览提示
+    if (!file.is_text) {
+      loadingContent = false;
+      return;
+    }
+
+    // 3. 读取文本或 JSON 内容
+    try {
+      const raw = await invoke<string>("read_app_data_file_content", {
+        relPath: file.rel_path,
+      });
+      selectedFileContent = raw;
+
+      if (file.is_json) {
+        try {
+          const parsed = JSON.parse(raw);
+          const masked = maskSensitiveData(parsed);
+          selectedFileDisplay = JSON.stringify(masked, null, 2);
+        } catch {
+          selectedFileDisplay = raw;
+        }
+      } else {
+        selectedFileDisplay = raw;
+      }
+    } catch (e) {
+      toast.error("读取文件内容失败：" + String(e));
+    } finally {
+      loadingContent = false;
+    }
+  };
+
+  // 复制未脱敏的原生配置内容
+  const handleCopyContent = async () => {
+    if (!selectedFileContent) return;
+    try {
+      await navigator.clipboard.writeText(selectedFileContent);
+      toast.success("已复制完整配置数据（包含密钥），请妥善保管");
+    } catch (e) {
+      toast.error("复制失败：" + String(e));
+    }
+  };
+
+  onMount(() => {
+    loadDataInfo();
+  });
+
+  // 按分类计算文件
+  const mainFiles = $derived(filesList.filter((f) => f.category === "main"));
+  const pluginFiles = $derived(
+    filesList.filter((f) => f.category === "plugin"),
+  );
+  const extensionFiles = $derived(
+    filesList.filter((f) => f.category === "extension"),
+  );
+</script>
+
+<div class="flex h-full w-full flex-col gap-4 overflow-hidden pr-2">
+  <!-- 顶部路径卡片 -->
+  <div
+    class="flex items-center justify-between gap-4 rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
+  >
+    <div class="flex flex-col gap-1 overflow-hidden">
+      <span
+        class="text-xs font-semibold text-neutral-400 uppercase dark:text-neutral-500"
+      >
+        本地数据存储路径
+      </span>
+      <span
+        class="truncate font-mono text-xs text-neutral-600 dark:text-neutral-300"
+        title={dataDirPath}
+      >
+        {dataDirPath}
+      </span>
+    </div>
+    <div class="flex gap-2">
+      <Button.Root
+        class="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 text-xs font-medium text-neutral-900 shadow-xs transition-colors hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200 dark:hover:bg-neutral-800"
+        onclick={loadDataInfo}
+        disabled={loadingList}
+      >
+        <ArrowClockwise size={14} class={loadingList ? "animate-spin" : ""} />
+        刷新
+      </Button.Root>
+      <Button.Root
+        class="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-neutral-900 px-3 text-xs font-medium text-white shadow-xs transition-colors hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-950 dark:hover:bg-neutral-200"
+        onclick={handleOpenDataDir}
+      >
+        <FolderOpen size={14} />
+        打开文件夹
+      </Button.Root>
+    </div>
+  </div>
+
+  <!-- 双栏展示区 -->
+  <div class="flex flex-1 gap-4 overflow-hidden">
+    <!-- 左侧列表 -->
+    <div
+      class="flex w-60 flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900"
+    >
+      <AppScrollArea
+        class="h-full w-full"
+        viewportClass="h-full w-full p-3 flex flex-col gap-4"
+      >
+        {#if loadingList}
+          <div
+            class="flex flex-1 items-center justify-center py-8 text-xs text-neutral-400"
+          >
+            加载列表中...
+          </div>
+        {:else}
+          <!-- 核心配置文件 -->
+          {#if mainFiles.length > 0}
+            <div class="flex flex-col gap-1">
+              <div
+                class="flex items-center gap-1.5 px-2 py-1 text-[11px] font-semibold tracking-wider text-neutral-400 uppercase dark:text-neutral-500"
+              >
+                <Cpu size={12} />
+                核心配置
+              </div>
+              {#each mainFiles as file}
+                <button
+                  class="flex w-full flex-col gap-1 rounded-lg px-2.5 py-1.5 text-left transition-colors {selectedFile?.id ===
+                  file.id
+                    ? 'bg-neutral-100 text-neutral-950 dark:bg-neutral-800 dark:text-white'
+                    : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white'}"
+                  onclick={() => handleSelectFile(file)}
+                >
+                  <span class="truncate text-xs font-medium">{file.name}</span>
+                  <div
+                    class="flex w-full items-center justify-between text-[9px] text-neutral-400 dark:text-neutral-500"
+                  >
+                    <span
+                      class="max-w-[110px] truncate font-mono"
+                      title={file.rel_path.split("/").pop()}
+                      >{file.rel_path.split("/").pop()}</span
+                    >
+                    <span class="shrink-0 font-mono"
+                      >{formatSize(file.size_bytes)}</span
+                    >
+                  </div>
+                </button>
+              {/each}
+            </div>
+          {/if}
+
+          <!-- 扩展配置文件 -->
+          {#if extensionFiles.length > 0}
+            <div class="flex flex-col gap-1">
+              <div
+                class="flex items-center gap-1.5 px-2 py-1 text-[11px] font-semibold tracking-wider text-neutral-400 uppercase dark:text-neutral-500"
+              >
+                <PuzzlePiece size={12} />
+                扩展数据
+              </div>
+              {#each extensionFiles as file}
+                <button
+                  class="flex w-full flex-col gap-1 rounded-lg px-2.5 py-1.5 text-left transition-colors {selectedFile?.id ===
+                  file.id
+                    ? 'bg-neutral-100 text-neutral-950 dark:bg-neutral-800 dark:text-white'
+                    : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white'}"
+                  onclick={() => handleSelectFile(file)}
+                >
+                  <span class="truncate text-xs font-medium" title={file.name}
+                    >{file.name}</span
+                  >
+                  <div
+                    class="flex w-full items-center justify-between text-[9px] text-neutral-400 dark:text-neutral-500"
+                  >
+                    <span
+                      class="max-w-[110px] truncate font-mono"
+                      title={file.rel_path.split("/").pop()}
+                      >{file.rel_path.split("/").pop()}</span
+                    >
+                    <span class="shrink-0 font-mono"
+                      >{formatSize(file.size_bytes)}</span
+                    >
+                  </div>
+                </button>
+              {/each}
+            </div>
+          {/if}
+
+          <!-- 插件配置文件 -->
+          {#if pluginFiles.length > 0}
+            <div class="flex flex-col gap-1">
+              <div
+                class="flex items-center gap-1.5 px-2 py-1 text-[11px] font-semibold tracking-wider text-neutral-400 uppercase dark:text-neutral-500"
+              >
+                <Plugs size={12} />
+                插件数据
+              </div>
+              {#each pluginFiles as file}
+                <button
+                  class="flex w-full flex-col gap-1 rounded-lg px-2.5 py-1.5 text-left transition-colors {selectedFile?.id ===
+                  file.id
+                    ? 'bg-neutral-100 text-neutral-950 dark:bg-neutral-800 dark:text-white'
+                    : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white'}"
+                  onclick={() => handleSelectFile(file)}
+                >
+                  <span class="truncate text-xs font-medium" title={file.name}
+                    >{file.name}</span
+                  >
+                  <div
+                    class="flex w-full items-center justify-between text-[9px] text-neutral-400 dark:text-neutral-500"
+                  >
+                    <span
+                      class="max-w-[110px] truncate font-mono"
+                      title={file.rel_path.split("/").pop()}
+                      >{file.rel_path.split("/").pop()}</span
+                    >
+                    <span class="shrink-0 font-mono"
+                      >{formatSize(file.size_bytes)}</span
+                    >
+                  </div>
+                </button>
+              {/each}
+            </div>
+          {/if}
+        {/if}
+      </AppScrollArea>
+    </div>
+
+    <!-- 右侧内容区域 -->
+    <div
+      class="flex flex-1 flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900"
+    >
+      {#if !selectedFile}
+        <div
+          class="flex flex-1 flex-col items-center justify-center gap-3 text-neutral-400 dark:text-neutral-600"
+        >
+          <Database size={40} weight="light" />
+          <span class="text-xs">请在左侧选择要预览的文件</span>
+        </div>
+      {:else}
+        <!-- 详情顶部面板 -->
+        <div
+          class="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-800"
+        >
+          <div class="flex flex-col gap-0.5 overflow-hidden">
+            <span
+              class="truncate text-xs font-semibold text-neutral-800 dark:text-neutral-100"
+            >
+              {selectedFile.name}
+            </span>
+            <span class="truncate font-mono text-[10px] text-neutral-400">
+              相对路径: {selectedFile.rel_path}
+            </span>
+          </div>
+          <div class="flex items-center gap-2">
+            {#if selectedFile.is_json}
+              <Button.Root
+                class="inline-flex h-7 items-center justify-center gap-1 rounded-md border border-neutral-200 bg-white px-2.5 text-[11px] font-medium text-neutral-700 shadow-xs transition-colors hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                onclick={handleCopyContent}
+                disabled={loadingContent || !selectedFileContent}
+              >
+                <Copy size={12} />
+                复制完整数据
+              </Button.Root>
+            {/if}
+          </div>
+        </div>
+
+        <!-- 详情内容区 -->
+        <AppScrollArea
+          class="w-full flex-1"
+          viewportClass="h-full w-full p-4 bg-neutral-50/50 dark:bg-neutral-950/30 flex flex-col"
+        >
+          {#if loadingContent}
+            <div
+              class="flex flex-1 items-center justify-center text-xs text-neutral-400"
+            >
+              读取数据内容中...
+            </div>
+          {:else if imageUrl}
+            <div class="flex flex-1 items-center justify-center p-2">
+              <img
+                src={imageUrl}
+                alt={selectedFile.name}
+                class="max-h-[380px] max-w-full rounded-lg border border-neutral-200 bg-white p-1.5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950"
+              />
+            </div>
+          {:else if !selectedFileDisplay}
+            <div
+              class="flex flex-1 flex-col items-center justify-center gap-2 text-neutral-400 dark:text-neutral-600"
+            >
+              <FileCode size={32} />
+              <span class="text-xs">当前文件是二进制文件或无法直接预览</span>
+            </div>
+          {:else}
+            <!-- 带有微动画和等宽字体的代码高亮 -->
+            <pre
+              class="overflow-x-auto rounded-lg border border-neutral-200 bg-white p-3 font-mono text-xs break-all whitespace-pre-wrap text-neutral-800 shadow-xs select-text dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200">{selectedFileDisplay}</pre>
+          {/if}
+        </AppScrollArea>
+      {/if}
+    </div>
+  </div>
+</div>
