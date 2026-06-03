@@ -12,6 +12,7 @@
     Plugs,
     PuzzlePiece,
     ArrowClockwise,
+    CaretRight,
   } from "phosphor-svelte";
   import AppScrollArea from "$lib/components/AppScrollArea.svelte";
 
@@ -83,6 +84,20 @@
     try {
       dataDirPath = await invoke<string>("get_app_data_dir_path");
       filesList = await invoke<AppDataFileInfo[]>("list_app_data_files");
+
+      // 加载内置扩展列表以获取友好名称
+      try {
+        loadedExtensions = await invoke<any[]>("get_extensions");
+      } catch (err) {
+        console.error("加载扩展列表失败", err);
+      }
+
+      // 加载已安装插件列表以获取友好名称
+      try {
+        loadedPlugins = await invoke<any[]>("get_loaded_plugins");
+      } catch (err) {
+        console.error("加载插件列表失败", err);
+      }
     } catch (e) {
       console.error(e);
       toast.error("加载数据目录信息失败：" + String(e));
@@ -103,6 +118,16 @@
   // 选择并读取文件内容
   const handleSelectFile = async (file: AppDataFileInfo) => {
     selectedFile = file;
+
+    // 自动展开选中的分组
+    if (file.category === "extension") {
+      const extId = getExtensionId(file);
+      expandedExtensions[extId] = true;
+    } else if (file.category === "plugin") {
+      const pluginId = getPluginId(file);
+      expandedPlugins[pluginId] = true;
+    }
+
     loadingContent = true;
     selectedFileContent = "";
     selectedFileDisplay = "";
@@ -174,6 +199,127 @@
   const extensionFiles = $derived(
     filesList.filter((f) => f.category === "extension"),
   );
+
+  interface ExtensionItemInfo {
+    id: string;
+    name: string;
+    description?: string;
+    icon?: string;
+    enabled?: boolean;
+  }
+
+  interface LoadedPluginInfo {
+    id: string;
+    name: string;
+    dir_name: string;
+    enabled?: boolean;
+  }
+
+  let loadedExtensions = $state<ExtensionItemInfo[]>([]);
+  let loadedPlugins = $state<LoadedPluginInfo[]>([]);
+  let expandedExtensions = $state<Record<string, boolean>>({});
+  let expandedPlugins = $state<Record<string, boolean>>({});
+
+  const getExtensionId = (file: AppDataFileInfo) => {
+    const parts = file.rel_path.split("/");
+    if (parts.length > 1 && parts[0] === "extensions") {
+      return parts[1];
+    }
+    return "unknown";
+  };
+
+  const getPluginId = (file: AppDataFileInfo) => {
+    if (file.rel_path.startsWith("plugin_settings/")) {
+      return file.rel_path
+        .substring("plugin_settings/".length)
+        .replace(/\.json$/i, "");
+    }
+    if (file.rel_path.startsWith("plugin_data/")) {
+      const sub = file.rel_path.substring("plugin_data/".length);
+      const parts = sub.split("/");
+      if (parts.length > 0) {
+        return parts[0];
+      }
+    }
+    return "unknown";
+  };
+
+  const getExtensionName = (id: string) => {
+    const ext = loadedExtensions.find((x) => x.id === id);
+    return ext?.name || id;
+  };
+
+  const getPluginName = (id: string) => {
+    if (id === "global") return "全局插件状态";
+    const p = loadedPlugins.find((x) => x.id === id || x.dir_name === id);
+    return p?.name || id;
+  };
+
+  const getFriendlyFileName = (file: AppDataFileInfo) => {
+    if (file.rel_path.startsWith("plugin_settings/")) {
+      return "插件设置 (.json)";
+    }
+    const parts = file.rel_path.split("/");
+    return parts[parts.length - 1];
+  };
+
+  const toggleExtensionExpand = (id: string) => {
+    expandedExtensions[id] = !expandedExtensions[id];
+  };
+
+  const togglePluginExpand = (id: string) => {
+    expandedPlugins[id] = !expandedPlugins[id];
+  };
+
+  const groupedExtensions = $derived(
+    (() => {
+      const groupsMap = new Map<string, AppDataFileInfo[]>();
+      for (const file of extensionFiles) {
+        const extId = getExtensionId(file);
+        if (!groupsMap.has(extId)) {
+          groupsMap.set(extId, []);
+        }
+        groupsMap.get(extId)!.push(file);
+      }
+      return Array.from(groupsMap.entries()).map(([id, files]) => ({
+        entityId: id,
+        entityName: getExtensionName(id),
+        files,
+      }));
+    })(),
+  );
+
+  const groupedPlugins = $derived(
+    (() => {
+      const groupsMap = new Map<string, AppDataFileInfo[]>();
+      for (const file of pluginFiles) {
+        const pluginId = getPluginId(file);
+        if (!groupsMap.has(pluginId)) {
+          groupsMap.set(pluginId, []);
+        }
+        groupsMap.get(pluginId)!.push(file);
+      }
+      return Array.from(groupsMap.entries()).map(([id, files]) => ({
+        entityId: id,
+        entityName: getPluginName(id),
+        files,
+      }));
+    })(),
+  );
+
+  const getSelectedFileDisplayName = (file: AppDataFileInfo) => {
+    if (file.category === "extension") {
+      const extId = getExtensionId(file);
+      const extName = getExtensionName(extId);
+      return `${extName} - ${getFriendlyFileName(file)}`;
+    }
+    if (file.category === "plugin") {
+      const pluginId = getPluginId(file);
+      const pluginName = getPluginName(pluginId);
+      return `${pluginName} - ${getFriendlyFileName(file)}`;
+    }
+    return file.name;
+  };
 </script>
 
 <div class="flex h-full w-full flex-col gap-4 overflow-hidden pr-2">
@@ -266,75 +412,159 @@
           {/if}
 
           <!-- 扩展配置文件 -->
-          {#if extensionFiles.length > 0}
-            <div class="flex flex-col gap-1">
+          {#if groupedExtensions.length > 0}
+            <div class="flex flex-col gap-1.5">
               <div
                 class="flex items-center gap-1.5 px-2 py-1 text-[11px] font-semibold tracking-wider text-neutral-400 uppercase dark:text-neutral-500"
               >
                 <PuzzlePiece size={12} />
                 扩展数据
               </div>
-              {#each extensionFiles as file}
-                <button
-                  class="flex w-full flex-col gap-1 rounded-lg px-2.5 py-1.5 text-left transition-colors {selectedFile?.id ===
-                  file.id
-                    ? 'bg-neutral-100 text-neutral-950 dark:bg-neutral-800 dark:text-white'
-                    : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white'}"
-                  onclick={() => handleSelectFile(file)}
+              {#each groupedExtensions as group}
+                {@const isExpanded = !!expandedExtensions[group.entityId]}
+                {@const hasActiveFile = group.files.some(
+                  (f) => selectedFile?.id === f.id,
+                )}
+                <div
+                  class="flex flex-col gap-0.5 overflow-hidden rounded-lg border border-neutral-100 bg-neutral-50/20 dark:border-neutral-800/40 dark:bg-neutral-950/10"
                 >
-                  <span class="truncate text-xs font-medium" title={file.name}
-                    >{file.name}</span
+                  <button
+                    class="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-semibold transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800/40 {hasActiveFile
+                      ? 'bg-neutral-50/50 text-neutral-950 dark:bg-neutral-800/20 dark:text-white'
+                      : 'text-neutral-600 dark:text-neutral-400'}"
+                    onclick={() => toggleExtensionExpand(group.entityId)}
                   >
-                  <div
-                    class="flex w-full items-center justify-between text-[9px] text-neutral-400 dark:text-neutral-500"
-                  >
+                    <div
+                      class="flex flex-col items-start gap-0.5 overflow-hidden"
+                    >
+                      <span class="truncate">{group.entityName}</span>
+                      {#if group.entityId !== group.entityName}
+                        <span
+                          class="truncate font-mono text-[9px] font-normal text-neutral-400 dark:text-neutral-500"
+                        >
+                          ID: {group.entityId}
+                        </span>
+                      {/if}
+                    </div>
                     <span
-                      class="max-w-[110px] truncate font-mono"
-                      title={file.rel_path.split("/").pop()}
-                      >{file.rel_path.split("/").pop()}</span
+                      class="text-neutral-400 transition-transform duration-200 dark:text-neutral-600 {isExpanded
+                        ? 'rotate-90'
+                        : ''}"
                     >
-                    <span class="shrink-0 font-mono"
-                      >{formatSize(file.size_bytes)}</span
+                      <CaretRight size={12} />
+                    </span>
+                  </button>
+                  {#if isExpanded}
+                    <div
+                      class="flex flex-col gap-0.5 border-t border-neutral-100/50 py-1 pr-1 pl-3 dark:border-neutral-800/20"
                     >
-                  </div>
-                </button>
+                      {#each group.files as file}
+                        <button
+                          class="flex w-full flex-col gap-1 rounded-lg px-2.5 py-1.5 text-left transition-colors {selectedFile?.id ===
+                          file.id
+                            ? 'bg-neutral-100 text-neutral-950 dark:bg-neutral-800 dark:text-white'
+                            : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white'}"
+                          onclick={() => handleSelectFile(file)}
+                        >
+                          <span class="truncate text-[11px] font-medium"
+                            >{getFriendlyFileName(file)}</span
+                          >
+                          <div
+                            class="flex w-full items-center justify-between text-[9px] text-neutral-400 dark:text-neutral-500"
+                          >
+                            <span
+                              class="max-w-[100px] truncate font-mono"
+                              title={file.rel_path}
+                              >{file.rel_path.split("/").pop()}</span
+                            >
+                            <span class="shrink-0 font-mono"
+                              >{formatSize(file.size_bytes)}</span
+                            >
+                          </div>
+                        </button>
+                      {/each}
+                    </div>
+                  {/if}
+                </div>
               {/each}
             </div>
           {/if}
 
           <!-- 插件配置文件 -->
-          {#if pluginFiles.length > 0}
-            <div class="flex flex-col gap-1">
+          {#if groupedPlugins.length > 0}
+            <div class="flex flex-col gap-1.5">
               <div
                 class="flex items-center gap-1.5 px-2 py-1 text-[11px] font-semibold tracking-wider text-neutral-400 uppercase dark:text-neutral-500"
               >
                 <Plugs size={12} />
                 插件数据
               </div>
-              {#each pluginFiles as file}
-                <button
-                  class="flex w-full flex-col gap-1 rounded-lg px-2.5 py-1.5 text-left transition-colors {selectedFile?.id ===
-                  file.id
-                    ? 'bg-neutral-100 text-neutral-950 dark:bg-neutral-800 dark:text-white'
-                    : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white'}"
-                  onclick={() => handleSelectFile(file)}
+              {#each groupedPlugins as group}
+                {@const isExpanded = !!expandedPlugins[group.entityId]}
+                {@const hasActiveFile = group.files.some(
+                  (f) => selectedFile?.id === f.id,
+                )}
+                <div
+                  class="flex flex-col gap-0.5 overflow-hidden rounded-lg border border-neutral-100 bg-neutral-50/20 dark:border-neutral-800/40 dark:bg-neutral-950/10"
                 >
-                  <span class="truncate text-xs font-medium" title={file.name}
-                    >{file.name}</span
+                  <button
+                    class="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-semibold transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800/40 {hasActiveFile
+                      ? 'bg-neutral-50/50 text-neutral-950 dark:bg-neutral-800/20 dark:text-white'
+                      : 'text-neutral-600 dark:text-neutral-400'}"
+                    onclick={() => togglePluginExpand(group.entityId)}
                   >
-                  <div
-                    class="flex w-full items-center justify-between text-[9px] text-neutral-400 dark:text-neutral-500"
-                  >
+                    <div
+                      class="flex flex-col items-start gap-0.5 overflow-hidden"
+                    >
+                      <span class="truncate">{group.entityName}</span>
+                      {#if group.entityId !== group.entityName}
+                        <span
+                          class="truncate font-mono text-[9px] font-normal text-neutral-400 dark:text-neutral-500"
+                        >
+                          ID: {group.entityId}
+                        </span>
+                      {/if}
+                    </div>
                     <span
-                      class="max-w-[110px] truncate font-mono"
-                      title={file.rel_path.split("/").pop()}
-                      >{file.rel_path.split("/").pop()}</span
+                      class="text-neutral-400 transition-transform duration-200 dark:text-neutral-600 {isExpanded
+                        ? 'rotate-90'
+                        : ''}"
                     >
-                    <span class="shrink-0 font-mono"
-                      >{formatSize(file.size_bytes)}</span
+                      <CaretRight size={12} />
+                    </span>
+                  </button>
+                  {#if isExpanded}
+                    <div
+                      class="flex flex-col gap-0.5 border-t border-neutral-100/50 py-1 pr-1 pl-3 dark:border-neutral-800/20"
                     >
-                  </div>
-                </button>
+                      {#each group.files as file}
+                        <button
+                          class="flex w-full flex-col gap-1 rounded-lg px-2.5 py-1.5 text-left transition-colors {selectedFile?.id ===
+                          file.id
+                            ? 'bg-neutral-100 text-neutral-950 dark:bg-neutral-800 dark:text-white'
+                            : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white'}"
+                          onclick={() => handleSelectFile(file)}
+                        >
+                          <span class="truncate text-[11px] font-medium"
+                            >{getFriendlyFileName(file)}</span
+                          >
+                          <div
+                            class="flex w-full items-center justify-between text-[9px] text-neutral-400 dark:text-neutral-500"
+                          >
+                            <span
+                              class="max-w-[100px] truncate font-mono"
+                              title={file.rel_path}
+                              >{file.rel_path.split("/").pop()}</span
+                            >
+                            <span class="shrink-0 font-mono"
+                              >{formatSize(file.size_bytes)}</span
+                            >
+                          </div>
+                        </button>
+                      {/each}
+                    </div>
+                  {/if}
+                </div>
               {/each}
             </div>
           {/if}
@@ -362,7 +592,7 @@
             <span
               class="truncate text-xs font-semibold text-neutral-800 dark:text-neutral-100"
             >
-              {selectedFile.name}
+              {getSelectedFileDisplayName(selectedFile)}
             </span>
             <span class="truncate font-mono text-[10px] text-neutral-400">
               相对路径: {selectedFile.rel_path}
@@ -397,7 +627,7 @@
             <div class="flex flex-1 items-center justify-center p-2">
               <img
                 src={imageUrl}
-                alt={selectedFile.name}
+                alt={getSelectedFileDisplayName(selectedFile)}
                 class="max-h-[380px] max-w-full rounded-lg border border-neutral-200 bg-white p-1.5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950"
               />
             </div>

@@ -156,13 +156,13 @@ pub fn list_app_data_files(app: AppHandle) -> Result<Vec<AppDataFileInfo>, Strin
             "plugin_states",
             "plugin_states.json",
             "插件启用状态配置",
-            "plugin",
+            "main",
         ),
         (
             "window_states",
             "plugin_data/window_states.json",
             "插件窗口状态配置",
-            "plugin",
+            "main",
         ),
     ];
 
