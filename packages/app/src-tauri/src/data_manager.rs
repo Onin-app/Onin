@@ -257,6 +257,13 @@ pub fn read_app_data_file_content(app: AppHandle, rel_path: String) -> Result<St
         return Err(format!("文件不存在或不是普通文件: {}", rel_path));
     }
 
+    // 限制最大读取大小为 10MB，防止大文件卡死
+    let metadata =
+        std::fs::metadata(&full_path).map_err(|e| format!("读取文件元数据失败: {}", e))?;
+    if metadata.len() > 10 * 1024 * 1024 {
+        return Err("文件过大，无法在应用内预览（大小限制 10 MB）".to_string());
+    }
+
     let content =
         std::fs::read_to_string(&full_path).map_err(|e| format!("读取文件失败: {}", e))?;
 

@@ -40,6 +40,7 @@
   let selectedFileDisplay = $state<string>(""); // 脱敏后的展示内容
   let imageUrl = $state<string>(""); // 图片文件的本地展示 URL
   let loadingContent = $state<boolean>(false);
+  let fileTooLarge = $state<boolean>(false);
 
   let highlightedHtml = $state<string | null>(null);
   let isHighlighting = $state<boolean>(false);
@@ -182,11 +183,20 @@
       expandedPlugins[pluginId] = true;
     }
 
-    loadingContent = true;
+    fileTooLarge = false;
     selectedFileContent = "";
     selectedFileDisplay = "";
     imageUrl = "";
     highlightedHtml = null;
+
+    // 限制最大读取大小为 10MB
+    const MAX_PREVIEW_SIZE = 10 * 1024 * 1024;
+    if (file.size_bytes > MAX_PREVIEW_SIZE && file.is_text) {
+      fileTooLarge = true;
+      return;
+    }
+
+    loadingContent = true;
 
     // 1. 如果是图片文件，直接用 convertFileSrc 显示
     if (file.is_image) {
@@ -759,6 +769,38 @@
                 alt={getSelectedFileDisplayName(selectedFile)}
                 class="max-h-[380px] max-w-full rounded-lg border border-neutral-200 bg-white p-1.5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950"
               />
+            </div>
+          {:else if fileTooLarge}
+            <div
+              class="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-neutral-500 dark:text-neutral-400"
+            >
+              <FileCode
+                size={40}
+                class="text-neutral-400 dark:text-neutral-600"
+              />
+              <span
+                class="text-xs font-semibold text-neutral-800 dark:text-neutral-200"
+              >
+                文件过大，已禁用在应用内直接读取预览
+              </span>
+              <p
+                class="max-w-md text-[11px] leading-relaxed text-neutral-400 dark:text-neutral-500"
+              >
+                当前文件大小为 <strong
+                  class="text-neutral-600 dark:text-neutral-300"
+                  >{formatSize(selectedFile?.size_bytes || 0)}</strong
+                >，已超过系统预览限制 (10
+                MB)。为了避免解析大文件导致应用卡死，我们限制了其直接预览。
+              </p>
+              <div class="mt-2 flex gap-2">
+                <Button.Root
+                  class="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 text-xs font-medium text-neutral-900 shadow-xs transition-colors hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                  onclick={handleOpenDataDir}
+                >
+                  <FolderOpen size={14} />
+                  在系统资源管理器中打开目录
+                </Button.Root>
+              </div>
             </div>
           {:else if !selectedFileDisplay}
             <div
