@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
+  import { get } from "svelte/store";
   import { invoke, convertFileSrc } from "@tauri-apps/api/core";
   import { Button } from "bits-ui";
   import { toast } from "svelte-sonner";
@@ -15,6 +16,8 @@
     CaretRight,
   } from "phosphor-svelte";
   import AppScrollArea from "$lib/components/AppScrollArea.svelte";
+  import { Theme } from "$lib/type";
+  import { getTheme, theme } from "$lib/utils/theme";
 
   interface AppDataFileInfo {
     id: string;
@@ -38,44 +41,92 @@
   let imageUrl = $state<string>(""); // 图片文件的本地展示 URL
   let loadingContent = $state<boolean>(false);
 
+  let highlightedHtml = $state<string | null>(null);
+  let isHighlighting = $state<boolean>(false);
+  let highlightRequestId = 0;
+  let fileSelectRequestId = 0;
+  let currentResolvedTheme = $state<Theme.DARK | Theme.LIGHT>(
+    getTheme(get(theme)),
+  );
+  let unsubscribeTheme: (() => void) | null = null;
+
   // 格式化文件大小
   const formatSize = (bytes: number) => {
     if (bytes === 0) return "0 B";
     const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    const sizes = ["B", "KB", "MB", "GB", "TB", "PB"];
+    const i = Math.min(
+      Math.floor(Math.log(bytes) / Math.log(k)),
+      sizes.length - 1,
+    );
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
-  // 敏感字段脱敏处理
-  const maskSensitiveData = (obj: any): any => {
-    if (typeof obj !== "object" || obj === null) {
-      return obj;
+  // 校验敏感字段 key，排除 monkey、keyboard 等误伤词
+  const isSensitiveKey = (key: string): boolean => {
+    const k = key.toLowerCase();
+    const exclusions = [
+      "monkey",
+      "donkey",
+      "turkey",
+      "whiskey",
+      "keyboard",
+      "keyword",
+    ];
+    if (exclusions.some((exclude) => k.includes(exclude))) {
+      return false;
     }
-    if (Array.isArray(obj)) {
-      return obj.map(maskSensitiveData);
+    return (
+      k.includes("key") ||
+      k.includes("password") ||
+      k.includes("secret") ||
+      k.includes("token")
+    );
+  };
+
+  // 敏感字段和长文本截断处理
+  const processDataForPreview = (val: any, keyName?: string): any => {
+    if (val === null || val === undefined) {
+      return val;
     }
-    const newObj: any = {};
-    for (const [key, value] of Object.entries(obj)) {
-      const lowerKey = key.toLowerCase();
-      if (
-        typeof value === "string" &&
-        (lowerKey.includes("key") ||
-          lowerKey.includes("password") ||
-          lowerKey.includes("secret") ||
-          lowerKey.includes("token"))
-      ) {
-        // 脱敏策略：保留前后 4 个字符，中间用星号遮蔽，若不够长则直接全遮蔽
-        if (value.length <= 8) {
-          newObj[key] = "••••••••";
+    if (typeof val === "string") {
+      // 1. 敏感字段脱敏
+      if (keyName && isSensitiveKey(keyName)) {
+        if (val.length <= 8) {
+          return "••••••••";
         } else {
-          newObj[key] = value.slice(0, 4) + "••••" + value.slice(-4);
+          return val.slice(0, 4) + "••••" + val.slice(-4);
         }
-      } else {
-        newObj[key] = maskSensitiveData(value);
       }
+      // 2. 长文本截断（如 base64 数据）
+      if (val.length > 1000) {
+        return (
+          val.slice(0, 50) +
+          ` ... [已截断，共 ${val.length} 字符，完整数据可复制或打开文件查看] ... ` +
+          val.slice(-10)
+        );
+      }
+      return val;
     }
-    return newObj;
+    if (Array.isArray(val)) {
+      return val.map((item) => processDataForPreview(item, undefined));
+    }
+    if (typeof val === "object") {
+      const newObj: any = {};
+      for (const [k, v] of Object.entries(val)) {
+        newObj[k] = processDataForPreview(v, k);
+      }
+      return newObj;
+    }
+    return val;
+  };
+
+  const truncateText = (text: string, maxLength: number): string => {
+    if (text.length <= maxLength) return text;
+    return (
+      text.slice(0, maxLength) +
+      `\n\n... [文件过大，已截断展示前 ${formatSize(maxLength)} 内容，完整数据可复制或打开文件查看] ...`
+    );
   };
 
   // 初始化加载数据路径和文件列表
@@ -117,6 +168,9 @@
 
   // 选择并读取文件内容
   const handleSelectFile = async (file: AppDataFileInfo) => {
+    fileSelectRequestId += 1;
+    const requestId = fileSelectRequestId;
+
     selectedFile = file;
 
     // 自动展开选中的分组
@@ -132,22 +186,28 @@
     selectedFileContent = "";
     selectedFileDisplay = "";
     imageUrl = "";
+    highlightedHtml = null;
 
     // 1. 如果是图片文件，直接用 convertFileSrc 显示
     if (file.is_image) {
       try {
         imageUrl = convertFileSrc(file.absolute_path);
       } catch (e) {
+        if (requestId !== fileSelectRequestId) return;
         toast.error("转换图片路径失败：" + String(e));
       } finally {
-        loadingContent = false;
+        if (requestId === fileSelectRequestId) {
+          loadingContent = false;
+        }
       }
       return;
     }
 
-    // 2. 如果不是文本文件，直接停止加载，在 UI 上显示二进制不可预览提示
+    // 2. 如果不是文本文件，直接停止加载， 在 UI 上显示二进制不可预览提示
     if (!file.is_text) {
-      loadingContent = false;
+      if (requestId === fileSelectRequestId) {
+        loadingContent = false;
+      }
       return;
     }
 
@@ -156,25 +216,77 @@
       const raw = await invoke<string>("read_app_data_file_content", {
         relPath: file.rel_path,
       });
+      if (requestId !== fileSelectRequestId) return;
+
       selectedFileContent = raw;
 
       if (file.is_json) {
         try {
           const parsed = JSON.parse(raw);
-          const masked = maskSensitiveData(parsed);
-          selectedFileDisplay = JSON.stringify(masked, null, 2);
+          const processed = processDataForPreview(parsed);
+          selectedFileDisplay = JSON.stringify(processed, null, 2);
         } catch {
-          selectedFileDisplay = raw;
+          selectedFileDisplay = truncateText(raw, 50000);
         }
       } else {
-        selectedFileDisplay = raw;
+        selectedFileDisplay = truncateText(raw, 50000);
       }
     } catch (e) {
+      if (requestId !== fileSelectRequestId) return;
       toast.error("读取文件内容失败：" + String(e));
     } finally {
-      loadingContent = false;
+      if (requestId === fileSelectRequestId) {
+        loadingContent = false;
+      }
     }
   };
+
+  // 语法高亮
+  const highlightText = async (
+    content: string,
+    isJson: boolean,
+    resolvedTheme: Theme.DARK | Theme.LIGHT,
+    requestId: number,
+  ) => {
+    isHighlighting = true;
+
+    try {
+      const { codeToHtml } = await import("shiki");
+      const html = await codeToHtml(content, {
+        lang: isJson ? "json" : "text",
+        theme: resolvedTheme === Theme.DARK ? "github-dark" : "github-light",
+      });
+
+      if (requestId !== highlightRequestId) return;
+      highlightedHtml = html;
+    } catch (error) {
+      console.warn("Failed to highlight JSON preview:", error);
+      if (requestId !== highlightRequestId) return;
+      highlightedHtml = null;
+    } finally {
+      if (requestId === highlightRequestId) {
+        isHighlighting = false;
+      }
+    }
+  };
+
+  $effect(() => {
+    highlightRequestId += 1;
+    const requestId = highlightRequestId;
+
+    if (!selectedFileDisplay || !selectedFile) {
+      highlightedHtml = null;
+      isHighlighting = false;
+      return;
+    }
+
+    void highlightText(
+      selectedFileDisplay,
+      selectedFile.is_json,
+      currentResolvedTheme,
+      requestId,
+    );
+  });
 
   // 复制未脱敏的原生配置内容
   const handleCopyContent = async () => {
@@ -189,6 +301,23 @@
 
   onMount(() => {
     loadDataInfo();
+    // 预加载 shiki，优化首次打开性能
+    void import("shiki").catch((err) => {
+      console.warn("预加载 shiki 失败:", err);
+    });
+
+    unsubscribeTheme = theme.subscribe((value) => {
+      const resolved = getTheme(value);
+      if (currentResolvedTheme !== resolved) {
+        currentResolvedTheme = resolved;
+      }
+    });
+  });
+
+  onDestroy(() => {
+    unsubscribeTheme?.();
+    fileSelectRequestId = -1;
+    highlightRequestId = -1;
   });
 
   // 按分类计算文件
@@ -606,7 +735,7 @@
                 disabled={loadingContent || !selectedFileContent}
               >
                 <Copy size={12} />
-                复制完整数据
+                复制
               </Button.Root>
             {/if}
           </div>
@@ -614,7 +743,7 @@
 
         <!-- 详情内容区 -->
         <AppScrollArea
-          class="w-full flex-1"
+          class="min-h-0 w-full flex-1"
           viewportClass="h-full w-full p-4 bg-neutral-50/50 dark:bg-neutral-950/30 flex flex-col"
         >
           {#if loadingContent}
@@ -640,11 +769,48 @@
             </div>
           {:else}
             <!-- 带有微动画和等宽字体的代码高亮 -->
-            <pre
-              class="overflow-x-auto rounded-lg border border-neutral-200 bg-white p-3 font-mono text-xs break-all whitespace-pre-wrap text-neutral-800 shadow-xs select-text dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200">{selectedFileDisplay}</pre>
+            <div class="file-preview-code relative min-h-0 w-full">
+              {#if isHighlighting}
+                <div
+                  class="absolute top-3 right-3 flex items-center gap-1.5 rounded-md bg-neutral-100/80 px-2 py-1 text-[10px] font-medium text-neutral-500 shadow-xs backdrop-blur-xs dark:bg-neutral-800/80 dark:text-neutral-400"
+                >
+                  <span
+                    class="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-500"
+                  ></span>
+                  正在高亮...
+                </div>
+              {/if}
+              {#if highlightedHtml}
+                {@html highlightedHtml}
+              {:else}
+                <pre
+                  class="overflow-x-auto rounded-lg border border-neutral-200 bg-white p-3 font-mono text-xs break-all whitespace-pre-wrap text-neutral-800 shadow-xs select-text dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200">{selectedFileDisplay}</pre>
+              {/if}
+            </div>
           {/if}
         </AppScrollArea>
       {/if}
     </div>
   </div>
 </div>
+
+<style>
+  :global(.file-preview-code pre.shiki) {
+    min-height: 100%;
+    margin: 0;
+    padding: 1rem;
+    overflow: visible;
+    font-family:
+      ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+      "Courier New", monospace;
+    font-size: 0.75rem;
+    line-height: 1.625;
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: transparent !important;
+  }
+
+  :global(.file-preview-code code) {
+    font-family: inherit;
+  }
+</style>
