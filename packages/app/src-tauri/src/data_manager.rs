@@ -58,6 +58,11 @@ fn scan_dir_recursive(
     if let Ok(entries) = std::fs::read_dir(current_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
+            if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+                if file_name.starts_with('.') {
+                    continue;
+                }
+            }
             if path.is_dir() {
                 scan_dir_recursive(base_dir, &path, category, prefix_label, result);
             } else if path.is_file() {
@@ -191,8 +196,11 @@ pub fn list_app_data_files(app: AppHandle) -> Result<Vec<AppDataFileInfo>, Strin
         if let Ok(entries) = std::fs::read_dir(settings_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.is_file() && path.extension().map_or(false, |ext| ext == "json") {
-                    if let Some(file_name) = path.file_name().and_then(|f| f.to_str()) {
+                if let Some(file_name) = path.file_name().and_then(|f| f.to_str()) {
+                    if file_name.starts_with('.') {
+                        continue;
+                    }
+                    if path.is_file() && path.extension().map_or(false, |ext| ext == "json") {
                         let plugin_id = file_name.trim_end_matches(".json");
                         let size_bytes = entry.metadata().map(|m| m.len()).unwrap_or(0);
                         let rel_path = format!("plugin_settings/{}", file_name);
