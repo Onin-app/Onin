@@ -126,36 +126,20 @@
             return;
           }
 
-          // Handle page routing for global shortcuts of extensions
-          if (commandName === "extension:ai:chat") {
-            goto("/extensions/ai").then(() => {
-              invoke("show_main_window_cmd");
-            });
-            return;
-          }
-          if (commandName === "extension:clipboard:history") {
-            goto("/extensions/clipboard").then(() => {
-              invoke("show_main_window_cmd");
-            });
-            return;
-          }
-          if (commandName === "extension:emoji:search") {
-            goto("/extensions/emoji").then(() => {
-              invoke("show_main_window_cmd");
-            });
-            return;
-          }
-          if (commandName === "extension:file_search:search") {
-            goto("/extensions/filesearch").then(() => {
-              invoke("show_main_window_cmd");
-            });
-            return;
-          }
-          if (commandName === "extension:color:convert") {
-            goto("/extensions/color").then(() => {
-              invoke("show_main_window_cmd");
-            });
-            return;
+          // Handle page routing for global shortcuts of extensions dynamically
+          if (commandName.startsWith("extension:")) {
+            const parts = commandName.split(":");
+            if (parts.length >= 3) {
+              const extensionId = parts[1];
+              // Exclude translator which opens in a standalone window handled by backend
+              if (extensionId !== "translator") {
+                const routeName = extensionId.replace(/_/g, "");
+                goto(`/extensions/${routeName}`).then(() => {
+                  invoke("show_main_window_cmd");
+                });
+                return;
+              }
+            }
           }
 
           invoke("execute_command", { name: commandName });

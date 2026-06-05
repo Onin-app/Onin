@@ -454,8 +454,8 @@
 
   onMount(async () => {
     loadPlatform();
-    await refreshStatus();
     headerRef?.focus();
+    await refreshStatus();
     window.addEventListener("mousemove", handlePaneResize);
     window.addEventListener("mouseup", stopPaneResize);
   });

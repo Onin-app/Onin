@@ -305,11 +305,12 @@
     isMac = /macintosh|mac os x/i.test(navigator.userAgent);
     // 使用 URL 参数初始化搜索值
     searchQuery = initialQuery;
-    // 每次进入页面时强制进行一次全量扫描，保证初始数据最新
-    await loadAllBookmarks(true);
 
     // 自动聚焦头部输入框
     headerRef?.focus();
+
+    // 每次进入页面时强制进行一次全量扫描，保证初始数据最新
+    await loadAllBookmarks(true);
   });
 </script>
 
