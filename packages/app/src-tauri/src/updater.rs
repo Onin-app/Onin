@@ -34,7 +34,14 @@ pub async fn download_and_install_update(
     } else if url.contains(".AppImage") {
         "AppImage"
     } else {
-        "msi"
+        #[cfg(target_os = "macos")]
+        {
+            "dmg"
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            "msi"
+        }
     };
 
     let temp_file_path = temp_dir.join(format!("onin_setup.{}", extension));
@@ -110,18 +117,42 @@ pub async fn download_and_install_update(
     // ================= Windows 下就地覆盖安装 =================
     #[cfg(target_os = "windows")]
     {
-        let mut cmd = std::process::Command::new("msiexec");
-        cmd.arg("/i")
-            .arg(&temp_file_path)
-            .arg("/passive")
-            .arg("/norestart");
+        let current_exe =
+            std::env::current_exe().map_err(|e| format!("获取当前可执行文件路径失败: {}", e))?;
+        let bat_path = temp_dir.join("onin_update.bat");
+
+        // 编写批处理脚本内容
+        // 1. timeout /t 2 /nobreak 来等待主进程彻底退出并释放文件锁
+        // 2. msiexec /i "temp_file_path" /passive /norestart 静默执行覆盖升级
+        // 3. start "" "current_exe" 重新拉起新版
+        // 4. del "%~f0" 进行自我清理物理销毁，防残留
+        let bat_content = format!(
+            "@echo off\r\n\
+             timeout /t 2 /nobreak > nul\r\n\
+             msiexec /i \"{}\" /passive /norestart\r\n\
+             start \"\" \"{}\"\r\n\
+             del \"%%~f0\"\r\n",
+            temp_file_path.to_string_lossy(),
+            current_exe.to_string_lossy()
+        );
+
+        std::fs::write(&bat_path, bat_content).map_err(|e| format!("创建更新脚本失败: {}", e))?;
+
+        // 启动批处理脚本（使用后台隐藏窗口模式）
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        let mut cmd = std::process::Command::new("cmd");
+        cmd.arg("/c")
+            .arg(&bat_path)
+            .creation_flags(CREATE_NO_WINDOW);
 
         match cmd.spawn() {
             Ok(_) => {
                 app.exit(0);
             }
             Err(e) => {
-                return Err(format!("启动更新程序失败: {}", e));
+                let _ = std::fs::remove_file(&bat_path);
+                return Err(format!("启动更新脚本失败: {}", e));
             }
         }
     }
@@ -207,21 +238,37 @@ pub async fn download_and_install_update(
                     .arg("detach")
                     .arg(&mount_point)
                     .arg("-force")
+                    .stdin(std::process::Stdio::null())
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
                     .status();
                 let _ = std::fs::remove_dir_all(&mount_point);
                 let _ = std::fs::create_dir_all(&mount_point);
 
-                // 2. 后台静默挂载 DMG 镜像（使用 -nobrowse 避免 Finder 激活弹窗）
-                let mount_status = std::process::Command::new("hdiutil")
+                // 2. 后台静默挂载 DMG 镜像，并重定向 stdin 写入 "y" 以防挂起
+                use std::io::Write;
+                let mut child = std::process::Command::new("hdiutil")
                     .arg("attach")
                     .arg("-nobrowse")
                     .arg("-readonly")
                     .arg("-mountpoint")
                     .arg(&mount_point)
                     .arg(&temp_file_path)
-                    .status();
+                    .stdin(std::process::Stdio::piped())
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .spawn();
 
-                if mount_status.as_ref().map_or(false, |s| s.success()) {
+                let mount_success = if let Ok(mut child) = child {
+                    if let Some(mut stdin) = child.stdin.take() {
+                        let _ = stdin.write_all(b"y\ny\ny\ny\ny\ny\ny\ny\ny\ny\n");
+                    }
+                    child.wait().map(|s| s.success()).unwrap_or(false)
+                } else {
+                    false
+                };
+
+                if mount_success {
                     let mut new_app_path = None;
                     if let Ok(entries) = std::fs::read_dir(&mount_point) {
                         for entry in entries.flatten() {
@@ -249,10 +296,17 @@ pub async fn download_and_install_update(
                                 .status();
 
                             if copy_status.as_ref().map_or(false, |s| s.success()) {
+                                // 4.1 自动清除隔离标识，绕过 Gatekeeper 拦截阻止
+                                let _ = std::process::Command::new("xattr")
+                                    .arg("-cr")
+                                    .arg(&bundle_path)
+                                    .status();
+
                                 // 5. 卸载 DMG
                                 let _ = std::process::Command::new("hdiutil")
                                     .arg("detach")
                                     .arg(&mount_point)
+                                    .arg("-force")
                                     .status();
 
                                 // 6. 异步拉起全新升级后的应用
@@ -301,6 +355,7 @@ pub async fn download_and_install_update(
                                 let _ = std::process::Command::new("hdiutil")
                                     .arg("detach")
                                     .arg(&mount_point)
+                                    .arg("-force")
                                     .status();
                                 let _ = std::fs::remove_dir_all(&mount_point);
 
@@ -315,6 +370,7 @@ pub async fn download_and_install_update(
                         let _ = std::process::Command::new("hdiutil")
                             .arg("detach")
                             .arg(&mount_point)
+                            .arg("-force")
                             .status();
                         let _ = std::fs::remove_dir_all(&mount_point);
                     }

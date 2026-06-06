@@ -4,9 +4,9 @@
 //! 使 `lib.rs` 更加简洁，同时方便统一管理和查找命令。
 
 use crate::{
-    app_config, command_manager, extension, file_command_manager, file_search, plugin, plugin_api,
-    shortcut_manager, sync, system_commands, toast_overlay, tray_manager, unified_launch_manager,
-    usage_tracker, window_manager,
+    app_config, command_manager, data_manager, extension, file_command_manager, file_search,
+    plugin, plugin_api, shortcut_manager, sync, system_commands, toast_overlay, tray_manager,
+    unified_launch_manager, usage_tracker, window_manager,
 };
 
 /// 生成包含所有 Tauri 命令的 invoke handler
@@ -155,6 +155,10 @@ pub fn get_invoke_handler(
         // App config
         app_config::get_app_config,
         app_config::update_app_config,
+        // Data manager
+        data_manager::get_app_data_dir_path,
+        data_manager::list_app_data_files,
+        data_manager::read_app_data_file_content,
         // WebDAV Sync
         sync::test_webdav_connection,
         sync::check_cloud_backup,

@@ -41,8 +41,9 @@ pub async fn add_shortcut(
     app: AppHandle,
     state: State<'_, ShortcutState>,
     shortcut: AppShortcut,
+    old_shortcut_str: Option<String>,
 ) -> Result<(), String> {
-    add_shortcut_sync(app, state, shortcut)
+    add_shortcut_sync(app, state, shortcut, old_shortcut_str)
 }
 
 /// 同步添加快捷键
@@ -50,31 +51,52 @@ fn add_shortcut_sync(
     app: AppHandle,
     state: State<'_, ShortcutState>,
     shortcut: AppShortcut,
+    old_shortcut_str: Option<String>,
 ) -> Result<(), String> {
+    // 提前解析新快捷键，如果格式有误直接返回错误，避免把旧的删除了
+    let tauri_shortcut = Shortcut::from_str(&shortcut.shortcut).map_err(|e| e.to_string())?;
+
     let mut shortcuts = state
         .shortcuts
         .lock()
         .map_err(|_| "Failed to acquire lock on shortcut state".to_string())?;
 
-    // 移除相同键位的旧快捷键
+    // 1. 如果有旧快捷键传入且与新快捷键不同，先移除旧快捷键
+    if let Some(ref old_str) = old_shortcut_str {
+        if !old_str.is_empty() && old_str != &shortcut.shortcut {
+            if let Some(index) = shortcuts.iter().position(|s| &s.shortcut == old_str) {
+                let old_tauri_shortcut = Shortcut::from_str(old_str).map_err(|e| e.to_string())?;
+                if app
+                    .global_shortcut()
+                    .is_registered(old_tauri_shortcut.clone())
+                {
+                    let _ = app.global_shortcut().unregister(old_tauri_shortcut);
+                }
+                shortcuts.remove(index);
+            }
+        }
+    }
+
+    // 2. 移除相同键位的旧快捷键，防止键位冲突
     if let Some(index) = shortcuts
         .iter()
         .position(|s| s.shortcut == shortcut.shortcut)
     {
         let old_shortcut = &shortcuts[index];
         if old_shortcut.command_name != shortcut.command_name {
-            let tauri_shortcut =
+            let old_tauri_shortcut =
                 Shortcut::from_str(&old_shortcut.shortcut).map_err(|e| e.to_string())?;
-            if app.global_shortcut().is_registered(tauri_shortcut.clone()) {
-                app.global_shortcut()
-                    .unregister(tauri_shortcut)
-                    .map_err(|e| e.to_string())?;
+            if app
+                .global_shortcut()
+                .is_registered(old_tauri_shortcut.clone())
+            {
+                let _ = app.global_shortcut().unregister(old_tauri_shortcut);
             }
         }
         shortcuts.remove(index);
     }
 
-    let tauri_shortcut = Shortcut::from_str(&shortcut.shortcut).map_err(|e| e.to_string())?;
+    // 3. 注册新快捷键
     app.global_shortcut()
         .register(tauri_shortcut)
         .map_err(|e| e.to_string())?;

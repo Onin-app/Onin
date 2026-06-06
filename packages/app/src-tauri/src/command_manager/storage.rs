@@ -26,6 +26,8 @@ pub async fn generate_and_save_commands(app: &AppHandle) -> Vec<Command> {
     let mut initial_commands = generators::get_initial_system_commands();
     let extension_commands = generators::get_initial_extension_commands(app);
     initial_commands.extend(extension_commands);
+    let internal_commands = generators::get_initial_internal_commands();
+    initial_commands.extend(internal_commands);
     let app_commands = generators::get_initial_app_commands().await;
     initial_commands.extend(app_commands);
     let file_commands = generators::get_initial_file_commands(app).await;
@@ -95,6 +97,7 @@ async fn merge_commands(app: &AppHandle, saved_commands: Vec<Command>) -> Vec<Co
             c.source != ItemSource::Plugin
                 && c.source != ItemSource::Command
                 && c.source != ItemSource::Extension
+                && c.source != ItemSource::Internal
         })
         .cloned()
         .collect();
@@ -150,6 +153,34 @@ async fn merge_commands(app: &AppHandle, saved_commands: Vec<Command>) -> Vec<Co
         }
     }
 
+    // 合并 Internal 命令 (类似系统命令)
+    let current_internal_commands = generators::get_initial_internal_commands();
+    let current_internal_map: HashMap<_, _> = current_internal_commands
+        .into_iter()
+        .map(|c| (c.name.clone(), c))
+        .collect();
+
+    let mut final_internal_commands: Vec<Command> = Vec::new();
+    for (name, internal_command) in &current_internal_map {
+        let existing = saved_commands
+            .iter()
+            .find(|c| c.source == ItemSource::Internal && &c.name == name);
+
+        if let Some(saved) = existing {
+            let mut merged = saved.clone();
+            // 更新元数据，保留用户配置（如 keywords）
+            merged.title = internal_command.title.clone();
+            merged.description = internal_command.description.clone();
+            merged.icon = internal_command.icon.clone();
+            merged.action = internal_command.action.clone();
+            merged.english_name = internal_command.english_name.clone();
+            merged.requires_confirmation = internal_command.requires_confirmation;
+            final_internal_commands.push(merged);
+        } else {
+            final_internal_commands.push(internal_command.clone());
+        }
+    }
+
     // 合并插件命令
     let mut final_plugins: Vec<Command> = Vec::new();
     for (name, plugin_command) in installed_plugins_map {
@@ -182,6 +213,7 @@ async fn merge_commands(app: &AppHandle, saved_commands: Vec<Command>) -> Vec<Co
     final_commands.extend(other_commands);
     final_commands.extend(final_plugins);
     final_commands.extend(final_extensions);
+    final_commands.extend(final_internal_commands);
     save_commands(app, &final_commands);
     final_commands
 }

@@ -14,6 +14,7 @@
     User,
     PuzzlePiece,
     Sparkle,
+    Compass,
   } from "phosphor-svelte";
 
   // 分类图标映射
@@ -24,6 +25,7 @@
     FileCommand: File,
     Plugin: Plugs,
     Custom: User,
+    Internal: Compass,
   };
 
   // 分类接口

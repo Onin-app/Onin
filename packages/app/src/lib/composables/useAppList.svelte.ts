@@ -9,6 +9,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { LaunchableItem, CommandUsageStats, AppConfig } from "$lib/type";
 import { fuzzyMatch } from "$lib/utils/fuzzyMatch";
 import { toast } from "svelte-sonner";
+import { accumulateCommandStat } from "$lib/tracking";
 
 export interface AppListState {
   originAppList: LaunchableItem[];
@@ -102,6 +103,8 @@ export function useAppList(): AppListManagerReturn {
           args: Object.keys(args).length > 0 ? args : null,
         });
 
+        accumulateCommandStat(app.source);
+
         Promise.all([
           invoke<CommandUsageStats[]>("get_usage_stats"),
           invoke<LaunchableItem[]>("get_all_launchable_items"),
@@ -115,6 +118,7 @@ export function useAppList(): AppListManagerReturn {
         await invoke("open_app", {
           path: app.path,
         });
+        accumulateCommandStat(app.source);
       }
 
       onSuccess();

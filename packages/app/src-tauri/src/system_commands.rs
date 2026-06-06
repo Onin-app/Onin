@@ -206,6 +206,10 @@ pub async fn execute_command(
                     Ok(())
                 }
             }
+            CommandAction::Internal(ref _name) => {
+                // 内部页面跳转指令，跳转由前端完成，后端直接返回成功以记录使用量统计
+                Ok(())
+            }
         }
     } else {
         let err = format!("Command not found: {}", name);

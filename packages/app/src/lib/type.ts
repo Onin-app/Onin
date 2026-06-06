@@ -6,7 +6,8 @@ export type Source =
   | "FileCommand"
   | "FileSearch"
   | "Plugin"
-  | "Extension";
+  | "Extension"
+  | "Internal";
 export type IconType = "Base64" | "Iconfont" | "Url";
 export type AppOrigin = "Hkey" | "Shortcut" | "Uwp";
 
@@ -72,7 +73,8 @@ export type CommandAction =
   | { File: string }
   | { PluginEntry: { plugin_id: string } }
   | { PluginCommand: { plugin_id: string; command_code: string } }
-  | { Extension: { extension_id: string; command_code: string } };
+  | { Extension: { extension_id: string; command_code: string } }
+  | { Internal: string };
 
 export interface Command {
   name: string;
@@ -99,6 +101,7 @@ export interface Shortcut {
   command_name: string;
   command_title?: string;
   readonly?: boolean;
+  originalShortcut?: string;
 }
 
 export type SortMode = "smart" | "frequency" | "recent" | "default";

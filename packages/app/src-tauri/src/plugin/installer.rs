@@ -166,16 +166,20 @@ pub async fn uninstall_plugin(
     plugin_id: String,
 ) -> Result<(), String> {
     // 1. 从 store 中获取插件信息
-    let (dir_name, actual_key) = {
+    let (dir_name, actual_key, plugin_name) = {
         let store_lock = store.0.lock().unwrap();
         if let Some(plugin) = find_plugin_by_id(&store_lock, &plugin_id) {
             let key = store_lock
                 .iter()
                 .find(|(_, p)| p.manifest.id == plugin_id)
                 .map(|(k, _)| k.clone());
-            (Some(plugin.dir_name.clone()), key)
+            (
+                Some(plugin.dir_name.clone()),
+                key,
+                Some(plugin.manifest.name.clone()),
+            )
         } else {
-            (None, None)
+            (None, None, None)
         }
     };
 
@@ -226,8 +230,20 @@ pub async fn uninstall_plugin(
         return Err(format!("插件未找到: {}", plugin_id));
     }
 
+    #[derive(serde::Serialize, Clone)]
+    struct PluginUninstalledPayload {
+        plugin_id: String,
+        plugin_name: Option<String>,
+    }
+
     // 发送事件通知前端插件已卸载
-    let _ = app.emit("plugin-uninstalled", &plugin_id);
+    let _ = app.emit(
+        "plugin-uninstalled",
+        PluginUninstalledPayload {
+            plugin_id,
+            plugin_name,
+        },
+    );
 
     Ok(())
 }
@@ -436,8 +452,22 @@ pub async fn download_and_install_plugin(
     // 7. 初始化后台脚本
     initialize_plugin_lifecycle(&app, &target_dir, &manifest, InstallSource::Marketplace);
 
+    #[derive(serde::Serialize, Clone)]
+    struct PluginInstalledPayload {
+        plugin_id: String,
+        version: String,
+        overwrite: bool,
+    }
+
     // 发送安装成功事件，使用市场 ID 以便前端匹配
-    let _ = app.emit("plugin-installed", &plugin_id);
+    let _ = app.emit(
+        "plugin-installed",
+        PluginInstalledPayload {
+            plugin_id,
+            version: manifest.version.clone(),
+            overwrite,
+        },
+    );
 
     Ok(loaded_plugin)
 }

@@ -24,9 +24,15 @@
     goto("/");
   };
 
-  // ESC 处理
+  // ESC 处理（增加防重入锁，防止物理按键 DOM 事件与后端事件极短时间内双重触发）
+  let isEscaping = false;
   const handleEsc = () => {
+    if (isEscaping) return;
+    isEscaping = true;
     handleBack();
+    setTimeout(() => {
+      isEscaping = false;
+    }, 150);
   };
 
   // Theme subscription
@@ -34,8 +40,24 @@
     currentTheme = value;
   });
 
+  let removeWindowEscapeListener: (() => void) | null = null;
+
   onMount(() => {
     escapeHandler.set(handleEsc);
+
+    const handleWindowEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      handleEsc();
+    };
+
+    window.addEventListener("keydown", handleWindowEscape, true);
+    removeWindowEscapeListener = () => {
+      window.removeEventListener("keydown", handleWindowEscape, true);
+    };
   });
 
   onDestroy(() => {
@@ -43,6 +65,7 @@
     if (get(escapeHandler) === handleEsc) {
       escapeHandler.set(null);
     }
+    removeWindowEscapeListener?.();
   });
 
   const isTranslator = $derived(page.route.id?.includes("translator"));

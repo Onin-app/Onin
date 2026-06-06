@@ -5,6 +5,7 @@
   import { openExternalLink } from "$lib/utils/link";
   import { marked } from "marked";
   import { X, ArrowCircleUp, CloudArrowDown, Warning } from "phosphor-svelte";
+  import { trackEvent } from "$lib/tracking";
 
   interface Props {
     open: boolean;
@@ -143,6 +144,11 @@
     downloadedBytes = 0;
     totalBytes = null;
 
+    trackEvent("update_started", {
+      current_version: currentVersion,
+      latest_version: latestVersion,
+    });
+
     try {
       // 监听进度事件
       unlistenProgress = await listen<ProgressPayload>(
@@ -159,6 +165,10 @@
 
       unlistenFinished = await listen("update-downloaded", () => {
         downloading = false;
+        trackEvent("update_downloaded", {
+          current_version: currentVersion,
+          latest_version: latestVersion,
+        });
         cleanupListeners();
       });
 
@@ -170,6 +180,14 @@
         return;
       }
       console.error("更新出错:", err);
+
+      // 上报下载/安装更新失败事件
+      trackEvent("update_failed", {
+        current_version: currentVersion,
+        latest_version: latestVersion,
+        error: String(err) || "unknown",
+      });
+
       errorMessage = String(err) || "下载更新失败，请重试";
       downloading = false;
       cleanupListeners();

@@ -130,7 +130,7 @@
     <span
       class="absolute top-0 right-0 rounded-md bg-neutral-200 px-1.5 py-0.5 text-xs text-neutral-700 dark:bg-neutral-700 dark:text-neutral-300"
     >
-      {app.source_display || app.source}
+      {app.source_display || (app.source === "Internal" ? "内置" : app.source)}
     </span>
 
     <!-- 第一行：名称 + 别名 -->

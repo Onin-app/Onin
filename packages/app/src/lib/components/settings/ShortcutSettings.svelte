@@ -29,6 +29,8 @@
         } else if (s.command_name === "detach_window") {
           s.readonly = true;
           s.command_title = "分离窗口";
+        } else {
+          s.originalShortcut = s.shortcut;
         }
       });
       shortcuts.sort((a, b) => {
@@ -55,7 +57,7 @@
   );
 
   async function addShortcut() {
-    const newShortcut = { shortcut: "", command_name: "" };
+    const newShortcut: Shortcut = { shortcut: "", command_name: "" };
     shortcuts.push(newShortcut);
     shortcuts = [...shortcuts];
   }
@@ -88,7 +90,19 @@
       return;
     }
     try {
-      await invoke("add_shortcut", { shortcut });
+      // 仅在键位真正发生改变时，才将 originalShortcut 传为 oldShortcutStr，避免无效注销
+      const hasShortcutChanged =
+        shortcut.originalShortcut &&
+        shortcut.originalShortcut !== shortcut.shortcut;
+      await invoke("add_shortcut", {
+        shortcut: {
+          shortcut: shortcut.shortcut,
+          command_name: shortcut.command_name,
+          command_title: shortcut.command_title,
+        },
+        oldShortcutStr: hasShortcutChanged ? shortcut.originalShortcut : null,
+      });
+      shortcut.originalShortcut = shortcut.shortcut;
       toast.success(successMessage);
     } catch (error) {
       console.error("Failed to add shortcut:", error);
@@ -163,14 +177,7 @@
                       );
                       shortcutInfo.command_name = value;
                       shortcutInfo.command_title = command?.title;
-                      saveShortcut(
-                        {
-                          shortcut: shortcutInfo.shortcut,
-                          command_name: value,
-                          command_title: command?.title,
-                        },
-                        "快捷键指令已保存",
-                      );
+                      saveShortcut(shortcutInfo, "快捷键指令已保存");
                       searchValue = "";
                     }}
                   >

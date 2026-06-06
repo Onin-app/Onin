@@ -273,6 +273,22 @@
 
   // 实际执行应用/命令的函数
   const executeApp = async (app: LaunchableItem) => {
+    // 拦截内部页面跳转
+    if (app.source === "Internal") {
+      await appListManager.openApp(app, {}, () => {
+        resetLauncherState();
+        if (app.action === "open_settings") {
+          goto("/settings");
+        } else if (app.action === "open_plugins_manager") {
+          goto("/plugins");
+        } else if (app.action?.startsWith("open_settings_")) {
+          const tab = app.action.replace("open_settings_", "");
+          goto(`/settings?tab=${tab}`);
+        }
+      });
+      return;
+    }
+
     // 1. 优先处理 Extension 命令
     if (app.source === "Extension") {
       const extensionInfo = parseExtensionAction(app.action);

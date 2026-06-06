@@ -13,6 +13,7 @@
     Sparkle,
     PuzzlePiece,
     Cloud,
+    Database,
   } from "phosphor-svelte";
 
   import GeneralSettings from "$lib/components/settings/GeneralSettings.svelte";
@@ -22,6 +23,7 @@
   import AISettings from "$lib/components/settings/AISettings.svelte";
   import ExtensionSettings from "$lib/components/settings/ExtensionSettings.svelte";
   import SyncSettings from "$lib/components/settings/SyncSettings.svelte";
+  import MyDataSettings from "$lib/components/settings/MyDataSettings.svelte";
   import { escapeHandler } from "$lib/stores/escapeHandler";
 
   interface SettingItem {
@@ -34,7 +36,8 @@
       | typeof ShortcutSettings
       | typeof AISettings
       | typeof ExtensionSettings
-      | typeof SyncSettings;
+      | typeof SyncSettings
+      | typeof MyDataSettings;
     icon: any;
   }
 
@@ -80,6 +83,12 @@
       id: "sync",
       component: SyncSettings,
       icon: Cloud,
+    },
+    {
+      name: "我的数据",
+      id: "my_data",
+      component: MyDataSettings,
+      icon: Database,
     },
   ];
 

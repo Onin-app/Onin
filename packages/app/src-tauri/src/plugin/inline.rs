@@ -217,9 +217,9 @@ pub fn post_inline_plugin_message<R: Runtime>(
 
 #[tauri::command]
 pub fn open_inline_plugin_devtools<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
-    if let Some(webview) = app.get_webview("plugin-inline") {
+    if let Some(_webview) = app.get_webview("plugin-inline") {
         #[cfg(debug_assertions)]
-        webview.open_devtools();
+        _webview.open_devtools();
         Ok(())
     } else {
         Err("插件视图未找到".to_string())

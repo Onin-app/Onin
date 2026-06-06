@@ -308,7 +308,7 @@ mod macos_activation {
     use objc2_foundation::{NSNotification, NSNotificationCenter};
     use once_cell::sync::{Lazy, OnceCell};
     use std::sync::Mutex;
-    use tauri::AppHandle;
+    use tauri::{AppHandle, Manager};
 
     define_class!(
         #[unsafe(super(objc2::runtime::NSObject))]
@@ -318,7 +318,14 @@ mod macos_activation {
             #[unsafe(method(handleDidBecomeActive:))]
             fn handle_did_become_active(&self, _notification: &NSNotification) {
                 if let Some(app) = APP_HANDLE.get() {
-                    show_main_window(app);
+                    // 检查是否有任何非 "main" 的窗口是可见的
+                    let has_other_visible_window = app.windows().iter().any(|(label, window)| {
+                        label != "main" && window.is_visible().unwrap_or(false)
+                    });
+
+                    if !has_other_visible_window {
+                        show_main_window(app);
+                    }
                 }
             }
         }
