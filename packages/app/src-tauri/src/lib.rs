@@ -17,6 +17,7 @@ mod file_search;
 mod focus_manager;
 pub mod icon_utils;
 mod installed_apps;
+mod internal_commands;
 mod js_runtime;
 mod plugin;
 mod plugin_api;

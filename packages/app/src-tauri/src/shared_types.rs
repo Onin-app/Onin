@@ -9,6 +9,7 @@ pub enum ItemSource {
     FileSearch,  // Indexed local file search results
     Plugin,      // Plugins
     Extension,   // Internal extensions (emoji, calculator, etc.)
+    Internal,    // Onin internal commands/pages
 }
 
 impl Default for ItemSource {
@@ -128,6 +129,7 @@ pub enum CommandAction {
         extension_id: String,
         command_code: String,
     }, // Internal extension command (e.g., emoji, calculator)
+    Internal(String), // Open internal pages/routes
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -245,6 +247,7 @@ mod tests {
             ItemSource::FileSearch,
             ItemSource::Plugin,
             ItemSource::Extension,
+            ItemSource::Internal,
         ];
         for source in cases {
             let json = serde_json::to_string(&source).unwrap();
@@ -367,6 +370,12 @@ mod tests {
         assert!(
             matches!(a, CommandAction::PluginCommand { ref plugin_id, ref command_code } if plugin_id == "plugin-1" && command_code == "cmd-1")
         );
+    }
+
+    #[test]
+    fn test_command_action_internal() {
+        let a = CommandAction::Internal("open_settings".into());
+        assert!(matches!(a, CommandAction::Internal(ref cmd) if cmd == "open_settings"));
     }
 
     // ==================== 非法 JSON 反序列化 ====================

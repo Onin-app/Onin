@@ -32,6 +32,14 @@
     Sparkle,
     Bookmark,
     BookmarkSimple,
+    Gear,
+    RocketLaunch,
+    TerminalWindow,
+    PuzzlePiece,
+    Keyboard,
+    Cloud,
+    Database,
+    PlugsConnected,
   } from "phosphor-svelte";
 
   interface PhosphorIconProps {
@@ -80,6 +88,14 @@
     sparkle: Sparkle,
     bookmark: Bookmark,
     bookmarkSimple: BookmarkSimple,
+    gear: Gear,
+    rocketLaunch: RocketLaunch,
+    terminalWindow: TerminalWindow,
+    puzzlePiece: PuzzlePiece,
+    keyboard: Keyboard,
+    cloud: Cloud,
+    database: Database,
+    plugsConnected: PlugsConnected,
   };
 
   const IconComponent = $derived(iconMap[icon] || Power);
