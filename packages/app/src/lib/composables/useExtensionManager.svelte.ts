@@ -68,6 +68,7 @@ function previewToLaunchableItem(preview: ExtensionPreview): LaunchableItem & {
     view_type: preview.view_type,
     grid_data: preview.grid_data,
     trigger_mode: "preview",
+    type: "Function",
   };
 }
 

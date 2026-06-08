@@ -52,6 +52,7 @@ describe("LaunchableItem", () => {
       item_type: "App",
       source: "Application",
       keywords: [],
+      type: "Function",
     };
     expect(item.name).toBe("test");
     expect(item.item_type).toBe("App");
@@ -74,6 +75,7 @@ describe("LaunchableItem", () => {
       modified_time: 123456,
       requires_confirmation: true,
       trigger_mode: "preview",
+      type: "Function",
     };
     expect(item.keywords[0].name).toBe("kw");
     expect(item.requires_confirmation).toBe(true);

@@ -12,6 +12,7 @@ function makeItem(name: string, action?: string): LaunchableItem {
     icon_type: "Url",
     item_type: "App",
     source: "FileCommand",
+    type: "Function",
   };
 }
 

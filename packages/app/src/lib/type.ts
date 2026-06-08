@@ -26,7 +26,7 @@ export interface LaunchableItem {
   modified_time?: number;
   requires_confirmation?: boolean;
   trigger_mode?: "matched" | "preview";
-  type?: "Function" | "Match";
+  type: "Function" | "Match";
 }
 
 export interface ColorConversion {

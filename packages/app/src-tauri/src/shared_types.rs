@@ -91,8 +91,8 @@ pub struct LaunchableItem {
     /// 是否需要二次确认(用于敏感操作如关机、重启等)
     #[serde(default)]
     pub requires_confirmation: bool,
-    #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
-    pub command_type: Option<CommandType>,
+    #[serde(rename = "type", default)]
+    pub command_type: CommandType,
 }
 
 /// 命令匹配配置

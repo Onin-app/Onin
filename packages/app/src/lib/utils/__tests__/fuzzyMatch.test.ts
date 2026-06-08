@@ -11,6 +11,7 @@ function makeItem(name: string, keywords?: string[]): LaunchableItem {
     icon_type: "Url",
     item_type: "App",
     source: "FileCommand",
+    type: "Function",
   };
 }
 
@@ -94,6 +95,7 @@ describe("fuzzyMatch", () => {
         icon_type: "Url" as const,
         item_type: "App" as const,
         source: "FileCommand" as const,
+        type: "Function" as const,
       },
       {
         name: "Command B",
@@ -103,6 +105,7 @@ describe("fuzzyMatch", () => {
         icon_type: "Url" as const,
         item_type: "App" as const,
         source: "FileCommand" as const,
+        type: "Function" as const,
       },
       {
         name: "Command C",
@@ -112,6 +115,7 @@ describe("fuzzyMatch", () => {
         icon_type: "Url" as const,
         item_type: "App" as const,
         source: "FileCommand" as const,
+        type: "Function" as const,
       },
       {
         name: "Command D",
@@ -121,6 +125,7 @@ describe("fuzzyMatch", () => {
         icon_type: "Url" as const,
         item_type: "App" as const,
         source: "FileCommand" as const,
+        type: "Function" as const,
       },
     ];
 
