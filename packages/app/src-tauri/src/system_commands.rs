@@ -184,11 +184,22 @@ pub async fn execute_command(
                 extension_id,
                 command_code,
             } => {
+                // 从 args 中提取文本内容
+                // 优先取 text（粘贴/附件文本），其次取 input（搜索框文本）
+                let input_text = args
+                    .as_ref()
+                    .and_then(|a| {
+                        a.get("text")
+                            .or_else(|| a.get("input"))
+                            .and_then(|v| v.as_str())
+                    })
+                    .unwrap_or("");
+
                 let result = crate::extension::execute_extension_command(
                     &app,
                     extension_id,
                     command_code,
-                    "",
+                    input_text,
                 );
                 if let Some(error) = result.error {
                     let err = format!("Extension command failed: {}", error);
