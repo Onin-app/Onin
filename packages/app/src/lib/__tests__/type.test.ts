@@ -154,7 +154,6 @@ describe("Command", () => {
       source: "Application",
       action: { System: "lock" },
       description: "Locks the desktop",
-      path: "/usr/bin/lock",
       origin: "Shortcut",
       matches: [{ type: "text", name: "text", description: "text" }],
       requires_confirmation: true,

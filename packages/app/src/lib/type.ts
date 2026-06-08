@@ -85,7 +85,6 @@ export interface Command {
   icon: string;
   source: Source;
   action: CommandAction;
-  path?: string;
   origin?: AppOrigin;
   matches?: CommandMatch[];
   requires_confirmation?: boolean;
