@@ -149,7 +149,6 @@ describe("Command", () => {
     const cmd: Command = {
       name: "lock-screen",
       title: "Lock Screen",
-      english_name: "lock",
       keywords: [{ name: "lock" }],
       icon: "lock.png",
       source: "Application",

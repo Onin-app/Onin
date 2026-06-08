@@ -139,7 +139,6 @@ pub struct Command {
     /// 描述信息，用于前端显示
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    pub english_name: String,
     pub keywords: Vec<CommandKeyword>,
     pub icon: String,
     pub source: ItemSource,

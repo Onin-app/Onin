@@ -49,7 +49,6 @@ pub fn get_initial_extension_commands(app: &AppHandle) -> Vec<Command> {
                     name: format!("extension:{}:{}", manifest.id, cmd.code),
                     title: cmd.name.to_string(),
                     description: Some(cmd.description.unwrap_or(manifest.description).to_string()),
-                    english_name: manifest.id.to_string(),
                     keywords,
                     icon: cmd.icon.unwrap_or(manifest.icon).to_string(),
                     source: ItemSource::Extension,

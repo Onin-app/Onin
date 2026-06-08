@@ -114,7 +114,6 @@ async fn merge_commands(app: &AppHandle, saved_commands: Vec<Command>) -> Vec<Co
             let mut merged = existing.clone();
             merged.title = system_command.title.clone();
             merged.description = system_command.description.clone();
-            merged.english_name = system_command.english_name.clone();
             merged.icon = system_command.icon.clone();
             merged.action = system_command.action.clone();
             // keywords 保持用户的配置（已保存的）
@@ -173,7 +172,6 @@ async fn merge_commands(app: &AppHandle, saved_commands: Vec<Command>) -> Vec<Co
             merged.description = internal_command.description.clone();
             merged.icon = internal_command.icon.clone();
             merged.action = internal_command.action.clone();
-            merged.english_name = internal_command.english_name.clone();
             merged.requires_confirmation = internal_command.requires_confirmation;
             final_internal_commands.push(merged);
         } else {

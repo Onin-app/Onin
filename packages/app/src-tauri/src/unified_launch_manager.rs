@@ -36,11 +36,38 @@ pub async fn get_all_launchable_items(
     let all_items: Vec<LaunchableItem> = all_commands
         .into_iter()
         .filter_map(|cmd| {
-            let enabled_keywords: Vec<_> = cmd
+            let mut enabled_keywords: Vec<_> = cmd
                 .keywords
                 .into_iter()
                 .filter(|keyword| !keyword.disabled.unwrap_or(false))
                 .collect();
+
+            // 1. 默认逻辑：确保指令名称 (title) 始终以默认别名的形式存在于列表中
+            if !enabled_keywords.iter().any(|kw| kw.name == cmd.title) {
+                enabled_keywords.insert(
+                    0,
+                    crate::shared_types::CommandKeyword {
+                        name: cmd.title.clone(),
+                        disabled: Some(false),
+                        is_default: Some(true),
+                    },
+                );
+            }
+
+            // 2. 预设别名加载：根据 cmd.name 检索是否有预置的额外别名并追加进来
+            if let Some(&preset_aliases) =
+                crate::extensions::preset_keywords::PRESET_KEYWORDS.get(cmd.name.as_str())
+            {
+                for &alias in preset_aliases {
+                    if !enabled_keywords.iter().any(|kw| kw.name == alias) {
+                        enabled_keywords.push(crate::shared_types::CommandKeyword {
+                            name: alias.to_string(),
+                            disabled: Some(false),
+                            is_default: Some(true),
+                        });
+                    }
+                }
+            }
 
             let has_matches = cmd.matches.as_ref().is_some_and(|m| !m.is_empty());
             if enabled_keywords.is_empty() && !has_matches {

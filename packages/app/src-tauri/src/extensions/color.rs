@@ -21,9 +21,7 @@ pub static COLOR_MANIFEST: ExtensionManifest = ExtensionManifest {
             name: "颜色转换",
             description: Some("解析 Hex、RGB、HSL 颜色并转换格式"),
             icon: Some("palette"),
-            keywords: &[
-                "color", "colour", "颜色", "色值", "hex", "rgb", "rgba", "hsl", "hsla",
-            ],
+            keywords: &[],
             matches: None,
         },
         ExtensionCommand {
@@ -31,15 +29,7 @@ pub static COLOR_MANIFEST: ExtensionManifest = ExtensionManifest {
             name: "取色",
             description: Some("从屏幕任意位置拾取颜色"),
             icon: Some("eyedropper"),
-            keywords: &[
-                "取色",
-                "吸管",
-                "拾色",
-                "屏幕取色",
-                "picker",
-                "pick color",
-                "eyedropper",
-            ],
+            keywords: &[],
             matches: None,
         },
     ],

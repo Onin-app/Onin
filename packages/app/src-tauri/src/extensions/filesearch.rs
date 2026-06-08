@@ -15,7 +15,7 @@ pub static FILE_SEARCH_MANIFEST: ExtensionManifest = ExtensionManifest {
         name: "文件搜索",
         description: Some("进入本地文件搜索模式"),
         icon: Some("folder"),
-        keywords: &["文件搜索", "本地搜索", "find", "files", "file", "search"],
+        keywords: &[],
         matches: None,
     }],
 };

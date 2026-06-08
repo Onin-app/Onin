@@ -29,7 +29,10 @@
   // 获取需要显示的别名（排除与名称相同的关键词，最多显示3个）
   const displayAliases = $derived(
     app.keywords
-      .filter((kw) => !kw.disabled && kw.name !== app.name)
+      .filter(
+        (kw) =>
+          !kw.disabled && kw.name.toLowerCase() !== app.name.toLowerCase(),
+      )
       .slice(0, 3)
       .map((kw) => kw.name),
   );
@@ -147,10 +150,12 @@
               {alias}
             </span>
           {/each}
-          {#if app.keywords.filter((kw) => !kw.disabled && kw.name !== app.name).length > 3}
+          {#if app.keywords.filter((kw) => !kw.disabled && kw.name.toLowerCase() !== app.name.toLowerCase()).length > 3}
             <span class="text-xs text-neutral-400 dark:text-neutral-500">
               +{app.keywords.filter(
-                (kw) => !kw.disabled && kw.name !== app.name,
+                (kw) =>
+                  !kw.disabled &&
+                  kw.name.toLowerCase() !== app.name.toLowerCase(),
               ).length - 3}
             </span>
           {/if}

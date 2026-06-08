@@ -17,7 +17,7 @@ pub static AI_MANIFEST: ExtensionManifest = ExtensionManifest {
             name: "AI 问答",
             description: Some("进入 AI 自由对话模式"),
             icon: Some("sparkles"),
-            keywords: &["ai", "chat", "ask", "问答", "对话", "liaotian", "wd"],
+            keywords: &[],
             matches: None,
         },
         ExtensionCommand {
@@ -25,7 +25,7 @@ pub static AI_MANIFEST: ExtensionManifest = ExtensionManifest {
             name: "AI 上下文分析",
             description: Some("对输入的文本或剪贴板内容进行 AI 提问与分析"),
             icon: Some("sparkles"),
-            keywords: &["ai", "action", "分析", "explain", "summarize", "fenxi"],
+            keywords: &[],
             matches: Some(&[StaticCommandMatch {
                 match_type: "text",
                 name: "分析文本",

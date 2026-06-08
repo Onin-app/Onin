@@ -80,7 +80,6 @@ export interface Command {
   name: string;
   title: string;
   description?: string;
-  english_name: string;
   keywords: CommandKeyword[];
   icon: string;
   source: Source;
