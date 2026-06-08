@@ -88,6 +88,7 @@ export interface Command {
   path?: string;
   origin?: AppOrigin;
   matches?: CommandMatch[];
+  requires_confirmation?: boolean;
   type: "Function" | "Match";
 }
 
