@@ -28,7 +28,6 @@
     Application: "程序启动",
     FileCommand: "文件启动",
     Plugin: "已安装插件",
-    Custom: "自定义",
     Internal: "页面导航",
   };
 

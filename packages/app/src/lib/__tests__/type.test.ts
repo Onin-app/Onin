@@ -219,7 +219,6 @@ describe("Union Types", () => {
   it("validates Source", () => {
     const sources: Source[] = [
       "Application",
-      "Custom",
       "Command",
       "FileCommand",
       "FileSearch",

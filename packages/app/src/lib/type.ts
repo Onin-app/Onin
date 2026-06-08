@@ -1,7 +1,6 @@
 export type ItemType = "App" | "Folder" | "File";
 export type Source =
   | "Application"
-  | "Custom"
   | "Command"
   | "FileCommand"
   | "FileSearch"

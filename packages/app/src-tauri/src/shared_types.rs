@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum ItemSource {
     Application, // System-installed applications
-    Custom,      // User-defined items (files, folders, URLs, etc.)
     Command,     // System commands
     FileCommand, // User-defined file commands
     FileSearch,  // Indexed local file search results
@@ -14,7 +13,7 @@ pub enum ItemSource {
 
 impl Default for ItemSource {
     fn default() -> Self {
-        // 对于用户手动添加的项目，默认为 Custom
+        // 对于用户手动添加的项目，默认为 FileCommand
         ItemSource::FileCommand
     }
 }
@@ -256,7 +255,6 @@ mod tests {
     fn test_item_source_roundtrip() {
         let cases = vec![
             ItemSource::Application,
-            ItemSource::Custom,
             ItemSource::Command,
             ItemSource::FileCommand,
             ItemSource::FileSearch,
