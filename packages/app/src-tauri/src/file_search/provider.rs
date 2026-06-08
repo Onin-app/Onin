@@ -567,6 +567,7 @@ fn launchable_item_from_file(file: PlatformFile) -> LaunchableItem {
         matches: None,
         modified_time: file.modified_time,
         requires_confirmation: false,
+        command_type: Some(crate::shared_types::CommandType::Function),
     }
 }
 

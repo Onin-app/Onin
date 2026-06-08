@@ -84,8 +84,9 @@
   };
 
   // ===== Computed =====
-  // 合并匹配命令和搜索结果
+  // 合并匹配命令和搜索结果并去重
   // 优先级：Extension 预览 -> 精确/模糊匹配 -> 匹配指令
+  // 若同一命令既被模糊匹配也满足匹配指令规则，优先保留支持传参执行的“匹配指令”版本
   const displayList = $derived.by(() => {
     const result: LaunchableItem[] = [];
 
@@ -94,8 +95,29 @@
       result.push(extensionPreviewItem);
     }
 
-    // 展示层不再做去重或语义过滤，是否显示由各命令自身的匹配规则决定
-    return [...result, ...appListManager.state.appList, ...matchedCommands];
+    const rawList = [...appListManager.state.appList, ...matchedCommands];
+    const itemMap = new Map<string, LaunchableItem>();
+    const order: string[] = [];
+
+    for (const item of rawList) {
+      const key = `${item.source}:${item.name}`;
+      if (!itemMap.has(key)) {
+        itemMap.set(key, item);
+        order.push(key);
+      } else {
+        // 遇到重复的项，若新的项有更具体的匹配触发模式，或者新的项包含 action 而旧的项没有 action，则覆盖保留
+        const existing = itemMap.get(key)!;
+        if (
+          item.trigger_mode === "matched" ||
+          (!existing.action && item.action)
+        ) {
+          itemMap.set(key, item);
+        }
+      }
+    }
+
+    const uniqueApps = order.map((key) => itemMap.get(key) as LaunchableItem);
+    return [...result, ...uniqueApps];
   });
 
   // ===== Effects =====

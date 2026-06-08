@@ -26,6 +26,7 @@ pub async fn get_initial_file_commands(app: &AppHandle) -> Vec<Command> {
             origin: None,
             matches: None,
             requires_confirmation: false,
+            command_type: crate::shared_types::CommandType::Function,
         })
         .collect()
 }

@@ -116,6 +116,7 @@ pub fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
                     origin: None,
                     matches: None,
                     requires_confirmation: false,
+                    command_type: crate::shared_types::CommandType::Function,
                 });
 
                 // 2. 为每个插件的功能指令创建 Command
@@ -163,8 +164,13 @@ pub fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
                             command_code: cmd.code.clone(),
                         },
                         origin: None,
-                        matches,
+                        matches: matches.clone(),
                         requires_confirmation: false,
+                        command_type: if matches.is_some() {
+                            crate::shared_types::CommandType::Match
+                        } else {
+                            crate::shared_types::CommandType::Function
+                        },
                     });
                 }
             }
@@ -238,8 +244,13 @@ pub fn get_initial_dynamic_commands(app: &AppHandle) -> Vec<Command> {
                     command_code: dc.code,
                 },
                 origin: None,
-                matches: dc.matches,
+                matches: dc.matches.clone(),
                 requires_confirmation: false,
+                command_type: if dc.matches.is_some() {
+                    crate::shared_types::CommandType::Match
+                } else {
+                    crate::shared_types::CommandType::Function
+                },
             }
         })
         .collect()

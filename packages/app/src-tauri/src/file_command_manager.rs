@@ -198,6 +198,7 @@ impl FileCommandManager {
             matches: None,
             modified_time: None,
             requires_confirmation: false,
+            command_type: Some(crate::shared_types::CommandType::Function),
         })
     }
     fn delete_commands_json(&self) {

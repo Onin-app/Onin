@@ -64,6 +64,11 @@ export function useAppList(): AppListManagerReturn {
     isRefreshing: false,
   });
 
+  // 过滤掉匹配指令 (Match) 后的列表
+  let nonMatchApps = $derived(
+    state.originAppList.filter((item) => item.type !== "Match"),
+  );
+
   const loadConfig = async () => {
     try {
       state.appConfig = await invoke<AppConfig>("get_app_config");
@@ -78,7 +83,8 @@ export function useAppList(): AppListManagerReturn {
       const res = await invoke<LaunchableItem[]>("get_all_launchable_items");
       if (res) {
         state.originAppList = res;
-        state.appList = res;
+        // 过滤掉匹配指令 (Match)，使它们不作为普通功能指令在列表中显示
+        state.appList = nonMatchApps;
       }
     } catch (error) {
       console.error("Failed to get all launchable items:", error);
@@ -86,7 +92,7 @@ export function useAppList(): AppListManagerReturn {
   };
 
   const handleInput = (value: string) => {
-    const apps = fuzzyMatch(value, state.originAppList);
+    const apps = fuzzyMatch(value, nonMatchApps);
     state.appList = apps;
     state.selectedIndex = 0;
   };
@@ -112,6 +118,8 @@ export function useAppList(): AppListManagerReturn {
           .then(([stats, items]) => {
             state.usageStats = stats;
             state.originAppList = items;
+            // 异步更新 originAppList 后同步更新 appList 防止显示旧数据
+            state.appList = nonMatchApps;
           })
           .catch((err) => console.error("Failed to refresh data:", err));
       } else if (app.source === "FileCommand") {
@@ -170,7 +178,7 @@ export function useAppList(): AppListManagerReturn {
   };
 
   const resetToOriginList = () => {
-    state.appList = state.originAppList;
+    state.appList = nonMatchApps;
     state.selectedIndex = 0;
   };
 

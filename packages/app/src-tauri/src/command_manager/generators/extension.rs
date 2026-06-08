@@ -57,8 +57,13 @@ pub fn get_initial_extension_commands(app: &AppHandle) -> Vec<Command> {
                         command_code: cmd.code.to_string(),
                     },
                     origin: None,
-                    matches,
+                    matches: matches.clone(),
                     requires_confirmation: false,
+                    command_type: if matches.is_some() {
+                        crate::shared_types::CommandType::Match
+                    } else {
+                        crate::shared_types::CommandType::Function
+                    },
                 }
             })
         })

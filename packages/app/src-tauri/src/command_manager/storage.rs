@@ -146,6 +146,7 @@ async fn merge_commands(app: &AppHandle, saved_commands: Vec<Command>) -> Vec<Co
             merged.icon = ext_command.icon.clone();
             merged.action = ext_command.action.clone();
             merged.matches = ext_command.matches.clone();
+            merged.command_type = ext_command.command_type.clone();
             final_extensions.push(merged);
         } else {
             final_extensions.push(ext_command.clone());

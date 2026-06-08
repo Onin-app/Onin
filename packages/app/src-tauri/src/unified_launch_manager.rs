@@ -127,6 +127,7 @@ pub async fn get_all_launchable_items(
                 matches: cmd.matches,
                 modified_time: None,
                 requires_confirmation: cmd.requires_confirmation,
+                command_type: Some(cmd.command_type),
             })
         })
         .collect();

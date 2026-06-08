@@ -27,6 +27,7 @@ export interface LaunchableItem {
   modified_time?: number;
   requires_confirmation?: boolean;
   trigger_mode?: "matched" | "preview";
+  type?: "Function" | "Match";
 }
 
 export interface ColorConversion {
@@ -87,6 +88,7 @@ export interface Command {
   path?: string;
   origin?: AppOrigin;
   matches?: CommandMatch[];
+  type: "Function" | "Match";
 }
 
 export enum Theme {

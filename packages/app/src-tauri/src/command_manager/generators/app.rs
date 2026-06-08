@@ -33,6 +33,7 @@ pub async fn get_initial_app_commands() -> Vec<Command> {
                         origin: app_info.origin,
                         matches: None,
                         requires_confirmation: false,
+                        command_type: crate::shared_types::CommandType::Function,
                     }
                 })
             })

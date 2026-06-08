@@ -157,6 +157,7 @@ describe("Command", () => {
       path: "/usr/bin/lock",
       origin: "Shortcut",
       matches: [{ type: "text", name: "text", description: "text" }],
+      type: "Match",
     };
     expect(cmd.name).toBe("lock-screen");
     expect(cmd.action).toHaveProperty("System");

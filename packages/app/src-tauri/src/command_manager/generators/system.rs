@@ -18,6 +18,7 @@ pub fn get_initial_system_commands() -> Vec<Command> {
             origin: None,
             matches: None,
             requires_confirmation: cmd_info.requires_confirmation,
+            command_type: crate::shared_types::CommandType::Function,
         })
         .collect()
 }

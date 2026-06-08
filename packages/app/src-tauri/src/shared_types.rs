@@ -20,6 +20,18 @@ impl Default for ItemSource {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub enum CommandType {
+    Function,
+    Match,
+}
+
+impl Default for CommandType {
+    fn default() -> Self {
+        CommandType::Function
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum ItemType {
     App,
     Folder,
@@ -80,6 +92,8 @@ pub struct LaunchableItem {
     /// 是否需要二次确认(用于敏感操作如关机、重启等)
     #[serde(default)]
     pub requires_confirmation: bool,
+    #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
+    pub command_type: Option<CommandType>,
 }
 
 /// 命令匹配配置
@@ -150,6 +164,8 @@ pub struct Command {
     /// 是否需要二次确认(用于敏感操作如关机、重启等)
     #[serde(default)]
     pub requires_confirmation: bool,
+    #[serde(rename = "type", default)]
+    pub command_type: CommandType,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
