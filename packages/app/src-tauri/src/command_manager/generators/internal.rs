@@ -34,6 +34,8 @@ fn build_internal_keywords(
             name: alias.to_string(),
             disabled: None,
             is_default: Some(true),
+            // TODO: make this configurable if internal command supports keyword type in the future
+            keyword_type: None,
         })
         .collect();
 

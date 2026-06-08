@@ -32,6 +32,8 @@ fn build_system_keywords(cmd_info: &system_commands::SystemCommandInfo) -> Vec<C
             name: alias.to_string(),
             disabled: None,
             is_default: Some(true),
+            // TODO: make this configurable if system command supports keyword type in the future
+            keyword_type: None,
         })
         .collect();
 

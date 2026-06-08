@@ -43,6 +43,7 @@ export interface CommandKeyword {
   name: string;
   disabled?: boolean;
   is_default?: boolean;
+  type?: string;
 }
 
 /**

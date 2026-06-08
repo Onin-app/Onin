@@ -25,6 +25,8 @@ pub async fn get_initial_app_commands() -> Vec<Command> {
                                 name: kw,
                                 disabled: None,
                                 is_default: Some(true),
+                                // TODO: make this configurable if app command supports keyword type in the future
+                                keyword_type: None,
                             })
                             .collect(),
                         icon: app_info.icon.unwrap_or_default(),

@@ -120,6 +120,7 @@ pub async fn register_dynamic_command(
             name: k.name,
             disabled: None,
             is_default: None,
+            keyword_type: k.keyword_type,
         })
         .collect();
 

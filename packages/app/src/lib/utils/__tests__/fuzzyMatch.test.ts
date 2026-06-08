@@ -83,4 +83,59 @@ describe("fuzzyMatch", () => {
     expect(result[0].name).toBe("Store");
     expect(result[1].name).toBe("App Store");
   });
+
+  it("supports keyword types: exact, prefix, fuzzy", () => {
+    const keywordItems = [
+      {
+        name: "Command A",
+        keywords: [{ name: "setting", type: "exact" }],
+        path: "",
+        icon: "",
+        icon_type: "Url" as const,
+        item_type: "App" as const,
+        source: "FileCommand" as const,
+      },
+      {
+        name: "Command B",
+        keywords: [{ name: "bookmark", type: "prefix" }],
+        path: "",
+        icon: "",
+        icon_type: "Url" as const,
+        item_type: "App" as const,
+        source: "FileCommand" as const,
+      },
+      {
+        name: "Command C",
+        keywords: [{ name: "搜索", type: "fuzzy" }],
+        path: "",
+        icon: "",
+        icon_type: "Url" as const,
+        item_type: "App" as const,
+        source: "FileCommand" as const,
+      },
+      {
+        name: "Command D",
+        keywords: [{ name: "search", type: "fuzzy" }],
+        path: "",
+        icon: "",
+        icon_type: "Url" as const,
+        item_type: "App" as const,
+        source: "FileCommand" as const,
+      },
+    ];
+
+    // 精确匹配测试
+    expect(fuzzyMatch("setting", keywordItems)).toHaveLength(1);
+    expect(fuzzyMatch("settin", keywordItems)).toHaveLength(0); // 不应该匹配 exact
+
+    // 前缀匹配测试
+    expect(fuzzyMatch("book", keywordItems)).toHaveLength(1);
+    expect(fuzzyMatch("bookmark", keywordItems)).toHaveLength(1);
+    expect(fuzzyMatch("mark", keywordItems)).toHaveLength(0); // 不应该匹配 prefix 的包含情况
+
+    // 模糊/拼音/首字母匹配测试
+    expect(fuzzyMatch("ss", keywordItems)).toHaveLength(1); // 首字母匹配成功
+    expect(fuzzyMatch("sousuo", keywordItems)).toHaveLength(1); // 拼音匹配成功
+    expect(fuzzyMatch("ear", keywordItems)).toHaveLength(0); // 英文子串包含匹配被跳过
+  });
 });

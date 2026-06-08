@@ -50,6 +50,8 @@ pub async fn get_all_launchable_items(
                         name: cmd.title.clone(),
                         disabled: Some(false),
                         is_default: Some(true),
+                        // TODO: make this configurable if launch manager supports keyword type in the future
+                        keyword_type: None,
                     },
                 );
             }
@@ -64,6 +66,8 @@ pub async fn get_all_launchable_items(
                             name: alias.to_string(),
                             disabled: Some(false),
                             is_default: Some(true),
+                            // TODO: make this configurable if launch manager supports keyword type in the future
+                            keyword_type: None,
                         });
                     }
                 }

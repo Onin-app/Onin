@@ -26,6 +26,8 @@ pub fn get_initial_extension_commands(app: &AppHandle) -> Vec<Command> {
                         name: kw.to_string(),
                         disabled: None,
                         is_default: Some(true),
+                        // TODO: make this configurable if extension command supports keyword type in the future
+                        keyword_type: None,
                     })
                     .collect();
 

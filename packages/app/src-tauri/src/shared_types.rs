@@ -124,6 +124,8 @@ pub struct CommandKeyword {
     pub disabled: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub is_default: Option<bool>,
+    #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
+    pub keyword_type: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -319,11 +321,13 @@ mod tests {
             name: "hello".into(),
             disabled: None,
             is_default: None,
+            keyword_type: None,
         };
         let b = CommandKeyword {
             name: "hello".into(),
             disabled: None,
             is_default: None,
+            keyword_type: None,
         };
         assert_eq!(a, b);
     }
@@ -334,11 +338,13 @@ mod tests {
             name: "hello".into(),
             disabled: None,
             is_default: None,
+            keyword_type: None,
         };
         let b = CommandKeyword {
             name: "world".into(),
             disabled: None,
             is_default: None,
+            keyword_type: None,
         };
         assert_ne!(a, b);
     }

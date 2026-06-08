@@ -107,6 +107,7 @@ pub fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
                         name: plugin.manifest.name.clone(),
                         disabled: None,
                         is_default: Some(true),
+                        keyword_type: None,
                     }],
                     icon: icon_base64.clone(),
                     source: ItemSource::Plugin,
@@ -129,6 +130,7 @@ pub fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
                             name: kw.name.clone(),
                             disabled: None,
                             is_default: Some(true),
+                            keyword_type: Some(kw.keyword_type.clone()),
                         })
                         .collect();
 

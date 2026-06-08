@@ -19,6 +19,8 @@ pub async fn get_initial_file_commands(app: &AppHandle) -> Vec<Command> {
                 name: item.name,
                 disabled: None,
                 is_default: Some(true),
+                // TODO: make this configurable if file command supports keyword type in the future
+                keyword_type: None,
             }],
             icon: item.icon,
             source: ItemSource::FileCommand,
