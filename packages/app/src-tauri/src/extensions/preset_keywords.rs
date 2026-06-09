@@ -20,7 +20,6 @@ pub static PRESET_KEYWORDS: LazyLock<HashMap<&'static str, &'static [&'static st
         // 内置扩展
         // ============================================================================
         m.insert("extension:ai:chat", &["ai", "chat"][..]);
-        m.insert("extension:ai:action", &["ai", "action"][..]);
         m.insert("extension:bookmarks:search", &["bookmarks", "bookmark"][..]);
         m.insert(
             "extension:calculator:calculate",

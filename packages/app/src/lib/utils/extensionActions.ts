@@ -76,14 +76,6 @@ export const EXTENSION_ACTION_MAP: Record<string, ExtensionAction> = {
     type: "navigate",
     route: () => "/extensions/ai",
   },
-  "ai:action": {
-    type: "navigate",
-    route: (ctx) =>
-      ctx.effectiveText
-        ? `/extensions/ai?q=${encode(ctx.effectiveText)}`
-        : "/extensions/ai",
-    queryOnlyWhenMatched: true,
-  },
 
   // ── Emoji ─────────────────────────────────────────────────────────────────
   "emoji:search": {
