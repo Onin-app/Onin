@@ -71,7 +71,7 @@ pub struct PluginCommandKeyword {
     /// 关键词名称
     pub name: String,
     /// 关键词类型
-    #[serde(rename = "type")]
+    #[serde(default, rename = "type")]
     pub keyword_type: String,
 }
 

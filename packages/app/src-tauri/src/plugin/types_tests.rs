@@ -49,3 +49,14 @@ fn test_manifest_background_field_is_parsed() {
 
     assert_eq!(manifest.background.as_deref(), Some("dist/background.js"));
 }
+
+#[test]
+fn test_plugin_command_keyword_deserialization_no_type() {
+    let keyword: PluginCommandKeyword = serde_json::from_value(json!({
+        "name": "test_keyword"
+    }))
+    .unwrap();
+
+    assert_eq!(keyword.name, "test_keyword");
+    assert_eq!(keyword.keyword_type, "");
+}
