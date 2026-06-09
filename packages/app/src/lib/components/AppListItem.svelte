@@ -12,9 +12,10 @@
     app: LaunchableItem;
     isSelected: boolean;
     onClick: () => void;
+    onHover?: (e: MouseEvent) => void;
   }
 
-  let { app, isSelected, onClick }: Props = $props();
+  let { app, isSelected, onClick, onHover }: Props = $props();
 
   const triggerMode = $derived(
     app.trigger_mode === "matched"
@@ -45,6 +46,7 @@
     ? 'hover:bg-neutral-200 dark:hover:bg-neutral-700'
     : ''} {isSelected ? 'bg-neutral-300 dark:bg-neutral-600' : ''}"
   onclick={onClick}
+  onmouseenter={onHover}
 >
   <div class="relative mr-2 h-8 w-8 flex-shrink-0">
     {#if app.icon}

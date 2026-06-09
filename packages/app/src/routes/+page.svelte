@@ -70,6 +70,21 @@
   let unlisten = $state<null | (() => void)>(null);
   let removeWindowEscapeListener = $state<null | (() => void)>(null);
 
+  let lastMouseX = $state<number>(0);
+  let lastMouseY = $state<number>(0);
+
+  const handleMouseMove = (e: MouseEvent) => {
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+  };
+
+  const handleItemHover = (index: number, e: MouseEvent) => {
+    if (e.clientX === lastMouseX && e.clientY === lastMouseY) {
+      return;
+    }
+    appListManager.state.selectedIndex = index;
+  };
+
   // Component references
   let searchInputRef: SearchInput;
   let pluginInlineViewRef = $state<PluginInlineView | null>(null);
@@ -627,7 +642,11 @@
   });
 </script>
 
-<div class="h-[100vh] w-full bg-transparent p-1">
+<div
+  class="h-[100vh] w-full bg-transparent p-1"
+  onmousemove={handleMouseMove}
+  role="presentation"
+>
   <main
     class="h-full w-full overflow-hidden rounded-xl bg-neutral-100 p-3 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100"
     data-tauri-drag-region
@@ -741,27 +760,27 @@
             viewportClass="h-full w-full overflow-x-hidden"
           >
             <div class="app-list overflow-hidden">
-              <div>
-                {#each displayList as app, index ((app.action || "") + app.path + app.name + index)}
-                  {#if app.path.startsWith("extension:")}
-                    <!-- Extension 预览项（如计算器结果） -->
-                    <ExtensionResultItem
-                      title={app.name}
-                      description={app.description || ""}
-                      icon={app.icon}
-                      triggerMode={app.trigger_mode}
-                      isSelected={appListManager.state.selectedIndex === index}
-                      onClick={() => handleOpenApp(app)}
-                    />
-                  {:else}
-                    <AppListItem
-                      {app}
-                      isSelected={appListManager.state.selectedIndex === index}
-                      onClick={() => handleOpenApp(app)}
-                    />
-                  {/if}
-                {/each}
-              </div>
+              {#each displayList as app, index ((app.action || "") + app.path + app.name + index)}
+                {#if app.path.startsWith("extension:")}
+                  <!-- Extension 预览项（如计算器结果） -->
+                  <ExtensionResultItem
+                    title={app.name}
+                    description={app.description || ""}
+                    icon={app.icon}
+                    triggerMode={app.trigger_mode}
+                    isSelected={appListManager.state.selectedIndex === index}
+                    onClick={() => handleOpenApp(app)}
+                    onHover={(e) => handleItemHover(index, e)}
+                  />
+                {:else}
+                  <AppListItem
+                    {app}
+                    isSelected={appListManager.state.selectedIndex === index}
+                    onClick={() => handleOpenApp(app)}
+                    onHover={(e) => handleItemHover(index, e)}
+                  />
+                {/if}
+              {/each}
             </div>
           </AppScrollArea>
         {/if}
