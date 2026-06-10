@@ -130,6 +130,8 @@ pub fn get_invoke_handler(
         plugin_api::dialog::plugin_dialog_save,
         // Plugin API: toast
         plugin_api::toast::plugin_toast,
+        // Plugin API: ocr
+        plugin_api::ocr::plugin_ocr_recognize,
         // Plugin API: clipboard
         plugin_api::clipboard::commands::plugin_clipboard_read_text,
         plugin_api::clipboard::commands::plugin_clipboard_write_text,

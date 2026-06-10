@@ -89,6 +89,7 @@ import { scheduler } from './api/scheduler';
 import { pluginWindow } from './api/window';
 import { ai } from './api/ai';
 import { toast } from './api/toast';
+import { ocr } from './api/ocr';
 
 import { invoke, listen } from './core/ipc';
 import { debug } from './utils/debug';
@@ -104,6 +105,7 @@ import type * as Retry from './utils/retry';
 import type * as Fs from './api/fs';
 import type * as Dialog from './api/dialog';
 import type * as Settings from './api/settings';
+import type * as Ocr from './api/ocr';
 
 /**
  * Contains all available type definitions for the SDK
@@ -143,6 +145,7 @@ const types = {
   Fs: {} as typeof Fs,
   Dialog: {} as typeof Dialog,
   Settings: {} as typeof Settings,
+  Ocr: {} as typeof Ocr,
 };
 
 // Export all APIs
@@ -160,6 +163,7 @@ export {
   pluginWindow,
   ai,
   toast,
+  ocr,
   invoke,
   listen,
   debug,
@@ -212,3 +216,6 @@ export type {
   ClipboardContentType,
   ClipboardFile,
 } from './api/clipboard';
+
+// OCR types
+export type { OcrWord, OcrLine, OcrResult, OcrOptions } from './api/ocr';
