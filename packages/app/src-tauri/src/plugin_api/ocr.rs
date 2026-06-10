@@ -61,7 +61,12 @@ pub async fn plugin_ocr_recognize(
         run_macos_ocr(image, options).await
     }
 
-    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    #[cfg(target_os = "linux")]
+    {
+        run_linux_ocr(image, options).await
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
     {
         let _ = (image, options);
         Err("OCR is currently not supported on this platform.".to_string())
@@ -458,4 +463,153 @@ impl Drop for ComGuard {
             windows::Win32::System::Com::CoUninitialize();
         }
     }
+}
+
+// ==========================================
+// Linux Platform Implementation (Tesseract Bridge)
+// ==========================================
+#[cfg(target_os = "linux")]
+fn map_bcp47_to_tesseract(lang: &str) -> String {
+    match lang.to_lowercase().as_str() {
+        "zh" | "zh-cn" | "zh-hans" => "chi_sim".to_string(),
+        "zh-tw" | "zh-hk" | "zh-hant" => "chi_tra".to_string(),
+        "en" | "en-us" | "en-gb" => "eng".to_string(),
+        "ja" | "jp" => "jpn".to_string(),
+        "ko" | "kr" => "kor".to_string(),
+        "fr" => "fra".to_string(),
+        "de" => "deu".to_string(),
+        "ru" => "rus".to_string(),
+        "es" => "spa".to_string(),
+        "it" => "ita".to_string(),
+        _ => lang.to_string(),
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn parse_tesseract_tsv(tsv_content: &str) -> Result<OcrResult, String> {
+    let mut lines: Vec<OcrLine> = Vec::new();
+    let mut full_text_parts: Vec<String> = Vec::new();
+
+    let tsv_lines = tsv_content.lines();
+    for tsv_line in tsv_lines {
+        let parts: Vec<&str> = tsv_line.split('\t').collect();
+        if parts.is_empty() || parts[0] == "level" {
+            continue; // Skip header
+        }
+
+        let level_str = parts[0].trim();
+        let level = match level_str.parse::<u32>() {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        if level == 4 || level == 5 {
+            if parts.len() < 10 {
+                continue;
+            }
+            let left = parts[6].trim().parse::<f32>().unwrap_or(0.0);
+            let top = parts[7].trim().parse::<f32>().unwrap_or(0.0);
+            let width = parts[8].trim().parse::<f32>().unwrap_or(0.0);
+            let height = parts[9].trim().parse::<f32>().unwrap_or(0.0);
+
+            let text = if parts.len() > 11 {
+                parts[11].trim().to_string()
+            } else {
+                "".to_string()
+            };
+
+            if level == 4 {
+                let line_text = text.clone();
+                if !line_text.is_empty() {
+                    full_text_parts.push(line_text.clone());
+                }
+                lines.push(OcrLine {
+                    text: line_text,
+                    x: left,
+                    y: top,
+                    width,
+                    height,
+                    words: Vec::new(),
+                });
+            } else if level == 5 {
+                if let Some(current_line) = lines.last_mut() {
+                    current_line.words.push(OcrWord {
+                        text,
+                        x: left,
+                        y: top,
+                        width,
+                        height,
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(OcrResult {
+        text: full_text_parts.join("\n"),
+        lines,
+    })
+}
+
+#[cfg(target_os = "linux")]
+async fn run_linux_ocr(image: String, options: Option<OcrOptions>) -> Result<OcrResult, String> {
+    let bytes = get_image_bytes(&image)?;
+
+    tokio::task::spawn_blocking(move || {
+        use std::io::Write;
+        use std::process::Command;
+
+        // 1. Write image to a temporary file
+        let mut temp_file = tempfile::Builder::new()
+            .suffix(".png")
+            .tempfile()
+            .map_err(|e| format!("Failed to create temp file: {}", e))?;
+
+        temp_file
+            .write_all(&bytes)
+            .map_err(|e| format!("Failed to write temp image: {}", e))?;
+
+        let temp_path = temp_file.path();
+
+        // 2. Set up Tesseract command
+        let mut cmd = Command::new("tesseract");
+        cmd.arg(temp_path).arg("stdout");
+
+        if let Some(opts) = &options {
+            if let Some(ref lang_code) = opts.language {
+                let mapped_lang = map_bcp47_to_tesseract(lang_code);
+                cmd.arg("-l").arg(mapped_lang);
+            }
+        }
+
+        cmd.arg("tsv");
+
+        // 3. Execute Tesseract
+        let output = cmd.output().map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                "tesseract command not found. Please install tesseract-ocr (e.g., 'sudo apt install tesseract-ocr' and language packs like 'tesseract-ocr-chi-sim').".to_string()
+            } else {
+                format!("Failed to execute tesseract: {}", e)
+            }
+        })?;
+
+        if !output.status.success() {
+            let err_msg = String::from_utf8_lossy(&output.stderr);
+            return Err(format!(
+                "Tesseract failed with exit code {:?}: {}",
+                output.status.code(),
+                err_msg
+            ));
+        }
+
+        let stdout_str = String::from_utf8(output.stdout)
+            .map_err(|e| format!("Tesseract output is not valid UTF-8: {}", e))?;
+
+        // 4. Parse TSV output
+        let ocr_result = parse_tesseract_tsv(&stdout_str)?;
+
+        Ok(ocr_result)
+    })
+    .await
+    .map_err(|e| format!("Task join error: {}", e))?
 }
