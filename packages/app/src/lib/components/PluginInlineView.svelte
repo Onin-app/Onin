@@ -20,7 +20,7 @@
 
   let containerElement = $state<HTMLDivElement | null>(null);
   let resizeObserver: ResizeObserver | null = null;
-  let isMounted = false;
+  let isMounted = $state(false);
   let unlistenLoaded: UnlistenFn | null = null; // [Fix] Declare at top level
 
   /**
@@ -155,24 +155,6 @@
       // Yes, on load, JS context is reset. So we MUST send init AFTER load.
       sendRuntimeInit();
     }).then((u) => (unlistenLoaded = u));
-
-    // 初始化显示
-    // 使用 requestAnimationFrame 确保布局已完成
-    requestAnimationFrame(() => {
-      try {
-        showWebview().catch((e) => {
-          console.error(`showWebview promise rejected: ${e}`);
-        });
-
-        // 初始化后发送 runtime-init (虽然 native bridge 可能会自己处理?)
-        // 运行时初始化改由宿主消息完成，这里不再依赖旧桥接路径。
-        // 所以我们需要通过 post_inline_plugin_message 发送 init data
-        // Moved to showWebview to ensure it sends on every load
-        // sendRuntimeInit();
-      } catch (e) {
-        console.error(`Error in RAF callback: ${e}`);
-      }
-    });
 
     // 监听大小变化
     if (containerElement) {

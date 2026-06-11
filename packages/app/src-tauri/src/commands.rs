@@ -76,6 +76,7 @@ pub fn get_invoke_handler(
         plugin::inline::post_inline_plugin_message,
         plugin::inline::open_inline_plugin_devtools,
         plugin::inline::restart_inline_plugin,
+        plugin::inline::focus_inline_plugin,
         // Plugin executor
         plugin::executor::execute_plugin_entry,
         // Plugin settings

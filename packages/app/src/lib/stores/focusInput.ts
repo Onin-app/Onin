@@ -6,6 +6,19 @@ export function requestInputFocus() {
   focusInputTrigger.update((n) => n + 1);
 }
 
+// 持有当前的 timer 引用以支持随时取消
+let activeFocusTimeout: any = null;
+
+/**
+ * 掐断当前的聚焦重试轮询
+ */
+export function cancelInputFocusRetry() {
+  if (activeFocusTimeout) {
+    clearTimeout(activeFocusTimeout);
+    activeFocusTimeout = null;
+  }
+}
+
 /**
  * 【Windows WebView2 焦点抢夺补偿机制】
  *
@@ -18,19 +31,28 @@ export function requestInputFocus() {
  *
  * 此处使用高频短时间的重定向探测（例如 15次 x 50ms=750ms），以“无论如何也要保证光标死死咬紧窗口”的策略弥补平台底层的时序间隙。
  */
-export function requestInputFocusWithRetry(maxRetries = 15, intervalMs = 50) {
+export function requestInputFocusWithRetry(maxRetries = 3, intervalMs = 150) {
+  // 启动前先清除上一次未完成的轮询，防止多任务重叠
+  cancelInputFocusRetry();
+
   let retries = 0;
 
   const attemptFocus = () => {
-    // 强制触发 Svelte 绑定去执行 searchInputRef.focus()
-    // 不管 document.hasFocus() 是不是 false，先狂点 focus() 再说
-
-    // Attempt DOM Window focus first
-    if (typeof window !== "undefined") {
-      window.focus();
+    // 核心安全防御：如果窗口已被隐藏，立刻静默退出，切勿在无效 HWND 上调用 SetFocus 触发闪退
+    if (typeof document !== "undefined" && document.hidden) {
+      activeFocusTimeout = null;
+      return;
     }
 
-    requestInputFocus();
+    // 尝试直接聚焦 input DOM 元素（绕过 Svelte 异步响应时序）
+    if (typeof document !== "undefined") {
+      const el = document.getElementById(
+        "main-search-input",
+      ) as HTMLInputElement | null;
+      if (el) {
+        el.focus();
+      }
+    }
 
     const activeEl =
       typeof document !== "undefined" ? document.activeElement : null;
@@ -39,17 +61,13 @@ export function requestInputFocusWithRetry(maxRetries = 15, intervalMs = 50) {
       (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA");
 
     // 如果焦点已经进入 Webview 内部的输入框，或者超时，则停止轮询
-    if (
-      (typeof document !== "undefined" &&
-        document.hasFocus() &&
-        isInputFocused) ||
-      retries >= maxRetries
-    ) {
+    if (isInputFocused || retries >= maxRetries) {
+      activeFocusTimeout = null;
       return;
     }
 
     retries++;
-    setTimeout(attemptFocus, intervalMs);
+    activeFocusTimeout = setTimeout(attemptFocus, intervalMs);
   };
 
   attemptFocus();

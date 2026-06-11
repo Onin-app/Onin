@@ -125,6 +125,7 @@
     </div>
   {/if}
   <input
+    id="main-search-input"
     bind:this={inputElement}
     class="{showAllFiles
       ? 'w-full'

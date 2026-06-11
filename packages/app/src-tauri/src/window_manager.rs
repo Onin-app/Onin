@@ -2,7 +2,7 @@ use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::time::Duration;
 use tauri::{App, AppHandle, Emitter, Listener, Manager, State};
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
+use tauri_plugin_global_shortcut::Shortcut;
 use tokio::time::sleep;
 
 // ============================================================================
@@ -161,7 +161,30 @@ fn spawn_smart_hide_task(
 
         // 最终检查并隐藏
         let lock_state: State<WindowCloseLockState> = app_handle.state();
-        let is_focused = window.is_focused().unwrap_or(false);
+        let mut is_focused = window.is_focused().unwrap_or(false);
+
+        if !is_focused {
+            // 在 Windows 上，检查前台 HWND 是否是当前窗口的子窗口
+            #[cfg(target_os = "windows")]
+            {
+                use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetParent};
+
+                if let Ok(hwnd) = window.hwnd() {
+                    let fg_hwnd = unsafe { GetForegroundWindow() };
+                    if fg_hwnd.0 != 0 {
+                        let mut current = fg_hwnd;
+                        while current.0 != 0 {
+                            if current.0 == (hwnd.0 as isize) {
+                                is_focused = true;
+                                break;
+                            }
+                            current = unsafe { GetParent(current) };
+                        }
+                    }
+                }
+            }
+        }
+
         let is_locked = lock_state.0.load(Ordering::Relaxed) > 0;
 
         if !is_focused && !is_locked {
@@ -195,27 +218,11 @@ fn store_hide_task_handle(app_handle: &AppHandle, handle: tauri::async_runtime::
 // ============================================================================
 
 /// 处理窗口获得焦点
-fn handle_window_focused(app_handle: &AppHandle, shortcut: Shortcut) {
+fn handle_window_focused(app_handle: &AppHandle, _shortcut: Shortcut) {
     // 取消隐藏任务
     let app_handle_clone = app_handle.clone();
     tauri::async_runtime::spawn(async move {
         cancel_hide_task(&app_handle_clone).await;
-    });
-
-    // 注册 ESC 快捷键 (Async to avoid deadlock if triggered by shortcut handler)
-    let app_handle_reg = app_handle.clone();
-    tauri::async_runtime::spawn(async move {
-        // Optional: tiny delay to ensure lock release
-        // sleep(Duration::from_millis(10)).await;
-        app_handle_reg
-            .global_shortcut()
-            .register(shortcut)
-            .unwrap_or_else(|err| {
-                // Ignore "already registered" error to reduce noise, or keep logging
-                if !err.to_string().contains("already registered") {
-                    eprintln!("[ERROR] Failed to register Esc shortcut: {}", err);
-                }
-            });
     });
 }
 
@@ -224,19 +231,8 @@ fn handle_window_blur(app_handle: &AppHandle, window: &tauri::WebviewWindow, sho
     let window_state: State<WindowState> = app_handle.state();
     let lock_state: State<WindowCloseLockState> = app_handle.state();
 
-    // 注销 ESC 快捷键 (Async to avoid deadlock)
-    let app_handle_unreg = app_handle.clone();
-    tauri::async_runtime::spawn(async move {
-        app_handle_unreg
-            .global_shortcut()
-            .unregister(shortcut)
-            .unwrap_or_else(|err| {
-                // Ignore "not registered" error
-                if !err.to_string().contains("not registered") {
-                    eprintln!("[ERROR] Failed to unregister Esc shortcut: {}", err);
-                }
-            });
-    });
+    // ESC 快捷键启动时注册一次后永不注销，避免 blur/focus 风暴中并发注册/注销死锁
+    let _ = shortcut;
 
     // 如果窗口被锁定，跳过隐藏
     if lock_state.0.load(Ordering::Relaxed) > 0 {

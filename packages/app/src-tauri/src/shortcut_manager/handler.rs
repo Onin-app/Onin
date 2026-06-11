@@ -16,36 +16,40 @@ pub fn handle_global_shortcut(
         return;
     }
 
-    let shortcut_str = shortcut.to_string();
-    let triggered_shortcut = normalize_shortcut_string(&shortcut_str);
-    let state: State<ShortcutState> = app.state();
+    let app_clone = app.clone();
+    let shortcut_clone = shortcut.clone();
+    let _ = app.run_on_main_thread(move || {
+        let shortcut_str = shortcut_clone.to_string();
+        let triggered_shortcut = normalize_shortcut_string(&shortcut_str);
+        let state: State<ShortcutState> = app_clone.state();
 
-    let shortcuts = match state.shortcuts.lock() {
-        Ok(shortcuts) => shortcuts,
-        Err(e) => {
-            eprintln!("Failed to lock shortcuts state: {}", e);
-            return;
+        let shortcuts = match state.shortcuts.lock() {
+            Ok(shortcuts) => shortcuts,
+            Err(e) => {
+                eprintln!("Failed to lock shortcuts state: {}", e);
+                return;
+            }
+        };
+
+        let matching_shortcut = shortcuts.iter().find(|s| {
+            let stored_shortcut = normalize_shortcut_string(&s.shortcut);
+            stored_shortcut == triggered_shortcut
+        });
+
+        if let Some(app_shortcut) = matching_shortcut {
+            if app_shortcut.command_name != "toggle_window"
+                && should_debounce_shortcut(&state, &triggered_shortcut)
+            {
+                return;
+            }
+            execute_shortcut_action(&app_clone, app_shortcut);
+        } else {
+            if should_debounce_shortcut(&state, &triggered_shortcut) {
+                return;
+            }
+            handle_special_keys(&app_clone, &triggered_shortcut);
         }
-    };
-
-    let matching_shortcut = shortcuts.iter().find(|s| {
-        let stored_shortcut = normalize_shortcut_string(&s.shortcut);
-        stored_shortcut == triggered_shortcut
     });
-
-    if let Some(app_shortcut) = matching_shortcut {
-        if app_shortcut.command_name != "toggle_window"
-            && should_debounce_shortcut(&state, &triggered_shortcut)
-        {
-            return;
-        }
-        execute_shortcut_action(app, app_shortcut);
-    } else {
-        if should_debounce_shortcut(&state, &triggered_shortcut) {
-            return;
-        }
-        handle_special_keys(app, &triggered_shortcut);
-    }
 }
 
 fn should_debounce_shortcut(state: &State<ShortcutState>, triggered_shortcut: &str) -> bool {

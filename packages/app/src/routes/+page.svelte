@@ -34,6 +34,7 @@
   import {
     focusInputTrigger,
     requestInputFocusWithRetry,
+    cancelInputFocusRetry,
   } from "$lib/stores/focusInput";
   import { detachWindowShortcut } from "$lib/stores/shortcuts";
   import { hasNewVersion, latestVersion, appVersion } from "$lib/stores/update";
@@ -156,7 +157,7 @@
 
   // ===== Event Handlers =====
 
-  const handleEsc = () => {
+  const handleEsc = async () => {
     // Only handle ESC on main page
     if (page.route.id !== "/") {
       return;
@@ -164,7 +165,7 @@
 
     if (plugin.state.showPluginInline) {
       invoke("acquire_window_close_lock").catch(console.error);
-      plugin.closePlugin();
+      await plugin.closePlugin();
       requestInputFocusWithRetry();
       setTimeout(() => {
         invoke("release_window_close_lock").catch(console.error);
@@ -176,6 +177,7 @@
     clipboard.clearAttachments();
     matchedCommands = [];
     appListManager.resetToOriginList();
+    cancelInputFocusRetry();
     invoke("close_main_window");
   };
 
@@ -579,7 +581,11 @@
           await updateExtensionManagerPreview(); // 更新 Extension 预览（如计算器）
           if (!plugin.state.showPluginInline) {
             requestInputFocusWithRetry();
+          } else {
+            invoke("focus_inline_plugin").catch(console.error);
           }
+        } else {
+          cancelInputFocusRetry();
         }
 
         // 转发可见性事件给插件

@@ -21,7 +21,7 @@ export interface PluginManagerReturn {
   // State (reactive)
   state: PluginState;
   // Methods
-  closePlugin: () => void;
+  closePlugin: () => Promise<void>;
   detachPlugin: () => Promise<void>;
   setModeSwitchConfirmHandler: (
     handler: ((direction: "inline-to-window") => Promise<boolean>) | null,
@@ -63,7 +63,7 @@ export function usePluginManager(): PluginManagerReturn {
   /**
    * 关闭插件内联显示
    */
-  const closePlugin = () => {
+  const closePlugin = async () => {
     // 内联返回列表时，先通知失焦，再通知隐藏，便于插件做窗口级清理。
     sendLifecycleEvent("blur");
     sendLifecycleEvent("hide");
@@ -79,9 +79,13 @@ export function usePluginManager(): PluginManagerReturn {
     state.currentPluginRunAtStartup = false;
 
     // 未勾选 terminate_on_bg 时，仅隐藏并保活；勾选时才销毁
-    invoke(
-      shouldTerminate ? "close_inline_plugin" : "hide_inline_plugin",
-    ).catch(console.error);
+    try {
+      await invoke(
+        shouldTerminate ? "close_inline_plugin" : "hide_inline_plugin",
+      );
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   /**
@@ -273,7 +277,7 @@ export function usePluginManager(): PluginManagerReturn {
     try {
       const pluginId = state.currentPluginId;
       await invoke("uninstall_plugin", { pluginId });
-      closePlugin();
+      await closePlugin();
       // Should also notify usePluginList to refresh, but it should listen to event
     } catch (error) {
       console.error("Failed to uninstall plugin:", error);
@@ -319,7 +323,11 @@ export function usePluginManager(): PluginManagerReturn {
       (event) => {
         const isVisible = event.payload;
         if (!isVisible && state.showPluginInline) {
-          closePlugin();
+          if (state.currentPluginTerminateOnBg) {
+            closePlugin();
+          } else {
+            sendLifecycleEvent("blur");
+          }
         }
       },
     );
