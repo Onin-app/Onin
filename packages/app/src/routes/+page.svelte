@@ -178,6 +178,16 @@
     matchedCommands = [];
     appListManager.resetToOriginList();
     cancelInputFocusRetry();
+
+    // 隐藏窗口前主动释放焦点，重置 activeElement 状态，防止混淆下次打开时的焦点判定
+    if (typeof document !== "undefined" && document.activeElement) {
+      try {
+        (document.activeElement as HTMLElement).blur();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
     invoke("close_main_window");
   };
 
@@ -574,12 +584,21 @@
       "window_visibility",
       async (event) => {
         if (event.payload) {
+          // 立即启动聚焦重试，不等待任何异步操作。
+          // clipboard / extension 预览等异步操作可能耗时数百毫秒，
+          // 若等到它们完成才聚焦，OS 可能已将焦点分配给其他窗口。
+          if (!plugin.state.showPluginInline) {
+            requestInputFocusWithRetry();
+          }
+
           await clipboard.autoPasteClipboard(
             appListManager.state.appConfig.auto_paste_time_limit,
           );
           updateMatchedCommands();
           await updateExtensionManagerPreview(); // 更新 Extension 预览（如计算器）
           if (!plugin.state.showPluginInline) {
+            await invoke("force_focus").catch(console.error);
+            // force_focus 之后再做一轮聚焦，此时 OS 层面已强抢前台
             requestInputFocusWithRetry();
           } else {
             invoke("focus_inline_plugin").catch(console.error);
@@ -604,6 +623,11 @@
       ({ payload: focused }) => {
         if (plugin.state.showPluginInline) {
           plugin.sendLifecycleEvent(focused ? "focus" : "blur");
+        }
+        // 窗口真正获得系统焦点时（如 Alt+Space 唤起），确保搜索框有 DOM 焦点
+        // 这是比 window_visibility 更可靠的时机，WebView 此时已确定拿到焦点
+        if (focused && !plugin.state.showPluginInline) {
+          requestInputFocusWithRetry();
         }
       },
     );

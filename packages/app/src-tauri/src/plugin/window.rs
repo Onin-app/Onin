@@ -6,9 +6,7 @@
 //! - ESC 快捷键管理
 //! - 窗口切换防抖
 
-use std::str::FromStr;
 use tauri::{Emitter, Manager, State, WebviewWindowBuilder};
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 
 use super::state::{load_plugin_window_states, save_plugin_window_state};
 use super::types::{
@@ -514,7 +512,6 @@ pub async fn create_or_show_plugin_window(
 ///
 /// 包括焦点变化、ESC 快捷键注册/注销、窗口关闭时保存状态
 fn setup_window_events(app: &tauri::AppHandle, window: &tauri::WebviewWindow, plugin_id: String) {
-    let esc_shortcut = Shortcut::from_str("escape").unwrap();
     let app_for_window_event = app.clone();
     let window_label_for_tracking = window.label().to_string();
 
@@ -523,7 +520,7 @@ fn setup_window_events(app: &tauri::AppHandle, window: &tauri::WebviewWindow, pl
         eprintln!("设置插件窗口焦点失败: {}", e);
     }
 
-    // 立即记录活跃窗口并注册 ESC 快捷键
+    // 立即记录活跃窗口（50ms 延迟避免创建时的焦点竞争）
     let app_for_immediate = app.clone();
     let label_for_immediate = window_label_for_tracking.clone();
     tauri::async_runtime::spawn(async move {
@@ -533,11 +530,6 @@ fn setup_window_events(app: &tauri::AppHandle, window: &tauri::WebviewWindow, pl
             if let Ok(mut active) = active_window_state.0.lock() {
                 *active = Some(label_for_immediate.clone());
             }
-        }
-
-        let _ = app_for_immediate.global_shortcut().unregister(esc_shortcut);
-        if let Err(e) = app_for_immediate.global_shortcut().register(esc_shortcut) {
-            eprintln!("[plugin/window] 注册 ESC 快捷键失败: {}", e);
         }
     });
 
@@ -566,17 +558,6 @@ fn setup_window_events(app: &tauri::AppHandle, window: &tauri::WebviewWindow, pl
                 let _ = window_for_event.eval(
                     r#"window.postMessage({ "type": "plugin-lifecycle-event", "event": "focus" }, "*")"#,
                 );
-
-                // 重新注册 ESC 快捷键
-                let _ = app_for_window_event
-                    .global_shortcut()
-                    .unregister(esc_shortcut);
-                if let Err(e) = app_for_window_event
-                    .global_shortcut()
-                    .register(esc_shortcut)
-                {
-                    eprintln!("[plugin/window] 注册 ESC 快捷键失败: {}", e);
-                }
             }
             tauri::WindowEvent::Focused(false) => {
                 // 清除活跃窗口记录
@@ -598,14 +579,6 @@ fn setup_window_events(app: &tauri::AppHandle, window: &tauri::WebviewWindow, pl
                 let _ = window_for_event.eval(
                     r#"window.postMessage({ "type": "plugin-lifecycle-event", "event": "blur" }, "*")"#,
                 );
-
-                // 注销 ESC 快捷键
-                if let Err(e) = app_for_window_event
-                    .global_shortcut()
-                    .unregister(esc_shortcut)
-                {
-                    eprintln!("注销 ESC 快捷键失败: {}", e);
-                }
             }
             tauri::WindowEvent::CloseRequested { .. } => {
                 // 保存窗口状态
@@ -621,10 +594,6 @@ fn setup_window_events(app: &tauri::AppHandle, window: &tauri::WebviewWindow, pl
                         }
                     }
                 }
-
-                let _ = app_for_window_event
-                    .global_shortcut()
-                    .unregister(esc_shortcut);
             }
             _ => {}
         }

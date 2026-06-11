@@ -464,6 +464,6 @@ pub fn simulate_paste(app: AppHandle) -> Result<(), String> {
 
 /// 允许前端在首次启动时强制接管焦点
 #[tauri::command]
-pub fn force_focus(window: tauri::Window) {
-    crate::focus_manager::focus_window(&window);
+pub fn force_focus(window: tauri::WebviewWindow) {
+    crate::focus_manager::focus_webview_window(&window);
 }

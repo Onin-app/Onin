@@ -1,8 +1,6 @@
-use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::time::Duration;
 use tauri::{App, AppHandle, Emitter, Listener, Manager, State};
-use tauri_plugin_global_shortcut::Shortcut;
 use tokio::time::sleep;
 
 // ============================================================================
@@ -41,12 +39,15 @@ pub fn release_window_close_lock(state: State<WindowCloseLockState>) {
     }
 }
 
-/// 关闭窗口快捷键字符串
-pub const CLOSE_WINDOW_SHORTCUT_STR: &str = "escape";
-
 /// 隐藏主窗口命令
 #[tauri::command]
 pub fn close_main_window(app: tauri::AppHandle, state: State<WindowState>) {
+    // Restore focus to the previous foreground window before hiding,
+    // consistent with the toggle shortcut (Alt+Space) behavior.
+    // Without this, Esc-close leaves the foreground in an unpredictable
+    // state, causing the next Alt+Space open to fail to acquire focus.
+    crate::focus_manager::restore_previous_foreground(&app);
+
     // Try get_webview_window first
     if let Some(window) = app.get_webview_window("main") {
         state
@@ -76,6 +77,8 @@ pub fn show_main_window(app: &AppHandle) {
         let _ = window.show();
         let _ = window.unminimize();
         let _ = window.set_focus();
+        // 与 focus_webview_window 一致：通过 eval 确保 WebView2 键盘焦点
+        let _ = window.eval("window.focus()");
         let _ = window.emit("window_visibility", &true);
     }
 }
@@ -218,7 +221,7 @@ fn store_hide_task_handle(app_handle: &AppHandle, handle: tauri::async_runtime::
 // ============================================================================
 
 /// 处理窗口获得焦点
-fn handle_window_focused(app_handle: &AppHandle, _shortcut: Shortcut) {
+fn handle_window_focused(app_handle: &AppHandle) {
     // 取消隐藏任务
     let app_handle_clone = app_handle.clone();
     tauri::async_runtime::spawn(async move {
@@ -227,12 +230,9 @@ fn handle_window_focused(app_handle: &AppHandle, _shortcut: Shortcut) {
 }
 
 /// 处理窗口失去焦点
-fn handle_window_blur(app_handle: &AppHandle, window: &tauri::WebviewWindow, shortcut: Shortcut) {
+fn handle_window_blur(app_handle: &AppHandle, window: &tauri::WebviewWindow) {
     let window_state: State<WindowState> = app_handle.state();
     let lock_state: State<WindowCloseLockState> = app_handle.state();
-
-    // ESC 快捷键启动时注册一次后永不注销，避免 blur/focus 风暴中并发注册/注销死锁
-    let _ = shortcut;
 
     // 如果窗口被锁定，跳过隐藏
     if lock_state.0.load(Ordering::Relaxed) > 0 {
@@ -270,17 +270,14 @@ pub fn setup_window_events(app: &App) -> Result<(), Box<dyn std::error::Error>> 
     // 设置文件拖放事件
     setup_file_drop_listeners(&window, &app_handle);
 
-    // 解析快捷键
-    let close_window_shortcut = Shortcut::from_str(CLOSE_WINDOW_SHORTCUT_STR)?;
-
     // 设置窗口焦点事件
     let window_for_blur = window.clone();
     window.on_window_event(move |event| match event {
         tauri::WindowEvent::Focused(true) => {
-            handle_window_focused(&app_handle, close_window_shortcut);
+            handle_window_focused(&app_handle);
         }
         tauri::WindowEvent::Focused(false) => {
-            handle_window_blur(&app_handle, &window_for_blur, close_window_shortcut);
+            handle_window_blur(&app_handle, &window_for_blur);
         }
         _ => {}
     });

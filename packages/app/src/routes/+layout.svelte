@@ -75,25 +75,25 @@
       });
 
     const listenersPromise = (async () => {
-      // Restore Listener:
-      // Listen to "escape_pressed" (standardized event)
-      // BUT only handle it if we are NOT on the main page.
-      // The main page (+page.svelte) has its own listener.
-      const unlisten = await listen("escape_pressed", () => {
-        // Check if we are on the main page
-        if (page.route.id === "/") {
-          // Do NOTHING. Let +page.svelte handle it.
+      // Esc key: use a window-level capture listener (no global shortcut needed).
+      // This fires for ALL routes. The main page (+page.svelte) also registers
+      // its own capture listener; it calls preventDefault + stopPropagation, so
+      // we check defaultPrevented to avoid double-handling.
+      const handleLayoutEscape = (e: KeyboardEvent) => {
+        if (e.key !== "Escape" || e.defaultPrevented) return;
+        if (page.route.id === "/") return; // main page handles itself
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const handler = get(escapeHandler);
+        if (handler && typeof handler === "function") {
+          handler();
         } else {
-          // If not on main page, check if there is a registered handler
-          const handler = get(escapeHandler);
-          if (handler && typeof handler === "function") {
-            handler();
-          } else {
-            // Fallback
-            window.history.back();
-          }
+          window.history.back();
         }
-      });
+      };
+      window.addEventListener("keydown", handleLayoutEscape, true);
 
       const unlistenVisibility = await listen<boolean>(
         "window_visibility",
@@ -205,7 +205,6 @@
       );
 
       return {
-        unlisten,
         unlistenVisibility,
         unlistenCommand,
         unlistenToast,
@@ -243,17 +242,16 @@
       if (autoUpdateIntervalId) {
         clearInterval(autoUpdateIntervalId);
       }
+      window.removeEventListener("keydown", handleLayoutEscape, true);
       listenersPromise
         .then(
           ({
-            unlisten,
             unlistenVisibility,
             unlistenCommand,
             unlistenToast,
             unlistenPluginInstalled,
             unlistenPluginUninstalled,
           }) => {
-            unlisten();
             unlistenVisibility();
             unlistenCommand();
             unlistenToast();
