@@ -74,26 +74,27 @@
         })();
       });
 
+    // Esc key: use a window-level capture listener (no global shortcut needed).
+    // This fires for ALL routes. The main page (+page.svelte) also registers
+    // its own capture listener; it calls preventDefault + stopPropagation, so
+    // we check defaultPrevented to avoid double-handling.
+    const handleLayoutEscape = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if (page.route.id === "/") return; // main page handles itself
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const handler = get(escapeHandler);
+      if (handler && typeof handler === "function") {
+        handler();
+      } else {
+        window.history.back();
+      }
+    };
+    window.addEventListener("keydown", handleLayoutEscape, true);
+
     const listenersPromise = (async () => {
-      // Esc key: use a window-level capture listener (no global shortcut needed).
-      // This fires for ALL routes. The main page (+page.svelte) also registers
-      // its own capture listener; it calls preventDefault + stopPropagation, so
-      // we check defaultPrevented to avoid double-handling.
-      const handleLayoutEscape = (e: KeyboardEvent) => {
-        if (e.key !== "Escape" || e.defaultPrevented) return;
-        if (page.route.id === "/") return; // main page handles itself
-
-        e.preventDefault();
-        e.stopPropagation();
-
-        const handler = get(escapeHandler);
-        if (handler && typeof handler === "function") {
-          handler();
-        } else {
-          window.history.back();
-        }
-      };
-      window.addEventListener("keydown", handleLayoutEscape, true);
 
       const unlistenVisibility = await listen<boolean>(
         "window_visibility",
