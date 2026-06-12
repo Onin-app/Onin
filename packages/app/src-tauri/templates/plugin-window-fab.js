@@ -213,7 +213,7 @@
     var settings = {
       auto_detach: false,
       terminate_on_bg: false,
-      run_at_startup: false
+      run_at_startup: false,
     };
 
     // 恢复上次拖拽位置（加 clamp 防止旧值超出当前窗口范围）
@@ -260,17 +260,19 @@
     }
 
     // 初始化获取插件详细设置
-    invoke("get_plugin_with_schema", { pluginId: pluginId }).then(function (plugin) {
-      if (plugin) {
-        settings.auto_detach = !!plugin.auto_detach;
-        settings.terminate_on_bg = !!plugin.terminate_on_bg;
-        settings.run_at_startup = !!plugin.run_at_startup;
+    invoke("get_plugin_with_schema", { pluginId: pluginId })
+      .then(function (plugin) {
+        if (plugin) {
+          settings.auto_detach = !!plugin.auto_detach;
+          settings.terminate_on_bg = !!plugin.terminate_on_bg;
+          settings.run_at_startup = !!plugin.run_at_startup;
 
-        updateSwitchUI("auto-detach", settings.auto_detach);
-        updateSwitchUI("terminate-bg", settings.terminate_on_bg);
-        updateSwitchUI("run-startup", settings.run_at_startup);
-      }
-    }).catch(console.error);
+          updateSwitchUI("auto-detach", settings.auto_detach);
+          updateSwitchUI("terminate-bg", settings.terminate_on_bg);
+          updateSwitchUI("run-startup", settings.run_at_startup);
+        }
+      })
+      .catch(console.error);
 
     function updateSwitchUI(id, enabled) {
       var sw = document.getElementById("onin-" + id + "-switch");
@@ -286,14 +288,14 @@
       var commandMap = {
         auto_detach: "toggle_plugin_auto_detach",
         terminate_on_bg: "toggle_plugin_terminate_on_bg",
-        run_at_startup: "toggle_plugin_run_at_startup"
+        run_at_startup: "toggle_plugin_run_at_startup",
       };
 
       // 映射为 Rust 端预期的 camelCase 参数名
       var argMap = {
         auto_detach: "autoDetach",
         terminate_on_bg: "terminateOnBg",
-        run_at_startup: "runAtStartup"
+        run_at_startup: "runAtStartup",
       };
 
       // 乐观更新 UI
@@ -302,13 +304,15 @@
       var args = { pluginId: pluginId };
       args[argMap[key]] = next;
 
-      invoke(commandMap[key], args).then(function () {
-        settings[key] = next;
-      }).catch(function (err) {
-        console.error("[FAB] Toggle failed (" + key + "):", err);
-        // 失败时回滚 UI
-        updateSwitchUI(elementId, settings[key]);
-      });
+      invoke(commandMap[key], args)
+        .then(function () {
+          settings[key] = next;
+        })
+        .catch(function (err) {
+          console.error("[FAB] Toggle failed (" + key + "):", err);
+          // 失败时回滚 UI
+          updateSwitchUI(elementId, settings[key]);
+        });
     }
 
     // ── 辅助：invoke Tauri 命令 ───────────────────────────────────
@@ -331,7 +335,11 @@
     });
 
     document.addEventListener("mousemove", function (e) {
-      if (isReadyToDrag && e.buttons === 1 && Math.abs(e.clientY - startY) > 3) {
+      if (
+        isReadyToDrag &&
+        e.buttons === 1 &&
+        Math.abs(e.clientY - startY) > 3
+      ) {
         isDragging = true;
         if (isMenuOpen) {
           toggleMenu(false);
@@ -360,7 +368,7 @@
 
     // ── FAB 按钮开关菜单 ──────────────────────────────────────────
     function toggleMenu(show) {
-      isMenuOpen = (typeof show === "boolean") ? show : !isMenuOpen;
+      isMenuOpen = typeof show === "boolean" ? show : !isMenuOpen;
       menuEl.classList.toggle("open", isMenuOpen);
       backdropEl.classList.toggle("open", isMenuOpen);
     }
@@ -377,7 +385,11 @@
     });
 
     document.addEventListener("click", function (e) {
-      if (isMenuOpen && !btnContainer.contains(e.target) && !backdropEl.contains(e.target)) {
+      if (
+        isMenuOpen &&
+        !btnContainer.contains(e.target) &&
+        !backdropEl.contains(e.target)
+      ) {
         toggleMenu(false);
       }
     });
@@ -393,7 +405,8 @@
           shouldSwitch = await invoke("plugin_dialog_confirm", {
             options: {
               title: "切换显示方式",
-              message: "切换显示方式会重新打开插件，当前页面状态可能丢失。确定继续吗？",
+              message:
+                "切换显示方式会重新打开插件，当前页面状态可能丢失。确定继续吗？",
               kind: "warning",
             },
           });
@@ -470,49 +483,102 @@
       });
 
     // ── 4. 插件项事件 ──────────────────────────────────────────────
-    document.getElementById("onin-btn-auto-detach").addEventListener("click", function (e) {
-      e.preventDefault(); e.stopPropagation();
-      toggleSetting("auto_detach", "auto-detach");
-    });
+    document
+      .getElementById("onin-btn-auto-detach")
+      .addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleSetting("auto_detach", "auto-detach");
+      });
 
-    document.getElementById("onin-btn-terminate-bg").addEventListener("click", function (e) {
-      e.preventDefault(); e.stopPropagation();
-      toggleSetting("terminate_on_bg", "terminate-bg");
-    });
+    document
+      .getElementById("onin-btn-terminate-bg")
+      .addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleSetting("terminate_on_bg", "terminate-bg");
+      });
 
-    document.getElementById("onin-btn-run-startup").addEventListener("click", function (e) {
-      e.preventDefault(); e.stopPropagation();
-      toggleSetting("run_at_startup", "run-startup");
-    });
+    document
+      .getElementById("onin-btn-run-startup")
+      .addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleSetting("run_at_startup", "run-startup");
+      });
 
-    document.getElementById("onin-btn-reload").addEventListener("click", function (e) {
-      e.preventDefault(); e.stopPropagation();
-      toggleMenu(false);
-      window.location.reload();
-    });
-
-    document.getElementById("onin-btn-restart").addEventListener("click", function (e) {
-      e.preventDefault(); e.stopPropagation();
-      toggleMenu(false);
-      invoke("plugin_restart_window", { pluginId: pluginId }).catch(console.error);
-    });
-
-    document.getElementById("onin-btn-devtools").addEventListener("click", function (e) {
-      e.preventDefault(); e.stopPropagation();
-      toggleMenu(false);
-      invoke("plugin_open_devtools").catch(console.error);
-    });
-
-    document.getElementById("onin-btn-uninstall").addEventListener("click", function (e) {
-      e.preventDefault(); e.stopPropagation();
-      if (confirm("确定要卸载此插件吗？此操作无法撤销。")) {
+    document
+      .getElementById("onin-btn-reload")
+      .addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
         toggleMenu(false);
-        invoke("uninstall_plugin", { pluginId: pluginId }).then(function () {
-          // 卸载后关闭窗口
-          invoke("plugin_close_window", { label: "plugin_" + pluginId.replace(/\./g, "_") });
-        }).catch(console.error);
-      }
-    });
+        window.location.reload();
+      });
 
+    document
+      .getElementById("onin-btn-restart")
+      .addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleMenu(false);
+        invoke("plugin_restart_window", { pluginId: pluginId }).catch(
+          console.error,
+        );
+      });
+
+    document
+      .getElementById("onin-btn-devtools")
+      .addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleMenu(false);
+        invoke("plugin_open_devtools").catch(console.error);
+      });
+
+    document
+      .getElementById("onin-btn-uninstall")
+      .addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (confirm("确定要卸载此插件吗？此操作无法撤销。")) {
+          toggleMenu(false);
+          invoke("uninstall_plugin", { pluginId: pluginId })
+            .then(function () {
+              // 卸载后关闭窗口
+              invoke("plugin_close_window", {
+                label: "plugin_" + pluginId.replace(/\./g, "_"),
+              });
+            })
+            .catch(console.error);
+        }
+      });
+
+    // ── Esc 键：直接最小化插件窗口（capture 阶段，优先于插件内部任何 handler） ──
+    window.addEventListener(
+      "keydown",
+      function (e) {
+        if (e.key !== "Escape") return;
+        // 如果 FAB 菜单是打开的，只关闭菜单，不最小化窗口
+        if (isMenuOpen) {
+          e.preventDefault();
+          e.stopPropagation();
+          toggleMenu(false);
+          return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        var label = "plugin_" + pluginId.replace(/\./g, "_");
+        invoke("plugin_minimize_window", { label: label }).catch(
+          function (err) {
+            console.error(
+              "[onin] Failed to minimize plugin window from Escape:",
+              err,
+            );
+          },
+        );
+      },
+      true,
+    );
   });
 })();

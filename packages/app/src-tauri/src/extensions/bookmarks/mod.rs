@@ -27,7 +27,7 @@ pub static BOOKMARKS_MANIFEST: ExtensionManifest = ExtensionManifest {
         name: "搜索书签",
         description: Some("进入本地浏览器书签搜索"),
         icon: Some("bookmark"),
-        keywords: &["bookmark", "书签"],
+        keywords: &[],
         matches: None, // 仅通过关键词触发，不参与主输入预览匹配
     }],
 };

@@ -11,7 +11,6 @@
     RocketLaunch,
     File,
     Plugs,
-    User,
     PuzzlePiece,
     Sparkle,
     Compass,
@@ -24,7 +23,6 @@
     Application: RocketLaunch,
     FileCommand: File,
     Plugin: Plugs,
-    Custom: User,
     Internal: Compass,
   };
 

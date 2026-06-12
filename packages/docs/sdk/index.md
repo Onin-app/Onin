@@ -27,6 +27,7 @@ import {
   pluginWindow,
   ai,
   toast,
+  ocr,
 } from 'onin-sdk';
 ```
 
@@ -42,11 +43,12 @@ import {
 | [`dialog`](./dialog)             | 系统对话框（文件选择、确认框）  | —              |
 | [`notification`](./notification) | 系统通知                        | `notification` |
 | [`scheduler`](./scheduler)       | 基于 cron 的定时任务            | `scheduler`    |
-| [`lifecycle`](./lifecycle)       | 插件加载/卸载/后台生命周期回调 | —              |
+| [`lifecycle`](./lifecycle)       | 插件加载/卸载/后台生命周期回调  | —              |
 | [`settings`](./settings)         | 插件设置页面配置                | —              |
 | [`pluginWindow`](./window)       | 窗口事件监听（show/hide/focus） | —              |
 | [`ai`](./ai)                     | 调用用户配置的 AI 能力          | —              |
 | [`toast`](./toast)               | 窗口内提示信息（Success/Error） | —              |
+| [`ocr`](./ocr)                   | 文字识别与坐标定位（OCR）       | —              |
 
 ## 典型用法模式
 

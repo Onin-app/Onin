@@ -15,11 +15,12 @@ pub async fn get_initial_file_commands(app: &AppHandle) -> Vec<Command> {
             name: format!("file_{}", item.path),
             title: item.name.clone(),
             description: None,
-            english_name: item.name.clone(),
             keywords: vec![CommandKeyword {
                 name: item.name,
                 disabled: None,
                 is_default: Some(true),
+                // TODO: make this configurable if file command supports keyword type in the future
+                keyword_type: None,
             }],
             icon: item.icon,
             source: ItemSource::FileCommand,
@@ -27,6 +28,7 @@ pub async fn get_initial_file_commands(app: &AppHandle) -> Vec<Command> {
             origin: None,
             matches: None,
             requires_confirmation: false,
+            command_type: crate::shared_types::CommandType::Function,
         })
         .collect()
 }

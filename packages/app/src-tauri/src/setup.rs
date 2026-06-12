@@ -3,9 +3,7 @@
 //! 这个模块封装了 Tauri `setup()` 闭包中的所有初始化逻辑，
 //! 使 `lib.rs` 更加简洁，同时提高代码的可读性和可维护性。
 
-use std::str::FromStr;
 use tauri::{App, Manager};
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 
 use crate::{
     app_config, command_manager, file_command_manager, focus_manager, js_runtime, plugin,
@@ -227,16 +225,8 @@ fn setup_desktop_features(app: &mut App) -> Result<(), Box<dyn std::error::Error
         eprintln!("[ERROR] Failed to set up shortcuts: {}", e);
     }
 
-    // 2. 注册 ESC 快捷键
-    let close_window_shortcut = Shortcut::from_str(window_manager::CLOSE_WINDOW_SHORTCUT_STR)?;
-    if !app
-        .global_shortcut()
-        .is_registered(close_window_shortcut.clone())
-    {
-        if let Err(e) = app.global_shortcut().register(close_window_shortcut) {
-            eprintln!("[ERROR] Failed to register ESC shortcut: {}", e);
-        }
-    }
+    // 2. ESC 快捷键由 window_manager 根据窗口焦点动态注册/注销，此处不再全局注册
+    // （全局注册会导致 Onin 在后台时也劫持 Esc 键，影响其他应用）
 
     // 3. 创建托盘图标
     if let Err(e) = tray_manager::setup_tray(app) {

@@ -14,6 +14,7 @@
     isSelected?: boolean;
     triggerMode?: "matched" | "preview";
     onClick: () => void;
+    onHover?: (e: MouseEvent) => void;
   }
 
   let {
@@ -23,6 +24,7 @@
     isSelected = false,
     triggerMode,
     onClick,
+    onHover,
   }: Props = $props();
 
   const triggerModeValue = $derived(
@@ -45,6 +47,7 @@
     ? 'hover:bg-neutral-200 dark:hover:bg-neutral-700'
     : ''} {isSelected ? 'bg-neutral-300 dark:bg-neutral-600' : ''}"
   onclick={onClick}
+  onmouseenter={onHover}
 >
   <!-- 图标：与 AppListItem 一致的尺寸和样式 -->
   <div class="relative mr-2 h-8 w-8 flex-shrink-0">

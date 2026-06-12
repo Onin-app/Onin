@@ -547,6 +547,8 @@ fn launchable_item_from_file(file: PlatformFile) -> LaunchableItem {
             name: file.name,
             disabled: None,
             is_default: Some(true),
+            // TODO: make this configurable if file search provider supports keyword type in the future
+            keyword_type: None,
         }],
         path: file.path,
         icon: if file.is_dir {
@@ -567,6 +569,7 @@ fn launchable_item_from_file(file: PlatformFile) -> LaunchableItem {
         matches: None,
         modified_time: file.modified_time,
         requires_confirmation: false,
+        command_type: crate::shared_types::CommandType::Function,
     }
 }
 

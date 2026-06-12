@@ -16,36 +16,35 @@ pub fn handle_global_shortcut(
         return;
     }
 
-    let shortcut_str = shortcut.to_string();
-    let triggered_shortcut = normalize_shortcut_string(&shortcut_str);
-    let state: State<ShortcutState> = app.state();
+    let app_clone = app.clone();
+    let shortcut_clone = shortcut.clone();
+    let _ = app.run_on_main_thread(move || {
+        let shortcut_str = shortcut_clone.to_string();
+        let triggered_shortcut = normalize_shortcut_string(&shortcut_str);
+        let state: State<ShortcutState> = app_clone.state();
 
-    let shortcuts = match state.shortcuts.lock() {
-        Ok(shortcuts) => shortcuts,
-        Err(e) => {
-            eprintln!("Failed to lock shortcuts state: {}", e);
-            return;
+        let shortcuts = match state.shortcuts.lock() {
+            Ok(shortcuts) => shortcuts,
+            Err(e) => {
+                eprintln!("Failed to lock shortcuts state: {}", e);
+                return;
+            }
+        };
+
+        let matching_shortcut = shortcuts.iter().find(|s| {
+            let stored_shortcut = normalize_shortcut_string(&s.shortcut);
+            stored_shortcut == triggered_shortcut
+        });
+
+        if let Some(app_shortcut) = matching_shortcut {
+            if app_shortcut.command_name != "toggle_window"
+                && should_debounce_shortcut(&state, &triggered_shortcut)
+            {
+                return;
+            }
+            execute_shortcut_action(&app_clone, app_shortcut);
         }
-    };
-
-    let matching_shortcut = shortcuts.iter().find(|s| {
-        let stored_shortcut = normalize_shortcut_string(&s.shortcut);
-        stored_shortcut == triggered_shortcut
     });
-
-    if let Some(app_shortcut) = matching_shortcut {
-        if app_shortcut.command_name != "toggle_window"
-            && should_debounce_shortcut(&state, &triggered_shortcut)
-        {
-            return;
-        }
-        execute_shortcut_action(app, app_shortcut);
-    } else {
-        if should_debounce_shortcut(&state, &triggered_shortcut) {
-            return;
-        }
-        handle_special_keys(app, &triggered_shortcut);
-    }
 }
 
 fn should_debounce_shortcut(state: &State<ShortcutState>, triggered_shortcut: &str) -> bool {
@@ -129,51 +128,5 @@ fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::
         if let Err(e) = window.emit("execute_command_by_name", &app_shortcut.command_name) {
             eprintln!("Error emitting command (fallback): {}", e);
         }
-    }
-}
-
-pub fn handle_escape_action(app: &AppHandle) {
-    if let Some(active_window_state) = app.try_state::<crate::plugin::ActivePluginWindow>() {
-        if let Ok(active) = active_window_state.0.lock() {
-            if let Some(window_label) = active.as_ref() {
-                if let Some(window) = app.get_webview_window(window_label) {
-                    if let Err(e) = window.minimize() {
-                        eprintln!("Failed to minimize plugin window: {}", e);
-                    }
-                    return;
-                }
-            }
-        }
-    }
-
-    if let Some(window) = app.get_window("translator-host") {
-        match window.is_visible() {
-            Ok(true) => {
-                if let Err(e) = window.close() {
-                    eprintln!("Failed to close translator window: {}", e);
-                }
-                return;
-            }
-            Ok(false) => {}
-            Err(e) => {
-                eprintln!("Failed to check translator window visibility: {}", e);
-            }
-        }
-    }
-
-    if let Some(window) = app.get_webview_window("main") {
-        if let Err(e) = window.emit("escape_pressed", ()) {
-            eprintln!("Error emitting escape_pressed event: {}", e);
-        }
-    } else if let Some(window) = app.get_window("main") {
-        let _ = window.emit("escape_pressed", ());
-    } else {
-        eprintln!("Main window not found when handling ESC");
-    }
-}
-
-fn handle_special_keys(app: &AppHandle, triggered_shortcut: &str) {
-    if triggered_shortcut.to_uppercase() == "ESCAPE" {
-        handle_escape_action(app);
     }
 }

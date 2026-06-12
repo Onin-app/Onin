@@ -12,9 +12,10 @@
     app: LaunchableItem;
     isSelected: boolean;
     onClick: () => void;
+    onHover?: (e: MouseEvent) => void;
   }
 
-  let { app, isSelected, onClick }: Props = $props();
+  let { app, isSelected, onClick, onHover }: Props = $props();
 
   const triggerMode = $derived(
     app.trigger_mode === "matched"
@@ -29,7 +30,10 @@
   // 获取需要显示的别名（排除与名称相同的关键词，最多显示3个）
   const displayAliases = $derived(
     app.keywords
-      .filter((kw) => !kw.disabled && kw.name !== app.name)
+      .filter(
+        (kw) =>
+          !kw.disabled && kw.name.toLowerCase() !== app.name.toLowerCase(),
+      )
       .slice(0, 3)
       .map((kw) => kw.name),
   );
@@ -42,6 +46,7 @@
     ? 'hover:bg-neutral-200 dark:hover:bg-neutral-700'
     : ''} {isSelected ? 'bg-neutral-300 dark:bg-neutral-600' : ''}"
   onclick={onClick}
+  onmouseenter={onHover}
 >
   <div class="relative mr-2 h-8 w-8 flex-shrink-0">
     {#if app.icon}
@@ -147,10 +152,12 @@
               {alias}
             </span>
           {/each}
-          {#if app.keywords.filter((kw) => !kw.disabled && kw.name !== app.name).length > 3}
+          {#if app.keywords.filter((kw) => !kw.disabled && kw.name.toLowerCase() !== app.name.toLowerCase()).length > 3}
             <span class="text-xs text-neutral-400 dark:text-neutral-500">
               +{app.keywords.filter(
-                (kw) => !kw.disabled && kw.name !== app.name,
+                (kw) =>
+                  !kw.disabled &&
+                  kw.name.toLowerCase() !== app.name.toLowerCase(),
               ).length - 3}
             </span>
           {/if}

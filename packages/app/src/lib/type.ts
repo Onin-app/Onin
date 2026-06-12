@@ -1,7 +1,6 @@
 export type ItemType = "App" | "Folder" | "File";
 export type Source =
   | "Application"
-  | "Custom"
   | "Command"
   | "FileCommand"
   | "FileSearch"
@@ -27,6 +26,7 @@ export interface LaunchableItem {
   modified_time?: number;
   requires_confirmation?: boolean;
   trigger_mode?: "matched" | "preview";
+  type: "Function" | "Match";
 }
 
 export interface ColorConversion {
@@ -43,6 +43,7 @@ export interface CommandKeyword {
   name: string;
   disabled?: boolean;
   is_default?: boolean;
+  type?: string;
 }
 
 /**
@@ -80,14 +81,14 @@ export interface Command {
   name: string;
   title: string;
   description?: string;
-  english_name: string;
   keywords: CommandKeyword[];
   icon: string;
   source: Source;
   action: CommandAction;
-  path?: string;
   origin?: AppOrigin;
   matches?: CommandMatch[];
+  requires_confirmation?: boolean;
+  type: "Function" | "Match";
 }
 
 export enum Theme {

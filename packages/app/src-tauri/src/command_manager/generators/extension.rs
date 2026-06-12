@@ -26,6 +26,8 @@ pub fn get_initial_extension_commands(app: &AppHandle) -> Vec<Command> {
                         name: kw.to_string(),
                         disabled: None,
                         is_default: Some(true),
+                        // TODO: make this configurable if extension command supports keyword type in the future
+                        keyword_type: None,
                     })
                     .collect();
 
@@ -49,7 +51,6 @@ pub fn get_initial_extension_commands(app: &AppHandle) -> Vec<Command> {
                     name: format!("extension:{}:{}", manifest.id, cmd.code),
                     title: cmd.name.to_string(),
                     description: Some(cmd.description.unwrap_or(manifest.description).to_string()),
-                    english_name: manifest.id.to_string(),
                     keywords,
                     icon: cmd.icon.unwrap_or(manifest.icon).to_string(),
                     source: ItemSource::Extension,
@@ -58,8 +59,13 @@ pub fn get_initial_extension_commands(app: &AppHandle) -> Vec<Command> {
                         command_code: cmd.code.to_string(),
                     },
                     origin: None,
-                    matches,
+                    matches: matches.clone(),
                     requires_confirmation: false,
+                    command_type: if matches.is_some() {
+                        crate::shared_types::CommandType::Match
+                    } else {
+                        crate::shared_types::CommandType::Function
+                    },
                 }
             })
         })

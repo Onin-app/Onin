@@ -65,6 +65,7 @@ export default defineConfig({
             { text: 'pluginWindow', link: '/sdk/window' },
             { text: 'ai', link: '/sdk/ai' },
             { text: 'toast', link: '/sdk/toast' },
+            { text: 'ocr', link: '/sdk/ocr' },
           ],
         },
       ],

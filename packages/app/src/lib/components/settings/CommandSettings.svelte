@@ -28,7 +28,6 @@
     Application: "程序启动",
     FileCommand: "文件启动",
     Plugin: "已安装插件",
-    Custom: "自定义",
     Internal: "页面导航",
   };
 
@@ -203,9 +202,11 @@
       : [],
   );
 
-  // 判断命令是否为匹配指令（有 matches 配置）
   function isMatchCommand(cmd: Command): boolean {
-    return cmd.matches != null && cmd.matches.length > 0;
+    if (cmd.type !== undefined) {
+      return cmd.type === "Match";
+    }
+    return (cmd.matches?.length ?? 0) > 0;
   }
 
   // 功能指令列表（没有 matches 配置的插件指令）
@@ -223,8 +224,10 @@
     filteredCommands.filter((cmd) => isMatchCommand(cmd)),
   );
 
-  // 当前分类下的所有命令（功能指令标签页展示全部，匹配指令标签页只展示有 matches 的）
-  let categoryFunctionCommands = $derived(filteredCommands);
+  // 当前分类下的所有命令（功能指令标签页排除有 matches 的，匹配指令标签页只展示有 matches 的）
+  let categoryFunctionCommands = $derived(
+    filteredCommands.filter((cmd) => !isMatchCommand(cmd)),
+  );
 </script>
 
 <main class="flex h-full w-full gap-6">

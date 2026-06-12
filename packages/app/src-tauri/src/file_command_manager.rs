@@ -186,6 +186,8 @@ impl FileCommandManager {
                 name,
                 disabled: None,
                 is_default: Some(true),
+                // TODO: make this configurable if file command manager supports keyword type in the future
+                keyword_type: None,
             }],
             path: path_str,
             icon,
@@ -198,6 +200,7 @@ impl FileCommandManager {
             matches: None,
             modified_time: None,
             requires_confirmation: false,
+            command_type: crate::shared_types::CommandType::Function,
         })
     }
     fn delete_commands_json(&self) {

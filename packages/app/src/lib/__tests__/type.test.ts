@@ -52,6 +52,7 @@ describe("LaunchableItem", () => {
       item_type: "App",
       source: "Application",
       keywords: [],
+      type: "Function",
     };
     expect(item.name).toBe("test");
     expect(item.item_type).toBe("App");
@@ -74,6 +75,7 @@ describe("LaunchableItem", () => {
       modified_time: 123456,
       requires_confirmation: true,
       trigger_mode: "preview",
+      type: "Function",
     };
     expect(item.keywords[0].name).toBe("kw");
     expect(item.requires_confirmation).toBe(true);
@@ -149,18 +151,19 @@ describe("Command", () => {
     const cmd: Command = {
       name: "lock-screen",
       title: "Lock Screen",
-      english_name: "lock",
       keywords: [{ name: "lock" }],
       icon: "lock.png",
       source: "Application",
       action: { System: "lock" },
       description: "Locks the desktop",
-      path: "/usr/bin/lock",
       origin: "Shortcut",
       matches: [{ type: "text", name: "text", description: "text" }],
+      requires_confirmation: true,
+      type: "Match",
     };
     expect(cmd.name).toBe("lock-screen");
     expect(cmd.action).toHaveProperty("System");
+    expect(cmd.requires_confirmation).toBe(true);
   });
 });
 
@@ -219,7 +222,6 @@ describe("Union Types", () => {
   it("validates Source", () => {
     const sources: Source[] = [
       "Application",
-      "Custom",
       "Command",
       "FileCommand",
       "FileSearch",

@@ -11,7 +11,6 @@ pub fn get_initial_system_commands() -> Vec<Command> {
             name: cmd_info.name.to_string(),
             title: cmd_info.title.to_string(),
             description: Some(cmd_info.description.to_string()),
-            english_name: cmd_info.english_name.to_string(),
             keywords: build_system_keywords(cmd_info),
             icon: cmd_info.icon.to_string(),
             source: ItemSource::Command,
@@ -19,37 +18,24 @@ pub fn get_initial_system_commands() -> Vec<Command> {
             origin: None,
             matches: None,
             requires_confirmation: cmd_info.requires_confirmation,
+            command_type: crate::shared_types::CommandType::Function,
         })
         .collect()
 }
 
 /// 构建系统命令关键词
 fn build_system_keywords(cmd_info: &system_commands::SystemCommandInfo) -> Vec<CommandKeyword> {
-    let mut kws: Vec<_> = cmd_info
+    let kws: Vec<_> = cmd_info
         .keywords
         .iter()
         .map(|&alias| CommandKeyword {
             name: alias.to_string(),
             disabled: None,
             is_default: Some(true),
+            // TODO: make this configurable if system command supports keyword type in the future
+            keyword_type: None,
         })
         .collect();
-
-    // 确保 title 和 english_name 也在关键词列表中
-    if !kws.iter().any(|kw| kw.name == cmd_info.title) {
-        kws.push(CommandKeyword {
-            name: cmd_info.title.to_string(),
-            disabled: None,
-            is_default: Some(true),
-        });
-    }
-    if !kws.iter().any(|kw| kw.name == cmd_info.english_name) {
-        kws.push(CommandKeyword {
-            name: cmd_info.english_name.to_string(),
-            disabled: None,
-            is_default: Some(true),
-        });
-    }
 
     kws
 }

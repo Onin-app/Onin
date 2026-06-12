@@ -28,9 +28,7 @@ pub static CALCULATOR_MANIFEST: ExtensionManifest = ExtensionManifest {
         name: "计算器",
         description: Some("数学、单位、日期与货币计算"),
         icon: Some("calculator"),
-        keywords: &[
-            "calc", "计算", "=", "convert", "转换", "date", "日期", "currency", "货币",
-        ],
+        keywords: &[],
         // Calculator 使用 custom_matches() 进行复杂语义分析，
         // 此处不需要声明式匹配规则
         matches: None,

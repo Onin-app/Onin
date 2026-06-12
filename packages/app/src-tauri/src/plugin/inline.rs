@@ -178,6 +178,9 @@ pub fn hide_inline_plugin<R: Runtime>(
             })
             .ok();
     }
+
+    window.set_focus().map_err(|e| e.to_string())?;
+
     Ok(())
 }
 #[tauri::command]
@@ -282,6 +285,15 @@ pub async fn restart_inline_plugin<R: Runtime>(
 
         // 3. 重新打开
         show_inline_plugin(app, state, store, url, id, rect).await?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn focus_inline_plugin<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+    let window = resolve_host_window(&app)?;
+    if let Some(webview) = window.get_webview("plugin-inline") {
+        webview.set_focus().map_err(|e| e.to_string())?;
     }
     Ok(())
 }

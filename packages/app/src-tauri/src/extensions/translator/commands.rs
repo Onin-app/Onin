@@ -1,9 +1,7 @@
 use serde::Deserialize;
-use std::str::FromStr;
 use tauri::{webview::WebviewBuilder, Listener, Manager, WebviewUrl, WindowBuilder};
 use tauri::{LogicalPosition, LogicalSize, PhysicalPosition, PhysicalSize, Rect};
 use tauri_plugin_clipboard_manager::ClipboardExt;
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 
 const TRANSLATOR_TOP_BAR_HEIGHT: f64 = 36.0;
 #[cfg(target_os = "macos")]
@@ -201,35 +199,8 @@ pub async fn open_window(app: &tauri::AppHandle, text: Option<String>) -> Result
         .build()
         .map_err(|e| e.to_string())?;
 
-    let esc_shortcut = Shortcut::from_str(crate::window_manager::CLOSE_WINDOW_SHORTCUT_STR)
-        .map_err(|e| format!("Failed to parse translator ESC shortcut: {}", e))?;
-
-    let app_for_window_event = app.clone();
-    let esc_shortcut_for_event = esc_shortcut.clone();
     let window_for_layout = window.clone();
     window.on_window_event(move |event| match event {
-        tauri::WindowEvent::Focused(true) => {
-            let _ = app_for_window_event
-                .global_shortcut()
-                .unregister(esc_shortcut_for_event.clone());
-            if let Err(e) = app_for_window_event
-                .global_shortcut()
-                .register(esc_shortcut_for_event.clone())
-            {
-                eprintln!("[translator] Failed to register ESC shortcut: {}", e);
-            }
-        }
-        tauri::WindowEvent::Focused(false) | tauri::WindowEvent::CloseRequested { .. } => {
-            if let Err(e) = app_for_window_event
-                .global_shortcut()
-                .unregister(esc_shortcut_for_event.clone())
-            {
-                let msg = e.to_string();
-                if !msg.contains("not registered") {
-                    eprintln!("[translator] Failed to unregister ESC shortcut: {}", msg);
-                }
-            }
-        }
         tauri::WindowEvent::Resized(..) => {
             if let Err(e) = layout_translator_webviews(&window_for_layout) {
                 eprintln!("[translator] Failed to update webview layout: {}", e);
@@ -237,14 +208,6 @@ pub async fn open_window(app: &tauri::AppHandle, text: Option<String>) -> Result
         }
         _ => {}
     });
-
-    let _ = app.global_shortcut().unregister(esc_shortcut.clone());
-    if let Err(e) = app.global_shortcut().register(esc_shortcut) {
-        eprintln!(
-            "[translator] Failed to register ESC shortcut immediately: {}",
-            e
-        );
-    }
 
     // 2. Create UI Webview (Top 50px)
     // This loads the dedicated translator shell route.

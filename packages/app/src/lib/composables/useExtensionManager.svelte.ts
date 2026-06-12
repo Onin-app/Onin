@@ -62,12 +62,13 @@ function previewToLaunchableItem(preview: ExtensionPreview): LaunchableItem & {
     icon: preview.icon,
     icon_type: "Iconfont",
     item_type: "App",
-    source: "Command",
+    source: "Extension",
     action: `extension:${preview.extension_id}:${preview.command_code}`,
     source_display: "Extension",
     view_type: preview.view_type,
     grid_data: preview.grid_data,
     trigger_mode: "preview",
+    type: "Function",
   };
 }
 

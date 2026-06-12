@@ -12,7 +12,6 @@ pub struct SystemCommandInfo {
     pub name: &'static str,
     pub title: &'static str,
     pub description: &'static str,
-    pub english_name: &'static str,
     pub keywords: &'static [&'static str],
     pub icon: &'static str,
     pub action: fn(AppHandle),
@@ -25,8 +24,7 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
         name: "shutdown",
         title: "关机",
         description: "关闭计算机",
-        english_name: "Shutdown",
-        keywords: &["shutdown", "关机"],
+        keywords: &[],
         icon: "shutdown",
         action: |_| shutdown(),
         requires_confirmation: true,
@@ -35,8 +33,7 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
         name: "reboot",
         title: "重启",
         description: "重新启动计算机",
-        english_name: "Restart",
-        keywords: &["restart", "reboot", "重启"],
+        keywords: &[],
         icon: "restart",
         action: |_| reboot(),
         requires_confirmation: true,
@@ -45,8 +42,7 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
         name: "sleep",
         title: "睡眠",
         description: "使计算机进入睡眠模式",
-        english_name: "Sleep",
-        keywords: &["sleep", "睡眠"],
+        keywords: &[],
         icon: "sleep",
         action: |_| sleep(),
         requires_confirmation: false,
@@ -55,8 +51,7 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
         name: "lock_screen",
         title: "锁屏",
         description: "锁定计算机屏幕",
-        english_name: "Lock Screen",
-        keywords: &["lock", "锁屏"],
+        keywords: &[],
         icon: "lock",
         action: |_| lock_screen(),
         requires_confirmation: false,
@@ -65,8 +60,7 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
         name: "logout",
         title: "注销",
         description: "注销当前用户",
-        english_name: "Logout",
-        keywords: &["logout", "注销"],
+        keywords: &[],
         icon: "logout",
         action: |_| logout(),
         requires_confirmation: true,
@@ -75,8 +69,7 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
         name: "open_app_data_dir",
         title: "打开应用数据目录",
         description: "打开应用程序的数据存储目录",
-        english_name: "Open App Data Directory",
-        keywords: &["数据目录"],
+        keywords: &[],
         icon: "folder",
         action: open_app_data_dir,
         requires_confirmation: false,
@@ -85,8 +78,7 @@ pub static SYSTEM_COMMANDS: &[SystemCommandInfo] = &[
         name: "refresh_list",
         title: "刷新列表",
         description: "刷新应用和命令列表",
-        english_name: "Refresh List",
-        keywords: &["refresh", "刷新"],
+        keywords: &[],
         icon: "arrowsClockwise",
         action: refresh_list,
         requires_confirmation: false,
@@ -192,11 +184,22 @@ pub async fn execute_command(
                 extension_id,
                 command_code,
             } => {
+                // 从 args 中提取文本内容
+                // 优先取 text（粘贴/附件文本），其次取 input（搜索框文本）
+                let input_text = args
+                    .as_ref()
+                    .and_then(|a| {
+                        a.get("text")
+                            .or_else(|| a.get("input"))
+                            .and_then(|v| v.as_str())
+                    })
+                    .unwrap_or("");
+
                 let result = crate::extension::execute_extension_command(
                     &app,
                     extension_id,
                     command_code,
-                    "",
+                    input_text,
                 );
                 if let Some(error) = result.error {
                     let err = format!("Extension command failed: {}", error);
@@ -461,6 +464,6 @@ pub fn simulate_paste(app: AppHandle) -> Result<(), String> {
 
 /// 允许前端在首次启动时强制接管焦点
 #[tauri::command]
-pub fn force_focus(window: tauri::Window) {
-    crate::focus_manager::focus_window(&window);
+pub fn force_focus(window: tauri::WebviewWindow) {
+    crate::focus_manager::focus_webview_window(&window);
 }

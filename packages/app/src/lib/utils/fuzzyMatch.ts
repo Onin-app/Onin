@@ -52,12 +52,48 @@ const calculateMatchScore = (query: string, item: LaunchableItem): number => {
   // 检查关键词
   for (const keyword of item.keywords || []) {
     const lowerKeyword = keyword.name.toLowerCase();
-    if (lowerKeyword === lowerQuery) {
-      maxScore = Math.max(maxScore, 100); // 关键词精确匹配
-    } else if (lowerKeyword.startsWith(lowerQuery)) {
-      maxScore = Math.max(maxScore, 70); // 关键词前缀匹配
-    } else if (lowerKeyword.includes(lowerQuery)) {
-      maxScore = Math.max(maxScore, 50); // 关键词包含匹配
+    const type = keyword.type;
+
+    if (type === "exact") {
+      if (lowerKeyword === lowerQuery) {
+        maxScore = Math.max(maxScore, 100); // 关键词精确匹配
+      }
+    } else if (type === "prefix") {
+      if (lowerKeyword === lowerQuery) {
+        maxScore = Math.max(maxScore, 100);
+      } else if (lowerKeyword.startsWith(lowerQuery)) {
+        maxScore = Math.max(maxScore, 70); // 关键词前缀匹配
+      }
+    } else if (type === "fuzzy") {
+      if (lowerKeyword === lowerQuery) {
+        maxScore = Math.max(maxScore, 100);
+      } else if (lowerKeyword.startsWith(lowerQuery)) {
+        maxScore = Math.max(maxScore, 70);
+      } else {
+        // 拼音与首字母匹配，仅对含非 ASCII 字符的关键词有效，跳过子串 includes 匹配，防范诸如 "search" 被 "ear" 意外匹配的情况
+        if (/[^\x00-\xff]/.test(keyword.name)) {
+          const { result, initials } = getPinyinData(keyword.name);
+          const keywordInitials = lowerKeyword
+            .split(/\s+/)
+            .map((word) => word.charAt(0))
+            .join("");
+          if (
+            result.includes(lowerQuery) ||
+            initials.includes(lowerQuery) ||
+            keywordInitials.includes(lowerQuery)
+          ) {
+            maxScore = Math.max(maxScore, 50);
+          }
+        }
+      }
+    } else {
+      if (lowerKeyword === lowerQuery) {
+        maxScore = Math.max(maxScore, 100); // 关键词精确匹配
+      } else if (lowerKeyword.startsWith(lowerQuery)) {
+        maxScore = Math.max(maxScore, 70); // 关键词前缀匹配
+      } else if (lowerKeyword.includes(lowerQuery)) {
+        maxScore = Math.max(maxScore, 50); // 关键词包含匹配
+      }
     }
   }
 

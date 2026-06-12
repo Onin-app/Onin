@@ -19,13 +19,14 @@ pub async fn get_initial_app_commands() -> Vec<Command> {
                         name: format!("app_{}", app_info.name),
                         title: app_info.name.clone(),
                         description: None,
-                        english_name: app_info.name.clone(),
                         keywords: final_keywords
                             .into_iter()
                             .map(|kw| CommandKeyword {
                                 name: kw,
                                 disabled: None,
                                 is_default: Some(true),
+                                // TODO: make this configurable if app command supports keyword type in the future
+                                keyword_type: None,
                             })
                             .collect(),
                         icon: app_info.icon.unwrap_or_default(),
@@ -34,6 +35,7 @@ pub async fn get_initial_app_commands() -> Vec<Command> {
                         origin: app_info.origin,
                         matches: None,
                         requires_confirmation: false,
+                        command_type: crate::shared_types::CommandType::Function,
                     }
                 })
             })

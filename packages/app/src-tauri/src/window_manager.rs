@@ -1,8 +1,6 @@
-use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::time::Duration;
 use tauri::{App, AppHandle, Emitter, Listener, Manager, State};
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 use tokio::time::sleep;
 
 // ============================================================================
@@ -41,12 +39,15 @@ pub fn release_window_close_lock(state: State<WindowCloseLockState>) {
     }
 }
 
-/// 关闭窗口快捷键字符串
-pub const CLOSE_WINDOW_SHORTCUT_STR: &str = "escape";
-
 /// 隐藏主窗口命令
 #[tauri::command]
 pub fn close_main_window(app: tauri::AppHandle, state: State<WindowState>) {
+    // Restore focus to the previous foreground window before hiding,
+    // consistent with the toggle shortcut (Alt+Space) behavior.
+    // Without this, Esc-close leaves the foreground in an unpredictable
+    // state, causing the next Alt+Space open to fail to acquire focus.
+    crate::focus_manager::restore_previous_foreground(&app);
+
     // Try get_webview_window first
     if let Some(window) = app.get_webview_window("main") {
         state
@@ -76,6 +77,8 @@ pub fn show_main_window(app: &AppHandle) {
         let _ = window.show();
         let _ = window.unminimize();
         let _ = window.set_focus();
+        // 与 focus_webview_window 一致：通过 eval 确保 WebView2 键盘焦点
+        let _ = window.eval("window.focus()");
         let _ = window.emit("window_visibility", &true);
     }
 }
@@ -161,7 +164,30 @@ fn spawn_smart_hide_task(
 
         // 最终检查并隐藏
         let lock_state: State<WindowCloseLockState> = app_handle.state();
-        let is_focused = window.is_focused().unwrap_or(false);
+        let mut is_focused = window.is_focused().unwrap_or(false);
+
+        if !is_focused {
+            // 在 Windows 上，检查前台 HWND 是否是当前窗口的子窗口
+            #[cfg(target_os = "windows")]
+            {
+                use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetParent};
+
+                if let Ok(hwnd) = window.hwnd() {
+                    let fg_hwnd = unsafe { GetForegroundWindow() };
+                    if fg_hwnd.0 != 0 {
+                        let mut current = fg_hwnd;
+                        while current.0 != 0 {
+                            if current.0 == (hwnd.0 as isize) {
+                                is_focused = true;
+                                break;
+                            }
+                            current = unsafe { GetParent(current) };
+                        }
+                    }
+                }
+            }
+        }
+
         let is_locked = lock_state.0.load(Ordering::Relaxed) > 0;
 
         if !is_focused && !is_locked {
@@ -195,48 +221,18 @@ fn store_hide_task_handle(app_handle: &AppHandle, handle: tauri::async_runtime::
 // ============================================================================
 
 /// 处理窗口获得焦点
-fn handle_window_focused(app_handle: &AppHandle, shortcut: Shortcut) {
+fn handle_window_focused(app_handle: &AppHandle) {
     // 取消隐藏任务
     let app_handle_clone = app_handle.clone();
     tauri::async_runtime::spawn(async move {
         cancel_hide_task(&app_handle_clone).await;
     });
-
-    // 注册 ESC 快捷键 (Async to avoid deadlock if triggered by shortcut handler)
-    let app_handle_reg = app_handle.clone();
-    tauri::async_runtime::spawn(async move {
-        // Optional: tiny delay to ensure lock release
-        // sleep(Duration::from_millis(10)).await;
-        app_handle_reg
-            .global_shortcut()
-            .register(shortcut)
-            .unwrap_or_else(|err| {
-                // Ignore "already registered" error to reduce noise, or keep logging
-                if !err.to_string().contains("already registered") {
-                    eprintln!("[ERROR] Failed to register Esc shortcut: {}", err);
-                }
-            });
-    });
 }
 
 /// 处理窗口失去焦点
-fn handle_window_blur(app_handle: &AppHandle, window: &tauri::WebviewWindow, shortcut: Shortcut) {
+fn handle_window_blur(app_handle: &AppHandle, window: &tauri::WebviewWindow) {
     let window_state: State<WindowState> = app_handle.state();
     let lock_state: State<WindowCloseLockState> = app_handle.state();
-
-    // 注销 ESC 快捷键 (Async to avoid deadlock)
-    let app_handle_unreg = app_handle.clone();
-    tauri::async_runtime::spawn(async move {
-        app_handle_unreg
-            .global_shortcut()
-            .unregister(shortcut)
-            .unwrap_or_else(|err| {
-                // Ignore "not registered" error
-                if !err.to_string().contains("not registered") {
-                    eprintln!("[ERROR] Failed to unregister Esc shortcut: {}", err);
-                }
-            });
-    });
 
     // 如果窗口被锁定，跳过隐藏
     if lock_state.0.load(Ordering::Relaxed) > 0 {
@@ -274,17 +270,14 @@ pub fn setup_window_events(app: &App) -> Result<(), Box<dyn std::error::Error>> 
     // 设置文件拖放事件
     setup_file_drop_listeners(&window, &app_handle);
 
-    // 解析快捷键
-    let close_window_shortcut = Shortcut::from_str(CLOSE_WINDOW_SHORTCUT_STR)?;
-
     // 设置窗口焦点事件
     let window_for_blur = window.clone();
     window.on_window_event(move |event| match event {
         tauri::WindowEvent::Focused(true) => {
-            handle_window_focused(&app_handle, close_window_shortcut);
+            handle_window_focused(&app_handle);
         }
         tauri::WindowEvent::Focused(false) => {
-            handle_window_blur(&app_handle, &window_for_blur, close_window_shortcut);
+            handle_window_blur(&app_handle, &window_for_blur);
         }
         _ => {}
     });

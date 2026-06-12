@@ -1,4 +1,3 @@
-use std::str::FromStr;
 use tauri::Manager;
 use tauri_plugin_global_shortcut::{Shortcut, ShortcutState};
 
@@ -41,7 +40,6 @@ mod macos_dialog;
 
 /// 创建全局快捷键处理器
 fn create_shortcut_handler(
-    close_window_shortcut: Shortcut,
 ) -> impl Fn(&tauri::AppHandle, &Shortcut, tauri_plugin_global_shortcut::ShortcutEvent)
        + Send
        + Sync
@@ -49,11 +47,6 @@ fn create_shortcut_handler(
     move |app, shortcut, event| {
         // macOS 特殊处理：只处理按下事件，避免崩溃
         if event.state() != ShortcutState::Pressed {
-            return;
-        }
-
-        if shortcut == &close_window_shortcut {
-            shortcut_manager::handle_escape_action(app);
             return;
         }
 
@@ -92,10 +85,6 @@ pub fn run() {
         .with(sentry_tracing::layer())
         .init();
 
-    // 解析关闭窗口快捷键
-    let close_window_shortcut =
-        Shortcut::from_str(window_manager::CLOSE_WINDOW_SHORTCUT_STR).unwrap();
-
     let client = reqwest::Client::new();
     let cancel_token = std::sync::Arc::new(tokio::sync::Mutex::new(
         None::<tokio::sync::oneshot::Sender<()>>,
@@ -124,7 +113,7 @@ pub fn run() {
         )
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(create_shortcut_handler(close_window_shortcut))
+                .with_handler(create_shortcut_handler())
                 .build(),
         )
         .plugin(tauri_plugin_opener::init())

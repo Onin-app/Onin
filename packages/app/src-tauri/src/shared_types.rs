@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum ItemSource {
     Application, // System-installed applications
-    Custom,      // User-defined items (files, folders, URLs, etc.)
     Command,     // System commands
     FileCommand, // User-defined file commands
     FileSearch,  // Indexed local file search results
@@ -14,8 +13,20 @@ pub enum ItemSource {
 
 impl Default for ItemSource {
     fn default() -> Self {
-        // 对于用户手动添加的项目，默认为 Custom
+        // 对于用户手动添加的项目，默认为 FileCommand
         ItemSource::FileCommand
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub enum CommandType {
+    Function,
+    Match,
+}
+
+impl Default for CommandType {
+    fn default() -> Self {
+        CommandType::Function
     }
 }
 
@@ -80,6 +91,8 @@ pub struct LaunchableItem {
     /// 是否需要二次确认(用于敏感操作如关机、重启等)
     #[serde(default)]
     pub requires_confirmation: bool,
+    #[serde(rename = "type", default)]
+    pub command_type: CommandType,
 }
 
 /// 命令匹配配置
@@ -111,6 +124,8 @@ pub struct CommandKeyword {
     pub disabled: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub is_default: Option<bool>,
+    #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
+    pub keyword_type: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -139,7 +154,6 @@ pub struct Command {
     /// 描述信息，用于前端显示
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    pub english_name: String,
     pub keywords: Vec<CommandKeyword>,
     pub icon: String,
     pub source: ItemSource,
@@ -151,6 +165,8 @@ pub struct Command {
     /// 是否需要二次确认(用于敏感操作如关机、重启等)
     #[serde(default)]
     pub requires_confirmation: bool,
+    #[serde(rename = "type", default)]
+    pub command_type: CommandType,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -241,7 +257,6 @@ mod tests {
     fn test_item_source_roundtrip() {
         let cases = vec![
             ItemSource::Application,
-            ItemSource::Custom,
             ItemSource::Command,
             ItemSource::FileCommand,
             ItemSource::FileSearch,
@@ -306,11 +321,13 @@ mod tests {
             name: "hello".into(),
             disabled: None,
             is_default: None,
+            keyword_type: None,
         };
         let b = CommandKeyword {
             name: "hello".into(),
             disabled: None,
             is_default: None,
+            keyword_type: None,
         };
         assert_eq!(a, b);
     }
@@ -321,11 +338,13 @@ mod tests {
             name: "hello".into(),
             disabled: None,
             is_default: None,
+            keyword_type: None,
         };
         let b = CommandKeyword {
             name: "world".into(),
             disabled: None,
             is_default: None,
+            keyword_type: None,
         };
         assert_ne!(a, b);
     }

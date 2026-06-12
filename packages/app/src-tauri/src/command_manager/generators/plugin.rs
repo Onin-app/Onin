@@ -103,11 +103,11 @@ pub fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
                     name: format!("plugin_{}", safe_plugin_id),
                     title: plugin.manifest.name.clone(),
                     description: Some(plugin.manifest.description.clone()),
-                    english_name: plugin.manifest.name.clone(),
                     keywords: vec![CommandKeyword {
                         name: plugin.manifest.name.clone(),
                         disabled: None,
                         is_default: Some(true),
+                        keyword_type: None,
                     }],
                     icon: icon_base64.clone(),
                     source: ItemSource::Plugin,
@@ -117,6 +117,7 @@ pub fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
                     origin: None,
                     matches: None,
                     requires_confirmation: false,
+                    command_type: crate::shared_types::CommandType::Function,
                 });
 
                 // 2. 为每个插件的功能指令创建 Command
@@ -129,6 +130,7 @@ pub fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
                             name: kw.name.clone(),
                             disabled: None,
                             is_default: Some(true),
+                            keyword_type: Some(kw.keyword_type.clone()),
                         })
                         .collect();
 
@@ -156,7 +158,6 @@ pub fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
                         name: format!("plugin_cmd_{}_{}", safe_plugin_id, safe_cmd_code),
                         title: cmd.name.clone(),
                         description: Some(cmd.description.clone()),
-                        english_name: cmd.name.clone(),
                         keywords,
                         icon: icon_base64.clone(),
                         source: ItemSource::Plugin,
@@ -165,8 +166,13 @@ pub fn get_initial_plugin_commands(app: &AppHandle) -> Vec<Command> {
                             command_code: cmd.code.clone(),
                         },
                         origin: None,
-                        matches,
+                        matches: matches.clone(),
                         requires_confirmation: false,
+                        command_type: if matches.is_some() {
+                            crate::shared_types::CommandType::Match
+                        } else {
+                            crate::shared_types::CommandType::Function
+                        },
                     });
                 }
             }
@@ -232,7 +238,6 @@ pub fn get_initial_dynamic_commands(app: &AppHandle) -> Vec<Command> {
                 name: format!("dynamic_{}_{}", safe_plugin_id, safe_code),
                 title: dc.name.clone(),
                 description: dc.description,
-                english_name: dc.name,
                 keywords: dc.keywords,
                 icon: "icon-plugin".to_string(),
                 source: ItemSource::Plugin,
@@ -241,8 +246,13 @@ pub fn get_initial_dynamic_commands(app: &AppHandle) -> Vec<Command> {
                     command_code: dc.code,
                 },
                 origin: None,
-                matches: dc.matches,
+                matches: dc.matches.clone(),
                 requires_confirmation: false,
+                command_type: if dc.matches.is_some() {
+                    crate::shared_types::CommandType::Match
+                } else {
+                    crate::shared_types::CommandType::Function
+                },
             }
         })
         .collect()

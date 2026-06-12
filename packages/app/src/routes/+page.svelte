@@ -25,10 +25,16 @@
   import { Theme, type LaunchableItem } from "$lib/type";
   import { theme, getTheme } from "$lib/utils/theme";
   import { startColorPickerFlow } from "$lib/utils/colorPicker";
+  import {
+    resolveExtensionAction,
+    buildNavigateRoute,
+    type ExtensionContext,
+  } from "$lib/utils/extensionActions";
   import { escapeHandler } from "$lib/stores/escapeHandler";
   import {
     focusInputTrigger,
     requestInputFocusWithRetry,
+    cancelInputFocusRetry,
   } from "$lib/stores/focusInput";
   import { detachWindowShortcut } from "$lib/stores/shortcuts";
   import { hasNewVersion, latestVersion, appVersion } from "$lib/stores/update";
@@ -65,6 +71,21 @@
   let unlisten = $state<null | (() => void)>(null);
   let removeWindowEscapeListener = $state<null | (() => void)>(null);
 
+  let lastMouseX = $state<number>(0);
+  let lastMouseY = $state<number>(0);
+
+  const handleMouseMove = (e: MouseEvent) => {
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+  };
+
+  const handleItemHover = (index: number, e: MouseEvent) => {
+    if (e.clientX === lastMouseX && e.clientY === lastMouseY) {
+      return;
+    }
+    appListManager.state.selectedIndex = index;
+  };
+
   // Component references
   let searchInputRef: SearchInput;
   let pluginInlineViewRef = $state<PluginInlineView | null>(null);
@@ -84,8 +105,9 @@
   };
 
   // ===== Computed =====
-  // 合并匹配命令和搜索结果
+  // 合并匹配命令和搜索结果并去重
   // 优先级：Extension 预览 -> 精确/模糊匹配 -> 匹配指令
+  // 若同一命令既被模糊匹配也满足匹配指令规则，优先保留支持传参执行的“匹配指令”版本
   const displayList = $derived.by(() => {
     const result: LaunchableItem[] = [];
 
@@ -94,8 +116,29 @@
       result.push(extensionPreviewItem);
     }
 
-    // 展示层不再做去重或语义过滤，是否显示由各命令自身的匹配规则决定
-    return [...result, ...appListManager.state.appList, ...matchedCommands];
+    const rawList = [...appListManager.state.appList, ...matchedCommands];
+    const itemMap = new Map<string, LaunchableItem>();
+    const order: string[] = [];
+
+    for (const item of rawList) {
+      const key = `${item.source}:${item.name}`;
+      if (!itemMap.has(key)) {
+        itemMap.set(key, item);
+        order.push(key);
+      } else {
+        // 遇到重复的项，若新的项有更具体的匹配触发模式，或者新的项包含 action 而旧的项没有 action，则覆盖保留
+        const existing = itemMap.get(key)!;
+        if (
+          item.trigger_mode === "matched" ||
+          (!existing.action && item.action)
+        ) {
+          itemMap.set(key, item);
+        }
+      }
+    }
+
+    const uniqueApps = order.map((key) => itemMap.get(key) as LaunchableItem);
+    return [...result, ...uniqueApps];
   });
 
   // ===== Effects =====
@@ -114,7 +157,7 @@
 
   // ===== Event Handlers =====
 
-  const handleEsc = () => {
+  const handleEsc = async () => {
     // Only handle ESC on main page
     if (page.route.id !== "/") {
       return;
@@ -122,7 +165,7 @@
 
     if (plugin.state.showPluginInline) {
       invoke("acquire_window_close_lock").catch(console.error);
-      plugin.closePlugin();
+      await plugin.closePlugin();
       requestInputFocusWithRetry();
       setTimeout(() => {
         invoke("release_window_close_lock").catch(console.error);
@@ -134,6 +177,17 @@
     clipboard.clearAttachments();
     matchedCommands = [];
     appListManager.resetToOriginList();
+    cancelInputFocusRetry();
+
+    // 隐藏窗口前主动释放焦点，重置 activeElement 状态，防止混淆下次打开时的焦点判定
+    if (typeof document !== "undefined" && document.activeElement) {
+      try {
+        (document.activeElement as HTMLElement).blur();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
     invoke("close_main_window");
   };
 
@@ -240,21 +294,99 @@
     });
   };
 
-  // 解析 Extension Action
+  // 解析 Extension Action 字符串（格式: "extension:id:code"）
   const parseExtensionAction = (
     action: string | undefined,
   ): { extensionId: string; commandCode: string } | null => {
     if (!action || !action.startsWith("extension:")) return null;
-
     const parts = action.split(":");
-    // 格式: extension:id:code
     if (parts.length >= 3) {
-      return {
-        extensionId: parts[1],
-        commandCode: parts[2],
-      };
+      return { extensionId: parts[1], commandCode: parts[2] };
     }
     return null;
+  };
+
+  // ===== Extension 执行辅助函数 =====
+
+  /** 清除所有启动器临时状态（不含窗口操作） */
+  const clearLauncherState = () => {
+    inputValue = "";
+    clipboard.clearAttachments();
+    extensionPreviewItem = null;
+    extensionManager.clearPreview();
+    matchedCommands = [];
+    appListManager.resetToOriginList();
+  };
+
+  /** 重置启动器状态并关闭主窗口 */
+  const resetLauncherAndClose = () => {
+    clearLauncherState();
+    invoke("close_main_window");
+  };
+
+  /** 重置启动器状态并跳转路由 */
+  const resetAndGoto = (route: string) => {
+    clearLauncherState();
+    goto(route);
+  };
+
+  /** 执行 Extension 命令并关闭（结果可复制） */
+  const runExtensionExecute = async (
+    extensionId: string,
+    commandCode: string,
+    text: string = "",
+  ) => {
+    const effectiveText = text || clipboard.state.attachedText || inputValue;
+    const result = await extensionManager.execute(
+      extensionId,
+      commandCode,
+      effectiveText,
+    );
+    if (result) {
+      try {
+        await navigator.clipboard.writeText(result);
+      } catch (e) {
+        console.error("[Extension] Failed to copy result:", e);
+      }
+    }
+    resetLauncherAndClose();
+  };
+
+  /**
+   * 统一处理 Extension 动作分发
+   * 查表 extensionActions.ts，根据策略类型执行对应操作
+   */
+  const handleExtensionAction = async (
+    extensionId: string,
+    commandCode: string,
+    triggerMode?: string,
+  ) => {
+    const action = resolveExtensionAction(extensionId, commandCode);
+    const effectiveText = clipboard.state.attachedText || inputValue;
+    const ctx: ExtensionContext = {
+      effectiveText,
+      triggerMode: triggerMode as ExtensionContext["triggerMode"],
+    };
+
+    if (!action) {
+      // 注册表中无配置：matched 模式走 execute，否则忽略
+      if (triggerMode === "matched") {
+        await runExtensionExecute(extensionId, commandCode);
+      }
+      return;
+    }
+
+    switch (action.type) {
+      case "navigate":
+        resetAndGoto(buildNavigateRoute(action, ctx));
+        break;
+      case "execute":
+        await runExtensionExecute(extensionId, commandCode);
+        break;
+      case "color-pick":
+        await startColorPickCommand();
+        break;
+    }
   };
 
   const handleOpenApp = async (app: LaunchableItem) => {
@@ -289,128 +421,16 @@
       return;
     }
 
-    // 1. 优先处理 Extension 命令
+    // 1. 优先处理 Extension 命令（查表分发，无需逐个 if-else）
     if (app.source === "Extension") {
       const extensionInfo = parseExtensionAction(app.action);
       if (extensionInfo) {
-        const { extensionId, commandCode } = extensionInfo;
-        if (extensionId === "file_search") {
-          inputValue = "";
-          clipboard.clearAttachments();
-          extensionPreviewItem = null;
-          extensionManager.clearPreview();
-          matchedCommands = [];
-          appListManager.resetToOriginList();
-          goto("/extensions/filesearch");
-          return;
-        }
-        // AI Extension
-        if (extensionId === "ai") {
-          const effectiveText = clipboard.state.attachedText || inputValue;
-          inputValue = "";
-          clipboard.clearAttachments();
-          extensionPreviewItem = null;
-          extensionManager.clearPreview();
-          matchedCommands = [];
-          appListManager.resetToOriginList();
-          if (commandCode === "action" && effectiveText) {
-            goto(`/extensions/ai?q=${encodeURIComponent(effectiveText)}`);
-          } else {
-            goto("/extensions/ai");
-          }
-          return;
-        }
-        // Emoji Extension 特殊处理：导航到独立页面
-        if (extensionId === "emoji") {
-          inputValue = "";
-          clipboard.clearAttachments();
-          extensionPreviewItem = null;
-          extensionManager.clearPreview();
-          matchedCommands = [];
-          goto("/extensions/emoji");
-          return;
-        }
-        // Bookmarks Extension 特殊处理：导航到独立页面
-        if (extensionId === "bookmarks") {
-          // 区分匹配指令和功能指令：功能指令默认不传递搜索参数，仅匹配指令才传递
-          const effectiveText =
-            app.trigger_mode === "matched" || app.trigger_mode === "preview"
-              ? clipboard.state.attachedText || inputValue
-              : "";
-          inputValue = "";
-          clipboard.clearAttachments();
-          extensionPreviewItem = null;
-          extensionManager.clearPreview();
-          matchedCommands = [];
-          const query = effectiveText
-            ? `?q=${encodeURIComponent(effectiveText)}`
-            : "";
-          goto(`/extensions/bookmarks${query}`);
-          return;
-        }
-        // Clipboard Extension
-        if (extensionId === "clipboard") {
-          inputValue = "";
-          clipboard.clearAttachments();
-          extensionPreviewItem = null;
-          extensionManager.clearPreview();
-          matchedCommands = [];
-          goto("/extensions/clipboard");
-          return;
-        }
-        if (extensionId === "color" && commandCode === "pick") {
-          await startColorPickCommand();
-          return;
-        }
-        if (extensionId === "color") {
-          const effectiveText =
-            app.trigger_mode === "preview"
-              ? clipboard.state.attachedText || inputValue
-              : "";
-          inputValue = "";
-          clipboard.clearAttachments();
-          extensionPreviewItem = null;
-          extensionManager.clearPreview();
-          matchedCommands = [];
-          const query = effectiveText
-            ? `?q=${encodeURIComponent(effectiveText)}`
-            : "";
-          goto(`/extensions/color${query}`);
-          return;
-        }
-        // 匹配指令：使用当前输入内容执行
-        if (app.trigger_mode === "matched") {
-          const effectiveText = clipboard.state.attachedText || inputValue;
-          await extensionManager.execute(
-            extensionId,
-            commandCode,
-            effectiveText,
-          );
-
-          inputValue = "";
-          clipboard.clearAttachments();
-          extensionPreviewItem = null;
-          extensionManager.clearPreview();
-          matchedCommands = [];
-          appListManager.resetToOriginList();
-          invoke("close_main_window");
-          return;
-        }
-        // Translator Extension
-        if (extensionId === "translator") {
-          await extensionManager.execute(extensionId, commandCode, "");
-
-          inputValue = "";
-          clipboard.clearAttachments();
-          extensionPreviewItem = null;
-          extensionManager.clearPreview();
-          matchedCommands = [];
-          appListManager.resetToOriginList();
-          // We likely want to close the main window as the translator opens in a new window
-          // The backend execute handler for translator opens a new window.
-          invoke("close_main_window");
-          return;
-        }
+        await handleExtensionAction(
+          extensionInfo.extensionId,
+          extensionInfo.commandCode,
+          app.trigger_mode,
+        );
+        return;
       }
     }
 
@@ -478,73 +498,19 @@
     });
   };
 
-  // 处理 Extension 项目点击（如计算器结果或 emoji）
+  // 处理 Extension 预览项点击（如计算器结果）
+  // preview 项的 path 格式为 "extension:id:code"，统一查表分发
   const handleExtensionClick = async (app: LaunchableItem) => {
-    // 获取 Extension ID
     const parts = app.path.split(":");
     if (parts.length >= 2) {
       const extensionId = parts[1];
-
-      // 检查是否是 grid 类型的 extension（如 emoji）
-      const preview = extensionManager.state.currentPreview;
-      if (preview?.view_type === "grid" && extensionId === "emoji") {
-        // 导航到 emoji 页面
-        inputValue = "";
-        clipboard.clearAttachments();
-        extensionPreviewItem = null;
-        extensionManager.clearPreview();
-        matchedCommands = [];
-        goto("/extensions/emoji");
-        return;
-      }
-
-      if (extensionId === "color") {
-        const commandCode = parts[2] || "";
-        if (commandCode === "pick") {
-          await startColorPickCommand();
-          return;
-        }
-
-        const effectiveText = clipboard.state.attachedText || inputValue;
-        inputValue = "";
-        clipboard.clearAttachments();
-        extensionPreviewItem = null;
-        extensionManager.clearPreview();
-        matchedCommands = [];
-        const query = effectiveText
-          ? `?q=${encodeURIComponent(effectiveText)}`
-          : "";
-        goto(`/extensions/color${query}`);
-        return;
-      }
-
-      // 使用有效文本（粘贴文本或输入框值）
       const commandCode = parts[2] || "";
-      const effectiveText = clipboard.state.attachedText || inputValue;
-      const result = await extensionManager.execute(
-        extensionId,
-        commandCode,
-        effectiveText,
-      );
-
-      if (result) {
-        // 复制结果到剪贴板
-        try {
-          await navigator.clipboard.writeText(result);
-        } catch (e) {
-          console.error("[Extension] Failed to copy:", e);
-        }
-      }
+      // grid 和普通预览项统一走注册表分发，triggerMode 均为 "preview"
+      await handleExtensionAction(extensionId, commandCode, "preview");
+      return;
     }
-
-    // 清理状态并关闭窗口
-    inputValue = "";
-    clipboard.clearAttachments();
-    extensionPreviewItem = null;
-    extensionManager.clearPreview();
-    matchedCommands = [];
-    appListManager.resetToOriginList();
-    invoke("close_main_window");
+    // path 格式不合法，降级关闭
+    resetLauncherAndClose();
   };
 
   const handleNavigationKeyDown = (e: KeyboardEvent) => {
@@ -618,14 +584,27 @@
       "window_visibility",
       async (event) => {
         if (event.payload) {
+          // 立即启动聚焦重试，不等待任何异步操作。
+          // clipboard / extension 预览等异步操作可能耗时数百毫秒，
+          // 若等到它们完成才聚焦，OS 可能已将焦点分配给其他窗口。
+          if (!plugin.state.showPluginInline) {
+            requestInputFocusWithRetry();
+          }
+
           await clipboard.autoPasteClipboard(
             appListManager.state.appConfig.auto_paste_time_limit,
           );
           updateMatchedCommands();
           await updateExtensionManagerPreview(); // 更新 Extension 预览（如计算器）
           if (!plugin.state.showPluginInline) {
+            await invoke("force_focus").catch(console.error);
+            // force_focus 之后再做一轮聚焦，此时 OS 层面已强抢前台
             requestInputFocusWithRetry();
+          } else {
+            invoke("focus_inline_plugin").catch(console.error);
           }
+        } else {
+          cancelInputFocusRetry();
         }
 
         // 转发可见性事件给插件
@@ -644,6 +623,11 @@
       ({ payload: focused }) => {
         if (plugin.state.showPluginInline) {
           plugin.sendLifecycleEvent(focused ? "focus" : "blur");
+        }
+        // 窗口真正获得系统焦点时（如 Alt+Space 唤起），确保搜索框有 DOM 焦点
+        // 这是比 window_visibility 更可靠的时机，WebView 此时已确定拿到焦点
+        if (focused && !plugin.state.showPluginInline) {
+          requestInputFocusWithRetry();
         }
       },
     );
@@ -688,7 +672,11 @@
   });
 </script>
 
-<div class="h-[100vh] w-full bg-transparent p-1">
+<div
+  class="h-[100vh] w-full bg-transparent p-1"
+  onmousemove={handleMouseMove}
+  role="presentation"
+>
   <main
     class="h-full w-full overflow-hidden rounded-xl bg-neutral-100 p-3 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100"
     data-tauri-drag-region
@@ -802,27 +790,27 @@
             viewportClass="h-full w-full overflow-x-hidden"
           >
             <div class="app-list overflow-hidden">
-              <div>
-                {#each displayList as app, index ((app.action || "") + app.path + app.name + index)}
-                  {#if app.path.startsWith("extension:")}
-                    <!-- Extension 预览项（如计算器结果） -->
-                    <ExtensionResultItem
-                      title={app.name}
-                      description={app.description || ""}
-                      icon={app.icon}
-                      triggerMode={app.trigger_mode}
-                      isSelected={appListManager.state.selectedIndex === index}
-                      onClick={() => handleOpenApp(app)}
-                    />
-                  {:else}
-                    <AppListItem
-                      {app}
-                      isSelected={appListManager.state.selectedIndex === index}
-                      onClick={() => handleOpenApp(app)}
-                    />
-                  {/if}
-                {/each}
-              </div>
+              {#each displayList as app, index ((app.action || "") + app.path + app.name + index)}
+                {#if app.path.startsWith("extension:")}
+                  <!-- Extension 预览项（如计算器结果） -->
+                  <ExtensionResultItem
+                    title={app.name}
+                    description={app.description || ""}
+                    icon={app.icon}
+                    triggerMode={app.trigger_mode}
+                    isSelected={appListManager.state.selectedIndex === index}
+                    onClick={() => handleOpenApp(app)}
+                    onHover={(e) => handleItemHover(index, e)}
+                  />
+                {:else}
+                  <AppListItem
+                    {app}
+                    isSelected={appListManager.state.selectedIndex === index}
+                    onClick={() => handleOpenApp(app)}
+                    onHover={(e) => handleItemHover(index, e)}
+                  />
+                {/if}
+              {/each}
             </div>
           </AppScrollArea>
         {/if}
