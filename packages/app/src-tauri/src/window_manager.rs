@@ -164,12 +164,10 @@ fn spawn_smart_hide_task(
 
         // 最终检查并隐藏
         let lock_state: State<WindowCloseLockState> = app_handle.state();
-        let mut is_focused = window.is_focused().unwrap_or(false);
-
-        if !is_focused {
-            // 在 Windows 上，检查前台 HWND 是否是当前窗口的子窗口
+        let is_focused = {
+            let mut focused = window.is_focused().unwrap_or(false);
             #[cfg(target_os = "windows")]
-            {
+            if !focused {
                 use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetParent};
 
                 if let Ok(hwnd) = window.hwnd() {
@@ -178,7 +176,7 @@ fn spawn_smart_hide_task(
                         let mut current = fg_hwnd;
                         while current.0 != 0 {
                             if current.0 == (hwnd.0 as isize) {
-                                is_focused = true;
+                                focused = true;
                                 break;
                             }
                             current = unsafe { GetParent(current) };
@@ -186,7 +184,8 @@ fn spawn_smart_hide_task(
                     }
                 }
             }
-        }
+            focused
+        };
 
         let is_locked = lock_state.0.load(Ordering::Relaxed) > 0;
 
