@@ -165,6 +165,7 @@ fn spawn_smart_hide_task(
         // 最终检查并隐藏
         let lock_state: State<WindowCloseLockState> = app_handle.state();
         let is_focused = {
+            #[allow(unused_mut)]
             let mut focused = window.is_focused().unwrap_or(false);
             #[cfg(target_os = "windows")]
             if !focused {

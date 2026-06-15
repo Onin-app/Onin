@@ -314,7 +314,8 @@ async fn run_macos_ocr(image: String, options: Option<OcrOptions>) -> Result<Ocr
 
                 let candidates: Retained<NSArray<objc2::runtime::AnyObject>> =
                     unsafe { msg_send![&observation, topCandidates: 1usize] };
-                if unsafe { msg_send![&candidates, count] } == 0 {
+                let candidates_count: usize = unsafe { msg_send![&candidates, count] };
+                if candidates_count == 0 {
                     continue;
                 }
 
