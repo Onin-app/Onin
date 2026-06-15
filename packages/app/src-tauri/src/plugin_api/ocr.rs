@@ -231,22 +231,32 @@ async fn run_macos_ocr(image: String, options: Option<OcrOptions>) -> Result<Ocr
     tokio::task::spawn_blocking(move || {
         load_vision_framework();
 
-        use objc2::{msg_send, ClassType};
+        use objc2::msg_send;
         use objc2::rc::Retained;
-        use objc2_foundation::{NSData, NSArray, NSDictionary, NSString, NSRange};
-        use core_graphics::geometry::CGRect;
+        use objc2_foundation::{NSArray, NSData, NSDictionary, NSRange, NSRect, NSString};
 
         let result = (|| -> Result<OcrResult, String> {
-            let cls_request = objc2::runtime::AnyClass::get("VNRecognizeTextRequest")
-                .ok_or_else(|| "Failed to find class VNRecognizeTextRequest. Make sure Vision.framework is loaded.".to_string())?;
-            let cls_handler = objc2::runtime::AnyClass::get("VNImageRequestHandler")
-                .ok_or_else(|| "Failed to find class VNImageRequestHandler. Make sure Vision.framework is loaded.".to_string())?;
+            let cls_request = objc2::runtime::AnyClass::get(
+                std::ffi::CStr::from_bytes_with_nul(b"VNRecognizeTextRequest\0").unwrap(),
+            )
+            .ok_or_else(|| {
+                "Failed to find class VNRecognizeTextRequest. Make sure Vision.framework is loaded."
+                    .to_string()
+            })?;
+            let cls_handler = objc2::runtime::AnyClass::get(
+                std::ffi::CStr::from_bytes_with_nul(b"VNImageRequestHandler\0").unwrap(),
+            )
+            .ok_or_else(|| {
+                "Failed to find class VNImageRequestHandler. Make sure Vision.framework is loaded."
+                    .to_string()
+            })?;
 
             // 1. 创建 VNRecognizeTextRequest
             let request: Retained<objc2::runtime::AnyObject> = unsafe {
                 let obj: *mut objc2::runtime::AnyObject = msg_send![cls_request, alloc];
                 let obj: *mut objc2::runtime::AnyObject = msg_send![obj, init];
-                Retained::from_raw(obj).ok_or("Failed to initialize VNRecognizeTextRequest".to_string())?
+                Retained::from_raw(obj)
+                    .ok_or("Failed to initialize VNRecognizeTextRequest".to_string())?
             };
 
             // 识别参数设置
@@ -262,13 +272,16 @@ async fn run_macos_ocr(image: String, options: Option<OcrOptions>) -> Result<Ocr
             }
 
             // 2. 创建 VNImageRequestHandler
-            let ns_data = NSData::from_slice(&bytes);
-            let options_dict = NSDictionary::<objc2::runtime::AnyObject, objc2::runtime::AnyObject>::new();
+            let ns_data = NSData::from_vec(bytes);
+            let options_dict =
+                NSDictionary::<objc2::runtime::AnyObject, objc2::runtime::AnyObject>::new();
 
             let handler: Retained<objc2::runtime::AnyObject> = unsafe {
                 let obj: *mut objc2::runtime::AnyObject = msg_send![cls_handler, alloc];
-                let obj: *mut objc2::runtime::AnyObject = msg_send![obj, initWithData: &*ns_data options: &*options_dict];
-                Retained::from_raw(obj).ok_or("Failed to initialize VNImageRequestHandler".to_string())?
+                let obj: *mut objc2::runtime::AnyObject =
+                    msg_send![obj, initWithData: &*ns_data, options: &*options_dict];
+                Retained::from_raw(obj)
+                    .ok_or("Failed to initialize VNImageRequestHandler".to_string())?
             };
 
             // 3. 运行 OCR 请求
@@ -276,7 +289,7 @@ async fn run_macos_ocr(image: String, options: Option<OcrOptions>) -> Result<Ocr
             let mut error: *mut objc2::runtime::AnyObject = std::ptr::null_mut();
 
             let success: bool = unsafe {
-                msg_send![&handler, performRequests: &*requests_array error: &mut error]
+                msg_send![&handler, performRequests: &*requests_array, error: &mut error]
             };
 
             if !success {
@@ -284,10 +297,10 @@ async fn run_macos_ocr(image: String, options: Option<OcrOptions>) -> Result<Ocr
             }
 
             // 4. 解析结果
-            let results: Option<Retained<NSArray<objc2::runtime::AnyObject>>> = unsafe {
-                msg_send![&request, results]
-            };
-            let results = results.ok_or_else(|| "No results returned from Vision OCR".to_string())?;
+            let results: Option<Retained<NSArray<objc2::runtime::AnyObject>>> =
+                unsafe { msg_send![&request, results] };
+            let results =
+                results.ok_or_else(|| "No results returned from Vision OCR".to_string())?;
             let count: usize = unsafe { msg_send![&results, count] };
 
             let mut lines = Vec::new();
@@ -299,15 +312,15 @@ async fn run_macos_ocr(image: String, options: Option<OcrOptions>) -> Result<Ocr
                     Retained::retain(obj).ok_or("Failed to retain observation")?
                 };
 
-                let candidates: Retained<NSArray<objc2::runtime::AnyObject>> = unsafe {
-                    msg_send![&observation, topCandidates: 1usize]
-                };
+                let candidates: Retained<NSArray<objc2::runtime::AnyObject>> =
+                    unsafe { msg_send![&observation, topCandidates: 1usize] };
                 if unsafe { msg_send![&candidates, count] } == 0 {
                     continue;
                 }
 
                 let recognized_text: Retained<objc2::runtime::AnyObject> = unsafe {
-                    let obj: *mut objc2::runtime::AnyObject = msg_send![&candidates, objectAtIndex: 0];
+                    let obj: *mut objc2::runtime::AnyObject =
+                        msg_send![&candidates, objectAtIndex: 0];
                     Retained::retain(obj).ok_or("Failed to retain recognized_text")?
                 };
 
@@ -316,7 +329,7 @@ async fn run_macos_ocr(image: String, options: Option<OcrOptions>) -> Result<Ocr
                 full_text_parts.push(line_text.clone());
 
                 // 获取 boundingBox
-                let bbox: CGRect = unsafe { msg_send![&observation, boundingBox] };
+                let bbox: NSRect = unsafe { msg_send![&observation, boundingBox] };
 
                 // macOS Vision 归一化且原点在左下角的 CGRect 转换到常规的左上角像素坐标
                 let pixel_x = bbox.origin.x * width;
@@ -344,8 +357,17 @@ async fn run_macos_ocr(image: String, options: Option<OcrOptions>) -> Result<Ocr
                     if !is_whitespace {
                         if is_cjk {
                             // CJK 字符单独提取
-                            let word_range = NSRange { location: idx, length: 1 };
-                            if let Some(word_word) = get_word_at_range(&recognized_text, word_range, &utf16_chars, width, height) {
+                            let word_range = NSRange {
+                                location: idx,
+                                length: 1,
+                            };
+                            if let Some(word_word) = get_word_at_range(
+                                &recognized_text,
+                                word_range,
+                                &utf16_chars,
+                                width,
+                                height,
+                            ) {
                                 words.push(word_word);
                             }
                         } else {
@@ -356,8 +378,17 @@ async fn run_macos_ocr(image: String, options: Option<OcrOptions>) -> Result<Ocr
                     } else {
                         if let Some(start) = current_word_start {
                             let len = idx - start;
-                            let word_range = NSRange { location: start, length: len };
-                            if let Some(word_word) = get_word_at_range(&recognized_text, word_range, &utf16_chars, width, height) {
+                            let word_range = NSRange {
+                                location: start,
+                                length: len,
+                            };
+                            if let Some(word_word) = get_word_at_range(
+                                &recognized_text,
+                                word_range,
+                                &utf16_chars,
+                                width,
+                                height,
+                            ) {
                                 words.push(word_word);
                             }
                             current_word_start = None;
@@ -369,8 +400,13 @@ async fn run_macos_ocr(image: String, options: Option<OcrOptions>) -> Result<Ocr
 
                 if let Some(start) = current_word_start {
                     let len = utf16_chars.len() - start;
-                    let word_range = NSRange { location: start, length: len };
-                    if let Some(word_word) = get_word_at_range(&recognized_text, word_range, &utf16_chars, width, height) {
+                    let word_range = NSRange {
+                        location: start,
+                        length: len,
+                    };
+                    if let Some(word_word) =
+                        get_word_at_range(&recognized_text, word_range, &utf16_chars, width, height)
+                    {
                         words.push(word_word);
                     }
                 }
@@ -405,16 +441,16 @@ fn get_word_at_range(
     img_w: f64,
     img_h: f64,
 ) -> Option<OcrWord> {
-    use core_graphics::geometry::CGRect;
     use objc2::msg_send;
     use objc2::rc::Retained;
+    use objc2_foundation::NSRect;
 
     let mut error: *mut objc2::runtime::AnyObject = std::ptr::null_mut();
     let rect_obs: Option<Retained<objc2::runtime::AnyObject>> =
-        unsafe { msg_send![recognized_text, boundingBoxForRange: range error: &mut error] };
+        unsafe { msg_send![recognized_text, boundingBoxForRange: range, error: &mut error] };
 
     if let Some(obs) = rect_obs {
-        let bbox: CGRect = unsafe { msg_send![&obs, boundingBox] };
+        let bbox: NSRect = unsafe { msg_send![&obs, boundingBox] };
 
         let word_text =
             String::from_utf16(&utf16_source[range.location..(range.location + range.length)])

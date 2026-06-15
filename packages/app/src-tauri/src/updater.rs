@@ -247,7 +247,7 @@ pub async fn download_and_install_update(
 
                 // 2. 后台静默挂载 DMG 镜像，并重定向 stdin 写入 "y" 以防挂起
                 use std::io::Write;
-                let mut child = std::process::Command::new("hdiutil")
+                let child = std::process::Command::new("hdiutil")
                     .arg("attach")
                     .arg("-nobrowse")
                     .arg("-readonly")

@@ -10,6 +10,7 @@ use std::{
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 
+#[cfg(target_os = "windows")]
 use serde::Deserialize;
 use tauri::AppHandle;
 #[cfg(target_os = "windows")]
@@ -21,12 +22,12 @@ use winreg::{
 use crate::shared_types::{CommandKeyword, IconType, ItemSource, ItemType, LaunchableItem};
 
 use super::{
-    path_utils::{
-        file_search_options, is_path_allowed_by_options_fast, platform_file_from_path,
-        platform_file_from_path_with_kind_and_modified_time,
-    },
+    path_utils::{file_search_options, is_path_allowed_by_options_fast, platform_file_from_path},
     types::{FileSearchOptions, FileSearchResponse, PlatformFile, DEFAULT_RESULT_LIMIT},
 };
+
+#[cfg(target_os = "windows")]
+use super::path_utils::platform_file_from_path_with_kind_and_modified_time;
 
 const MAX_PAGE_OFFSET: usize = 5_000;
 const MAX_CANDIDATE_LIMIT: usize = 5_000;
