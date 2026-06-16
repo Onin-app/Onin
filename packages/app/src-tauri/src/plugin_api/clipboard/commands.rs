@@ -222,6 +222,7 @@ pub async fn get_clipboard_content(app: AppHandle) -> Result<ClipboardContent, C
                     return Ok(ClipboardContent {
                         text: None,
                         files: Some(clipboard_files),
+                        image: None,
                         timestamp,
                     });
                 }
@@ -229,11 +230,35 @@ pub async fn get_clipboard_content(app: AppHandle) -> Result<ClipboardContent, C
         }
     }
 
-    // 如果没有文件，尝试读取文本
+    // 尝试读取图片
+    #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+    {
+        use base64::{engine::general_purpose, Engine as _};
+        use clipboard_rs::common::RustImage;
+        use clipboard_rs::{Clipboard, ClipboardContext};
+
+        if let Ok(ctx) = ClipboardContext::new() {
+            if let Ok(img) = ctx.get_image() {
+                if let Ok(png_img) = img.to_png() {
+                    let bytes = png_img.get_bytes();
+                    let b64 = general_purpose::STANDARD.encode(bytes);
+                    return Ok(ClipboardContent {
+                        text: None,
+                        files: None,
+                        image: Some(format!("data:image/png;base64,{}", b64)),
+                        timestamp,
+                    });
+                }
+            }
+        }
+    }
+
+    // 如果没有文件和图片，尝试读取文本
     match app.clipboard().read_text() {
         Ok(text) => Ok(ClipboardContent {
             text: Some(text),
             files: None,
+            image: None,
             timestamp,
         }),
         Err(e) => Err(ClipboardError::from(format!(

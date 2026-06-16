@@ -56,6 +56,7 @@ pub struct ClipboardFile {
 pub struct ClipboardContent {
     pub text: Option<String>,
     pub files: Option<Vec<ClipboardFile>>,
+    pub image: Option<String>,
     /// 剪贴板内容的时间戳（Unix 时间戳，秒）
     pub timestamp: Option<u64>,
 }

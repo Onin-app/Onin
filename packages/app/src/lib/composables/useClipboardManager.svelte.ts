@@ -101,6 +101,7 @@ export function useClipboardManager(): ClipboardManagerReturn {
       const clipboardContent = await invoke<{
         text?: string;
         files?: Array<{ path: string; name: string; is_directory: boolean }>;
+        image?: string;
         timestamp?: number;
       }>("get_clipboard_content");
 
@@ -158,6 +159,16 @@ export function useClipboardManager(): ClipboardManagerReturn {
         if (files.length > 0) {
           state.attachedText = "";
           state.attachedFiles = files;
+        }
+      } else if (clipboardContent.image) {
+        try {
+          const res = await fetch(clipboardContent.image);
+          const blob = await res.blob();
+          const file = new File([blob], "image.png", { type: "image/png" });
+          state.attachedText = "";
+          state.attachedFiles = [file];
+        } catch (e) {
+          console.error("Failed to convert auto-pasted image:", e);
         }
       } else if (clipboardContent.text) {
         const text = clipboardContent.text.trim();
