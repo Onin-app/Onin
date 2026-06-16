@@ -66,7 +66,12 @@ export function useAppList(): AppListManagerReturn {
 
   // 过滤掉匹配指令 (Match) 后的列表
   let nonMatchApps = $derived(
-    state.originAppList.filter((item) => item.type !== "Match"),
+    state.originAppList.filter(
+      (item) =>
+        item.type !== "Match" ||
+        item.source === "Extension" ||
+        item.source === "Plugin",
+    ),
   );
 
   const loadConfig = async () => {

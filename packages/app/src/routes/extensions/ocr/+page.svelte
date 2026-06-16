@@ -2,20 +2,20 @@
   /**
    * Onin 内置 OCR (文字识别) 扩展
    */
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, tick } from "svelte";
   import { invoke, convertFileSrc } from "@tauri-apps/api/core";
   import { goto } from "$app/navigation";
   import { toast } from "svelte-sonner";
   import {
     Copy,
     Trash,
-    ArrowLeft,
     Spinner,
     FileImage,
     ClipboardText,
-    ArrowCounterClockwise,
     MagnifyingGlass,
+    TextIndent,
   } from "phosphor-svelte";
+  import { Tabs, Button } from "bits-ui";
   import AppScrollArea from "$lib/components/AppScrollArea.svelte";
   import ExtensionHeader from "$lib/components/ExtensionHeader.svelte";
 
@@ -48,7 +48,6 @@
   let isProcessing = $state(false);
   let ocrResult = $state<OcrResult | null>(null);
   let lastClipboardImage = $state<string | null>(null);
-  let ocrLanguage = $state<string>("auto");
   let displayImageSrc = $derived(
     imageSrc
       ? imageSrc.startsWith("data:")
@@ -57,18 +56,27 @@
       : null,
   );
 
-  // 图片展示宽高尺寸
+  // 图片缩放和展示尺寸
+  let zoom = $state(1.0);
   let naturalWidth = $state(1);
   let naturalHeight = $state(1);
-  let displayWidth = $state(1);
-  let displayHeight = $state(1);
+  let baseDisplayWidth = $state(1);
+  let baseDisplayHeight = $state(1);
+
+  let displayWidth = $derived(baseDisplayWidth * zoom);
+  let displayHeight = $derived(baseDisplayHeight * zoom);
+
   let imgContainer = $state<HTMLDivElement | null>(null);
+  let wheelContainer = $state<HTMLDivElement | null>(null);
 
   // Tab 状态
   let activeTab = $state<"merged" | "lines">("merged");
 
   // 对合并文本的响应式编辑状态
   let editableText = $state("");
+
+  // 点击选中的行索引，实现图片和逐行列表的联动
+  let selectedLineIndex = $state<number | null>(null);
 
   // 根据搜索过滤后的行数据
   let filteredLines = $derived(
@@ -84,11 +92,12 @@
     isProcessing = true;
     ocrResult = null;
     editableText = "";
+    selectedLineIndex = null;
 
     try {
       const result = await invoke<OcrResult>("plugin_ocr_recognize", {
         image: src,
-        options: ocrLanguage === "auto" ? null : { language: ocrLanguage },
+        options: null, // 恒为默认的 auto 模式，减少用户多余操作
       });
 
       ocrResult = result;
@@ -115,17 +124,53 @@
   function calculateDisplaySize() {
     if (naturalWidth === 0 || naturalHeight === 0) return;
 
-    // 默认最大宽度限制在容器的可用宽度（假设约 480 像素），最大高度限制 400 像素
-    const maxW = Math.min(480, imgContainer?.clientWidth || 480);
-    const maxH = 380;
+    // 最大宽度限制在容器的可用宽度（减去内边距），最大高度 360
+    const maxW = Math.min(
+      480,
+      imgContainer?.clientWidth ? imgContainer.clientWidth - 48 : 480,
+    );
+    const maxH = 360;
 
     let scale = Math.min(maxW / naturalWidth, maxH / naturalHeight);
     if (scale > 1) {
       scale = 1; // 不放大原图
     }
 
-    displayWidth = naturalWidth * scale;
-    displayHeight = naturalHeight * scale;
+    baseDisplayWidth = naturalWidth * scale;
+    baseDisplayHeight = naturalHeight * scale;
+
+    // 自适应重置 zoom
+    zoom = 1.0;
+  }
+
+  // 滚轮缩放处理函数
+  function handleWheel(e: WheelEvent) {
+    if (!imageSrc) return;
+
+    e.preventDefault();
+    const zoomStep = 0.05;
+    const minZoom = 0.2;
+    const maxZoom = 4.0;
+
+    if (e.deltaY < 0) {
+      zoom = Math.min(maxZoom, zoom + zoomStep);
+    } else {
+      zoom = Math.max(minZoom, zoom - zoomStep);
+    }
+  }
+
+  // 滚动至并高亮选中的行
+  async function highlightAndScrollToLine(lineIndex: number) {
+    activeTab = "lines";
+    selectedLineIndex = lineIndex;
+
+    // 等待 Tab 切换和 DOM 渲染
+    await tick();
+
+    const element = document.getElementById(`line-item-${lineIndex}`);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
   }
 
   // 从剪贴板读取并识别图片
@@ -205,6 +250,7 @@
     isDragging = true;
   }
 
+  // 处理拖拽离开
   function handleDragLeave() {
     isDragging = false;
   }
@@ -266,12 +312,25 @@
     }
   }
 
+  // 整理换行和空白
+  function cleanTextSpaces() {
+    if (!editableText) return;
+    editableText = editableText
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .join("\n");
+    toast.success("已完成文本空白整理");
+  }
+
   // 清空数据
   function handleClear() {
     imageSrc = null;
     ocrResult = null;
     editableText = "";
     lastClipboardImage = null;
+    zoom = 1.0;
+    selectedLineIndex = null;
   }
 
   // 监听重新聚焦事件，自动读取剪贴板
@@ -297,6 +356,11 @@
     window.addEventListener("resize", calculateDisplaySize);
     document.addEventListener("paste", handlePaste);
 
+    // 手动注册非 passive 的 wheel 事件以确保 preventDefault 生效
+    if (wheelContainer) {
+      wheelContainer.addEventListener("wheel", handleWheel, { passive: false });
+    }
+
     // 挂载时尝试自动识别一次当前剪贴板的图片
     readClipboardImage(true);
   });
@@ -309,23 +373,24 @@
     if (typeof document !== "undefined") {
       document.removeEventListener("paste", handlePaste);
     }
+    if (wheelContainer) {
+      wheelContainer.removeEventListener("wheel", handleWheel);
+    }
   });
 </script>
 
 <div class="flex h-full w-full flex-col p-3 select-none">
-  <!-- 头部顶栏 -->
   <ExtensionHeader
     placeholder="在识别结果中过滤/搜索行..."
     bind:value={searchQuery}
     onBack={handleBack}
   />
 
-  <div class="mt-2 flex min-h-0 flex-1 flex-row gap-4 overflow-hidden">
-    <!-- 未选择图片时的 Dropzone 状态 -->
+  <div class="mt-3 flex min-h-0 flex-1 flex-row gap-5 overflow-hidden">
     {#if !imageSrc}
       <div
-        class="flex flex-1 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-neutral-300 bg-white/40 p-8 transition-colors hover:border-neutral-400 hover:bg-white/60 dark:border-neutral-700 dark:bg-neutral-800/40 dark:hover:border-neutral-600 dark:hover:bg-neutral-800/60 {isDragging
-          ? 'border-blue-500 bg-blue-500/5 dark:border-blue-400 dark:bg-blue-400/5'
+        class="group relative flex flex-1 flex-col items-center justify-center overflow-hidden rounded-3xl border border-neutral-200/80 bg-white/40 p-8 shadow-sm backdrop-blur-md transition-all duration-500 hover:border-neutral-300 hover:shadow-xl hover:shadow-neutral-200/20 dark:border-neutral-800/80 dark:bg-neutral-900/40 dark:hover:border-neutral-700 dark:hover:shadow-neutral-950/40 {isDragging
+          ? 'border-blue-500/80 bg-blue-500/5 ring-4 ring-blue-500/10 dark:border-blue-400/80 dark:bg-blue-400/5 dark:ring-blue-400/10'
           : ''}"
         role="button"
         tabindex="0"
@@ -335,218 +400,356 @@
         onclick={selectLocalFile}
         onkeydown={(e) => e.key === "Enter" && selectLocalFile()}
       >
-        <FileImage
-          class="mb-4 size-16 text-neutral-400 dark:text-neutral-500"
-        />
-        <h3
-          class="mb-2 text-xl font-medium text-neutral-800 dark:text-neutral-200"
-        >
-          拖入图片文件，或点击选择本地图片
-        </h3>
-        <p
-          class="mb-6 max-w-sm text-center text-sm text-neutral-500 dark:text-neutral-400"
-        >
-          支持直接按下 <kbd
-            class="rounded border border-neutral-300 bg-neutral-100 px-1.5 py-0.5 text-xs text-neutral-700 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
-            >Ctrl+V</kbd
-          >
-          (或
-          <kbd
-            class="rounded border border-neutral-300 bg-neutral-100 px-1.5 py-0.5 text-xs text-neutral-700 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
-            >Cmd+V</kbd
-          >) 粘贴已复制的图片
-        </p>
+        <div
+          class="absolute -top-40 -left-40 size-80 rounded-full bg-blue-400/10 blur-3xl transition-all duration-500 group-hover:bg-blue-400/15"
+        ></div>
+        <div
+          class="absolute -right-40 -bottom-40 size-80 rounded-full bg-indigo-400/10 blur-3xl transition-all duration-500 group-hover:bg-indigo-400/15"
+        ></div>
 
-        <div class="flex gap-3">
-          <button
-            class="flex items-center gap-2 rounded-xl bg-neutral-200 px-5 py-2.5 font-medium text-neutral-700 transition-colors hover:bg-neutral-300 active:scale-95 dark:bg-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-600"
-            onclick={(e) => {
-              e.stopPropagation();
-              readClipboardImage();
-            }}
+        <div class="relative flex max-w-md flex-col items-center">
+          <div
+            class="mb-6 flex size-20 items-center justify-center rounded-2xl bg-neutral-100 shadow-inner transition-transform duration-500 group-hover:scale-105 dark:bg-neutral-800"
           >
-            <ClipboardText class="size-5" />
-            识别剪贴板图片
-          </button>
+            <FileImage
+              class="size-10 text-neutral-500 transition-transform duration-500 group-hover:-translate-y-0.5 dark:text-neutral-400"
+            />
+          </div>
+          <h3
+            class="mb-2 text-lg font-semibold tracking-tight text-neutral-800 dark:text-neutral-100"
+          >
+            拖入图片文件，或点击选择本地图片
+          </h3>
+          <p
+            class="mb-8 text-sm leading-relaxed text-neutral-500 dark:text-neutral-400"
+          >
+            支持直接按下 <kbd
+              class="rounded-lg border border-neutral-200 bg-neutral-50 px-2 py-1 font-mono text-xs text-neutral-600 shadow-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+              >Ctrl+V</kbd
+            >
+            /
+            <kbd
+              class="rounded-lg border border-neutral-200 bg-neutral-50 px-2 py-1 font-mono text-xs text-neutral-600 shadow-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+              >Cmd+V</kbd
+            > 粘贴已复制的图片
+          </p>
+
+          <div class="flex gap-4">
+            <Button.Root
+              class="flex items-center gap-2 rounded-xl bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-neutral-950/10 transition-all hover:bg-neutral-800 hover:shadow-lg hover:shadow-neutral-950/20 active:scale-95 dark:bg-neutral-100 dark:text-neutral-900 dark:shadow-neutral-900/10 dark:hover:bg-neutral-200 dark:hover:shadow-neutral-900/20"
+              onclick={(e: MouseEvent) => {
+                e.stopPropagation();
+                readClipboardImage();
+              }}
+            >
+              <ClipboardText class="size-4" />
+              识别剪贴板图片
+            </Button.Root>
+          </div>
         </div>
       </div>
     {:else}
-      <!-- 左右分栏面板 -->
-      <!-- 左栏：图片和高亮定位 -->
       <div
         bind:this={imgContainer}
-        class="relative flex w-1/2 flex-col items-center justify-center overflow-hidden rounded-2xl border border-neutral-200 bg-neutral-50/50 p-4 dark:border-neutral-800 dark:bg-neutral-900/50"
+        class="relative flex w-[45%] flex-col items-center justify-center overflow-hidden rounded-3xl border border-neutral-200/80 bg-neutral-50/40 p-6 shadow-inner backdrop-blur-md dark:border-neutral-800/80 dark:bg-neutral-900/20"
       >
+        <div
+          class="pointer-events-none absolute inset-0 bg-[radial-gradient(#e5e7eb_1.5px,transparent_1.5px)] [background-size:24px_24px] opacity-60 dark:bg-[radial-gradient(#262626_1.5px,transparent_1.5px)] dark:opacity-100"
+        ></div>
+
         {#if isProcessing}
-          <!-- 加载遮罩 -->
           <div
-            class="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/75 backdrop-blur-sm dark:bg-neutral-900/75"
+            class="animate-scan absolute right-0 left-0 z-20 h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent shadow-[0_0_15px_#3b82f6]"
+          ></div>
+
+          <div
+            class="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/40 backdrop-blur-xs dark:bg-neutral-950/40"
           >
-            <Spinner class="mb-3 size-10 animate-spin text-blue-500" />
+            <div class="relative flex items-center justify-center">
+              <div
+                class="absolute size-16 animate-ping rounded-full border-2 border-blue-500/10"
+              ></div>
+              <Spinner class="size-10 animate-spin text-blue-500" />
+            </div>
             <span
-              class="text-sm font-medium text-neutral-600 dark:text-neutral-400"
-              >正在识别文字，请稍候...</span
+              class="mt-5 animate-pulse text-xs font-semibold tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
+              >正在扫描图像文字...</span
             >
           </div>
         {/if}
 
         <div
-          class="relative flex items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-100 shadow-inner dark:border-neutral-800 dark:bg-neutral-950"
-          style="width: {displayWidth}px; height: {displayHeight}px;"
+          bind:this={wheelContainer}
+          class="relative max-h-full max-w-full overflow-auto rounded-2xl border-4 border-white bg-neutral-100 p-0.5 shadow-2xl transition-all duration-200 dark:border-neutral-800 dark:bg-neutral-950/40"
         >
-          <img
-            src={displayImageSrc}
-            class="h-full w-full object-fill select-none"
-            onload={handleImageLoad}
-            alt="OCR Source"
-          />
+          <div
+            class="relative flex items-center justify-center"
+            style="width: {displayWidth}px; height: {displayHeight}px;"
+          >
+            <img
+              src={displayImageSrc}
+              class="h-full w-full object-fill select-none"
+              onload={handleImageLoad}
+              alt="OCR Source"
+            />
 
-          <!-- 定位高亮框图层 -->
-          {#if ocrResult && !isProcessing}
-            <div class="pointer-events-auto absolute inset-0">
-              {#each ocrResult.lines as line}
-                <!-- 仅当此行匹配搜索条件时高亮显示 -->
-                {#if searchQuery === "" || line.text
-                    .toLowerCase()
-                    .includes(searchQuery.toLowerCase())}
-                  <div
-                    class="group absolute cursor-pointer rounded border border-blue-500/20 bg-blue-500/5 transition-all hover:border-blue-500/80 hover:bg-blue-500/25"
-                    style="
-                      left: {(line.x / naturalWidth) * 100}%;
-                      top: {(line.y / naturalHeight) * 100}%;
-                      width: {(line.width / naturalWidth) * 100}%;
-                      height: {(line.height / naturalHeight) * 100}%;
-                    "
-                    onclick={() => copyText(line.text)}
-                    onkeydown={(e) => e.key === "Enter" && copyText(line.text)}
-                    role="button"
-                    tabindex="0"
-                    title="点击复制此行"
-                  >
-                    <!-- 悬浮提示气泡 -->
-                    <span
-                      class="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 line-clamp-3 hidden max-w-[250px] min-w-[150px] -translate-x-1/2 rounded-lg bg-neutral-900 px-2.5 py-1.5 text-center text-xs whitespace-normal text-white shadow-lg group-hover:block"
+            {#if ocrResult && !isProcessing}
+              <div class="pointer-events-auto absolute inset-0">
+                {#each ocrResult.lines as line}
+                  {#if searchQuery === "" || line.text
+                      .toLowerCase()
+                      .includes(searchQuery.toLowerCase())}
+                    <div
+                      class="group absolute cursor-pointer rounded border border-blue-500/25 bg-blue-500/5 transition-all duration-200 hover:border-blue-500/90 hover:bg-blue-500/15 hover:shadow-lg hover:shadow-blue-500/10"
+                      style="
+                        left: {(line.x / naturalWidth) * 100}%;
+                        top: {(line.y / naturalHeight) * 100}%;
+                        width: {(line.width / naturalWidth) * 100}%;
+                        height: {(line.height / naturalHeight) * 100}%;
+                      "
+                      onclick={() => {
+                        copyText(line.text);
+                        if (ocrResult) {
+                          const idx = ocrResult.lines.indexOf(line);
+                          if (idx !== -1) {
+                            highlightAndScrollToLine(idx);
+                          }
+                        }
+                      }}
+                      onkeydown={(e) => {
+                        if (e.key === "Enter" && ocrResult) {
+                          copyText(line.text);
+                          const idx = ocrResult.lines.indexOf(line);
+                          if (idx !== -1) {
+                            highlightAndScrollToLine(idx);
+                          }
+                        }
+                      }}
+                      role="button"
+                      tabindex="0"
+                      title="点击定位并复制"
                     >
-                      {line.text}
-                    </span>
-                  </div>
-                {/if}
-              {/each}
-            </div>
-          {/if}
+                      <span
+                        class="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2.5 line-clamp-3 hidden max-w-[250px] min-w-[150px] -translate-x-1/2 rounded-xl border border-neutral-800 bg-neutral-950 px-3 py-2 text-center text-xs whitespace-normal text-white shadow-xl group-hover:block dark:border-neutral-700"
+                      >
+                        {line.text}
+                      </span>
+                    </div>
+                  {/if}
+                {/each}
+              </div>
+            {/if}
+          </div>
+        </div>
+
+        <div
+          class="absolute right-4 bottom-4 z-20 flex items-center gap-1.5 rounded-xl border border-neutral-200/60 bg-white/80 p-1.5 shadow-md backdrop-blur-md dark:border-neutral-800/80 dark:bg-neutral-950/80"
+        >
+          <Button.Root
+            class="flex size-6 items-center justify-center rounded-lg text-sm font-bold text-neutral-600 transition-colors hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+            onclick={() => (zoom = Math.max(0.2, zoom - 0.1))}
+            title="缩小"
+          >
+            -
+          </Button.Root>
+          <span
+            class="min-w-[36px] text-center font-mono text-[11px] font-semibold text-neutral-700 select-text dark:text-neutral-300"
+          >
+            {Math.round(zoom * 100)}%
+          </span>
+          <Button.Root
+            class="flex size-6 items-center justify-center rounded-lg text-sm font-bold text-neutral-600 transition-colors hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+            onclick={() => (zoom = Math.min(4.0, zoom + 0.1))}
+            title="放大"
+          >
+            +
+          </Button.Root>
+          <span class="mx-0.5 h-3 w-[1px] bg-neutral-200 dark:bg-neutral-800"
+          ></span>
+          <Button.Root
+            class="rounded-lg bg-neutral-100 px-2 py-0.5 text-[10px] font-semibold text-neutral-700 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+            onclick={() => (zoom = 1.0)}
+          >
+            自适应
+          </Button.Root>
         </div>
       </div>
 
-      <!-- 右栏：合并文本与搜索 -->
-      <div
-        class="flex w-1/2 flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-800/40"
+      <Tabs.Root
+        value={activeTab}
+        onValueChange={(v) => v && (activeTab = v as "merged" | "lines")}
+        class="flex w-[55%] flex-col overflow-hidden rounded-3xl border border-neutral-200/80 bg-white/90 shadow-xl shadow-neutral-200/10 backdrop-blur-md dark:border-neutral-800/80 dark:bg-neutral-900/40 dark:shadow-neutral-950/30"
       >
-        <!-- 选项卡与操作栏 -->
         <div
-          class="flex items-center justify-between border-b border-neutral-200 bg-neutral-50/50 px-4 py-2 dark:border-neutral-800 dark:bg-neutral-900/30"
+          class="flex items-center justify-between border-b border-neutral-200/60 bg-neutral-50/40 px-4 py-2.5 dark:border-neutral-800/60 dark:bg-neutral-950/20"
         >
-          <div
-            class="flex gap-1 rounded-lg bg-neutral-200/60 p-0.5 dark:bg-neutral-700/60"
-          >
-            <button
-              class="rounded-md px-3 py-1.5 text-xs font-medium transition-colors {activeTab ===
-              'merged'
-                ? 'bg-white text-neutral-800 shadow-sm dark:bg-neutral-800 dark:text-white'
-                : 'text-neutral-500 hover:text-neutral-800 dark:text-neutral-400'}"
-              onclick={() => (activeTab = "merged")}
+          <div class="w-40">
+            <Tabs.List
+              class="flex gap-1 rounded-lg bg-neutral-100 p-0.5 dark:bg-neutral-800/80"
             >
-              完整文本
-            </button>
-            <button
-              class="rounded-md px-3 py-1.5 text-xs font-medium transition-colors {activeTab ===
-              'lines'
-                ? 'bg-white text-neutral-800 shadow-sm dark:bg-neutral-800 dark:text-white'
-                : 'text-neutral-500 hover:text-neutral-800 dark:text-neutral-400'}"
-              onclick={() => (activeTab = "lines")}
-            >
-              逐行列表
-            </button>
+              <Tabs.Trigger
+                value="merged"
+                class="flex-1 rounded-md py-1 text-xs font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-neutral-900 data-[state=active]:shadow-xs dark:text-neutral-400 dark:data-[state=active]:bg-neutral-700 dark:data-[state=active]:text-white"
+              >
+                完整文本
+              </Tabs.Trigger>
+              <Tabs.Trigger
+                value="lines"
+                class="flex-1 rounded-md py-1 text-xs font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-neutral-900 data-[state=active]:shadow-xs dark:text-neutral-400 dark:data-[state=active]:bg-neutral-700 dark:data-[state=active]:text-white"
+              >
+                逐行列表
+              </Tabs.Trigger>
+            </Tabs.List>
           </div>
 
           <div class="flex items-center gap-2">
-            <select
-              bind:value={ocrLanguage}
-              onchange={() => imageSrc && recognizeImage(imageSrc)}
-              class="rounded-lg border border-neutral-300 bg-white px-2 py-1 text-xs font-semibold text-neutral-700 transition-colors outline-none hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
-            >
-              <option value="auto">自动 (混合)</option>
-              <option value="zh-Hans">中文 (简体)</option>
-              <option value="en-US">英文 (English)</option>
-            </select>
-
             {#if ocrResult}
-              <button
-                class="flex items-center gap-1.5 rounded-lg bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-blue-600 active:scale-95"
+              <Button.Root
+                class="flex h-7 items-center gap-1 rounded-lg bg-blue-500 px-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-blue-600 active:scale-95"
                 onclick={() =>
                   copyText(
                     activeTab === "merged" ? editableText : ocrResult!.text,
                   )}
               >
-                <Copy class="size-4" />
+                <Copy class="size-3.5" />
                 复制全部
-              </button>
+              </Button.Root>
             {/if}
-            <button
-              class="flex items-center gap-1.5 rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-semibold text-neutral-700 transition-colors hover:bg-neutral-100 active:scale-95 dark:border-neutral-600 dark:text-neutral-200 dark:hover:bg-neutral-700"
+
+            <Button.Root
+              class="flex h-7 items-center gap-1 rounded-lg border border-neutral-200 px-2.5 text-xs font-semibold text-neutral-700 transition-colors hover:bg-neutral-50 active:scale-95 dark:border-neutral-800/80 dark:text-neutral-200 dark:hover:bg-neutral-800"
               onclick={handleClear}
             >
-              <Trash class="size-4" />
+              <Trash class="size-3.5" />
               清空
-            </button>
+            </Button.Root>
           </div>
         </div>
 
-        <!-- 文本内容展示区 -->
-        <div class="relative min-h-0 flex-1">
-          {#if activeTab === "merged"}
-            <!-- 完整文本面板 (支持编辑以便快速修改) -->
+        <div class="relative flex min-h-0 flex-1 flex-col">
+          <Tabs.Content
+            value="merged"
+            class="flex min-h-0 w-full flex-1 flex-col justify-between focus:outline-none"
+          >
             <textarea
               bind:value={editableText}
               disabled={isProcessing}
               placeholder="识别文本将显示在此处，您也可以在此编辑或调整内容..."
-              class="h-full w-full resize-none border-0 bg-transparent p-4 text-base text-neutral-800 focus:border-0 focus:ring-0 focus:outline-none dark:text-neutral-200"
+              class="w-full flex-1 resize-none border-0 bg-transparent p-4 font-sans text-sm leading-relaxed text-neutral-800 focus:border-0 focus:ring-0 focus:outline-none dark:text-neutral-200"
             ></textarea>
-          {:else}
-            <!-- 逐行显示面板 -->
-            <AppScrollArea>
-              <div class="flex flex-col gap-2 p-3">
-                {#if filteredLines.length === 0}
-                  <div
-                    class="flex flex-col items-center justify-center py-12 text-neutral-400 dark:text-neutral-500"
-                  >
-                    <MagnifyingGlass class="mb-2 size-8" />
-                    <span>没有找到匹配的文字行</span>
-                  </div>
-                {:else}
-                  {#each filteredLines as line, i}
-                    <div
-                      class="group flex items-center justify-between gap-3 rounded-xl border border-neutral-100 bg-neutral-50/30 p-2.5 transition-colors hover:bg-neutral-100/50 dark:border-neutral-800 dark:bg-neutral-900/10 dark:hover:bg-neutral-900/30"
-                    >
-                      <span
-                        class="text-sm break-all text-neutral-800 select-text dark:text-neutral-200"
-                      >
-                        {line.text}
-                      </span>
-                      <button
-                        class="flex-shrink-0 rounded-lg bg-neutral-200 p-1.5 text-neutral-600 opacity-0 transition-all group-hover:opacity-100 hover:bg-neutral-300 active:scale-90 dark:bg-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-600"
-                        onclick={() => copyText(line.text)}
-                        title="复制此行"
-                      >
-                        <Copy class="size-3.5" />
-                      </button>
-                    </div>
-                  {/each}
-                {/if}
+
+            <div
+              class="flex items-center justify-between border-t border-neutral-200/60 bg-neutral-50/50 px-4 py-2 text-xs text-neutral-500 dark:border-neutral-800/60 dark:bg-neutral-950/20 dark:text-neutral-400"
+            >
+              <div class="flex items-center gap-3">
+                <span
+                  >字符数: <strong
+                    class="font-mono text-neutral-700 dark:text-neutral-200"
+                    >{editableText.length}</strong
+                  > 字</span
+                >
+                <span class="h-3 w-[1px] bg-neutral-300 dark:bg-neutral-700"
+                ></span>
+                <span
+                  >行数: <strong
+                    class="font-mono text-neutral-700 dark:text-neutral-200"
+                    >{editableText
+                      ? editableText.split("\n").length
+                      : 0}</strong
+                  > 行</span
+                >
               </div>
-            </AppScrollArea>
-          {/if}
+              {#if editableText}
+                <div class="flex items-center gap-1.5">
+                  <Button.Root
+                    class="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold transition-colors hover:bg-neutral-200 hover:text-neutral-800 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+                    onclick={cleanTextSpaces}
+                    title="清理段落多余空格并去除首尾空白"
+                  >
+                    <TextIndent class="size-3" />
+                    <span>整理空白</span>
+                  </Button.Root>
+                </div>
+              {/if}
+            </div>
+          </Tabs.Content>
+
+          <Tabs.Content
+            value="lines"
+            class="flex h-full min-h-0 w-full flex-1 flex-col focus:outline-none"
+          >
+            <div class="h-full min-h-0 w-full flex-1">
+              <AppScrollArea
+                class="h-full w-full"
+                viewportClass="h-full w-full"
+              >
+                <div class="flex flex-col gap-2 p-4">
+                  {#if filteredLines.length === 0}
+                    <div
+                      class="flex flex-col items-center justify-center py-16 text-neutral-400 dark:text-neutral-500"
+                    >
+                      <MagnifyingGlass class="mb-2 size-8" />
+                      <span class="text-xs">没有找到匹配的文字行</span>
+                    </div>
+                  {:else}
+                    {#each filteredLines as line}
+                      {@const originalIndex = ocrResult!.lines.indexOf(line)}
+                      <div
+                        id="line-item-{originalIndex}"
+                        class="group flex items-center justify-between gap-3 rounded-xl border p-3 transition-all duration-200 {selectedLineIndex ===
+                        originalIndex
+                          ? 'border-blue-500/50 bg-blue-500/10 shadow-md ring-1 shadow-blue-500/5 ring-blue-500/20 dark:border-blue-400/50 dark:bg-blue-400/10 dark:ring-blue-400/20'
+                          : 'border-neutral-200/40 bg-neutral-50/20 hover:border-neutral-200 hover:bg-neutral-50/50 dark:border-neutral-800/40 dark:bg-neutral-900/10 dark:hover:border-neutral-800 dark:hover:bg-neutral-900/30'}"
+                        onclick={() => {
+                          selectedLineIndex = originalIndex;
+                        }}
+                        onkeydown={(e) =>
+                          e.key === "Enter" &&
+                          (selectedLineIndex = originalIndex)}
+                        role="button"
+                        tabindex="0"
+                      >
+                        <span
+                          class="font-sans text-xs leading-relaxed break-all text-neutral-800 select-text dark:text-neutral-200"
+                        >
+                          {line.text}
+                        </span>
+                        <Button.Root
+                          class="flex-shrink-0 rounded-lg border border-neutral-200 bg-white p-1.5 text-neutral-500 opacity-0 shadow-xs transition-all group-hover:opacity-100 hover:bg-neutral-50 hover:text-neutral-700 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+                          onclick={(e: MouseEvent) => {
+                            e.stopPropagation();
+                            copyText(line.text);
+                          }}
+                          title="复制此行"
+                        >
+                          <Copy class="size-3.5" />
+                        </Button.Root>
+                      </div>
+                    {/each}
+                  {/if}
+                </div>
+              </AppScrollArea>
+            </div>
+          </Tabs.Content>
         </div>
-      </div>
+      </Tabs.Root>
     {/if}
   </div>
 </div>
+
+<style>
+  @keyframes scan {
+    0% {
+      top: 0%;
+    }
+    50% {
+      top: 100%;
+    }
+    100% {
+      top: 0%;
+    }
+  }
+  .animate-scan {
+    animation: scan 2.5s linear infinite;
+  }
+</style>
