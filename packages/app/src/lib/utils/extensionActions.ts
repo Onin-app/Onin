@@ -129,6 +129,12 @@ export const EXTENSION_ACTION_MAP: Record<string, ExtensionAction> = {
   // ── 计算器 ────────────────────────────────────────────────────────────────
   // calculator 通常以预览项出现，点击后执行命令并复制结果
   "calculator:calculate": { type: "execute" },
+
+  // ── 文字识别 (OCR) ────────────────────────────────────────────────────────
+  "ocr:recognize": {
+    type: "navigate",
+    route: () => "/extensions/ocr",
+  },
 };
 
 // ============================================================================

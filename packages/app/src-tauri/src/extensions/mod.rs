@@ -10,6 +10,7 @@ pub mod color;
 pub mod color_picker;
 pub mod emoji;
 pub mod filesearch;
+pub mod ocr;
 pub mod preset_keywords;
 pub mod translator;
 pub mod web;

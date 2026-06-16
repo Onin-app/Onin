@@ -37,14 +37,41 @@ pub async fn plugin_clipboard_write_text(
     }
 }
 
-/// 读取剪贴板图片（暂未实现）
+/// 读取剪贴板图片
 #[tauri::command]
 pub async fn plugin_clipboard_read_image(
     _app: AppHandle,
 ) -> Result<Option<String>, ClipboardError> {
-    Err(ClipboardError::from(
-        "Image reading is not yet implemented. Please use text operations for now.",
-    ))
+    #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+    {
+        use base64::{engine::general_purpose, Engine as _};
+        use clipboard_rs::common::RustImage;
+        use clipboard_rs::{Clipboard, ClipboardContext};
+
+        let ctx = ClipboardContext::new().map_err(|e| {
+            ClipboardError::from(format!("Failed to create clipboard context: {}", e))
+        })?;
+
+        match ctx.get_image() {
+            Ok(img) => match img.to_png() {
+                Ok(png_img) => {
+                    let bytes = png_img.get_bytes();
+                    let b64 = general_purpose::STANDARD.encode(bytes);
+                    Ok(Some(format!("data:image/png;base64,{}", b64)))
+                }
+                Err(e) => Err(ClipboardError::from(format!(
+                    "Failed to convert image to PNG: {}",
+                    e
+                ))),
+            },
+            Err(_) => Ok(None),
+        }
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    {
+        Ok(None)
+    }
 }
 
 /// 写入剪贴板图片（暂未实现）

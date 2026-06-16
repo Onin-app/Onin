@@ -23,6 +23,7 @@
     "core:window:allow-close",
     "core:window:allow-start-dragging",
     "core:window:allow-start-resize-dragging",
+    "core:window:allow-set-always-on-top",
     "autostart:allow-enable",
     "autostart:allow-disable",
     "autostart:allow-is-enabled",

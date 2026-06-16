@@ -48,6 +48,9 @@ pub fn on_app_setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     // Initialize AI Extension
     crate::extensions::ai::init(app.handle());
 
+    // Initialize OCR Extension
+    crate::extensions::ocr::init(app.handle());
+
     // Initialize file search index in the background after startup.
     crate::file_search::init(app.handle().clone());
 
