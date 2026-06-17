@@ -1,4 +1,7 @@
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
+
+const MIN_DIM: u32 = 1200;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct OcrWord {
@@ -46,6 +49,25 @@ fn get_image_bytes(image_str: &str) -> Result<Vec<u8>, String> {
     }
 }
 
+fn preprocess_image_bytes<'a>(bytes: &'a [u8]) -> (Cow<'a, [u8]>, f32) {
+    if let Ok(img) = image::load_from_memory(bytes) {
+        let w = img.width();
+        let h = img.height();
+        // 如果图像宽或高小于 MIN_DIM 像素，等比放大 2 倍提升识别率
+        if w < MIN_DIM || h < MIN_DIM {
+            let scaled = img.resize(w * 2, h * 2, image::imageops::FilterType::CatmullRom);
+            let mut buffer = std::io::Cursor::new(Vec::new());
+            if scaled
+                .write_to(&mut buffer, image::ImageFormat::Png)
+                .is_ok()
+            {
+                return (Cow::Owned(buffer.into_inner()), 2.0);
+            }
+        }
+    }
+    (Cow::Borrowed(bytes), 1.0)
+}
+
 #[tauri::command]
 pub async fn plugin_ocr_recognize(
     image: String,
@@ -78,10 +100,11 @@ pub async fn plugin_ocr_recognize(
 // ==========================================
 #[cfg(target_os = "windows")]
 async fn run_windows_ocr(image: String, options: Option<OcrOptions>) -> Result<OcrResult, String> {
-    let bytes = get_image_bytes(&image)?;
+    let raw_bytes = get_image_bytes(&image)?;
 
     tokio::task::spawn_blocking(move || {
         let _com_guard = ComGuard::new();
+        let (bytes, scale) = preprocess_image_bytes(&raw_bytes);
 
         let result = (|| -> windows::core::Result<OcrResult> {
             use windows::core::HSTRING;
@@ -139,22 +162,27 @@ async fn run_windows_ocr(image: String, options: Option<OcrOptions>) -> Result<O
                     let word_text = word.Text()?.to_string();
                     let rect = word.BoundingRect()?;
 
+                    let rx = rect.X / scale;
+                    let ry = rect.Y / scale;
+                    let rw = rect.Width / scale;
+                    let rh = rect.Height / scale;
+
                     words.push(OcrWord {
                         text: word_text,
-                        x: rect.X,
-                        y: rect.Y,
-                        width: rect.Width,
-                        height: rect.Height,
+                        x: rx,
+                        y: ry,
+                        width: rw,
+                        height: rh,
                     });
 
-                    if rect.X < min_x {
-                        min_x = rect.X;
+                    if rx < min_x {
+                        min_x = rx;
                     }
-                    if rect.Y < min_y {
-                        min_y = rect.Y;
+                    if ry < min_y {
+                        min_y = ry;
                     }
-                    let word_max_x = rect.X + rect.Width;
-                    let word_max_y = rect.Y + rect.Height;
+                    let word_max_x = rx + rw;
+                    let word_max_y = ry + rh;
                     if word_max_x > max_x {
                         max_x = word_max_x;
                     }
@@ -212,11 +240,11 @@ fn load_vision_framework() {
 
 #[cfg(target_os = "macos")]
 async fn run_macos_ocr(image: String, options: Option<OcrOptions>) -> Result<OcrResult, String> {
-    let bytes = get_image_bytes(&image)?;
+    let raw_bytes = get_image_bytes(&image)?;
 
     // 快速读取图片物理宽度与高度
     let (width, height) = {
-        let cursor = std::io::Cursor::new(&bytes);
+        let cursor = std::io::Cursor::new(&raw_bytes);
         if let Ok(reader) = image::ImageReader::new(cursor).with_guessed_format() {
             if let Ok(dims) = reader.into_dimensions() {
                 (dims.0 as f64, dims.1 as f64)
@@ -227,6 +255,11 @@ async fn run_macos_ocr(image: String, options: Option<OcrOptions>) -> Result<Ocr
             (1.0, 1.0)
         }
     };
+
+    // scale cancels out because boundingBox is normalized against processed dimensions.
+    // As long as we use the original dimensions to scale the normalized coordinates back,
+    // the resulting coordinates will automatically align with the original image pixels.
+    let (bytes, _scale) = preprocess_image_bytes(&raw_bytes);
 
     tokio::task::spawn_blocking(move || {
         load_vision_framework();
@@ -272,7 +305,7 @@ async fn run_macos_ocr(image: String, options: Option<OcrOptions>) -> Result<Ocr
             }
 
             // 2. 创建 VNImageRequestHandler
-            let ns_data = NSData::from_vec(bytes);
+            let ns_data = NSData::from_vec(bytes.into_owned());
             let options_dict =
                 NSDictionary::<objc2::runtime::AnyObject, objc2::runtime::AnyObject>::new();
 
@@ -523,7 +556,7 @@ fn map_bcp47_to_tesseract(lang: &str) -> String {
 }
 
 #[cfg(target_os = "linux")]
-fn parse_tesseract_tsv(tsv_content: &str) -> Result<OcrResult, String> {
+fn parse_tesseract_tsv(tsv_content: &str, scale: f32) -> Result<OcrResult, String> {
     let mut lines: Vec<OcrLine> = Vec::new();
     let mut full_text_parts: Vec<String> = Vec::new();
 
@@ -544,10 +577,10 @@ fn parse_tesseract_tsv(tsv_content: &str) -> Result<OcrResult, String> {
             if parts.len() < 10 {
                 continue;
             }
-            let left = parts[6].trim().parse::<f32>().unwrap_or(0.0);
-            let top = parts[7].trim().parse::<f32>().unwrap_or(0.0);
-            let width = parts[8].trim().parse::<f32>().unwrap_or(0.0);
-            let height = parts[9].trim().parse::<f32>().unwrap_or(0.0);
+            let left = parts[6].trim().parse::<f32>().unwrap_or(0.0) / scale;
+            let top = parts[7].trim().parse::<f32>().unwrap_or(0.0) / scale;
+            let width = parts[8].trim().parse::<f32>().unwrap_or(0.0) / scale;
+            let height = parts[9].trim().parse::<f32>().unwrap_or(0.0) / scale;
 
             let text = if parts.len() > 11 {
                 parts[11].trim().to_string()
@@ -590,11 +623,13 @@ fn parse_tesseract_tsv(tsv_content: &str) -> Result<OcrResult, String> {
 
 #[cfg(target_os = "linux")]
 async fn run_linux_ocr(image: String, options: Option<OcrOptions>) -> Result<OcrResult, String> {
-    let bytes = get_image_bytes(&image)?;
+    let raw_bytes = get_image_bytes(&image)?;
 
     tokio::task::spawn_blocking(move || {
         use std::io::Write;
         use std::process::Command;
+
+        let (bytes, scale) = preprocess_image_bytes(&raw_bytes);
 
         // 1. Write image to a temporary file
         let mut temp_file = tempfile::Builder::new()
@@ -643,7 +678,7 @@ async fn run_linux_ocr(image: String, options: Option<OcrOptions>) -> Result<Ocr
             .map_err(|e| format!("Tesseract output is not valid UTF-8: {}", e))?;
 
         // 4. Parse TSV output
-        let ocr_result = parse_tesseract_tsv(&stdout_str)?;
+        let ocr_result = parse_tesseract_tsv(&stdout_str, scale)?;
 
         Ok(ocr_result)
     })
