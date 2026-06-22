@@ -203,6 +203,11 @@ impl AIProvider for OpenAICompatibleProvider {
                 name: m.id,
                 description: m.owned_by,
                 context_window: None,
+                attachment: None,
+                reasoning: None,
+                tool_call: None,
+                modalities: None,
+                limit: None,
             })
             .collect())
     }

@@ -46,9 +46,25 @@
     models?: ModelInfo[] | null;
   }
 
+  interface ModelModalities {
+    input: string[];
+    output: string[];
+  }
+
+  interface ModelLimit {
+    context?: number | null;
+    output?: number | null;
+  }
+
   interface RegistryModel {
     id: string;
     name: string;
+    description?: string | null;
+    attachment?: boolean;
+    reasoning?: boolean;
+    tool_call?: boolean;
+    modalities?: ModelModalities;
+    limit?: ModelLimit;
   }
 
   interface RegistryProvider {
@@ -73,6 +89,11 @@
     name: string;
     description?: string | null;
     context_window?: number | null;
+    attachment?: boolean | null;
+    reasoning?: boolean | null;
+    tool_call?: boolean | null;
+    modalities?: ModelModalities | null;
+    limit?: ModelLimit | null;
   }
 
   let config = $state<AIConfig>({ active_provider_id: null, providers: [] });
@@ -122,7 +143,7 @@
       ? data
       : Object.values(data);
     try {
-      const providersList = rawProviders.map((p) => {
+      const providersList: RemoteProvider[] = rawProviders.map((p) => {
         const rawModels = p.models || {};
         const modelList: RegistryModel[] = Array.isArray(rawModels)
           ? rawModels
@@ -133,7 +154,17 @@
             const parts = cleanId.split("/");
             cleanId = parts.slice(1).join("/");
           }
-          return { id: cleanId, name: m.name };
+          return {
+            id: cleanId,
+            name: m.name,
+            description: m.description || null,
+            context_window: m.limit?.context || null,
+            attachment: m.attachment ?? false,
+            reasoning: m.reasoning ?? false,
+            tool_call: m.tool_call ?? false,
+            modalities: m.modalities ?? null,
+            limit: m.limit ?? null,
+          };
         });
         return {
           id: p.id,
@@ -156,6 +187,13 @@
             allOpenRouterModels.push({
               id: m.id,
               name: `${p.name}: ${m.name}`,
+              description: m.description || null,
+              context_window: m.limit?.context || null,
+              attachment: m.attachment ?? false,
+              reasoning: m.reasoning ?? false,
+              tool_call: m.tool_call ?? false,
+              modalities: m.modalities ?? null,
+              limit: m.limit ?? null,
             });
           }
         }
@@ -209,25 +247,35 @@
         ),
   );
 
+  interface ModelOption {
+    value: string;
+    label: string;
+    model: ModelInfo;
+  }
+
   let modelOptions = $derived.by(() => {
     // 1. 如果该配置实例已经有单独拉取并保存的 models，优先使用它
     if (editForm.models && editForm.models.length > 0) {
-      return editForm.models.map((m) => ({
-        value: m.id,
-        label:
-          m.name +
-          (m.context_window
-            ? ` (${Math.round(m.context_window / 1024)}k)`
-            : ""),
-      }));
+      return editForm.models.map(
+        (m) =>
+          ({
+            value: m.id,
+            label: m.name,
+            model: m,
+          }) satisfies ModelOption,
+      );
     }
 
     // 2. 如果选定了服务提供商
     if (selectedRemoteProvider) {
-      return selectedRemoteProvider.models.map((m) => ({
-        value: m.id,
-        label: m.name,
-      }));
+      return selectedRemoteProvider.models.map(
+        (m) =>
+          ({
+            value: m.id,
+            label: m.name,
+            model: m,
+          }) satisfies ModelOption,
+      );
     }
 
     return [];
@@ -310,6 +358,51 @@
     }
   }
 
+  function enrichModelsWithRegistry(fetchedModels: any[]): ModelInfo[] {
+    const registryModelMap = new Map<string, ModelInfo>();
+
+    for (const provider of providersRegistry) {
+      for (const m of provider.models) {
+        registryModelMap.set(m.id.toLowerCase(), m);
+      }
+    }
+
+    return fetchedModels.map((m) => {
+      const matchId = m.id.toLowerCase();
+      const matched = registryModelMap.get(matchId);
+
+      if (matched) {
+        return {
+          id: m.id,
+          name: m.name || matched.name,
+          description: m.description || matched.description || null,
+          context_window:
+            m.context_window ||
+            matched.context_window ||
+            matched.limit?.context ||
+            null,
+          attachment: m.attachment ?? matched.attachment ?? false,
+          reasoning: m.reasoning ?? matched.reasoning ?? false,
+          tool_call: m.tool_call ?? matched.tool_call ?? false,
+          modalities: m.modalities ?? matched.modalities ?? null,
+          limit: m.limit ?? matched.limit ?? null,
+        };
+      }
+
+      return {
+        id: m.id,
+        name: m.name,
+        description: m.description || null,
+        context_window: m.context_window || null,
+        attachment: m.attachment ?? false,
+        reasoning: m.reasoning ?? false,
+        tool_call: m.tool_call ?? false,
+        modalities: m.modalities ?? null,
+        limit: m.limit ?? null,
+      };
+    });
+  }
+
   async function syncDirectModels() {
     if (!editForm.base_url) {
       toast.error("API 地址不能为空，无法拉取模型");
@@ -325,7 +418,7 @@
       });
 
       if (fetched && fetched.length > 0) {
-        editForm.models = fetched;
+        editForm.models = enrichModelsWithRegistry(fetched);
         toast.success(`成功拉取并缓存了 ${fetched.length} 个模型`, {
           id: toastId,
         });
@@ -986,9 +1079,42 @@
                               label={option.label}
                             >
                               {#snippet children({ selected })}
-                                <span class="flex-1">{option.label}</span>
+                                <div
+                                  class="flex min-w-0 flex-1 items-center gap-1.5"
+                                >
+                                  <span class="truncate">{option.label}</span>
+                                  <div class="flex shrink-0 items-center gap-1">
+                                    {#if option.model.context_window}
+                                      <span
+                                        class="rounded bg-neutral-100 px-1 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
+                                      >
+                                        {Math.round(
+                                          option.model.context_window / 1024,
+                                        )}k
+                                      </span>
+                                    {/if}
+                                    {#if option.model.reasoning}
+                                      <span
+                                        class="rounded bg-purple-100 px-1 py-0.5 text-[10px] font-medium text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
+                                        title="思考链推理">思考</span
+                                      >
+                                    {/if}
+                                    {#if option.model.tool_call}
+                                      <span
+                                        class="rounded bg-blue-100 px-1 py-0.5 text-[10px] font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                                        title="工具/函数调用">工具</span
+                                      >
+                                    {/if}
+                                    {#if option.model.attachment}
+                                      <span
+                                        class="rounded bg-green-100 px-1 py-0.5 text-[10px] font-medium text-green-600 dark:bg-green-900/30 dark:text-green-400"
+                                        title="图片/文件上传">附件</span
+                                      >
+                                    {/if}
+                                  </div>
+                                </div>
                                 {#if selected}
-                                  <Check class="h-4 w-4" />
+                                  <Check class="h-4 w-4 shrink-0" />
                                 {/if}
                               {/snippet}
                             </Combobox.Item>

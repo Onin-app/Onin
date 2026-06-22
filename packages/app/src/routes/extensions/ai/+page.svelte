@@ -48,6 +48,12 @@
   let isConfigured = $state<boolean | null>(null); // null = 检查中, true = 已配置, false = 未配置
   let activeProviderName = $state("");
   let activeModelName = $state("");
+  let activeModelInfo = $state<{
+    attachment?: boolean | null;
+    reasoning?: boolean | null;
+    tool_call?: boolean | null;
+    context_window?: number | null;
+  } | null>(null);
   let activeEventId = $state("");
   let currentCleanup = $state<(() => void) | null>(null);
 
@@ -168,6 +174,9 @@
           activeProvider.name ||
           "OpenAI Compatible";
         activeModelName = activeProvider.default_model || "未指定模型";
+        const models: any[] = activeProvider.models || [];
+        activeModelInfo =
+          models.find((m: any) => m.id === activeModelName) || null;
       }
     } catch (e) {
       console.error("[AI Extension] Failed to check AI config:", e);
@@ -466,6 +475,36 @@
           >
             {activeProviderName}
           </span>
+          {#if activeModelInfo}
+            <div class="flex items-center gap-1">
+              {#if activeModelInfo.context_window}
+                <span
+                  class="rounded bg-neutral-100 px-1 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
+                  title="上下文窗口"
+                >
+                  {Math.round(activeModelInfo.context_window / 1024)}k
+                </span>
+              {/if}
+              {#if activeModelInfo.reasoning}
+                <span
+                  class="rounded bg-purple-100 px-1 py-0.5 text-[10px] font-medium text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
+                  title="支持思考链推理">思考</span
+                >
+              {/if}
+              {#if activeModelInfo.tool_call}
+                <span
+                  class="rounded bg-blue-100 px-1 py-0.5 text-[10px] font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                  title="支持工具/函数调用">工具</span
+                >
+              {/if}
+              {#if activeModelInfo.attachment}
+                <span
+                  class="rounded bg-green-100 px-1 py-0.5 text-[10px] font-medium text-green-600 dark:bg-green-900/30 dark:text-green-400"
+                  title="支持图片/文件上传">附件</span
+                >
+              {/if}
+            </div>
+          {/if}
         {/if}
       </div>
     </div>
@@ -666,7 +705,37 @@
                 当前模型：<code
                   class="rounded border border-neutral-300/30 bg-neutral-200/50 px-1 py-0.5 font-mono text-[10px] text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
                   >{activeModelName}</code
-                >。<br />
+                >。
+              </p>
+              <p
+                class="mt-1 flex max-w-xs items-center justify-center gap-1.5 text-xs text-neutral-500"
+              >
+                {#if activeModelInfo?.context_window}
+                  <span
+                    class="rounded bg-neutral-100 px-1 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
+                    >{Math.round(activeModelInfo.context_window / 1024)}k 上下文</span
+                  >
+                {/if}
+                {#if activeModelInfo?.reasoning}
+                  <span
+                    class="rounded bg-purple-100 px-1 py-0.5 text-[10px] font-medium text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
+                    >思考链</span
+                  >
+                {/if}
+                {#if activeModelInfo?.tool_call}
+                  <span
+                    class="rounded bg-blue-100 px-1 py-0.5 text-[10px] font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                    >工具调用</span
+                  >
+                {/if}
+                {#if activeModelInfo?.attachment}
+                  <span
+                    class="rounded bg-green-100 px-1 py-0.5 text-[10px] font-medium text-green-600 dark:bg-green-900/30 dark:text-green-400"
+                    >图片支持</span
+                  >
+                {/if}
+              </p>
+              <p class="max-w-xs text-xs text-neutral-500">
                 支持编写代码、解答问题、整理文本。
               </p>
             </div>
