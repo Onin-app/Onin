@@ -1,3 +1,4 @@
+use super::provider::ModelInfo;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -15,4 +16,6 @@ pub struct ProviderConfig {
     pub base_url: String,             // API endpoint
     pub api_key: Option<String>,      // API Key (optional for local models)
     pub default_model: Option<String>, // Default model for this provider
+    #[serde(default)]
+    pub models: Option<Vec<ModelInfo>>, // Cached models for this provider
 }

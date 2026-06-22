@@ -20,11 +20,11 @@ use futures::stream::BoxStream;
 pub struct AIManager {
     config: RwLock<AIConfig>,
     active_provider: RwLock<Option<Arc<dyn AIProvider>>>,
-    app_handle: AppHandle,
     history_manager: std::sync::Mutex<self::history::HistoryManager>,
     app_data_dir: PathBuf,
     pub active_streams:
         std::sync::Mutex<std::collections::HashMap<String, tauri::async_runtime::JoinHandle<()>>>,
+    pub client: reqwest::Client,
 }
 
 impl AIManager {
@@ -34,14 +34,19 @@ impl AIManager {
             .app_data_dir()
             .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default());
         let history_manager = self::history::HistoryManager::new(data_dir.clone());
+        let user_agent = format!("Onin/{}", env!("CARGO_PKG_VERSION"));
+        let client = reqwest::Client::builder()
+            .user_agent(user_agent)
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new());
 
         Self {
             config: RwLock::new(AIConfig::default()),
             active_provider: RwLock::new(None),
-            app_handle,
             history_manager: std::sync::Mutex::new(history_manager),
             app_data_dir: data_dir,
             active_streams: std::sync::Mutex::new(std::collections::HashMap::new()),
+            client,
         }
     }
 
