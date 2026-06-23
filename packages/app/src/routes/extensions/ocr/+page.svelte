@@ -58,15 +58,22 @@
 
   // 图片缩放和展示尺寸
   let zoom = $state(1.0);
-  let naturalWidth = $state(1);
-  let naturalHeight = $state(1);
-  let baseDisplayWidth = $state(1);
-  let baseDisplayHeight = $state(1);
+  let naturalWidth = $state(0);
+  let naturalHeight = $state(0);
+  let baseDisplayWidth = $state(0);
+  let baseDisplayHeight = $state(0);
 
-  let displayWidth = $derived(baseDisplayWidth * zoom);
-  let displayHeight = $derived(baseDisplayHeight * zoom);
+  // 平移与拖拽状态
+  let translateX = $state(0);
+  let translateY = $state(0);
+  let isMouseDown = $state(false);
+  let hasMoved = $state(false);
 
-  let imgContainer = $state<HTMLDivElement | null>(null);
+  let startX = 0;
+  let startY = 0;
+  let startTranslateX = 0;
+  let startTranslateY = 0;
+
   let wheelContainer = $state<HTMLDivElement | null>(null);
 
   // Tab 状态
@@ -124,39 +131,119 @@
   function calculateDisplaySize() {
     if (naturalWidth === 0 || naturalHeight === 0) return;
 
-    // 最大宽度限制在容器的可用宽度（减去内边距），最大高度 360
-    const maxW = Math.min(
-      480,
-      imgContainer?.clientWidth ? imgContainer.clientWidth - 48 : 480,
-    );
-    const maxH = 360;
+    // 自适应容器大小，不再硬编码 480/360
+    const containerW = wheelContainer?.clientWidth || 400;
+    const containerH = wheelContainer?.clientHeight || 300;
+
+    const maxW = containerW - 24;
+    const maxH = containerH - 24;
 
     let scale = Math.min(maxW / naturalWidth, maxH / naturalHeight);
     if (scale > 1) {
-      scale = 1; // 不放大原图
+      scale = 1;
     }
 
     baseDisplayWidth = naturalWidth * scale;
     baseDisplayHeight = naturalHeight * scale;
 
-    // 自适应重置 zoom
     zoom = 1.0;
+    resetPosition();
+  }
+
+  function resetPosition() {
+    if (
+      wheelContainer &&
+      naturalWidth > 0 &&
+      baseDisplayWidth > 0 &&
+      baseDisplayHeight > 0
+    ) {
+      const containerW = wheelContainer.clientWidth;
+      const containerH = wheelContainer.clientHeight;
+      translateX = (containerW - baseDisplayWidth) / 2;
+      translateY = (containerH - baseDisplayHeight) / 2;
+    } else {
+      translateX = 0;
+      translateY = 0;
+    }
+  }
+
+  function zoomTo(nextZoom: number, centerX?: number, centerY?: number) {
+    if (!wheelContainer) return;
+
+    const minZoom = 0.1;
+    const maxZoom = 10.0;
+    nextZoom = Math.max(minZoom, Math.min(maxZoom, nextZoom));
+
+    const rect = wheelContainer.getBoundingClientRect();
+    const cx = centerX !== undefined ? centerX : rect.width / 2;
+    const cy = centerY !== undefined ? centerY : rect.height / 2;
+
+    const oldZoom = zoom;
+    translateX = cx - (cx - translateX) * (nextZoom / oldZoom);
+    translateY = cy - (cy - translateY) * (nextZoom / oldZoom);
+    zoom = nextZoom;
   }
 
   // 滚轮缩放处理函数
   function handleWheel(e: WheelEvent) {
-    if (!imageSrc) return;
+    if (!imageSrc || !wheelContainer) return;
 
     e.preventDefault();
-    const zoomStep = 0.05;
-    const minZoom = 0.2;
-    const maxZoom = 4.0;
+    const zoomStep = 0.08;
+    const rect = wheelContainer.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
 
-    if (e.deltaY < 0) {
-      zoom = Math.min(maxZoom, zoom + zoomStep);
-    } else {
-      zoom = Math.max(minZoom, zoom - zoomStep);
+    const nextZoom =
+      e.deltaY < 0 ? zoom + zoomStep * zoom : zoom - zoomStep * zoom;
+    zoomTo(nextZoom, mx, my);
+  }
+
+  // 拖拽处理函数
+  function handleMouseDown(e: MouseEvent) {
+    if (!imageSrc) return;
+    if (e.button !== 0) return; // 只响应左键
+
+    const target = e.target as HTMLElement;
+    if (target.closest(".no-pan") || target.closest("button")) {
+      return;
     }
+
+    isMouseDown = true;
+    hasMoved = false;
+    startX = e.clientX;
+    startY = e.clientY;
+    startTranslateX = translateX;
+    startTranslateY = translateY;
+  }
+
+  function handleMouseMove(e: MouseEvent) {
+    if (!isMouseDown) return;
+
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+      hasMoved = true;
+    }
+
+    translateX = startTranslateX + dx;
+    translateY = startTranslateY + dy;
+  }
+
+  function handleMouseUp() {
+    if (isMouseDown) {
+      isMouseDown = false;
+      setTimeout(() => {
+        hasMoved = false;
+      }, 0);
+    }
+  }
+
+  function handleDoubleClick() {
+    if (!imageSrc) return;
+    zoom = 1.0;
+    resetPosition();
   }
 
   // 滚动至并高亮选中的行
@@ -331,6 +418,8 @@
     lastClipboardImage = null;
     zoom = 1.0;
     selectedLineIndex = null;
+    translateX = 0;
+    translateY = 0;
   }
 
   // 监听重新聚焦事件，自动读取剪贴板
@@ -356,11 +445,6 @@
     window.addEventListener("resize", calculateDisplaySize);
     document.addEventListener("paste", handlePaste);
 
-    // 手动注册非 passive 的 wheel 事件以确保 preventDefault 生效
-    if (wheelContainer) {
-      wheelContainer.addEventListener("wheel", handleWheel, { passive: false });
-    }
-
     // 挂载时尝试自动识别一次当前剪贴板的图片
     readClipboardImage(true);
   });
@@ -373,11 +457,22 @@
     if (typeof document !== "undefined") {
       document.removeEventListener("paste", handlePaste);
     }
+  });
+
+  // 使用 Svelte 5 的 $effect 动态且安全地在 wheelContainer 上绑定非 passive wheel 事件
+  $effect(() => {
     if (wheelContainer) {
-      wheelContainer.removeEventListener("wheel", handleWheel);
+      const container = wheelContainer;
+      const onWheel = (e: WheelEvent) => handleWheel(e);
+      container.addEventListener("wheel", onWheel, { passive: false });
+      return () => {
+        container.removeEventListener("wheel", onWheel);
+      };
     }
   });
 </script>
+
+<svelte:window onmousemove={handleMouseMove} onmouseup={handleMouseUp} />
 
 <div class="flex h-full w-full flex-col p-3 select-none">
   <ExtensionHeader
@@ -449,9 +544,14 @@
         </div>
       </div>
     {:else}
+      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
       <div
-        bind:this={imgContainer}
-        class="relative flex w-[45%] flex-col items-center justify-center overflow-hidden rounded-3xl border border-neutral-200/80 bg-neutral-50/40 p-6 shadow-inner backdrop-blur-md dark:border-neutral-800/80 dark:bg-neutral-900/20"
+        bind:this={wheelContainer}
+        class="relative w-[45%] cursor-grab overflow-hidden rounded-3xl border border-neutral-200/80 bg-neutral-50/40 shadow-inner backdrop-blur-md active:cursor-grabbing dark:border-neutral-800/80 dark:bg-neutral-900/20"
+        onmousedown={handleMouseDown}
+        ondblclick={handleDoubleClick}
+        role="region"
+        aria-label="图片预览区"
       >
         <div
           class="pointer-events-none absolute inset-0 bg-[radial-gradient(#e5e7eb_1.5px,transparent_1.5px)] [background-size:24px_24px] opacity-60 dark:bg-[radial-gradient(#262626_1.5px,transparent_1.5px)] dark:opacity-100"
@@ -477,77 +577,73 @@
             >
           </div>
         {/if}
-
         <div
-          bind:this={wheelContainer}
-          class="relative max-h-full max-w-full overflow-auto rounded-2xl border-4 border-white bg-neutral-100 p-0.5 shadow-2xl transition-all duration-200 dark:border-neutral-800 dark:bg-neutral-950/40"
+          class="relative"
+          style="width: {baseDisplayWidth}px; height: {baseDisplayHeight}px; transform: translate({translateX}px, {translateY}px) scale({zoom}); transform-origin: 0 0;"
         >
-          <div
-            class="relative flex items-center justify-center"
-            style="width: {displayWidth}px; height: {displayHeight}px;"
-          >
-            <img
-              src={displayImageSrc}
-              class="h-full w-full object-fill select-none"
-              onload={handleImageLoad}
-              alt="OCR Source"
-            />
+          <img
+            src={displayImageSrc}
+            class="h-full w-full object-fill select-none"
+            onload={handleImageLoad}
+            alt="OCR Source"
+            draggable="false"
+          />
 
-            {#if ocrResult && !isProcessing}
-              <div class="pointer-events-auto absolute inset-0">
-                {#each ocrResult.lines as line}
-                  {#if searchQuery === "" || line.text
-                      .toLowerCase()
-                      .includes(searchQuery.toLowerCase())}
-                    <div
-                      class="group absolute cursor-pointer rounded border border-blue-500/25 bg-blue-500/5 transition-all duration-200 hover:border-blue-500/90 hover:bg-blue-500/15 hover:shadow-lg hover:shadow-blue-500/10"
-                      style="
+          {#if ocrResult && !isProcessing}
+            <div class="pointer-events-auto absolute inset-0">
+              {#each ocrResult.lines as line}
+                {#if searchQuery === "" || line.text
+                    .toLowerCase()
+                    .includes(searchQuery.toLowerCase())}
+                  <div
+                    class="group absolute cursor-pointer rounded border border-blue-500/25 bg-blue-500/5 transition-all duration-200 hover:border-blue-500/90 hover:bg-blue-500/15 hover:shadow-lg hover:shadow-blue-500/10"
+                    style="
                         left: {(line.x / naturalWidth) * 100}%;
                         top: {(line.y / naturalHeight) * 100}%;
                         width: {(line.width / naturalWidth) * 100}%;
                         height: {(line.height / naturalHeight) * 100}%;
                       "
-                      onclick={() => {
+                    onclick={() => {
+                      if (hasMoved) return;
+                      copyText(line.text);
+                      if (ocrResult) {
+                        const idx = ocrResult.lines.indexOf(line);
+                        if (idx !== -1) {
+                          highlightAndScrollToLine(idx);
+                        }
+                      }
+                    }}
+                    onkeydown={(e) => {
+                      if (e.key === "Enter" && ocrResult) {
                         copyText(line.text);
-                        if (ocrResult) {
-                          const idx = ocrResult.lines.indexOf(line);
-                          if (idx !== -1) {
-                            highlightAndScrollToLine(idx);
-                          }
+                        const idx = ocrResult.lines.indexOf(line);
+                        if (idx !== -1) {
+                          highlightAndScrollToLine(idx);
                         }
-                      }}
-                      onkeydown={(e) => {
-                        if (e.key === "Enter" && ocrResult) {
-                          copyText(line.text);
-                          const idx = ocrResult.lines.indexOf(line);
-                          if (idx !== -1) {
-                            highlightAndScrollToLine(idx);
-                          }
-                        }
-                      }}
-                      role="button"
-                      tabindex="0"
-                      title="点击定位并复制"
+                      }
+                    }}
+                    role="button"
+                    tabindex="0"
+                    title="点击定位并复制"
+                  >
+                    <span
+                      class="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2.5 line-clamp-3 hidden max-w-[250px] min-w-[150px] -translate-x-1/2 rounded-xl border border-neutral-800 bg-neutral-950 px-3 py-2 text-center text-xs whitespace-normal text-white shadow-xl group-hover:block dark:border-neutral-700"
                     >
-                      <span
-                        class="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2.5 line-clamp-3 hidden max-w-[250px] min-w-[150px] -translate-x-1/2 rounded-xl border border-neutral-800 bg-neutral-950 px-3 py-2 text-center text-xs whitespace-normal text-white shadow-xl group-hover:block dark:border-neutral-700"
-                      >
-                        {line.text}
-                      </span>
-                    </div>
-                  {/if}
-                {/each}
-              </div>
-            {/if}
-          </div>
+                      {line.text}
+                    </span>
+                  </div>
+                {/if}
+              {/each}
+            </div>
+          {/if}
         </div>
 
         <div
-          class="absolute right-4 bottom-4 z-20 flex items-center gap-1.5 rounded-xl border border-neutral-200/60 bg-white/80 p-1.5 shadow-md backdrop-blur-md dark:border-neutral-800/80 dark:bg-neutral-950/80"
+          class="no-pan absolute right-4 bottom-4 z-20 flex items-center gap-1.5 rounded-xl border border-neutral-200/60 bg-white/80 p-1.5 shadow-md backdrop-blur-md dark:border-neutral-800/80 dark:bg-neutral-950/80"
         >
           <Button.Root
             class="flex size-6 items-center justify-center rounded-lg text-sm font-bold text-neutral-600 transition-colors hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
-            onclick={() => (zoom = Math.max(0.2, zoom - 0.1))}
+            onclick={() => zoomTo(zoom - 0.1 * zoom)}
             title="缩小"
           >
             -
@@ -559,7 +655,7 @@
           </span>
           <Button.Root
             class="flex size-6 items-center justify-center rounded-lg text-sm font-bold text-neutral-600 transition-colors hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
-            onclick={() => (zoom = Math.min(4.0, zoom + 0.1))}
+            onclick={() => zoomTo(zoom + 0.1 * zoom)}
             title="放大"
           >
             +
@@ -568,7 +664,10 @@
           ></span>
           <Button.Root
             class="rounded-lg bg-neutral-100 px-2 py-0.5 text-[10px] font-semibold text-neutral-700 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
-            onclick={() => (zoom = 1.0)}
+            onclick={() => {
+              zoom = 1.0;
+              resetPosition();
+            }}
           >
             自适应
           </Button.Root>
