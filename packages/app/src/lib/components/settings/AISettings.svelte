@@ -443,6 +443,34 @@
     }
   }
 
+  function getModelInfo(provider: ProviderConfig): ModelInfo | undefined {
+    if (provider.models && provider.models.length > 0) {
+      const matched = provider.models.find(
+        (m) => m.id === provider.default_model,
+      );
+      if (matched) return matched;
+    }
+
+    const remoteProvider = providersRegistry.find(
+      (p) => p.id === provider.provider_type,
+    );
+    if (remoteProvider && remoteProvider.models) {
+      const matched = remoteProvider.models.find(
+        (m) => m.id === provider.default_model,
+      );
+      if (matched) return matched;
+    }
+
+    for (const p of providersRegistry) {
+      if (p.models) {
+        const matched = p.models.find((m) => m.id === provider.default_model);
+        if (matched) return matched;
+      }
+    }
+
+    return undefined;
+  }
+
   function startAdd() {
     editingIndex = -1;
     editForm = {
@@ -582,13 +610,13 @@
 
     try {
       await invoke("update_ai_config", { config });
-      toast.success("服务商配置已保存");
+      toast.success("模型配置已保存");
       editingIndex = null;
       providerSearch = "";
       modelSearch = "";
     } catch (e) {
       console.error(e);
-      toast.error("保存服务商配置失败");
+      toast.error("保存模型配置失败");
     }
   }
 
@@ -618,10 +646,10 @@
 
     try {
       await invoke("update_ai_config", { config });
-      toast.success("服务商配置已删除");
+      toast.success("模型配置已删除");
     } catch (e) {
       console.error(e);
-      toast.error("删除服务商配置失败");
+      toast.error("删除模型配置失败");
     }
   }
 
@@ -642,10 +670,10 @@
     config.active_provider_id = providerId;
     try {
       await invoke("update_ai_config", { config });
-      toast.success("当前启用的服务商已更新");
+      toast.success("当前启用的模型已更新");
     } catch (e) {
       console.error(e);
-      toast.error("更新启用服务商失败");
+      toast.error("更新启用模型失败");
     }
   }
 </script>
@@ -682,10 +710,10 @@
           <h2
             class="mb-1 text-sm font-semibold text-neutral-900 dark:text-neutral-100"
           >
-            AI Providers
+            模型
           </h2>
           <p class="text-xs text-neutral-500 dark:text-neutral-400">
-            管理你的 AI 服务提供商
+            管理你的 AI 大模型配置与服务
           </p>
         </div>
         {#if editingIndex === null}
@@ -695,7 +723,7 @@
               disabled={isSyncingRegistry}
               onclick={() => syncProvidersRegistry(true)}
             >
-              {isSyncingRegistry ? "正在同步..." : "同步提供商配置"}
+              {isSyncingRegistry ? "正在同步..." : "同步模型列表"}
             </Button.Root>
           </div>
         {/if}
@@ -710,18 +738,19 @@
               class="rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-6 py-12 text-center dark:border-neutral-700 dark:bg-neutral-900/50"
             >
               <p class="mb-4 text-sm text-neutral-500 dark:text-neutral-400">
-                No providers configured yet
+                暂无已配置的模型
               </p>
               <Button.Root
                 class="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-neutral-900 px-4 text-sm font-medium text-neutral-50 shadow-sm transition-colors hover:bg-neutral-900/90 focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:outline-hidden dark:bg-neutral-50 dark:text-neutral-900 dark:hover:bg-neutral-50/90"
                 onclick={startAdd}
               >
                 <Plus class="h-4 w-4" />
-                添加你的第一个服务商
+                添加第一个模型
               </Button.Root>
             </div>
           {:else}
             {#each config.providers as provider, index (provider.id)}
+              {@const defaultModelInfo = getModelInfo(provider)}
               <div
                 class="group relative overflow-hidden rounded-xl border transition-all {config.active_provider_id ===
                 provider.id
@@ -760,17 +789,55 @@
                       {/if}
                     </div>
                     <div
-                      class="mt-1 flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400"
+                      class="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400"
                     >
                       {#if provider.display_name}
                         <span>{provider.name}</span>
                         <span>•</span>
                       {/if}
                       {#if provider.default_model}
-                        <span>{provider.default_model}</span>
-                        <span>•</span>
+                        <code
+                          class="rounded border border-neutral-300/30 bg-neutral-100 px-1 py-0.5 font-mono text-[10px] text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+                          >{provider.default_model}</code
+                        >
                       {/if}
-                      <span class="truncate">{provider.base_url}</span>
+                      {#if defaultModelInfo}
+                        <div class="flex items-center gap-1">
+                          {#if defaultModelInfo.context_window}
+                            <span
+                              class="rounded bg-neutral-100 px-1 py-0.5 text-[9px] font-medium text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
+                              title="上下文窗口"
+                            >
+                              {Math.round(
+                                defaultModelInfo.context_window / 1024,
+                              )}k
+                            </span>
+                          {/if}
+                          {#if defaultModelInfo.reasoning}
+                            <span
+                              class="rounded bg-purple-100 px-1 py-0.5 text-[9px] font-medium text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
+                              title="支持思考链推理">思考</span
+                            >
+                          {/if}
+                          {#if defaultModelInfo.tool_call}
+                            <span
+                              class="rounded bg-blue-100 px-1 py-0.5 text-[9px] font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                              title="支持工具/函数调用">工具</span
+                            >
+                          {/if}
+                          {#if defaultModelInfo.attachment}
+                            <span
+                              class="rounded bg-green-100 px-1 py-0.5 text-[9px] font-medium text-green-600 dark:bg-green-900/30 dark:text-green-400"
+                              title="支持图片/文件上传（多模态）">多模态</span
+                            >
+                          {/if}
+                        </div>
+                      {/if}
+                      <span>•</span>
+                      <span
+                        class="max-w-[200px] truncate"
+                        title={provider.base_url}>{provider.base_url}</span
+                      >
                     </div>
                   </div>
 
@@ -801,7 +868,7 @@
               onclick={startAdd}
             >
               <Plus class="h-4 w-4" />
-              添加新服务商
+              添加模型
             </Button.Root>
           {/if}
         {:else}
@@ -813,7 +880,7 @@
               class="border-b border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-800/50"
             >
               <h3 class="font-semibold text-neutral-900 dark:text-neutral-100">
-                {editingIndex === -1 ? "添加新服务商" : "编辑服务商"}
+                {editingIndex === -1 ? "添加模型" : "编辑模型"}
               </h3>
             </div>
 
@@ -883,13 +950,13 @@
                             <div
                               class="px-2 py-3 text-center text-sm text-neutral-400"
                             >
-                              正在加载服务商列表...
+                              正在加载模型列表...
                             </div>
                           {:else if providersRegistry.length === 0}
                             <div
                               class="px-2 py-3 text-center text-sm text-neutral-400"
                             >
-                              暂无服务商数据，请点击上方的「同步提供商配置」按钮获取
+                              暂无模型数据，请点击上方的「同步模型列表」按钮获取
                             </div>
                           {:else}
                             <div
