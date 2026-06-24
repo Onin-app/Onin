@@ -48,6 +48,8 @@
   let isProcessing = $state(false);
   let ocrResult = $state<OcrResult | null>(null);
   let lastClipboardImage = $state<string | null>(null);
+  let ocrEngine = $state<"local" | "ai">("local");
+
   let displayImageSrc = $derived(
     imageSrc
       ? imageSrc.startsWith("data:")
@@ -104,7 +106,9 @@
     try {
       const result = await invoke<OcrResult>("plugin_ocr_recognize", {
         image: src,
-        options: null, // 恒为默认的 auto 模式，减少用户多余操作
+        options: {
+          engine: ocrEngine,
+        },
       });
 
       ocrResult = result;
@@ -112,10 +116,36 @@
       toast.success("文字识别完成");
     } catch (error) {
       console.error("OCR Failed:", error);
-      toast.error(typeof error === "string" ? error : "识别失败，请重试");
+      const errMsg = typeof error === "string" ? error : "识别失败，请重试";
+      if (errMsg.includes("AI 管理器未激活")) {
+        toast.error(
+          "未启用 AI 模型。请前往系统设置 - 模型中配置并启用支持多模态（图片输入）的模型。",
+        );
+      } else if (
+        errMsg.includes("支持图片") ||
+        errMsg.includes("image") ||
+        errMsg.includes("multimodal") ||
+        errMsg.includes("400")
+      ) {
+        toast.error(
+          "识别失败：当前启用的 AI 模型可能不支持图片识别。请前往“设置 - 模型”中配置并启用支持多模态（图片输入）的模型。",
+        );
+      } else {
+        toast.error(errMsg);
+      }
       imageSrc = null;
     } finally {
       isProcessing = false;
+    }
+  }
+
+  // 切换引擎，如果已有图片则重新识别
+  async function handleEngineChange(engine: "local" | "ai") {
+    if (ocrEngine === engine) return;
+    ocrEngine = engine;
+
+    if (imageSrc) {
+      await recognizeImage(imageSrc);
     }
   }
 
@@ -474,11 +504,39 @@
 
 <svelte:window onmousemove={handleMouseMove} onmouseup={handleMouseUp} />
 
+{#snippet rightSnippet()}
+  <div class="flex items-center gap-2">
+    <div
+      class="flex items-center gap-0.5 rounded-xl border border-neutral-200/50 bg-neutral-100/80 p-0.5 dark:border-neutral-700/50 dark:bg-neutral-800/80"
+    >
+      <button
+        class="rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all {ocrEngine ===
+        'local'
+          ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-700 dark:text-white'
+          : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'}"
+        onclick={() => handleEngineChange("local")}
+      >
+        本地 OCR
+      </button>
+      <button
+        class="rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all {ocrEngine ===
+        'ai'
+          ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-700 dark:text-white'
+          : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'}"
+        onclick={() => handleEngineChange("ai")}
+      >
+        AI OCR
+      </button>
+    </div>
+  </div>
+{/snippet}
+
 <div class="flex h-full w-full flex-col p-3 select-none">
   <ExtensionHeader
     placeholder="在识别结果中过滤/搜索行..."
     bind:value={searchQuery}
     onBack={handleBack}
+    right={rightSnippet}
   />
 
   <div class="mt-3 flex min-h-0 flex-1 flex-row gap-5 overflow-hidden">
@@ -556,6 +614,14 @@
         <div
           class="pointer-events-none absolute inset-0 bg-[radial-gradient(#e5e7eb_1.5px,transparent_1.5px)] [background-size:24px_24px] opacity-60 dark:bg-[radial-gradient(#262626_1.5px,transparent_1.5px)] dark:opacity-100"
         ></div>
+
+        {#if ocrResult && !isProcessing && ocrEngine === "ai"}
+          <div
+            class="pointer-events-none absolute top-4 left-4 z-10 rounded-xl border border-neutral-200/50 bg-white/80 px-2.5 py-1.5 text-[10px] font-semibold text-neutral-600 shadow-sm backdrop-blur-md dark:border-neutral-800/50 dark:bg-neutral-950/80 dark:text-neutral-300"
+          >
+            ✨ AI 高精度识别模式（无高亮定位框）
+          </div>
+        {/if}
 
         {#if isProcessing}
           <div

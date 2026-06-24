@@ -31,6 +31,7 @@ pub struct OcrResult {
 #[derive(Deserialize, Debug, Clone)]
 pub struct OcrOptions {
     pub language: Option<String>,
+    pub engine: Option<String>, // "local" | "ai"
 }
 
 fn get_image_bytes(image_str: &str) -> Result<Vec<u8>, String> {
@@ -68,30 +69,112 @@ fn preprocess_image_bytes<'a>(bytes: &'a [u8]) -> (Cow<'a, [u8]>, f32) {
     (Cow::Borrowed(bytes), 1.0)
 }
 
+async fn run_ai_ocr(
+    app_handle: tauri::AppHandle,
+    image: String,
+    _options: Option<OcrOptions>,
+) -> Result<OcrResult, String> {
+    use crate::ai_manager::provider::{ChatMessage, ChatRequest, ContentPart};
+    use base64::Engine;
+    use tauri::Manager;
+
+    // 1. 获取 AI 管理器
+    let ai_manager = app_handle
+        .try_state::<std::sync::Arc<crate::ai_manager::AIManager>>()
+        .ok_or_else(|| "AI 管理器未激活，请检查是否在设置中配置了默认模型".to_string())?;
+
+    // 2. 提取 Base64 图片数据
+    let raw_bytes = get_image_bytes(&image)?;
+    let base64_data = base64::prelude::BASE64_STANDARD.encode(&raw_bytes);
+
+    // 检测媒体类型：通过 image 库精准猜测真实格式以防 API 报错
+    let media_type = match image::guess_format(&raw_bytes) {
+        Ok(image::ImageFormat::Png) => "image/png".to_string(),
+        Ok(image::ImageFormat::Jpeg) => "image/jpeg".to_string(),
+        Ok(image::ImageFormat::WebP) => "image/webp".to_string(),
+        Ok(image::ImageFormat::Gif) => "image/gif".to_string(),
+        _ => "image/png".to_string(), // fallback
+    };
+
+    // 3. 构建多模态 AI 识别请求
+    let system_message = ChatMessage {
+        role: "system".to_string(),
+        content: vec![ContentPart::Text {
+            text: "You are a highly accurate OCR (Optical Character Recognition) assistant. Please extract and identify all text from the provided image and output the recognized text content exactly matching the layout and line breaks of the original image. Do not add any explanations, introductory text, markdown block formatting (do not wrap with ```), or conversational filler. Output only the raw text.".to_string(),
+        }],
+    };
+
+    let user_message = ChatMessage {
+        role: "user".to_string(),
+        content: vec![ContentPart::ImageBase64 {
+            image_base64: base64_data,
+            media_type: Some(media_type),
+        }],
+    };
+
+    let chat_request = ChatRequest {
+        model: None, // 恢复为默认模型
+        messages: vec![system_message, user_message],
+        temperature: Some(0.1), // 设低温度以保证输出的稳定性
+        max_tokens: Some(4000),
+        stream: Some(false),
+    };
+
+    let text = ai_manager.ask(chat_request).await.map_err(|e| {
+        let err_str = e.to_string();
+        // 友好的底层异常映射提示
+        if err_str.contains("modalities")
+            || err_str.contains("image")
+            || err_str.contains("multimodal")
+            || err_str.contains("400")
+        {
+            format!("{} (当前启用的 AI 模型可能不支持图片识别)", err_str)
+        } else {
+            format!("AI 识别失败: {}", err_str)
+        }
+    })?;
+
+    Ok(OcrResult {
+        text,
+        lines: Vec::new(), // AI OCR 不带高亮定位框
+    })
+}
+
 #[tauri::command]
 pub async fn plugin_ocr_recognize(
+    app_handle: tauri::AppHandle,
     image: String,
     options: Option<OcrOptions>,
 ) -> Result<OcrResult, String> {
-    #[cfg(target_os = "windows")]
-    {
-        run_windows_ocr(image, options).await
-    }
+    let engine = options
+        .as_ref()
+        .and_then(|opts| opts.engine.as_ref())
+        .map(|s| s.as_str())
+        .unwrap_or("local");
 
-    #[cfg(target_os = "macos")]
-    {
-        run_macos_ocr(image, options).await
-    }
+    if engine == "ai" {
+        run_ai_ocr(app_handle, image, options).await
+    } else {
+        #[cfg(target_os = "windows")]
+        {
+            run_windows_ocr(image, options).await
+        }
 
-    #[cfg(target_os = "linux")]
-    {
-        run_linux_ocr(image, options).await
-    }
+        #[cfg(target_os = "macos")]
+        {
+            run_macos_ocr(image, options).await
+        }
 
-    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-    {
-        let _ = (image, options);
-        Err("OCR is currently not supported on this platform.".to_string())
+        #[cfg(target_os = "linux")]
+        {
+            run_linux_ocr(image, options).await
+        }
+
+        #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+        {
+            let _ = (image, options);
+            Err("OCR is currently not supported on this platform.".to_string())
+        }
     }
 }
 
