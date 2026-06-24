@@ -11,8 +11,6 @@
     CaretDoubleUp,
     CaretDoubleDown,
     Plus,
-    Trash,
-    PencilSimple,
     Sparkle,
     Cpu,
     Lightning,
@@ -24,7 +22,7 @@
 
   type TabId = "providers" | "mcp" | "skills";
   const tabs: { id: TabId; label: string; icon: any }[] = [
-    { id: "providers", label: "模型", icon: Sparkle },
+    { id: "providers", label: "提供商", icon: Sparkle },
     { id: "mcp", label: "MCP", icon: Cpu },
     { id: "skills", label: "Skills", icon: Lightning },
   ];
@@ -229,14 +227,22 @@
   let isSyncingRegistry = $state(false);
   let isRegistryLoading = $state(true);
 
-  let providers = $derived<RemoteProvider[]>(providersRegistry);
+  let availableProviders = $derived<RemoteProvider[]>(providersRegistry);
+
+  let popularProviders = $derived(
+    availableProviders.filter((p) => getProviderMeta(p.id).isPopular),
+  );
+
+  let otherProviders = $derived(
+    availableProviders.filter((p) => !getProviderMeta(p.id).isPopular),
+  );
 
   let selectedRemoteProvider = $derived(
-    providers.find((p) => p.id === editForm.provider_type),
+    availableProviders.find((p) => p.id === editForm.provider_type),
   );
 
   let providerOptions = $derived(
-    providers.map((p) => ({ value: p.id, label: p.name })),
+    availableProviders.map((p) => ({ value: p.id, label: p.name })),
   );
 
   let filteredProviderOptions = $derived(
@@ -299,7 +305,7 @@
   $effect(() => {
     const type = editForm.provider_type;
     if (type && editingIndex === -1) {
-      const remote = providers.find((p) => p.id === type);
+      const remote = availableProviders.find((p) => p.id === type);
       if (remote) {
         editForm.base_url = remote.baseUrl;
         editForm.name = remote.name.split(" ")[0];
@@ -473,6 +479,8 @@
 
   function startAdd() {
     editingIndex = -1;
+    providerSearch = "";
+    modelSearch = "";
     editForm = {
       id: "",
       provider_type: "",
@@ -481,6 +489,98 @@
       base_url: "",
       api_key: null,
       default_model: null,
+      models: null,
+    };
+  }
+
+  interface ProviderMeta {
+    description: string;
+    isPopular: boolean;
+    recommendTag?: string;
+  }
+
+  const PROVIDER_METAS: Record<string, ProviderMeta> = {
+    deepseek: {
+      description: "高性价比国产大模型服务，提供极佳的推理与通用能力",
+      isPopular: true,
+      recommendTag: "推荐",
+    },
+    openai: {
+      description: "行业标杆，提供强大的 GPT 系列模型与多模态能力",
+      isPopular: true,
+      recommendTag: "推荐",
+    },
+    anthropic: {
+      description: "业界顶尖的 Claude 系列模型，适合复杂推理与长文本",
+      isPopular: true,
+      recommendTag: "推荐",
+    },
+    google: {
+      description: "Google Gemini 核心模型，多模态与长上下文优势明显",
+      isPopular: true,
+    },
+    ollama: {
+      description: "本地部署大模型服务的首选，完全免费，数据绝对安全隐私",
+      isPopular: true,
+    },
+    openrouter: {
+      description: "一站式 API 路由服务，可快速接入成百上千种前沿与开源模型",
+      isPopular: true,
+    },
+    groq: {
+      description: "超高速开源大模型推理引擎",
+      isPopular: true,
+    },
+    together: {
+      description: "大模型开源托管平台",
+      isPopular: true,
+    },
+    mistral: {
+      description: "欧洲主流的开源大模型先锋",
+      isPopular: true,
+    },
+    cohere: {
+      description: "企业级语言模型与重排服务",
+      isPopular: true,
+    },
+    siliconflow: {
+      description: "硅基流动高性能大模型服务平台",
+      isPopular: true,
+    },
+    zhipu: {
+      description: "智谱 AI 大模型开放平台",
+      isPopular: true,
+    },
+    moonshot: {
+      description: "月之暗面 (Kimi) 开放平台",
+      isPopular: true,
+    },
+  };
+
+  function getProviderMeta(id: string) {
+    const key = id.toLowerCase();
+    if (PROVIDER_METAS[key]) {
+      return PROVIDER_METAS[key];
+    }
+    return {
+      description: "通过标准 OpenAI 协议连接的其他 AI 大模型服务",
+      isPopular: false,
+    };
+  }
+
+  function connectRegistryProvider(remote: RemoteProvider) {
+    editingIndex = -1;
+    providerSearch = "";
+    modelSearch = "";
+    editForm = {
+      id: "",
+      provider_type: remote.id,
+      name: remote.name,
+      display_name: null,
+      base_url: remote.baseUrl,
+      api_key: null,
+      default_model:
+        remote.models && remote.models.length > 0 ? remote.models[0].id : null,
       models: null,
     };
   }
@@ -581,7 +681,9 @@
     // 根据 provider_type 决定默认的显示名称
     let defaultName = editForm.name;
     if (!defaultName) {
-      const remote = providers.find((p) => p.id === editForm.provider_type);
+      const remote = availableProviders.find(
+        (p) => p.id === editForm.provider_type,
+      );
       if (remote) {
         defaultName = remote.name.split(" ")[0];
       } else {
@@ -704,19 +806,18 @@
     {:else if activeTab === "skills"}
       <SkillsSettings />
     {:else}
-      <!-- Header -->
-      <div class="mb-6 flex items-center justify-between px-1">
-        <div>
-          <h2
-            class="mb-1 text-sm font-semibold text-neutral-900 dark:text-neutral-100"
-          >
-            模型
-          </h2>
-          <p class="text-xs text-neutral-500 dark:text-neutral-400">
-            管理你的 AI 大模型配置与服务
-          </p>
-        </div>
-        {#if editingIndex === null}
+      {#if editingIndex === null}
+        <div class="mb-6 flex items-center justify-between px-1">
+          <div>
+            <h2
+              class="mb-1 text-sm font-semibold text-neutral-900 dark:text-neutral-100"
+            >
+              提供商
+            </h2>
+            <p class="text-xs text-neutral-500 dark:text-neutral-400">
+              管理你的 AI 提供商与服务
+            </p>
+          </div>
           <div class="flex gap-2">
             <Button.Root
               class="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 text-xs font-medium text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
@@ -726,401 +827,262 @@
               {isSyncingRegistry ? "正在同步..." : "同步模型列表"}
             </Button.Root>
           </div>
-        {/if}
-      </div>
+        </div>
+      {/if}
 
       <!-- Provider List or Edit Form -->
-      <div class="space-y-3">
+      <div class="space-y-6">
         {#if editingIndex === null}
-          <!-- List View -->
-          {#if config.providers.length === 0}
-            <div
-              class="rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-6 py-12 text-center dark:border-neutral-700 dark:bg-neutral-900/50"
+          <!-- 已连接的提供商分区 -->
+          <div>
+            <h3
+              class="mb-3 text-xs font-semibold tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
             >
-              <p class="mb-4 text-sm text-neutral-500 dark:text-neutral-400">
-                暂无已配置的模型
-              </p>
-              <Button.Root
-                class="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-neutral-900 px-4 text-sm font-medium text-neutral-50 shadow-sm transition-colors hover:bg-neutral-900/90 focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:outline-hidden dark:bg-neutral-50 dark:text-neutral-900 dark:hover:bg-neutral-50/90"
-                onclick={startAdd}
-              >
-                <Plus class="h-4 w-4" />
-                添加第一个模型
-              </Button.Root>
-            </div>
-          {:else}
-            {#each config.providers as provider, index (provider.id)}
-              {@const defaultModelInfo = getModelInfo(provider)}
-              <div
-                class="group relative overflow-hidden rounded-xl border transition-all {config.active_provider_id ===
-                provider.id
-                  ? 'border-green-500 bg-green-50/50 dark:border-green-600 dark:bg-green-950/20'
-                  : 'border-neutral-200 bg-white hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700'}"
-              >
-                <div class="flex items-start gap-4 p-4">
-                  <!-- Active Indicator -->
-                  <button
-                    class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors {config.active_provider_id ===
-                    provider.id
-                      ? 'border-green-500 bg-green-500'
-                      : 'border-neutral-300 hover:border-neutral-400 dark:border-neutral-600 dark:hover:border-neutral-500'}"
-                    onclick={() => setActive(provider.id)}
-                    aria-label="Set as active provider"
-                  >
-                    {#if config.active_provider_id === provider.id}
-                      <div class="h-2 w-2 rounded-full bg-white"></div>
-                    {/if}
-                  </button>
+              已连接的提供商
+            </h3>
 
-                  <!-- Provider Info -->
-                  <div class="min-w-0 flex-1">
-                    <div class="flex items-center gap-2">
-                      <h3
-                        class="font-semibold text-neutral-900 dark:text-neutral-100"
-                      >
-                        {provider.display_name || provider.name}
-                      </h3>
-                      {#if config.active_provider_id === provider.id}
-                        <span
-                          class="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                        >
-                          当前启用
-                        </span>
-                      {/if}
+            {#if config.providers.length === 0}
+              <div
+                class="rounded-xl border border-dashed border-neutral-200 bg-neutral-50/50 px-6 py-8 text-center dark:border-neutral-800 dark:bg-neutral-900/20"
+              >
+                <p class="text-xs text-neutral-400 dark:text-neutral-500">
+                  暂无已连接的提供商
+                </p>
+              </div>
+            {:else}
+              <div
+                class="divide-y divide-neutral-100 overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-xs dark:divide-neutral-800/60 dark:border-neutral-800 dark:bg-neutral-900"
+              >
+                {#each config.providers as provider, index (provider.id)}
+                  {@const defaultModelInfo = getModelInfo(provider)}
+                  <div
+                    class="group relative flex cursor-pointer items-center justify-between px-4 py-3 transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800/30"
+                    onclick={() => setActive(provider.id)}
+                  >
+                    <!-- Left indicator & Info -->
+                    <div class="flex min-w-0 items-center gap-2.5">
+                      <!-- Active dot indicator -->
+                      <div class="flex w-4 items-center justify-center">
+                        {#if config.active_provider_id === provider.id}
+                          <span class="relative flex h-2 w-2">
+                            <span
+                              class="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"
+                            ></span>
+                            <span
+                              class="relative inline-flex h-2 w-2 rounded-full bg-green-500"
+                            ></span>
+                          </span>
+                        {:else}
+                          <span
+                            class="h-2 w-2 rounded-full bg-neutral-200 transition-colors group-hover:bg-neutral-300 dark:bg-neutral-700 dark:group-hover:bg-neutral-600"
+                          ></span>
+                        {/if}
+                      </div>
+
+                      <!-- Text details -->
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-2">
+                          <span
+                            class="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100"
+                          >
+                            {provider.display_name || provider.name}
+                          </span>
+                          <span
+                            class="rounded border border-solid border-neutral-200/50 bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:border-neutral-700/50 dark:bg-neutral-800 dark:text-neutral-400"
+                          >
+                            {provider.api_key ? "API 密钥" : "免密钥"}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <div
-                      class="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400"
-                    >
-                      {#if provider.display_name}
-                        <span>{provider.name}</span>
-                        <span>•</span>
-                      {/if}
+
+                    <!-- Middle: Default Model display -->
+                    <div class="hidden items-center gap-2 sm:flex">
                       {#if provider.default_model}
                         <code
-                          class="rounded border border-neutral-300/30 bg-neutral-100 px-1 py-0.5 font-mono text-[10px] text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
-                          >{provider.default_model}</code
+                          class="rounded-md border border-neutral-200/60 bg-neutral-50 px-2 py-0.5 font-mono text-[11px] text-neutral-700 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-300"
                         >
+                          {provider.default_model}
+                        </code>
                       {/if}
-                      {#if defaultModelInfo}
-                        <div class="flex items-center gap-1">
-                          {#if defaultModelInfo.context_window}
-                            <span
-                              class="rounded bg-neutral-100 px-1 py-0.5 text-[9px] font-medium text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
-                              title="上下文窗口"
-                            >
-                              {Math.round(
-                                defaultModelInfo.context_window / 1024,
-                              )}k
-                            </span>
-                          {/if}
-                          {#if defaultModelInfo.reasoning}
-                            <span
-                              class="rounded bg-purple-100 px-1 py-0.5 text-[9px] font-medium text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
-                              title="支持思考链推理">思考</span
-                            >
-                          {/if}
-                          {#if defaultModelInfo.tool_call}
-                            <span
-                              class="rounded bg-blue-100 px-1 py-0.5 text-[9px] font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
-                              title="支持工具/函数调用">工具</span
-                            >
-                          {/if}
-                          {#if defaultModelInfo.attachment}
-                            <span
-                              class="rounded bg-green-100 px-1 py-0.5 text-[9px] font-medium text-green-600 dark:bg-green-900/30 dark:text-green-400"
-                              title="支持图片/文件上传（多模态）">多模态</span
-                            >
-                          {/if}
-                        </div>
-                      {/if}
-                      <span>•</span>
-                      <span
-                        class="max-w-[200px] truncate"
-                        title={provider.base_url}>{provider.base_url}</span
+                    </div>
+
+                    <!-- Right actions -->
+                    <div
+                      class="flex items-center gap-3"
+                      onclick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        class="text-xs text-neutral-500 transition-colors hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200"
+                        onclick={() => startEdit(index)}
                       >
+                        编辑
+                      </button>
+                      <span class="text-neutral-300 dark:text-neutral-800"
+                        >|</span
+                      >
+                      <button
+                        class="text-xs text-red-500 transition-colors hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
+                        onclick={() => deleteProvider(index)}
+                      >
+                        断开连接
+                      </button>
                     </div>
                   </div>
-
-                  <!-- Actions -->
-                  <div class="flex shrink-0 gap-2">
-                    <Button.Root
-                      class="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 text-xs font-medium text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
-                      onclick={() => startEdit(index)}
-                    >
-                      <PencilSimple class="h-3.5 w-3.5" />
-                      编辑
-                    </Button.Root>
-                    <Button.Root
-                      class="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-red-200 bg-white px-3 text-xs font-medium text-red-600 shadow-sm transition-colors hover:bg-red-50 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-hidden dark:border-red-900 dark:bg-neutral-800 dark:text-red-400 dark:hover:bg-red-950/30"
-                      onclick={() => deleteProvider(index)}
-                    >
-                      <Trash class="h-3.5 w-3.5" />
-                      删除
-                    </Button.Root>
-                  </div>
-                </div>
+                {/each}
               </div>
-            {/each}
+            {/if}
+          </div>
 
-            <!-- Add Button -->
-            <Button.Root
-              class="flex h-12 w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-neutral-300 bg-transparent text-sm font-medium text-neutral-600 transition-colors hover:border-neutral-400 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:border-neutral-600 dark:hover:bg-neutral-800/50"
-              onclick={startAdd}
+          <!-- 热门提供商分区 -->
+          <div class="space-y-2.5">
+            <h3
+              class="text-xs font-semibold tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
             >
-              <Plus class="h-4 w-4" />
-              添加模型
-            </Button.Root>
-          {/if}
+              热门提供商
+            </h3>
+            <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3">
+              {#each popularProviders as rp (rp.id)}
+                <div
+                  class="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-2.5 shadow-xs transition-all hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700"
+                >
+                  <span
+                    class="truncate pr-1 text-xs font-medium text-neutral-900 dark:text-neutral-100"
+                  >
+                    {rp.name}
+                  </span>
+                  <Button.Root
+                    class="inline-flex h-7 shrink-0 items-center justify-center gap-0.5 rounded-lg border border-neutral-200 bg-white px-2.5 text-[11px] font-semibold text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+                    onclick={() => connectRegistryProvider(rp)}
+                  >
+                    <Plus class="h-3 w-3" />
+                    连接
+                  </Button.Root>
+                </div>
+              {/each}
+            </div>
+          </div>
+
+          <!-- 其他提供商分区 -->
+          <div class="space-y-2.5 pt-2">
+            <h3
+              class="text-xs font-semibold tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
+            >
+              其他可用提供商
+            </h3>
+            <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+              {#each otherProviders as rp (rp.id)}
+                <div
+                  class="flex items-center justify-between rounded-lg border border-neutral-200 bg-white p-2 shadow-2xs transition-all hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700"
+                >
+                  <span
+                    class="truncate pr-1 text-xs font-medium text-neutral-800 dark:text-neutral-200"
+                  >
+                    {rp.name}
+                  </span>
+                  <Button.Root
+                    class="shadow-3xs inline-flex h-6 shrink-0 items-center justify-center gap-0.5 rounded-md border border-neutral-200 bg-white px-2 text-[10px] font-semibold text-neutral-600 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700"
+                    onclick={() => connectRegistryProvider(rp)}
+                  >
+                    <Plus class="h-2.5 w-2.5" />
+                    连接
+                  </Button.Root>
+                </div>
+              {/each}
+
+              <!-- 手动连接自定义大模型 -->
+              <div
+                class="flex items-center justify-between rounded-lg border border-dashed border-neutral-200 bg-transparent p-2 transition-all hover:border-neutral-300 dark:border-neutral-800 dark:hover:border-neutral-700"
+              >
+                <span
+                  class="truncate pr-1 text-xs font-medium text-neutral-800 dark:text-neutral-200"
+                >
+                  自定义直连服务
+                </span>
+                <Button.Root
+                  class="shadow-3xs inline-flex h-6 shrink-0 items-center justify-center gap-0.5 rounded-md border border-neutral-200 bg-white px-2 text-[10px] font-semibold text-neutral-600 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700"
+                  onclick={startAdd}
+                >
+                  <Plus class="h-2.5 w-2.5" />
+                  连接
+                </Button.Root>
+              </div>
+            </div>
+          </div>
         {:else}
           <!-- Edit Form -->
           <div
-            class="overflow-hidden rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900"
+            class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-xs transition-all dark:border-neutral-800 dark:bg-neutral-900"
           >
+            <!-- Header with name -->
             <div
-              class="border-b border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-800/50"
+              class="relative flex items-center justify-between border-b border-neutral-200/60 bg-neutral-50/50 px-4 py-3.5 dark:border-neutral-800/60 dark:bg-neutral-800/30"
             >
-              <h3 class="font-semibold text-neutral-900 dark:text-neutral-100">
-                {editingIndex === -1 ? "添加模型" : "编辑模型"}
-              </h3>
+              <div class="flex items-center gap-2.5">
+                <div>
+                  <h3
+                    class="text-sm font-semibold text-neutral-900 dark:text-neutral-100"
+                  >
+                    {editingIndex === -1 ? "连接新提供商" : "编辑提供商配置"}
+                  </h3>
+                  <p class="text-xs text-neutral-500 dark:text-neutral-400">
+                    {editForm.provider_type
+                      ? `正在配置 ${selectedRemoteProvider?.name || editForm.provider_type}`
+                      : "选择一个大模型提供商开始连接"}
+                  </p>
+                </div>
+              </div>
+
+              <!-- 如果是新建且已经选了类型，允许用户清除重选 -->
+              {#if editingIndex === -1 && editForm.provider_type}
+                <button
+                  type="button"
+                  class="text-xs text-neutral-500 transition-colors hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
+                  onclick={() => {
+                    editForm.provider_type = "";
+                    editForm.base_url = "";
+                    editForm.name = "";
+                    editForm.default_model = null;
+                    editForm.models = null;
+                  }}
+                >
+                  重新选择
+                </button>
+              {/if}
             </div>
 
             <div class="space-y-4 p-4">
-              <!-- Provider Selector -->
-              <div>
-                <span
-                  class="mb-1.5 block text-sm font-medium text-neutral-700 dark:text-neutral-300"
-                >
-                  服务提供商
-                </span>
-                <Combobox.Root
-                  type="single"
-                  name="provider"
-                  inputValue={providerOptions.find(
-                    (o) => o.value === editForm.provider_type,
-                  )?.label || ""}
-                  onOpenChange={(o) => {
-                    if (!o) providerSearch = "";
-                  }}
-                  onValueChange={(v) => {
-                    if (v) {
-                      editForm.provider_type = v;
-                      providerSearch = "";
-                    }
-                  }}
-                >
-                  <div class="relative w-full">
-                    <Combobox.Input
-                      id="provider-type"
-                      oninput={(e) => (providerSearch = e.currentTarget.value)}
-                      class="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm font-medium text-neutral-900 placeholder:text-neutral-500 focus:ring-2 focus:ring-neutral-950 focus:ring-offset-2 focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-offset-neutral-950 dark:placeholder:text-neutral-400 dark:focus:ring-neutral-300"
-                      placeholder="选择提供商"
-                    />
-                    <Combobox.Trigger
-                      class="absolute top-1/2 right-3 -translate-y-1/2 text-neutral-400"
-                    >
-                      <CaretUpDown class="h-4 w-4" />
-                    </Combobox.Trigger>
-                  </div>
-
-                  <Combobox.Portal>
-                    <Combobox.Content
-                      class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 max-h-64 w-[var(--bits-combobox-anchor-width)] overflow-hidden rounded-md border border-neutral-200 bg-white shadow-md dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-50"
-                    >
-                      <Combobox.ScrollUpButton
-                        class="flex w-full items-center justify-center py-1 text-neutral-400"
-                      >
-                        <CaretDoubleUp class="h-3 w-3" />
-                      </Combobox.ScrollUpButton>
-                      <Combobox.Viewport class="p-1">
-                        {#each filteredProviderOptions as option (option.value)}
-                          <Combobox.Item
-                            class="flex cursor-pointer items-center rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-[highlighted]:bg-neutral-100 dark:data-[highlighted]:bg-neutral-800"
-                            value={option.value}
-                            label={option.label}
-                          >
-                            {#snippet children({ selected })}
-                              <span class="flex-1">{option.label}</span>
-                              {#if selected}
-                                <Check class="h-4 w-4" />
-                              {/if}
-                            {/snippet}
-                          </Combobox.Item>
-                        {:else}
-                          {#if isRegistryLoading}
-                            <div
-                              class="px-2 py-3 text-center text-sm text-neutral-400"
-                            >
-                              正在加载模型列表...
-                            </div>
-                          {:else if providersRegistry.length === 0}
-                            <div
-                              class="px-2 py-3 text-center text-sm text-neutral-400"
-                            >
-                              暂无模型数据，请点击上方的「同步模型列表」按钮获取
-                            </div>
-                          {:else}
-                            <div
-                              class="px-2 py-3 text-center text-sm text-neutral-400"
-                            >
-                              未找到匹配项
-                            </div>
-                          {/if}
-                        {/each}
-                      </Combobox.Viewport>
-                      <Combobox.ScrollDownButton
-                        class="flex w-full items-center justify-center py-1 text-neutral-400"
-                      >
-                        <CaretDoubleDown class="h-3 w-3" />
-                      </Combobox.ScrollDownButton>
-                    </Combobox.Content>
-                  </Combobox.Portal>
-                </Combobox.Root>
-              </div>
-
-              <!-- 提供商名称 -->
-              <div>
-                <label
-                  for="provider-name-input"
-                  class="mb-1.5 block text-sm font-medium text-neutral-700 dark:text-neutral-300"
-                >
-                  配置名称
-                </label>
-                <input
-                  id="provider-name-input"
-                  type="text"
-                  bind:value={editForm.name}
-                  placeholder="如「DeepSeek」、「OpenAI」"
-                  class="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:focus:border-neutral-100"
-                />
-              </div>
-
-              <!-- Base URL -->
-              <div>
-                <label
-                  for="api-url-input"
-                  class="mb-1.5 block text-sm font-medium text-neutral-700 dark:text-neutral-300"
-                >
-                  API 地址 (Base URL)
-                </label>
-                {#if editForm.provider_type === "openrouter"}
-                  <input
-                    id="api-url-input"
-                    type="text"
-                    value={editForm.base_url}
-                    disabled
-                    class="h-10 w-full cursor-not-allowed rounded-lg border border-neutral-200 bg-neutral-50 px-3 text-sm text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800/50 dark:text-neutral-400"
-                  />
-                {:else}
-                  <input
-                    id="api-url-input"
-                    type="text"
-                    bind:value={editForm.base_url}
-                    placeholder="https://..."
-                    class="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:focus:border-neutral-100"
-                  />
-                {/if}
-              </div>
-
-              <!-- 自定义显示别名 (可选) -->
-              <div>
-                <label
-                  for="display-name-input"
-                  class="mb-1.5 block text-sm font-medium text-neutral-700 dark:text-neutral-300"
-                >
-                  自定义显示别名 (可选)
-                </label>
-                <input
-                  id="display-name-input"
-                  type="text"
-                  bind:value={editForm.display_name}
-                  placeholder="区分多个账号用, 如「我的工作账号」"
-                  class="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:focus:border-neutral-100"
-                />
-              </div>
-
-              <!-- API Key -->
-              <div>
-                <label
-                  for="api-key-input"
-                  class="mb-1.5 block text-sm font-medium text-neutral-700 dark:text-neutral-300"
-                >
-                  API 密钥 (API Key)
-                </label>
-                <PasswordInput
-                  id="api-key-input"
-                  bind:value={editForm.api_key}
-                  placeholder="sk-..."
-                  class="h-10 w-full rounded-lg bg-white dark:bg-neutral-800"
-                />
-                {#if selectedRemoteProvider?.apiKeyUrl}
-                  <p
-                    class="mt-1 text-xs text-neutral-500 dark:text-neutral-400"
+              <!-- 1. 如果尚未选择提供商类型 (仅在新建且 provider_type 为空时显示) -->
+              {#if !editForm.provider_type}
+                <div>
+                  <span
+                    class="mb-1.5 block text-xs font-semibold tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
                   >
-                    需要申请 API 密钥?
-                    <button
-                      type="button"
-                      class="text-blue-600 hover:underline dark:text-blue-400"
-                      onclick={() => {
-                        if (selectedRemoteProvider?.apiKeyUrl) {
-                          openUrl(selectedRemoteProvider.apiKeyUrl);
-                        }
-                      }}
-                    >
-                      点击前往官网申请
-                    </button>
-                  </p>
-                {/if}
-              </div>
-
-              <!-- Model Selector -->
-              <div>
-                <div class="mb-1.5 flex items-center justify-between">
-                  <label
-                    for="default-model-input"
-                    class="block text-sm font-medium text-neutral-700 dark:text-neutral-300"
-                  >
-                    默认模型
-                  </label>
-                  <button
-                    type="button"
-                    class="text-xs font-medium text-blue-600 hover:underline disabled:opacity-50 dark:text-blue-400"
-                    disabled={isSyncingDirect}
-                    onclick={syncDirectModels}
-                  >
-                    {isSyncingDirect ? "正在拉取..." : "从 API 拉取最新模型"}
-                  </button>
-                </div>
-                {#if modelOptions.length > 0}
+                    服务提供商
+                  </span>
                   <Combobox.Root
                     type="single"
-                    name="model"
-                    inputValue={modelOptions.find(
-                      (o) => o.value === editForm.default_model,
-                    )?.label ||
-                      editForm.default_model ||
-                      ""}
+                    name="provider"
+                    inputValue={providerOptions.find(
+                      (o) => o.value === editForm.provider_type,
+                    )?.label || ""}
                     onOpenChange={(o) => {
-                      if (!o) modelSearch = "";
+                      if (!o) providerSearch = "";
                     }}
                     onValueChange={(v) => {
-                      if (v) editForm.default_model = v;
-                      modelSearch = "";
+                      if (v) {
+                        editForm.provider_type = v;
+                        providerSearch = "";
+                      }
                     }}
                   >
                     <div class="relative w-full">
                       <Combobox.Input
-                        id="default-model-input"
-                        oninput={(e) => {
-                          modelSearch = e.currentTarget.value;
-                          editForm.default_model = e.currentTarget.value;
-                        }}
-                        onblur={(e) => {
-                          if (e.currentTarget.value) {
-                            editForm.default_model = e.currentTarget.value;
-                          }
-                        }}
+                        id="provider-type"
+                        oninput={(e) =>
+                          (providerSearch = e.currentTarget.value)}
                         class="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm font-medium text-neutral-900 placeholder:text-neutral-500 focus:ring-2 focus:ring-neutral-950 focus:ring-offset-2 focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-offset-neutral-950 dark:placeholder:text-neutral-400 dark:focus:ring-neutral-300"
-                        placeholder="选择或输入模型"
+                        placeholder="选择提供商"
                       />
                       <Combobox.Trigger
                         class="absolute top-1/2 right-3 -translate-y-1/2 text-neutral-400"
@@ -1139,58 +1101,39 @@
                           <CaretDoubleUp class="h-3 w-3" />
                         </Combobox.ScrollUpButton>
                         <Combobox.Viewport class="p-1">
-                          {#each filteredModelOptions as option (option.value)}
+                          {#each filteredProviderOptions as option (option.value)}
                             <Combobox.Item
                               class="flex cursor-pointer items-center rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-[highlighted]:bg-neutral-100 dark:data-[highlighted]:bg-neutral-800"
                               value={option.value}
                               label={option.label}
                             >
                               {#snippet children({ selected })}
-                                <div
-                                  class="flex min-w-0 flex-1 items-center gap-1.5"
-                                >
-                                  <span class="truncate">{option.label}</span>
-                                  <div class="flex shrink-0 items-center gap-1">
-                                    {#if option.model.context_window}
-                                      <span
-                                        class="rounded bg-neutral-100 px-1 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
-                                      >
-                                        {Math.round(
-                                          option.model.context_window / 1024,
-                                        )}k
-                                      </span>
-                                    {/if}
-                                    {#if option.model.reasoning}
-                                      <span
-                                        class="rounded bg-purple-100 px-1 py-0.5 text-[10px] font-medium text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
-                                        title="思考链推理">思考</span
-                                      >
-                                    {/if}
-                                    {#if option.model.tool_call}
-                                      <span
-                                        class="rounded bg-blue-100 px-1 py-0.5 text-[10px] font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
-                                        title="工具/函数调用">工具</span
-                                      >
-                                    {/if}
-                                    {#if option.model.attachment}
-                                      <span
-                                        class="rounded bg-green-100 px-1 py-0.5 text-[10px] font-medium text-green-600 dark:bg-green-900/30 dark:text-green-400"
-                                        title="图片/文件上传">附件</span
-                                      >
-                                    {/if}
-                                  </div>
-                                </div>
+                                <span class="flex-1">{option.label}</span>
                                 {#if selected}
-                                  <Check class="h-4 w-4 shrink-0" />
+                                  <Check class="h-4 w-4" />
                                 {/if}
                               {/snippet}
                             </Combobox.Item>
                           {:else}
-                            <div
-                              class="px-2 py-3 text-center text-sm text-neutral-400"
-                            >
-                              未找到匹配项
-                            </div>
+                            {#if isRegistryLoading}
+                              <div
+                                class="px-2 py-3 text-center text-sm text-neutral-400"
+                              >
+                                正在加载模型列表...
+                              </div>
+                            {:else if providersRegistry.length === 0}
+                              <div
+                                class="px-2 py-3 text-center text-sm text-neutral-400"
+                              >
+                                暂无模型数据，请点击上方的「同步模型列表」按钮获取
+                              </div>
+                            {:else}
+                              <div
+                                class="px-2 py-3 text-center text-sm text-neutral-400"
+                              >
+                                未找到匹配项
+                              </div>
+                            {/if}
                           {/each}
                         </Combobox.Viewport>
                         <Combobox.ScrollDownButton
@@ -1201,36 +1144,282 @@
                       </Combobox.Content>
                     </Combobox.Portal>
                   </Combobox.Root>
-                {:else}
-                  <input
-                    id="default-model-input"
-                    class="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:focus:border-neutral-100"
-                    bind:value={editForm.default_model}
-                    placeholder="例如 gpt-4o"
+                </div>
+              {:else}
+                <!-- 2. 已选定提供商，展示具体配置字段 -->
+
+                <!-- 双栏排列: 配置名称 和 自定义显示别名 -->
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <label
+                      for="provider-name-input"
+                      class="mb-1.5 block text-xs font-semibold tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
+                    >
+                      配置名称 (必填)
+                    </label>
+                    <input
+                      id="provider-name-input"
+                      type="text"
+                      bind:value={editForm.name}
+                      placeholder="如「DeepSeek」、「OpenAI」"
+                      class="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:focus:border-neutral-100"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      for="display-name-input"
+                      class="mb-1.5 block text-xs font-semibold tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
+                    >
+                      配置别名 (可选)
+                    </label>
+                    <input
+                      id="display-name-input"
+                      type="text"
+                      bind:value={editForm.display_name}
+                      placeholder="区分多个账号, 如「工作账号」"
+                      class="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:focus:border-neutral-100"
+                    />
+                  </div>
+                </div>
+
+                <!-- API Key -->
+                <div>
+                  <label
+                    for="api-key-input"
+                    class="mb-1.5 block text-xs font-semibold tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
+                  >
+                    API 密钥 (API Key)
+                  </label>
+                  <PasswordInput
+                    id="api-key-input"
+                    bind:value={editForm.api_key}
+                    placeholder={editForm.provider_type === "ollama"
+                      ? "Ollama 本地服务通常免密钥"
+                      : "输入您的 API Key / 密钥"}
+                    class="h-10 w-full rounded-lg bg-white dark:bg-neutral-800"
                   />
-                {/if}
-              </div>
+                  {#if selectedRemoteProvider?.apiKeyUrl}
+                    <p
+                      class="mt-1.5 text-xs text-neutral-500 dark:text-neutral-400"
+                    >
+                      需要申请 API 密钥?
+                      <button
+                        type="button"
+                        class="text-blue-600 hover:underline dark:text-blue-400"
+                        onclick={() => {
+                          if (selectedRemoteProvider?.apiKeyUrl) {
+                            openUrl(selectedRemoteProvider.apiKeyUrl);
+                          }
+                        }}
+                      >
+                        点击前往官网申请
+                      </button>
+                    </p>
+                  {/if}
+                </div>
+
+                <!-- Base URL -->
+                <div>
+                  <label
+                    for="api-url-input"
+                    class="mb-1.5 block text-xs font-semibold tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
+                  >
+                    API 地址 (Base URL)
+                  </label>
+                  {#if editForm.provider_type === "openrouter"}
+                    <input
+                      id="api-url-input"
+                      type="text"
+                      value={editForm.base_url}
+                      disabled
+                      class="h-10 w-full cursor-not-allowed rounded-lg border border-neutral-200 bg-neutral-50 px-3 text-sm text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800/50 dark:text-neutral-400"
+                    />
+                  {:else}
+                    <input
+                      id="api-url-input"
+                      type="text"
+                      bind:value={editForm.base_url}
+                      placeholder="https://..."
+                      class="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:focus:border-neutral-100"
+                    />
+                  {/if}
+                </div>
+
+                <!-- Model Selector -->
+                <div>
+                  <div class="mb-1.5 flex items-center justify-between">
+                    <label
+                      for="default-model-input"
+                      class="text-xs font-semibold tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
+                    >
+                      默认模型
+                    </label>
+                    <button
+                      type="button"
+                      class="text-xs font-semibold text-blue-600 hover:underline disabled:opacity-50 dark:text-blue-400"
+                      disabled={isSyncingDirect}
+                      onclick={syncDirectModels}
+                    >
+                      {isSyncingDirect ? "正在拉取..." : "从 API 拉取最新模型"}
+                    </button>
+                  </div>
+                  {#if modelOptions.length > 0}
+                    <Combobox.Root
+                      type="single"
+                      name="model"
+                      inputValue={modelOptions.find(
+                        (o) => o.value === editForm.default_model,
+                      )?.label ||
+                        editForm.default_model ||
+                        ""}
+                      onOpenChange={(o) => {
+                        if (!o) modelSearch = "";
+                      }}
+                      onValueChange={(v) => {
+                        if (v) editForm.default_model = v;
+                        modelSearch = "";
+                      }}
+                    >
+                      <div class="relative w-full">
+                        <Combobox.Input
+                          id="default-model-input"
+                          oninput={(e) => {
+                            modelSearch = e.currentTarget.value;
+                            editForm.default_model = e.currentTarget.value;
+                          }}
+                          onblur={(e) => {
+                            if (e.currentTarget.value) {
+                              editForm.default_model = e.currentTarget.value;
+                            }
+                          }}
+                          class="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm font-medium text-neutral-900 placeholder:text-neutral-500 focus:ring-2 focus:ring-neutral-950 focus:ring-offset-2 focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-offset-neutral-950 dark:placeholder:text-neutral-400 dark:focus:ring-neutral-300"
+                          placeholder="选择或输入模型"
+                        />
+                        <Combobox.Trigger
+                          class="absolute top-1/2 right-3 -translate-y-1/2 text-neutral-400"
+                        >
+                          <CaretUpDown class="h-4 w-4" />
+                        </Combobox.Trigger>
+                      </div>
+
+                      <Combobox.Portal>
+                        <Combobox.Content
+                          class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 max-h-64 w-[var(--bits-combobox-anchor-width)] overflow-hidden rounded-md border border-neutral-200 bg-white shadow-md dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-50"
+                        >
+                          <Combobox.ScrollUpButton
+                            class="flex w-full items-center justify-center py-1 text-neutral-400"
+                          >
+                            <CaretDoubleUp class="h-3 w-3" />
+                          </Combobox.ScrollUpButton>
+                          <Combobox.Viewport class="p-1">
+                            {#each filteredModelOptions as option (option.value)}
+                              <Combobox.Item
+                                class="flex cursor-pointer items-center rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-[highlighted]:bg-neutral-100 dark:data-[highlighted]:bg-neutral-800"
+                                value={option.value}
+                                label={option.label}
+                              >
+                                {#snippet children({ selected })}
+                                  <div
+                                    class="flex min-w-0 flex-1 items-center gap-1.5"
+                                  >
+                                    <span class="truncate">{option.label}</span>
+                                    <div
+                                      class="flex shrink-0 items-center gap-1"
+                                    >
+                                      {#if option.model.context_window}
+                                        <span
+                                          class="rounded bg-neutral-100 px-1 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
+                                        >
+                                          {Math.round(
+                                            option.model.context_window / 1024,
+                                          )}k
+                                        </span>
+                                      {/if}
+                                      {#if option.model.reasoning}
+                                        <span
+                                          class="rounded bg-purple-100 px-1 py-0.5 text-[10px] font-medium text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
+                                          title="思考链推理">思考</span
+                                        >
+                                      {/if}
+                                      {#if option.model.tool_call}
+                                        <span
+                                          class="rounded bg-blue-100 px-1 py-0.5 text-[10px] font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                                          title="工具/函数调用">工具</span
+                                        >
+                                      {/if}
+                                      {#if option.model.attachment}
+                                        <span
+                                          class="rounded bg-green-100 px-1 py-0.5 text-[10px] font-medium text-green-600 dark:bg-green-900/30 dark:text-green-400"
+                                          title="图片/文件上传">附件</span
+                                        >
+                                      {/if}
+                                    </div>
+                                  </div>
+                                  {#if selected}
+                                    <Check class="h-4 w-4 shrink-0" />
+                                  {/if}
+                                {/snippet}
+                              </Combobox.Item>
+                            {:else}
+                              <div
+                                class="px-2 py-3 text-center text-sm text-neutral-400"
+                              >
+                                未找到匹配项
+                              </div>
+                            {/each}
+                          </Combobox.Viewport>
+                          <Combobox.ScrollDownButton
+                            class="flex w-full items-center justify-center py-1 text-neutral-400"
+                          >
+                            <CaretDoubleDown class="h-3 w-3" />
+                          </Combobox.ScrollDownButton>
+                        </Combobox.Content>
+                      </Combobox.Portal>
+                    </Combobox.Root>
+                  {:else}
+                    <input
+                      id="default-model-input"
+                      class="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:focus:border-neutral-100"
+                      bind:value={editForm.default_model}
+                      placeholder="例如 gpt-4o"
+                    />
+                  {/if}
+                </div>
+              {/if}
 
               <!-- Actions -->
-              <div class="flex justify-end gap-2 pt-2">
-                <Button.Root
-                  class="inline-flex h-9 items-center justify-center rounded-lg border border-neutral-200 bg-white px-4 text-sm font-medium text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
-                  onclick={testConnection}
-                >
-                  测试连接
-                </Button.Root>
-                <Button.Root
-                  class="inline-flex h-9 items-center justify-center rounded-lg border border-neutral-200 bg-white px-4 text-sm font-medium text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
-                  onclick={cancelEdit}
-                >
-                  取消
-                </Button.Root>
-                <Button.Root
-                  class="inline-flex h-9 items-center justify-center rounded-lg bg-neutral-900 px-4 text-sm font-semibold text-neutral-50 shadow-sm transition-colors hover:bg-neutral-900/90 focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:outline-hidden dark:bg-neutral-50 dark:text-neutral-900 dark:hover:bg-neutral-50/90"
-                  onclick={save}
-                >
-                  保存
-                </Button.Root>
+              <div
+                class="mt-6 flex items-center justify-between gap-2 border-t border-neutral-100 pt-3 dark:border-neutral-800/80"
+              >
+                <!-- Left: Test connection -->
+                <div>
+                  {#if editForm.provider_type}
+                    <Button.Root
+                      class="inline-flex h-9 items-center justify-center rounded-lg border border-neutral-200 bg-white px-4 text-xs font-semibold text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+                      onclick={testConnection}
+                    >
+                      测试连接
+                    </Button.Root>
+                  {/if}
+                </div>
+
+                <!-- Right: Cancel and Save -->
+                <div class="flex gap-2">
+                  <Button.Root
+                    class="inline-flex h-9 items-center justify-center rounded-lg border border-neutral-200 bg-white px-4 text-xs font-semibold text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+                    onclick={cancelEdit}
+                  >
+                    取消
+                  </Button.Root>
+                  <Button.Root
+                    class="inline-flex h-9 items-center justify-center rounded-lg bg-neutral-900 px-4 text-xs font-bold text-neutral-50 shadow-sm transition-colors hover:bg-neutral-900/90 focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:outline-hidden dark:bg-neutral-50 dark:text-neutral-900 dark:hover:bg-neutral-50/90"
+                    onclick={save}
+                    disabled={!editForm.provider_type}
+                  >
+                    保存
+                  </Button.Root>
+                </div>
               </div>
             </div>
           </div>

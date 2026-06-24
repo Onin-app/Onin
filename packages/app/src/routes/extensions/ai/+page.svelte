@@ -645,7 +645,7 @@
         class="flex h-full w-full flex-col items-center justify-center gap-3"
       >
         <Spinner class="h-5 w-5 animate-spin text-neutral-500" />
-        <span class="text-xs text-neutral-500">检测 AI 能力中...</span>
+        <span class="text-xs text-neutral-500">检测 AI 配置中...</span>
       </div>
     {:else if isConfigured === false}
       <!-- 智海迷航：未配置 Provider 引导状态 -->
@@ -675,7 +675,7 @@
             onclick={handleToConfig}
           >
             <Gear size={14} />
-            配置 AI 能力
+            前往配置 AI
           </Button.Root>
         </div>
       </div>
