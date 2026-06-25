@@ -8,18 +8,18 @@ pub fn init(_app: &tauri::AppHandle) {}
 
 pub static OCR_MANIFEST: ExtensionManifest = ExtensionManifest {
     id: "ocr",
-    name: "文字识别",
+    name: "OCR",
     description: "Onin 官方 OCR 扩展，支持识别剪贴板或拖拽的图片中的文字",
     icon: "scan",
     commands: &[ExtensionCommand {
         code: "recognize",
-        name: "文字识别",
+        name: "OCR",
         description: Some("从剪贴板或拖拽的图片中识别文字"),
         icon: Some("scan"),
         keywords: &[],
         matches: Some(&[StaticCommandMatch {
             match_type: "image",
-            name: "文字识别",
+            name: "OCR",
             description: "识别图片中的文字",
             regexp: None,
             min: Some(1),

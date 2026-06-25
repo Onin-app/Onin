@@ -12,7 +12,6 @@
     Spinner,
     FileImage,
     ClipboardText,
-    MagnifyingGlass,
     TextIndent,
   } from "phosphor-svelte";
   import { Tabs, Button } from "bits-ui";
@@ -44,7 +43,6 @@
   }
 
   // 状态变量 (Svelte 5 语法)
-  let searchQuery = $state("");
   let imageSrc = $state<string | null>(null);
   let isProcessing = $state(false);
   let ocrResult = $state<OcrResult | null>(null);
@@ -88,14 +86,8 @@
   // 点击选中的行索引，实现图片和逐行列表的联动
   let selectedLineIndex = $state<number | null>(null);
 
-  // 根据搜索过滤后的行数据
-  let filteredLines = $derived(
-    ocrResult
-      ? ocrResult.lines.filter((line) =>
-          line.text.toLowerCase().includes(searchQuery.toLowerCase()),
-        )
-      : [],
-  );
+  // 行数据
+  let filteredLines = $derived(ocrResult ? ocrResult.lines : []);
 
   // OCR 识别执行
   async function recognizeImage(src: string) {
@@ -144,6 +136,10 @@
   async function handleEngineChange(engine: "local" | "ai") {
     if (ocrEngine === engine) return;
     ocrEngine = engine;
+
+    if (engine === "ai") {
+      activeTab = "merged";
+    }
 
     if (imageSrc) {
       await recognizeImage(imageSrc);
@@ -485,6 +481,9 @@
           config.ocr_default_engine === "ai")
       ) {
         ocrEngine = config.ocr_default_engine;
+        if (ocrEngine === "ai") {
+          activeTab = "merged";
+        }
       }
     } catch (e) {
       console.error("Failed to load OCR default engine config:", e);
@@ -520,7 +519,61 @@
 <svelte:window onmousemove={handleMouseMove} onmouseup={handleMouseUp} />
 
 {#snippet rightSnippet()}
-  <div class="flex items-center gap-2">
+  <div class="flex items-center gap-3">
+    <!-- 1. 完整文本 / 逐行列表 切换 (仅在本地 OCR 模式且有结果时显示) -->
+    {#if ocrResult && ocrEngine === "local"}
+      <div
+        class="flex gap-1 rounded-lg bg-neutral-100 p-0.5 dark:bg-neutral-800/80"
+      >
+        <button
+          class="rounded-md px-2.5 py-1 text-xs font-semibold transition-all {activeTab ===
+          'merged'
+            ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-700 dark:text-white'
+            : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'}"
+          onclick={() => (activeTab = "merged")}
+        >
+          完整文本
+        </button>
+        <button
+          class="rounded-md px-2.5 py-1 text-xs font-semibold transition-all {activeTab ===
+          'lines'
+            ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-700 dark:text-white'
+            : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'}"
+          onclick={() => (activeTab = "lines")}
+        >
+          逐行列表
+        </button>
+      </div>
+    {/if}
+
+    <!-- 2. 操作动作：复制、清空 (仅在有识别结果时显示) -->
+    {#if ocrResult}
+      {#if ocrEngine === "local"}
+        <span class="h-4 w-[1px] bg-neutral-200 dark:bg-neutral-800"></span>
+      {/if}
+      <div class="flex items-center gap-1.5">
+        <Button.Root
+          class="flex h-7 items-center gap-1 rounded-lg bg-blue-500 px-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-blue-600 active:scale-95"
+          onclick={() =>
+            copyText(activeTab === "merged" ? editableText : ocrResult!.text)}
+        >
+          <Copy class="size-3.5" />
+          复制全部
+        </Button.Root>
+
+        <Button.Root
+          class="flex h-7 items-center gap-1 rounded-lg border border-neutral-200 px-2.5 text-xs font-semibold text-neutral-700 transition-colors hover:bg-neutral-50 active:scale-95 dark:border-neutral-800/80 dark:text-neutral-200 dark:hover:bg-neutral-800"
+          onclick={handleClear}
+        >
+          <Trash class="size-3.5" />
+          清空
+        </Button.Root>
+      </div>
+    {/if}
+
+    <span class="h-4 w-[1px] bg-neutral-200 dark:bg-neutral-800"></span>
+
+    <!-- 3. 本地 OCR / AI OCR 引擎切换 -->
     <div
       class="flex items-center gap-0.5 rounded-xl border border-neutral-200/50 bg-neutral-100/80 p-0.5 dark:border-neutral-700/50 dark:bg-neutral-800/80"
     >
@@ -548,8 +601,8 @@
 
 <div class="flex h-full w-full flex-col p-3 select-none">
   <ExtensionHeader
-    placeholder="在识别结果中过滤/搜索行..."
-    bind:value={searchQuery}
+    showSearch={false}
+    title="OCR"
     onBack={handleBack}
     right={rightSnippet}
   />
@@ -673,47 +726,43 @@
           {#if ocrResult && !isProcessing}
             <div class="pointer-events-auto absolute inset-0">
               {#each ocrResult.lines as line}
-                {#if searchQuery === "" || line.text
-                    .toLowerCase()
-                    .includes(searchQuery.toLowerCase())}
-                  <div
-                    class="group absolute cursor-pointer rounded border border-blue-500/25 bg-blue-500/5 transition-all duration-200 hover:border-blue-500/90 hover:bg-blue-500/15 hover:shadow-lg hover:shadow-blue-500/10"
-                    style="
-                        left: {(line.x / naturalWidth) * 100}%;
-                        top: {(line.y / naturalHeight) * 100}%;
-                        width: {(line.width / naturalWidth) * 100}%;
-                        height: {(line.height / naturalHeight) * 100}%;
-                      "
-                    onclick={() => {
-                      if (hasMoved) return;
+                <div
+                  class="group absolute cursor-pointer rounded border border-blue-500/25 bg-blue-500/5 transition-all duration-200 hover:border-blue-500/90 hover:bg-blue-500/15 hover:shadow-lg hover:shadow-blue-500/10"
+                  style="
+                      left: {(line.x / naturalWidth) * 100}%;
+                      top: {(line.y / naturalHeight) * 100}%;
+                      width: {(line.width / naturalWidth) * 100}%;
+                      height: {(line.height / naturalHeight) * 100}%;
+                    "
+                  onclick={() => {
+                    if (hasMoved) return;
+                    copyText(line.text);
+                    if (ocrResult) {
+                      const idx = ocrResult.lines.indexOf(line);
+                      if (idx !== -1) {
+                        highlightAndScrollToLine(idx);
+                      }
+                    }
+                  }}
+                  onkeydown={(e) => {
+                    if (e.key === "Enter" && ocrResult) {
                       copyText(line.text);
-                      if (ocrResult) {
-                        const idx = ocrResult.lines.indexOf(line);
-                        if (idx !== -1) {
-                          highlightAndScrollToLine(idx);
-                        }
+                      const idx = ocrResult.lines.indexOf(line);
+                      if (idx !== -1) {
+                        highlightAndScrollToLine(idx);
                       }
-                    }}
-                    onkeydown={(e) => {
-                      if (e.key === "Enter" && ocrResult) {
-                        copyText(line.text);
-                        const idx = ocrResult.lines.indexOf(line);
-                        if (idx !== -1) {
-                          highlightAndScrollToLine(idx);
-                        }
-                      }
-                    }}
-                    role="button"
-                    tabindex="0"
-                    title="点击定位并复制"
+                    }
+                  }}
+                  role="button"
+                  tabindex="0"
+                  title="点击定位并复制"
+                >
+                  <span
+                    class="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2.5 line-clamp-3 hidden max-w-[250px] min-w-[150px] -translate-x-1/2 rounded-xl border border-neutral-800 bg-neutral-950 px-3 py-2 text-center text-xs whitespace-normal text-white shadow-xl group-hover:block dark:border-neutral-700"
                   >
-                    <span
-                      class="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2.5 line-clamp-3 hidden max-w-[250px] min-w-[150px] -translate-x-1/2 rounded-xl border border-neutral-800 bg-neutral-950 px-3 py-2 text-center text-xs whitespace-normal text-white shadow-xl group-hover:block dark:border-neutral-700"
-                    >
-                      {line.text}
-                    </span>
-                  </div>
-                {/if}
+                    {line.text}
+                  </span>
+                </div>
               {/each}
             </div>
           {/if}
@@ -760,52 +809,6 @@
         onValueChange={(v) => v && (activeTab = v as "merged" | "lines")}
         class="flex w-[55%] flex-col overflow-hidden rounded-3xl border border-neutral-200/80 bg-white/90 shadow-xl shadow-neutral-200/10 backdrop-blur-md dark:border-neutral-800/80 dark:bg-neutral-900/40 dark:shadow-neutral-950/30"
       >
-        <div
-          class="flex items-center justify-between border-b border-neutral-200/60 bg-neutral-50/40 px-4 py-2.5 dark:border-neutral-800/60 dark:bg-neutral-950/20"
-        >
-          <div class="w-40">
-            <Tabs.List
-              class="flex gap-1 rounded-lg bg-neutral-100 p-0.5 dark:bg-neutral-800/80"
-            >
-              <Tabs.Trigger
-                value="merged"
-                class="flex-1 rounded-md py-1 text-xs font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-neutral-900 data-[state=active]:shadow-xs dark:text-neutral-400 dark:data-[state=active]:bg-neutral-700 dark:data-[state=active]:text-white"
-              >
-                完整文本
-              </Tabs.Trigger>
-              <Tabs.Trigger
-                value="lines"
-                class="flex-1 rounded-md py-1 text-xs font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-neutral-900 data-[state=active]:shadow-xs dark:text-neutral-400 dark:data-[state=active]:bg-neutral-700 dark:data-[state=active]:text-white"
-              >
-                逐行列表
-              </Tabs.Trigger>
-            </Tabs.List>
-          </div>
-
-          <div class="flex items-center gap-2">
-            {#if ocrResult}
-              <Button.Root
-                class="flex h-7 items-center gap-1 rounded-lg bg-blue-500 px-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-blue-600 active:scale-95"
-                onclick={() =>
-                  copyText(
-                    activeTab === "merged" ? editableText : ocrResult!.text,
-                  )}
-              >
-                <Copy class="size-3.5" />
-                复制全部
-              </Button.Root>
-            {/if}
-
-            <Button.Root
-              class="flex h-7 items-center gap-1 rounded-lg border border-neutral-200 px-2.5 text-xs font-semibold text-neutral-700 transition-colors hover:bg-neutral-50 active:scale-95 dark:border-neutral-800/80 dark:text-neutral-200 dark:hover:bg-neutral-800"
-              onclick={handleClear}
-            >
-              <Trash class="size-3.5" />
-              清空
-            </Button.Root>
-          </div>
-        </div>
-
         <div class="relative flex min-h-0 flex-1 flex-col">
           <Tabs.Content
             value="merged"
@@ -868,8 +871,8 @@
                     <div
                       class="flex flex-col items-center justify-center py-16 text-neutral-400 dark:text-neutral-500"
                     >
-                      <MagnifyingGlass class="mb-2 size-8" />
-                      <span class="text-xs">没有找到匹配的文字行</span>
+                      <ClipboardText class="mb-2 size-8" />
+                      <span class="text-xs">无可用的文字行</span>
                     </div>
                   {:else}
                     {#each filteredLines as line}

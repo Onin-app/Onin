@@ -13,6 +13,8 @@
     title?: string;
     placeholder?: string;
     value?: string;
+    showSearch?: boolean;
+    disabled?: boolean;
     onInput?: (value: string) => void;
     onBack?: () => void;
     onKeyDown?: (e: KeyboardEvent) => void;
@@ -24,6 +26,8 @@
     title,
     placeholder = "搜索...",
     value = $bindable(""),
+    showSearch = true,
+    disabled = false,
     onInput,
     onBack,
     onKeyDown,
@@ -71,20 +75,35 @@
     <ArrowLeft class="size-5" weight="bold" />
   </button>
 
-  <!-- Search Input -->
-  <div
-    class="flex w-full flex-row items-center gap-2 rounded-lg border border-neutral-300 bg-white px-2 py-2 dark:border-neutral-600 dark:bg-neutral-800"
-  >
-    <input
-      bind:this={inputElement}
-      class="h-[34px] min-w-0 flex-1 bg-transparent text-2xl focus:ring-0 focus:outline-none active:ring-0 active:outline-none"
-      type="text"
-      {placeholder}
-      {value}
-      oninput={handleInput}
-      onkeydown={handleKeyDown}
-    />
-  </div>
+  <!-- Search Input or Title -->
+  {#if showSearch}
+    <div
+      class="flex w-full flex-row items-center gap-2 rounded-lg border border-neutral-300 bg-white px-2 py-2 transition-all duration-200 dark:border-neutral-600 dark:bg-neutral-800 {disabled
+        ? 'cursor-not-allowed bg-neutral-50 opacity-65 dark:bg-neutral-900/50'
+        : ''}"
+    >
+      <input
+        bind:this={inputElement}
+        class="h-[34px] min-w-0 flex-1 bg-transparent text-2xl focus:ring-0 focus:outline-none active:ring-0 active:outline-none {disabled
+          ? 'cursor-not-allowed text-neutral-400 dark:text-neutral-500'
+          : ''}"
+        type="text"
+        {disabled}
+        {placeholder}
+        {value}
+        oninput={handleInput}
+        onkeydown={handleKeyDown}
+      />
+    </div>
+  {:else}
+    <div class="flex-1 pl-1.5">
+      <h2
+        class="text-sm font-semibold tracking-wide text-neutral-800 uppercase dark:text-neutral-100"
+      >
+        {title || "扩展"}
+      </h2>
+    </div>
+  {/if}
 
   <!-- Right Slot -->
   <div class="flex-shrink-0">
