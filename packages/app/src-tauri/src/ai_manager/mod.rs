@@ -159,6 +159,80 @@ impl AIManager {
         }
     }
 
+    pub async fn ask_with_provider(
+        &self,
+        provider_id: Option<&str>,
+        mut request: ChatRequest,
+    ) -> Result<String, Box<dyn Error + Send + Sync>> {
+        // 1. 在局限的作用域内读取配置并立即释放 config 读锁
+        let (target_provider_id, active_provider_id, target_provider_config) = {
+            let config = self.config.read().await;
+
+            let target_id = provider_id
+                .map(|s| s.to_string())
+                .or_else(|| config.active_provider_id.clone());
+
+            let target_id = match target_id {
+                Some(id) => id,
+                None => return Err("No AI provider configured".into()),
+            };
+
+            let provider_config = config.providers.iter().find(|p| p.id == target_id).cloned();
+
+            (
+                target_id,
+                config.active_provider_id.clone(),
+                provider_config,
+            )
+        }; // config 读锁在此释放
+
+        // 2. 检查是否可复用活跃的提供商实例，Arc 拷贝后立即释放 active_provider 读锁
+        let active_provider_opt = {
+            let active_lock = self.active_provider.read().await;
+            if active_provider_id.as_deref() == Some(&target_provider_id) {
+                active_lock.clone()
+            } else {
+                None
+            }
+        }; // active_lock 读锁在此释放
+
+        // 3. 执行 ask 网络请求，此时所有锁均已安全释放
+        if let Some(active) = active_provider_opt {
+            if request.model.is_none() {
+                if let Some(ref provider_config) = target_provider_config {
+                    request.model = provider_config.default_model.clone();
+                }
+            }
+
+            if request.model.is_none() {
+                return Err("No model specified and no default model configured".into());
+            }
+
+            active.ask(request).await
+        } else if let Some(provider_config) = target_provider_config {
+            let provider = OpenAICompatibleProvider::new(
+                provider_config.base_url.clone(),
+                provider_config.api_key.clone(),
+            );
+
+            if request.model.is_none() {
+                request.model = provider_config.default_model.clone();
+            }
+
+            if request.model.is_none() {
+                return Err("No model specified and no default model configured".into());
+            }
+
+            provider.ask(request).await
+        } else {
+            Err(format!(
+                "Provider with ID {} not found in configuration",
+                target_provider_id
+            )
+            .into())
+        }
+    }
+
     pub async fn stream(
         &self,
         mut request: ChatRequest,

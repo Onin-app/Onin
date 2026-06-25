@@ -18,6 +18,7 @@
   import { Tabs, Button } from "bits-ui";
   import AppScrollArea from "$lib/components/AppScrollArea.svelte";
   import ExtensionHeader from "$lib/components/ExtensionHeader.svelte";
+  import type { AppConfig } from "$lib/type";
 
   // 定义类型
   interface OcrWord {
@@ -469,11 +470,25 @@
     goto("/");
   };
 
-  onMount(() => {
+  onMount(async () => {
     // 监听聚焦，如果是自动切回来可以实现无缝识别
     window.addEventListener("focus", handleWindowFocus);
     window.addEventListener("resize", calculateDisplaySize);
     document.addEventListener("paste", handlePaste);
+
+    // 读取默认引擎配置
+    try {
+      const config = await invoke<AppConfig>("get_app_config");
+      if (
+        config &&
+        (config.ocr_default_engine === "local" ||
+          config.ocr_default_engine === "ai")
+      ) {
+        ocrEngine = config.ocr_default_engine;
+      }
+    } catch (e) {
+      console.error("Failed to load OCR default engine config:", e);
+    }
 
     // 挂载时尝试自动识别一次当前剪贴板的图片
     readClipboardImage(true);

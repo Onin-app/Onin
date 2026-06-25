@@ -78,12 +78,25 @@ async fn run_ai_ocr(
     use base64::Engine;
     use tauri::Manager;
 
-    // 1. 获取 AI 管理器
+    // 1. 获取 OCR 专用 AI 配置
+    let (ocr_provider_id, ocr_model_id) = {
+        if let Some(config_state) = app_handle.try_state::<crate::app_config::AppConfigState>() {
+            let config = config_state
+                .0
+                .lock()
+                .map_err(|e| format!("配置锁已被毒化: {}", e))?;
+            (config.ocr_provider_id.clone(), config.ocr_model_id.clone())
+        } else {
+            (None, None)
+        }
+    };
+
+    // 2. 获取 AI 管理器
     let ai_manager = app_handle
         .try_state::<std::sync::Arc<crate::ai_manager::AIManager>>()
         .ok_or_else(|| "AI 管理器未激活，请检查是否在设置中配置了默认模型".to_string())?;
 
-    // 2. 提取 Base64 图片数据
+    // 3. 提取 Base64 图片数据
     let raw_bytes = get_image_bytes(&image)?;
     let base64_data = base64::prelude::BASE64_STANDARD.encode(&raw_bytes);
 
@@ -96,7 +109,7 @@ async fn run_ai_ocr(
         _ => "image/png".to_string(), // fallback
     };
 
-    // 3. 构建多模态 AI 识别请求
+    // 4. 构建多模态 AI 识别请求
     let system_message = ChatMessage {
         role: "system".to_string(),
         content: vec![ContentPart::Text {
@@ -113,26 +126,29 @@ async fn run_ai_ocr(
     };
 
     let chat_request = ChatRequest {
-        model: None, // 恢复为默认模型
+        model: ocr_model_id, // 使用 OCR 专属配置的模型
         messages: vec![system_message, user_message],
         temperature: Some(0.1), // 设低温度以保证输出的稳定性
         max_tokens: Some(4000),
         stream: Some(false),
     };
 
-    let text = ai_manager.ask(chat_request).await.map_err(|e| {
-        let err_str = e.to_string();
-        // 友好的底层异常映射提示
-        if err_str.contains("modalities")
-            || err_str.contains("image")
-            || err_str.contains("multimodal")
-            || err_str.contains("400")
-        {
-            format!("{} (当前启用的 AI 模型可能不支持图片识别)", err_str)
-        } else {
-            format!("AI 识别失败: {}", err_str)
-        }
-    })?;
+    let text = ai_manager
+        .ask_with_provider(ocr_provider_id.as_deref(), chat_request)
+        .await
+        .map_err(|e| {
+            let err_str = e.to_string();
+            // 友好的底层异常映射提示
+            if err_str.contains("modalities")
+                || err_str.contains("image")
+                || err_str.contains("multimodal")
+                || err_str.contains("400")
+            {
+                format!("{} (当前启用的 AI 模型可能不支持图片识别)", err_str)
+            } else {
+                format!("AI 识别失败: {}", err_str)
+            }
+        })?;
 
     Ok(OcrResult {
         text,
