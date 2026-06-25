@@ -95,7 +95,6 @@
     window.addEventListener("keydown", handleLayoutEscape, true);
 
     const listenersPromise = (async () => {
-
       const unlistenVisibility = await listen<boolean>(
         "window_visibility",
         (event) => {
