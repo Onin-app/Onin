@@ -1,5 +1,6 @@
 use crate::ai_manager::provider::{
-    AIProvider, ChatRequest, ModelInfo, ProviderCapabilities, ValidationResult,
+    AIProvider, ChatRequest, ContentPart, ImageUrl, ModelInfo, ProviderCapabilities,
+    ValidationResult,
 };
 
 use async_trait::async_trait;
@@ -55,6 +56,34 @@ struct OpenAIStreamDelta {
     content: Option<String>,
 }
 
+fn normalize_request(mut request: ChatRequest) -> ChatRequest {
+    for msg in &mut request.messages {
+        msg.content = msg
+            .content
+            .iter()
+            .map(|part| match part {
+                ContentPart::ImageBase64 {
+                    image_base64,
+                    media_type,
+                } => {
+                    let mime = media_type
+                        .clone()
+                        .unwrap_or_else(|| "image/png".to_string());
+                    let data_url = format!("data:{};base64,{}", mime, image_base64);
+                    ContentPart::ImageUrl {
+                        image_url: ImageUrl {
+                            url: data_url,
+                            detail: None,
+                        },
+                    }
+                }
+                other => other.clone(),
+            })
+            .collect();
+    }
+    request
+}
+
 #[async_trait]
 impl AIProvider for OpenAICompatibleProvider {
     fn id(&self) -> &str {
@@ -62,6 +91,7 @@ impl AIProvider for OpenAICompatibleProvider {
     }
 
     async fn ask(&self, request: ChatRequest) -> Result<String, Box<dyn Error + Send + Sync>> {
+        let request = normalize_request(request);
         let url = format!("{}/chat/completions", self.base_url.trim_end_matches('/'));
 
         // request already has the correct structure (MessageContent is untagged enum)
@@ -91,11 +121,12 @@ impl AIProvider for OpenAICompatibleProvider {
 
     async fn stream(
         &self,
-        mut request: ChatRequest,
+        request: ChatRequest,
     ) -> Result<
         BoxStream<'static, Result<String, Box<dyn Error + Send + Sync>>>,
         Box<dyn Error + Send + Sync>,
     > {
+        let mut request = normalize_request(request);
         request.stream = Some(true);
         let url = format!("{}/chat/completions", self.base_url.trim_end_matches('/'));
 
@@ -203,6 +234,11 @@ impl AIProvider for OpenAICompatibleProvider {
                 name: m.id,
                 description: m.owned_by,
                 context_window: None,
+                attachment: None,
+                reasoning: None,
+                tool_call: None,
+                modalities: None,
+                limit: None,
             })
             .collect())
     }

@@ -73,7 +73,7 @@
       icon: Keyboard,
     },
     {
-      name: "AI 能力",
+      name: "AI",
       id: "ai",
       component: AISettings,
       icon: Sparkle,

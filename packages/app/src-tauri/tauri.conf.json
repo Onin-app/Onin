@@ -42,6 +42,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -61,6 +62,12 @@
     "globalShortcut": {
       "enable": true
     },
-    "notification": null
+    "notification": null,
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRFRjZFRkY2RDIyMDM0MTYKUldRV05DRFM5dS8yVG8vWkRCdVAyWC9OMGgwNEo0cnFLNW1VV1AzZjFQSVNnbW9zQTdUQUVyVHgK",
+      "endpoints": [
+        "https://github.com/Onin-app/Onin/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

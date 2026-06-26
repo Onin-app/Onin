@@ -94,6 +94,18 @@ pub struct AppConfig {
     /// 是否在启动时自动检查更新
     #[serde(default = "default_auto_check_update")]
     pub auto_check_update: bool,
+
+    /// OCR 默认引擎 ("local" | "ai")
+    #[serde(default = "default_ocr_default_engine")]
+    pub ocr_default_engine: String,
+
+    /// OCR AI 提供商 ID
+    #[serde(default)]
+    pub ocr_provider_id: Option<String>,
+
+    /// OCR AI 模型 ID
+    #[serde(default)]
+    pub ocr_model_id: Option<String>,
 }
 
 fn default_auto_paste_time_limit() -> u64 {
@@ -116,6 +128,10 @@ fn default_auto_check_update() -> bool {
     true // 默认开启
 }
 
+fn default_ocr_default_engine() -> String {
+    "local".to_string()
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
@@ -129,6 +145,9 @@ impl Default for AppConfig {
             file_search_include_hidden: false,
             webdav: WebDavConfig::default(),
             auto_check_update: default_auto_check_update(),
+            ocr_default_engine: default_ocr_default_engine(),
+            ocr_provider_id: None,
+            ocr_model_id: None,
         }
     }
 }

@@ -43,11 +43,26 @@ export interface AICapabilities {
   max_images_per_message?: number;
 }
 
+export interface ModelModalities {
+  input: string[];
+  output: string[];
+}
+
+export interface ModelLimit {
+  context?: number | null;
+  output?: number | null;
+}
+
 export interface ModelInfo {
   id: string;
   name: string;
-  description?: string;
-  context_window?: number;
+  description?: string | null;
+  context_window?: number | null;
+  attachment?: boolean | null;
+  reasoning?: boolean | null;
+  tool_call?: boolean | null;
+  modalities?: ModelModalities | null;
+  limit?: ModelLimit | null;
 }
 
 export interface ValidationResult {

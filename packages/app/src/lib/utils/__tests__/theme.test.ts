@@ -1,13 +1,13 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getTheme } from '../theme';
-import { Theme } from '$lib/type';
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { getTheme } from "../theme";
+import { Theme } from "$lib/type";
 
-describe('getTheme', () => {
+describe("getTheme", () => {
   const originalMatchMedia = window.matchMedia;
 
   beforeEach(() => {
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-      matches: query === '(prefers-color-scheme: dark)',
+      matches: query === "(prefers-color-scheme: dark)",
       media: query,
       onchange: null,
       addListener: vi.fn(),
@@ -22,19 +22,19 @@ describe('getTheme', () => {
     window.matchMedia = originalMatchMedia;
   });
 
-  it('returns DARK for Theme.DARK', () => {
+  it("returns DARK for Theme.DARK", () => {
     expect(getTheme(Theme.DARK)).toBe(Theme.DARK);
   });
 
-  it('returns LIGHT for Theme.LIGHT', () => {
+  it("returns LIGHT for Theme.LIGHT", () => {
     expect(getTheme(Theme.LIGHT)).toBe(Theme.LIGHT);
   });
 
-  it('returns DARK from system when prefers dark', () => {
+  it("returns DARK from system when prefers dark", () => {
     expect(getTheme(Theme.SYSTEM)).toBe(Theme.DARK);
   });
 
-  it('returns LIGHT from system when prefers light', () => {
+  it("returns LIGHT from system when prefers light", () => {
     window.matchMedia = vi.fn().mockReturnValue({ matches: false });
     expect(getTheme(Theme.SYSTEM)).toBe(Theme.LIGHT);
   });

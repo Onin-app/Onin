@@ -20,7 +20,6 @@
     appVersion,
     latestVersion,
     releaseNotes,
-    downloadUrl,
     checkUpdate,
     closeUpdateDialog,
   } from "$lib/stores/update";
@@ -95,7 +94,6 @@
     window.addEventListener("keydown", handleLayoutEscape, true);
 
     const listenersPromise = (async () => {
-
       const unlistenVisibility = await listen<boolean>(
         "window_visibility",
         (event) => {
@@ -279,6 +277,5 @@
   currentVersion={$appVersion}
   latestVersion={$latestVersion}
   releaseNotes={$releaseNotes}
-  downloadUrl={$downloadUrl}
   onClose={closeUpdateDialog}
 />

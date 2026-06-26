@@ -270,6 +270,8 @@ jobs:
           GLITCHTIP_ENVIRONMENT: production
           APTABASE_KEY: ${{ secrets.APTABASE_KEY }}
           VITE_APTABASE_KEY: ${{ secrets.VITE_APTABASE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: packages/app
           tagName: ${{ needs.release.outputs.tag }}

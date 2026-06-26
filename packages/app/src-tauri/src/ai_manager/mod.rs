@@ -20,11 +20,11 @@ use futures::stream::BoxStream;
 pub struct AIManager {
     config: RwLock<AIConfig>,
     active_provider: RwLock<Option<Arc<dyn AIProvider>>>,
-    app_handle: AppHandle,
     history_manager: std::sync::Mutex<self::history::HistoryManager>,
     app_data_dir: PathBuf,
     pub active_streams:
         std::sync::Mutex<std::collections::HashMap<String, tauri::async_runtime::JoinHandle<()>>>,
+    pub client: reqwest::Client,
 }
 
 impl AIManager {
@@ -34,14 +34,19 @@ impl AIManager {
             .app_data_dir()
             .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default());
         let history_manager = self::history::HistoryManager::new(data_dir.clone());
+        let user_agent = format!("Onin/{}", env!("CARGO_PKG_VERSION"));
+        let client = reqwest::Client::builder()
+            .user_agent(user_agent)
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new());
 
         Self {
             config: RwLock::new(AIConfig::default()),
             active_provider: RwLock::new(None),
-            app_handle,
             history_manager: std::sync::Mutex::new(history_manager),
             app_data_dir: data_dir,
             active_streams: std::sync::Mutex::new(std::collections::HashMap::new()),
+            client,
         }
     }
 
@@ -151,6 +156,80 @@ impl AIManager {
             provider.ask(request).await
         } else {
             Err("No active AI provider configured".into())
+        }
+    }
+
+    pub async fn ask_with_provider(
+        &self,
+        provider_id: Option<&str>,
+        mut request: ChatRequest,
+    ) -> Result<String, Box<dyn Error + Send + Sync>> {
+        // 1. 在局限的作用域内读取配置并立即释放 config 读锁
+        let (target_provider_id, active_provider_id, target_provider_config) = {
+            let config = self.config.read().await;
+
+            let target_id = provider_id
+                .map(|s| s.to_string())
+                .or_else(|| config.active_provider_id.clone());
+
+            let target_id = match target_id {
+                Some(id) => id,
+                None => return Err("No AI provider configured".into()),
+            };
+
+            let provider_config = config.providers.iter().find(|p| p.id == target_id).cloned();
+
+            (
+                target_id,
+                config.active_provider_id.clone(),
+                provider_config,
+            )
+        }; // config 读锁在此释放
+
+        // 2. 检查是否可复用活跃的提供商实例，Arc 拷贝后立即释放 active_provider 读锁
+        let active_provider_opt = {
+            let active_lock = self.active_provider.read().await;
+            if active_provider_id.as_deref() == Some(&target_provider_id) {
+                active_lock.clone()
+            } else {
+                None
+            }
+        }; // active_lock 读锁在此释放
+
+        // 3. 执行 ask 网络请求，此时所有锁均已安全释放
+        if let Some(active) = active_provider_opt {
+            if request.model.is_none() {
+                if let Some(ref provider_config) = target_provider_config {
+                    request.model = provider_config.default_model.clone();
+                }
+            }
+
+            if request.model.is_none() {
+                return Err("No model specified and no default model configured".into());
+            }
+
+            active.ask(request).await
+        } else if let Some(provider_config) = target_provider_config {
+            let provider = OpenAICompatibleProvider::new(
+                provider_config.base_url.clone(),
+                provider_config.api_key.clone(),
+            );
+
+            if request.model.is_none() {
+                request.model = provider_config.default_model.clone();
+            }
+
+            if request.model.is_none() {
+                return Err("No model specified and no default model configured".into());
+            }
+
+            provider.ask(request).await
+        } else {
+            Err(format!(
+                "Provider with ID {} not found in configuration",
+                target_provider_id
+            )
+            .into())
         }
     }
 

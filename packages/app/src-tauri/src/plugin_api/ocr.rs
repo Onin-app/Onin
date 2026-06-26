@@ -1,4 +1,7 @@
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
+
+const MIN_DIM: u32 = 1200;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct OcrWord {
@@ -28,6 +31,7 @@ pub struct OcrResult {
 #[derive(Deserialize, Debug, Clone)]
 pub struct OcrOptions {
     pub language: Option<String>,
+    pub engine: Option<String>, // "local" | "ai"
 }
 
 fn get_image_bytes(image_str: &str) -> Result<Vec<u8>, String> {
@@ -46,30 +50,147 @@ fn get_image_bytes(image_str: &str) -> Result<Vec<u8>, String> {
     }
 }
 
+fn preprocess_image_bytes<'a>(bytes: &'a [u8]) -> (Cow<'a, [u8]>, f32) {
+    if let Ok(img) = image::load_from_memory(bytes) {
+        let w = img.width();
+        let h = img.height();
+        // 如果图像宽或高小于 MIN_DIM 像素，等比放大 2 倍提升识别率
+        if w < MIN_DIM || h < MIN_DIM {
+            let scaled = img.resize(w * 2, h * 2, image::imageops::FilterType::CatmullRom);
+            let mut buffer = std::io::Cursor::new(Vec::new());
+            if scaled
+                .write_to(&mut buffer, image::ImageFormat::Png)
+                .is_ok()
+            {
+                return (Cow::Owned(buffer.into_inner()), 2.0);
+            }
+        }
+    }
+    (Cow::Borrowed(bytes), 1.0)
+}
+
+async fn run_ai_ocr(
+    app_handle: tauri::AppHandle,
+    image: String,
+    _options: Option<OcrOptions>,
+) -> Result<OcrResult, String> {
+    use crate::ai_manager::provider::{ChatMessage, ChatRequest, ContentPart};
+    use base64::Engine;
+    use tauri::Manager;
+
+    // 1. 获取 OCR 专用 AI 配置
+    let (ocr_provider_id, ocr_model_id) = {
+        if let Some(config_state) = app_handle.try_state::<crate::app_config::AppConfigState>() {
+            let config = config_state
+                .0
+                .lock()
+                .map_err(|e| format!("配置锁已被毒化: {}", e))?;
+            (config.ocr_provider_id.clone(), config.ocr_model_id.clone())
+        } else {
+            (None, None)
+        }
+    };
+
+    // 2. 获取 AI 管理器
+    let ai_manager = app_handle
+        .try_state::<std::sync::Arc<crate::ai_manager::AIManager>>()
+        .ok_or_else(|| "AI 管理器未激活，请检查是否在设置中配置了默认模型".to_string())?;
+
+    // 3. 提取 Base64 图片数据
+    let raw_bytes = get_image_bytes(&image)?;
+    let base64_data = base64::prelude::BASE64_STANDARD.encode(&raw_bytes);
+
+    // 检测媒体类型：通过 image 库精准猜测真实格式以防 API 报错
+    let media_type = match image::guess_format(&raw_bytes) {
+        Ok(image::ImageFormat::Png) => "image/png".to_string(),
+        Ok(image::ImageFormat::Jpeg) => "image/jpeg".to_string(),
+        Ok(image::ImageFormat::WebP) => "image/webp".to_string(),
+        Ok(image::ImageFormat::Gif) => "image/gif".to_string(),
+        _ => "image/png".to_string(), // fallback
+    };
+
+    // 4. 构建多模态 AI 识别请求
+    let system_message = ChatMessage {
+        role: "system".to_string(),
+        content: vec![ContentPart::Text {
+            text: "You are a highly accurate OCR (Optical Character Recognition) assistant. Please extract and identify all text from the provided image and output the recognized text content exactly matching the layout and line breaks of the original image. Do not add any explanations, introductory text, markdown block formatting (do not wrap with ```), or conversational filler. Output only the raw text.".to_string(),
+        }],
+    };
+
+    let user_message = ChatMessage {
+        role: "user".to_string(),
+        content: vec![ContentPart::ImageBase64 {
+            image_base64: base64_data,
+            media_type: Some(media_type),
+        }],
+    };
+
+    let chat_request = ChatRequest {
+        model: ocr_model_id, // 使用 OCR 专属配置的模型
+        messages: vec![system_message, user_message],
+        temperature: Some(0.1), // 设低温度以保证输出的稳定性
+        max_tokens: Some(4000),
+        stream: Some(false),
+    };
+
+    let text = ai_manager
+        .ask_with_provider(ocr_provider_id.as_deref(), chat_request)
+        .await
+        .map_err(|e| {
+            let err_str = e.to_string();
+            // 友好的底层异常映射提示
+            if err_str.contains("modalities")
+                || err_str.contains("image")
+                || err_str.contains("multimodal")
+                || err_str.contains("400")
+            {
+                format!("{} (当前启用的 AI 模型可能不支持图片识别)", err_str)
+            } else {
+                format!("AI 识别失败: {}", err_str)
+            }
+        })?;
+
+    Ok(OcrResult {
+        text,
+        lines: Vec::new(), // AI OCR 不带高亮定位框
+    })
+}
+
 #[tauri::command]
 pub async fn plugin_ocr_recognize(
+    app_handle: tauri::AppHandle,
     image: String,
     options: Option<OcrOptions>,
 ) -> Result<OcrResult, String> {
-    #[cfg(target_os = "windows")]
-    {
-        run_windows_ocr(image, options).await
-    }
+    let engine = options
+        .as_ref()
+        .and_then(|opts| opts.engine.as_ref())
+        .map(|s| s.as_str())
+        .unwrap_or("local");
 
-    #[cfg(target_os = "macos")]
-    {
-        run_macos_ocr(image, options).await
-    }
+    if engine == "ai" {
+        run_ai_ocr(app_handle, image, options).await
+    } else {
+        #[cfg(target_os = "windows")]
+        {
+            run_windows_ocr(image, options).await
+        }
 
-    #[cfg(target_os = "linux")]
-    {
-        run_linux_ocr(image, options).await
-    }
+        #[cfg(target_os = "macos")]
+        {
+            run_macos_ocr(image, options).await
+        }
 
-    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-    {
-        let _ = (image, options);
-        Err("OCR is currently not supported on this platform.".to_string())
+        #[cfg(target_os = "linux")]
+        {
+            run_linux_ocr(image, options).await
+        }
+
+        #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+        {
+            let _ = (image, options);
+            Err("OCR is currently not supported on this platform.".to_string())
+        }
     }
 }
 
@@ -78,10 +199,11 @@ pub async fn plugin_ocr_recognize(
 // ==========================================
 #[cfg(target_os = "windows")]
 async fn run_windows_ocr(image: String, options: Option<OcrOptions>) -> Result<OcrResult, String> {
-    let bytes = get_image_bytes(&image)?;
+    let raw_bytes = get_image_bytes(&image)?;
 
     tokio::task::spawn_blocking(move || {
         let _com_guard = ComGuard::new();
+        let (bytes, scale) = preprocess_image_bytes(&raw_bytes);
 
         let result = (|| -> windows::core::Result<OcrResult> {
             use windows::core::HSTRING;
@@ -139,22 +261,27 @@ async fn run_windows_ocr(image: String, options: Option<OcrOptions>) -> Result<O
                     let word_text = word.Text()?.to_string();
                     let rect = word.BoundingRect()?;
 
+                    let rx = rect.X / scale;
+                    let ry = rect.Y / scale;
+                    let rw = rect.Width / scale;
+                    let rh = rect.Height / scale;
+
                     words.push(OcrWord {
                         text: word_text,
-                        x: rect.X,
-                        y: rect.Y,
-                        width: rect.Width,
-                        height: rect.Height,
+                        x: rx,
+                        y: ry,
+                        width: rw,
+                        height: rh,
                     });
 
-                    if rect.X < min_x {
-                        min_x = rect.X;
+                    if rx < min_x {
+                        min_x = rx;
                     }
-                    if rect.Y < min_y {
-                        min_y = rect.Y;
+                    if ry < min_y {
+                        min_y = ry;
                     }
-                    let word_max_x = rect.X + rect.Width;
-                    let word_max_y = rect.Y + rect.Height;
+                    let word_max_x = rx + rw;
+                    let word_max_y = ry + rh;
                     if word_max_x > max_x {
                         max_x = word_max_x;
                     }
@@ -212,11 +339,11 @@ fn load_vision_framework() {
 
 #[cfg(target_os = "macos")]
 async fn run_macos_ocr(image: String, options: Option<OcrOptions>) -> Result<OcrResult, String> {
-    let bytes = get_image_bytes(&image)?;
+    let raw_bytes = get_image_bytes(&image)?;
 
     // 快速读取图片物理宽度与高度
     let (width, height) = {
-        let cursor = std::io::Cursor::new(&bytes);
+        let cursor = std::io::Cursor::new(&raw_bytes);
         if let Ok(reader) = image::ImageReader::new(cursor).with_guessed_format() {
             if let Ok(dims) = reader.into_dimensions() {
                 (dims.0 as f64, dims.1 as f64)
@@ -227,6 +354,11 @@ async fn run_macos_ocr(image: String, options: Option<OcrOptions>) -> Result<Ocr
             (1.0, 1.0)
         }
     };
+
+    // scale cancels out because boundingBox is normalized against processed dimensions.
+    // As long as we use the original dimensions to scale the normalized coordinates back,
+    // the resulting coordinates will automatically align with the original image pixels.
+    let (bytes, _scale) = preprocess_image_bytes(&raw_bytes);
 
     tokio::task::spawn_blocking(move || {
         load_vision_framework();
@@ -272,7 +404,7 @@ async fn run_macos_ocr(image: String, options: Option<OcrOptions>) -> Result<Ocr
             }
 
             // 2. 创建 VNImageRequestHandler
-            let ns_data = NSData::from_vec(bytes);
+            let ns_data = NSData::from_vec(bytes.into_owned());
             let options_dict =
                 NSDictionary::<objc2::runtime::AnyObject, objc2::runtime::AnyObject>::new();
 
@@ -523,7 +655,7 @@ fn map_bcp47_to_tesseract(lang: &str) -> String {
 }
 
 #[cfg(target_os = "linux")]
-fn parse_tesseract_tsv(tsv_content: &str) -> Result<OcrResult, String> {
+fn parse_tesseract_tsv(tsv_content: &str, scale: f32) -> Result<OcrResult, String> {
     let mut lines: Vec<OcrLine> = Vec::new();
     let mut full_text_parts: Vec<String> = Vec::new();
 
@@ -544,10 +676,10 @@ fn parse_tesseract_tsv(tsv_content: &str) -> Result<OcrResult, String> {
             if parts.len() < 10 {
                 continue;
             }
-            let left = parts[6].trim().parse::<f32>().unwrap_or(0.0);
-            let top = parts[7].trim().parse::<f32>().unwrap_or(0.0);
-            let width = parts[8].trim().parse::<f32>().unwrap_or(0.0);
-            let height = parts[9].trim().parse::<f32>().unwrap_or(0.0);
+            let left = parts[6].trim().parse::<f32>().unwrap_or(0.0) / scale;
+            let top = parts[7].trim().parse::<f32>().unwrap_or(0.0) / scale;
+            let width = parts[8].trim().parse::<f32>().unwrap_or(0.0) / scale;
+            let height = parts[9].trim().parse::<f32>().unwrap_or(0.0) / scale;
 
             let text = if parts.len() > 11 {
                 parts[11].trim().to_string()
@@ -590,11 +722,13 @@ fn parse_tesseract_tsv(tsv_content: &str) -> Result<OcrResult, String> {
 
 #[cfg(target_os = "linux")]
 async fn run_linux_ocr(image: String, options: Option<OcrOptions>) -> Result<OcrResult, String> {
-    let bytes = get_image_bytes(&image)?;
+    let raw_bytes = get_image_bytes(&image)?;
 
     tokio::task::spawn_blocking(move || {
         use std::io::Write;
         use std::process::Command;
+
+        let (bytes, scale) = preprocess_image_bytes(&raw_bytes);
 
         // 1. Write image to a temporary file
         let mut temp_file = tempfile::Builder::new()
@@ -643,7 +777,7 @@ async fn run_linux_ocr(image: String, options: Option<OcrOptions>) -> Result<Ocr
             .map_err(|e| format!("Tesseract output is not valid UTF-8: {}", e))?;
 
         // 4. Parse TSV output
-        let ocr_result = parse_tesseract_tsv(&stdout_str)?;
+        let ocr_result = parse_tesseract_tsv(&stdout_str, scale)?;
 
         Ok(ocr_result)
     })

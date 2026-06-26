@@ -134,4 +134,7 @@ export interface AppConfig {
   file_search_include_hidden?: boolean;
   webdav?: WebDavConfig;
   auto_check_update?: boolean;
+  ocr_default_engine?: string;
+  ocr_provider_id?: string | null;
+  ocr_model_id?: string | null;
 }

@@ -37,14 +37,41 @@ pub async fn plugin_clipboard_write_text(
     }
 }
 
-/// 读取剪贴板图片（暂未实现）
+/// 读取剪贴板图片
 #[tauri::command]
 pub async fn plugin_clipboard_read_image(
     _app: AppHandle,
 ) -> Result<Option<String>, ClipboardError> {
-    Err(ClipboardError::from(
-        "Image reading is not yet implemented. Please use text operations for now.",
-    ))
+    #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+    {
+        use base64::{engine::general_purpose, Engine as _};
+        use clipboard_rs::common::RustImage;
+        use clipboard_rs::{Clipboard, ClipboardContext};
+
+        let ctx = ClipboardContext::new().map_err(|e| {
+            ClipboardError::from(format!("Failed to create clipboard context: {}", e))
+        })?;
+
+        match ctx.get_image() {
+            Ok(img) => match img.to_png() {
+                Ok(png_img) => {
+                    let bytes = png_img.get_bytes();
+                    let b64 = general_purpose::STANDARD.encode(bytes);
+                    Ok(Some(format!("data:image/png;base64,{}", b64)))
+                }
+                Err(e) => Err(ClipboardError::from(format!(
+                    "Failed to convert image to PNG: {}",
+                    e
+                ))),
+            },
+            Err(_) => Ok(None),
+        }
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    {
+        Ok(None)
+    }
 }
 
 /// 写入剪贴板图片（暂未实现）
@@ -195,6 +222,7 @@ pub async fn get_clipboard_content(app: AppHandle) -> Result<ClipboardContent, C
                     return Ok(ClipboardContent {
                         text: None,
                         files: Some(clipboard_files),
+                        image: None,
                         timestamp,
                     });
                 }
@@ -202,11 +230,35 @@ pub async fn get_clipboard_content(app: AppHandle) -> Result<ClipboardContent, C
         }
     }
 
-    // 如果没有文件，尝试读取文本
+    // 尝试读取图片
+    #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+    {
+        use base64::{engine::general_purpose, Engine as _};
+        use clipboard_rs::common::RustImage;
+        use clipboard_rs::{Clipboard, ClipboardContext};
+
+        if let Ok(ctx) = ClipboardContext::new() {
+            if let Ok(img) = ctx.get_image() {
+                if let Ok(png_img) = img.to_png() {
+                    let bytes = png_img.get_bytes();
+                    let b64 = general_purpose::STANDARD.encode(bytes);
+                    return Ok(ClipboardContent {
+                        text: None,
+                        files: None,
+                        image: Some(format!("data:image/png;base64,{}", b64)),
+                        timestamp,
+                    });
+                }
+            }
+        }
+    }
+
+    // 如果没有文件和图片，尝试读取文本
     match app.clipboard().read_text() {
         Ok(text) => Ok(ClipboardContent {
             text: Some(text),
             files: None,
+            image: None,
             timestamp,
         }),
         Err(e) => Err(ClipboardError::from(format!(

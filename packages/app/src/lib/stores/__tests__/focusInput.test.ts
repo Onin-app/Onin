@@ -1,23 +1,23 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { focusInputTrigger, requestInputFocus } from '../focusInput';
+import { describe, it, expect, beforeEach } from "vitest";
+import { focusInputTrigger, requestInputFocus } from "../focusInput";
 
-describe('focusInput store', () => {
+describe("focusInput store", () => {
   beforeEach(() => {
     focusInputTrigger.set(0);
   });
 
-  it('starts at 0', () => {
+  it("starts at 0", () => {
     const value = get(focusInputTrigger);
     expect(value).toBe(0);
   });
 
-  it('increments on requestInputFocus', () => {
+  it("increments on requestInputFocus", () => {
     requestInputFocus();
     const value = get(focusInputTrigger);
     expect(value).toBe(1);
   });
 
-  it('increments multiple times', () => {
+  it("increments multiple times", () => {
     requestInputFocus();
     requestInputFocus();
     requestInputFocus();
@@ -26,8 +26,12 @@ describe('focusInput store', () => {
   });
 });
 
-function get<T>(store: { subscribe: (run: (value: T) => void) => () => void }): T {
+function get<T>(store: {
+  subscribe: (run: (value: T) => void) => () => void;
+}): T {
   let value: T;
-  store.subscribe((v: T) => { value = v; })();
+  store.subscribe((v: T) => {
+    value = v;
+  })();
   return value!;
 }

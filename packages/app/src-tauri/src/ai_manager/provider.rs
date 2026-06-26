@@ -56,6 +56,18 @@ pub struct ValidationResult {
     pub models_count: Option<usize>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct ModelModalities {
+    pub input: Vec<String>,
+    pub output: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct ModelLimit {
+    pub context: Option<u32>,
+    pub output: Option<u32>,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ModelInfo {
     pub id: String,
@@ -64,6 +76,16 @@ pub struct ModelInfo {
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context_window: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attachment: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_call: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub modalities: Option<ModelModalities>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<ModelLimit>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

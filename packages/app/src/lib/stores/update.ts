@@ -1,23 +1,92 @@
 import { writable, get } from "svelte/store";
 import { getVersion } from "@tauri-apps/api/app";
-import { platform } from "@tauri-apps/plugin-os";
-import { UPDATE_CONFIG } from "$lib/constants";
+import { check, type Update } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
 import { toast } from "svelte-sonner";
 import { trackEvent } from "$lib/tracking";
 
-// 全局响应式状态
+// 响应式状态
 export const checkingUpdate = writable(false);
 export const updateDialogOpen = writable(false);
 export const hasNewVersion = writable(false);
 export const latestVersion = writable("");
 export const releaseNotes = writable("");
-export const downloadUrl = writable("");
 export const appVersion = writable("未知");
 
-const CACHE_KEY_NOTIFIED = "onin_last_notified_version";
-const CACHE_KEY_CHECKED_STATE = "onin_last_checked_version_state";
+// 下载与安装状态
+export const downloading = writable(false);
+export const installing = writable(false);
+export const downloadPercent = writable(0);
+export const downloadedBytes = writable(0);
+export const totalBytes = writable<number | null>(null);
+export const downloadError = writable("");
 
-// 初始化当前应用版本号
+// 缓存当前可用的更新对象
+let currentUpdate: Update | null = null;
+
+const CACHE_KEY_NOTIFIED = "onin_last_notified_version";
+
+// 极简的原生 DOMParser HTML 安全消毒函数，彻底防御 XSS 攻击
+function sanitizeHtml(html: string): string {
+  if (typeof window === "undefined") return html;
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, "text/html");
+
+    const clean = (node: Node) => {
+      if (node.nodeType === 1) {
+        const el = node as Element;
+        const tagName = el.tagName.toLowerCase();
+
+        if (
+          [
+            "script",
+            "iframe",
+            "object",
+            "embed",
+            "form",
+            "style",
+            "meta",
+            "link",
+          ].includes(tagName)
+        ) {
+          el.remove();
+          return;
+        }
+
+        const attrs = Array.from(el.attributes || []);
+        for (const attr of attrs) {
+          const attrName = attr.name.toLowerCase();
+          if (attrName.startsWith("on")) {
+            el.removeAttribute(attr.name);
+          }
+          if (
+            ["src", "href", "data"].includes(attrName) &&
+            (attr.value.toLowerCase().trim().startsWith("javascript:") ||
+              attr.value.toLowerCase().trim().startsWith("data:"))
+          ) {
+            el.removeAttribute(attr.name);
+          }
+        }
+      }
+
+      const children = Array.from(node.childNodes || []);
+      for (const child of children) {
+        clean(child);
+      }
+    };
+
+    if (doc.body) {
+      clean(doc.body);
+      return doc.body.innerHTML;
+    }
+    return html;
+  } catch (e) {
+    console.error("HTML 消毒失败:", e);
+    return html;
+  }
+}
+
 async function initVersion() {
   try {
     const version = await getVersion();
@@ -29,27 +98,13 @@ async function initVersion() {
   }
 }
 
-// 简单的语义化版本号对比算法
-function isNewerVersion(current: string, latest: string) {
-  const cur = current.replace(/^v/, "").split(".").map(Number);
-  const lat = latest.replace(/^v/, "").split(".").map(Number);
-
-  for (let i = 0; i < Math.max(cur.length, lat.length); i++) {
-    const c = cur[i] || 0;
-    const l = lat[i] || 0;
-    if (l > c) return true;
-    if (l < c) return false;
-  }
-  return false;
-}
-
 /**
- * 核心检查更新方法
- * @param silent 是否为静默检测（启动/轮询时）。如果为 false（手动触发），将直接拉起模态下载弹窗。
+ * 检查更新
  */
 export async function checkUpdate(silent: boolean = false) {
   if (get(checkingUpdate)) return;
   checkingUpdate.set(true);
+  downloadError.set(""); // 重置上次可能残留的错误状态
 
   try {
     let currentVer = get(appVersion);
@@ -57,80 +112,52 @@ export async function checkUpdate(silent: boolean = false) {
       currentVer = await initVersion();
     }
 
-    const response = await fetch(UPDATE_CONFIG.LATEST_RELEASE_URL);
-    if (!response.ok) {
-      throw new Error("网络连接失败");
-    }
-    const data = await response.json();
-    const tagName = data.tag_name || "";
+    const update = await check();
 
-    if (isNewerVersion(currentVer, tagName)) {
-      let osPlatform = "windows";
+    if (update?.available) {
+      currentUpdate = update;
+      const cleanVersion = update.version.replace(/^v/, "");
+
+      latestVersion.set(cleanVersion);
+
+      // 按需动态加载 marked 进行 Markdown 解析，提升首屏渲染性能
       try {
-        osPlatform = await platform();
-      } catch (e) {
-        console.error("Failed to get platform", e);
+        const { marked } = await import("marked");
+        const rawHtml = await marked.parse(update.body || "无详细更新说明。");
+        const cleanHtml = sanitizeHtml(rawHtml as string);
+        releaseNotes.set(cleanHtml);
+      } catch (err) {
+        console.error("解析 Release Notes 失败:", err);
+        releaseNotes.set(update.body || "无详细更新说明。");
       }
 
-      // 根据平台匹配正确的安装包资源 (加装防守链，彻底防御 assets 未定义引发崩溃的隐患)
-      const assets = data.assets || [];
-      let matchedAsset = null;
-      if (osPlatform === "windows") {
-        matchedAsset = assets.find((asset: any) => asset.name.endsWith(".msi"));
-      } else if (osPlatform === "linux") {
-        matchedAsset =
-          assets.find((asset: any) => asset.name.endsWith(".AppImage")) ||
-          assets.find((asset: any) => asset.name.endsWith(".deb"));
-      } else if (osPlatform === "macos") {
-        matchedAsset = assets.find((asset: any) => asset.name.endsWith(".dmg"));
-      }
+      hasNewVersion.set(true);
 
-      const cleanLatestVersion = tagName.replace(/^v/, "");
+      trackEvent("update_found", {
+        current_version: currentVer,
+        latest_version: cleanVersion,
+      });
+
       const lastNotified = localStorage.getItem(CACHE_KEY_NOTIFIED);
-      const lastCheckedState = localStorage.getItem(CACHE_KEY_CHECKED_STATE);
-      const currentCheckedState = `${cleanLatestVersion}_${!!matchedAsset}`;
 
-      // 每个版本与资产状态组合仅上报一次，避免轮询/重复检测造成冗余
-      if (lastCheckedState !== currentCheckedState) {
-        trackEvent("update_found", {
-          current_version: currentVer,
-          latest_version: cleanLatestVersion,
-          has_asset: !!matchedAsset,
-        });
-        localStorage.setItem(CACHE_KEY_CHECKED_STATE, currentCheckedState);
-      }
-
-      if (matchedAsset) {
-        latestVersion.set(cleanLatestVersion);
-        releaseNotes.set(data.body || "");
-        downloadUrl.set(matchedAsset.browser_download_url);
-        hasNewVersion.set(true);
-
-        if (silent) {
-          if (lastNotified !== cleanLatestVersion) {
-            toast.info(`发现新版本 v${cleanLatestVersion}！`, {
-              duration: 10000,
-              action: {
-                label: "立即查看",
-                onClick: () => {
-                  updateDialogOpen.set(true);
-                },
-              },
-            });
-            localStorage.setItem(CACHE_KEY_NOTIFIED, cleanLatestVersion);
-          }
-        } else {
-          updateDialogOpen.set(true);
-          localStorage.setItem(CACHE_KEY_NOTIFIED, cleanLatestVersion);
+      if (silent) {
+        if (lastNotified !== cleanVersion) {
+          toast.info(`发现新版本 v${cleanVersion}！`, {
+            duration: 10000,
+            action: {
+              label: "立即查看",
+              onClick: () => updateDialogOpen.set(true),
+            },
+          });
+          localStorage.setItem(CACHE_KEY_NOTIFIED, cleanVersion);
         }
-      } else if (!silent) {
-        toast.warning(
-          `检测到新版本 ${tagName}，但未找到适用于您平台的安装包。`,
-        );
+      } else {
+        updateDialogOpen.set(true);
+        localStorage.setItem(CACHE_KEY_NOTIFIED, cleanVersion);
       }
     } else {
-      // 当前是最新版本，若自动检查则悄无声息重置状态，手动检查则温馨提示
       hasNewVersion.set(false);
+      currentUpdate = null;
       if (!silent) {
         toast.success("当前已是最新版本");
       }
@@ -146,11 +173,77 @@ export async function checkUpdate(silent: boolean = false) {
 }
 
 /**
- * 关闭并清理模态弹窗状态
+ * 下载并安装更新
  */
-export function closeUpdateDialog() {
-  updateDialogOpen.set(false);
+export async function startUpdate() {
+  if (!currentUpdate || get(downloading) || get(installing)) return;
+
+  downloading.set(true);
+  installing.set(false);
+  downloadError.set("");
+  downloadPercent.set(0);
+  downloadedBytes.set(0);
+  totalBytes.set(null);
+
+  const currentVer = get(appVersion);
+  const targetVer = get(latestVersion);
+
+  trackEvent("update_started", {
+    current_version: currentVer,
+    latest_version: targetVer,
+  });
+
+  try {
+    let downloaded = 0;
+
+    await currentUpdate.downloadAndInstall((event) => {
+      switch (event.event) {
+        case "Started":
+          totalBytes.set(event.data.contentLength ?? null);
+          break;
+        case "Progress":
+          // 因官方 v2 API 回调 payload 仅包含 chunkLength 增量值，故在此进行累加
+          downloaded += event.data.chunkLength;
+          downloadedBytes.set(downloaded);
+          const total = get(totalBytes);
+          if (total && total > 0) {
+            downloadPercent.set(Math.round((downloaded / total) * 1000) / 10);
+          }
+          break;
+        case "Finished":
+          downloadPercent.set(100);
+          downloading.set(false);
+          installing.set(true); // 转为正在安装中
+          trackEvent("update_downloaded", {
+            current_version: currentVer,
+            latest_version: targetVer,
+          });
+          break;
+      }
+    });
+
+    // 下载安装完成，重启应用
+    await relaunch();
+  } catch (e) {
+    console.error("更新失败:", e);
+
+    trackEvent("update_failed", {
+      current_version: currentVer,
+      latest_version: targetVer,
+      error: String(e) || "unknown",
+    });
+
+    downloadError.set(String(e) || "下载更新失败，请重试");
+    downloading.set(false);
+    installing.set(false);
+  }
 }
 
-// 自动执行一次初始化
+export function closeUpdateDialog() {
+  updateDialogOpen.set(false);
+  downloadError.set(""); // 关闭弹窗时重置错误，防止下次残留
+  installing.set(false);
+}
+
+// 初始化版本号
 initVersion();

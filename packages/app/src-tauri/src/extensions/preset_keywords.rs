@@ -49,5 +49,9 @@ pub static PRESET_KEYWORDS: LazyLock<HashMap<&'static str, &'static [&'static st
         m.insert("extension:web:search_google", &["web", "google"][..]);
         m.insert("extension:web:search_bing", &["web", "bing"][..]);
         m.insert("extension:web:search_baidu", &["web", "baidu"][..]);
+        m.insert(
+            "extension:ocr:recognize",
+            &["ocr", "识别文字", "文字识别"][..],
+        );
         m
     });

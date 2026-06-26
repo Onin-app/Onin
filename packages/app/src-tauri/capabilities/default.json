@@ -23,6 +23,7 @@
     "core:window:allow-close",
     "core:window:allow-start-dragging",
     "core:window:allow-start-resize-dragging",
+    "core:window:allow-set-always-on-top",
     "autostart:allow-enable",
     "autostart:allow-disable",
     "autostart:allow-is-enabled",
@@ -33,7 +34,9 @@
     "core:webview:allow-internal-toggle-devtools",
     "core:webview:allow-create-webview-window",
     "os:default",
-    "aptabase:allow-track-event"
+    "aptabase:allow-track-event",
+    "updater:default",
+    "process:allow-restart"
   ],
   "remote": {
     "urls": ["http://localhost:*", "http://127.0.0.1:*"]

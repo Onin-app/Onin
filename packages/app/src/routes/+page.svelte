@@ -116,7 +116,16 @@
       result.push(extensionPreviewItem);
     }
 
-    const rawList = [...appListManager.state.appList, ...matchedCommands];
+    // 判断是否处于纯粘贴状态：有粘贴的附件（文本或文件），且输入框中没有手动输入
+    const isPurePasteState =
+      (clipboard.state.attachedText ||
+        clipboard.state.attachedFiles.length > 0) &&
+      !inputValue.trim();
+
+    const rawList = isPurePasteState
+      ? [...matchedCommands]
+      : [...appListManager.state.appList, ...matchedCommands];
+
     const itemMap = new Map<string, LaunchableItem>();
     const order: string[] = [];
 
@@ -126,7 +135,7 @@
         itemMap.set(key, item);
         order.push(key);
       } else {
-        // 遇到重复的项，若新的项有更具体的匹配触发模式，或者新的项包含 action 而旧的项没有 action，则覆盖保留
+        // 遇到重复的项，若新的项有更具体的匹配触发模式，或者新的项包含 action 而旧 of 没有 action，则覆盖保留
         const existing = itemMap.get(key)!;
         if (
           item.trigger_mode === "matched" ||
@@ -226,6 +235,7 @@
         ...cmd,
         trigger_mode: "matched" as const,
       }));
+    appListManager.resetSelection();
   };
 
   const handlePaste = async (e: ClipboardEvent) => {

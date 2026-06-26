@@ -60,9 +60,9 @@ pub static INTERNAL_COMMANDS: &[InternalCommandInfo] = &[
     },
     InternalCommandInfo {
         name: "open_settings_ai",
-        title: "AI 能力",
-        description: "打开 Onin AI 能力配置项",
-        keywords: &["AI 能力"],
+        title: "AI",
+        description: "打开 Onin AI 配置项",
+        keywords: &["AI", "AI 配置", "AI 设置"],
         icon: "sparkle",
         requires_confirmation: false,
     },

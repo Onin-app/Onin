@@ -136,7 +136,7 @@ pub fn list_app_data_files(app: AppHandle) -> Result<Vec<AppDataFileInfo>, Strin
     // 1. 静态主应用/核心配置文件定义
     let static_files = vec![
         ("app_config", "app_config.json", "应用通用配置", "main"),
-        ("ai_config", "ai_config.json", "AI 能力配置", "main"),
+        ("ai_config", "ai_config.json", "AI 配置", "main"),
         ("commands", "commands.json", "自定义指令配置", "main"),
         (
             "dynamic_commands",

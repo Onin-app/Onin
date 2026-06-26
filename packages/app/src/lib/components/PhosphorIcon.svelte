@@ -40,6 +40,9 @@
     Cloud,
     Database,
     PlugsConnected,
+    Scan,
+    Eyedropper,
+    AppWindow,
   } from "phosphor-svelte";
 
   interface PhosphorIconProps {
@@ -86,6 +89,7 @@
     browser: Browser,
     shieldCheck: ShieldCheck,
     sparkle: Sparkle,
+    sparkles: Sparkle,
     bookmark: Bookmark,
     bookmarkSimple: BookmarkSimple,
     gear: Gear,
@@ -96,6 +100,10 @@
     cloud: Cloud,
     database: Database,
     plugsConnected: PlugsConnected,
+    scan: Scan,
+    eyedropper: Eyedropper,
+    appWindow: AppWindow,
+    "icon-plugin": PlugsConnected,
   };
 
   const IconComponent = $derived(iconMap[icon] || Power);
