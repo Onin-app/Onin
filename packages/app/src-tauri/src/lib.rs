@@ -31,7 +31,6 @@ mod telemetry;
 mod toast_overlay;
 mod tray_manager;
 mod unified_launch_manager;
-pub mod updater;
 mod usage_tracker;
 mod window_manager;
 
@@ -86,10 +85,6 @@ pub fn run() {
         .init();
 
     let client = reqwest::Client::new();
-    let cancel_token = std::sync::Arc::new(tokio::sync::Mutex::new(
-        None::<tokio::sync::oneshot::Sender<()>>,
-    ));
-
     // 读取 Aptabase 统计服务的 App Key，如果未设置则使用占位符以确保正常编译
     let aptabase_key = option_env!("APTABASE_KEY")
         .or(option_env!("VITE_APTABASE_KEY"))
@@ -99,7 +94,6 @@ pub fn run() {
     // 构建并运行 Tauri 应用
     let app = state::setup_managed_state(tauri::Builder::default())
         .manage(client)
-        .manage(updater::UpdateCancelToken(cancel_token))
         // 插件
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -117,6 +111,8 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         // 命令
         // 命令
         .invoke_handler(commands::get_invoke_handler())

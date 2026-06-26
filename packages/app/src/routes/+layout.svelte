@@ -20,7 +20,6 @@
     appVersion,
     latestVersion,
     releaseNotes,
-    downloadUrl,
     checkUpdate,
     closeUpdateDialog,
   } from "$lib/stores/update";
@@ -278,6 +277,5 @@
   currentVersion={$appVersion}
   latestVersion={$latestVersion}
   releaseNotes={$releaseNotes}
-  downloadUrl={$downloadUrl}
   onClose={closeUpdateDialog}
 />

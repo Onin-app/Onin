@@ -210,8 +210,6 @@ pub fn get_invoke_handler(
         crate::ai_manager::commands::get_providers_registry,
         crate::ai_manager::commands::sync_providers_registry,
         open_file_or_folder_dialog,
-        crate::updater::download_and_install_update,
-        crate::updater::cancel_update,
     ]
 }
 

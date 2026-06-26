@@ -34,7 +34,9 @@
     "core:webview:allow-internal-toggle-devtools",
     "core:webview:allow-create-webview-window",
     "os:default",
-    "aptabase:allow-track-event"
+    "aptabase:allow-track-event",
+    "updater:default",
+    "process:allow-restart"
   ],
   "remote": {
     "urls": ["http://localhost:*", "http://127.0.0.1:*"]
