@@ -355,13 +355,13 @@ async fn run_macos_ocr(image: String, options: Option<OcrOptions>) -> Result<Ocr
         }
     };
 
-    // scale cancels out because boundingBox is normalized against processed dimensions.
-    // As long as we use the original dimensions to scale the normalized coordinates back,
-    // the resulting coordinates will automatically align with the original image pixels.
-    let (bytes, _scale) = preprocess_image_bytes(&raw_bytes);
-
     tokio::task::spawn_blocking(move || {
         load_vision_framework();
+
+        // scale cancels out because boundingBox is normalized against processed dimensions.
+        // As long as we use the original dimensions to scale the normalized coordinates back,
+        // the resulting coordinates will automatically align with the original image pixels.
+        let (bytes, _scale) = preprocess_image_bytes(&raw_bytes);
 
         use objc2::msg_send;
         use objc2::rc::Retained;
