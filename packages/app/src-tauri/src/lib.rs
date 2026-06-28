@@ -1,5 +1,9 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::Manager;
 use tauri_plugin_global_shortcut::{Shortcut, ShortcutState};
+
+static IS_SYNCING_ON_EXIT: AtomicBool = AtomicBool::new(false);
+static SYNC_ON_EXIT_COMPLETED: AtomicBool = AtomicBool::new(false);
 
 use tracing_subscriber;
 use tracing_subscriber::fmt::format::FmtSpan;
@@ -122,10 +126,10 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
-    app.run(|_app_handle, _event| match _event {
+    app.run(|app_handle, _event| match _event {
         tauri::RunEvent::ExitRequested { api, .. } => {
             let webdav_config = {
-                let state = _app_handle.state::<crate::app_config::AppConfigState>();
+                let state = app_handle.state::<crate::app_config::AppConfigState>();
                 let x = match state.0.lock() {
                     Ok(lock) => lock.webdav.clone(),
                     Err(_) => crate::app_config::WebDavConfig::default(),
@@ -134,29 +138,42 @@ pub fn run() {
             };
 
             if webdav_config.enabled && webdav_config.sync_on_exit {
-                println!("[sync] 检测到退出自动备份已启用，正在执行自动上传备份...");
+                // 如果备份已完成，直接允许退出（不再拦截）
+                if SYNC_ON_EXIT_COMPLETED.load(Ordering::SeqCst) {
+                    return;
+                }
+
                 api.prevent_exit();
 
-                let app_handle_clone = _app_handle.clone();
-                tauri::async_runtime::block_on(async move {
-                    match crate::sync::trigger_webdav_sync(app_handle_clone, "backup".to_string())
-                        .await
+                if IS_SYNCING_ON_EXIT.swap(true, Ordering::SeqCst) {
+                    return;
+                }
+
+                println!("[sync] 检测到退出自动备份已启用，正在执行自动上传备份...");
+
+                let app_handle_clone = app_handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    match crate::sync::trigger_webdav_sync(
+                        app_handle_clone.clone(),
+                        "backup".to_string(),
+                    )
+                    .await
                     {
                         Ok(_) => println!("[sync] 退出自动备份成功！"),
                         Err(e) => eprintln!("[sync] 退出自动备份失败: {}", e),
                     }
+                    SYNC_ON_EXIT_COMPLETED.store(true, Ordering::SeqCst);
+                    app_handle_clone.exit(0);
                 });
-
-                _app_handle.exit(0);
             }
         }
         #[cfg(target_os = "macos")]
         tauri::RunEvent::Reopen { .. } => {
-            window_manager::show_main_window(_app_handle);
+            window_manager::show_main_window(app_handle);
         }
         #[cfg(target_os = "macos")]
         tauri::RunEvent::Resumed => {
-            window_manager::show_main_window(_app_handle);
+            window_manager::show_main_window(app_handle);
         }
         _ => {}
     });
