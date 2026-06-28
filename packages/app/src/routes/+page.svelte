@@ -683,7 +683,7 @@
 </script>
 
 <div
-  class="h-[100vh] w-full bg-transparent p-1"
+  class="h-[100vh] w-full bg-transparent p-0"
   onmousemove={handleMouseMove}
   role="presentation"
 >

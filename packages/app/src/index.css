@@ -302,12 +302,20 @@
     scrollbar-color: var(--bg-muted);
     /* 透明窗口支持 - 让圆角区域外完全透明 */
     background: transparent;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
   }
 
   body {
     @apply text-foreground;
     /* 透明窗口支持 - body 背景透明，让 main 容器自己处理背景 */
     background: transparent;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
     font-family: var(--font-sans);
     font-feature-settings:
       "rlig" 1,

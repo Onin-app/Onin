@@ -5,8 +5,9 @@
    * Extension 页面通用 header 组件
    * 包含返回按钮、搜索输入框和可选的右侧插槽
    */
-  import { ArrowLeft } from "phosphor-svelte";
+  import { ArrowLeft, Gear } from "phosphor-svelte";
   import type { Snippet } from "svelte";
+  import ExtensionSettingsDrawer from "./ExtensionSettingsDrawer.svelte";
 
   interface Props {
     icon?: string;
@@ -19,6 +20,7 @@
     onBack?: () => void;
     onKeyDown?: (e: KeyboardEvent) => void;
     right?: Snippet;
+    extensionId?: string;
   }
 
   let {
@@ -32,7 +34,10 @@
     onBack,
     onKeyDown,
     right,
+    extensionId,
   }: Props = $props();
+
+  let settingsOpen = $state(false);
 
   let inputElement: HTMLInputElement;
 
@@ -105,10 +110,30 @@
     </div>
   {/if}
 
-  <!-- Right Slot -->
-  <div class="flex-shrink-0">
+  <!-- Right Slot & Settings Button -->
+  <div class="flex flex-shrink-0 items-center gap-2">
     {#if right}
       {@render right()}
     {/if}
+    {#if extensionId}
+      {#if right}
+        <span class="h-4 w-[1px] bg-neutral-200 dark:bg-neutral-800"></span>
+      {/if}
+      <button
+        class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-neutral-600 transition-all hover:bg-neutral-200 active:scale-95 dark:text-neutral-400 dark:hover:bg-neutral-700"
+        onclick={() => (settingsOpen = true)}
+        aria-label="扩展设置"
+      >
+        <Gear class="size-5" />
+      </button>
+    {/if}
   </div>
 </div>
+
+{#if extensionId}
+  <ExtensionSettingsDrawer
+    bind:open={settingsOpen}
+    {extensionId}
+    extensionName={title || ""}
+  />
+{/if}
