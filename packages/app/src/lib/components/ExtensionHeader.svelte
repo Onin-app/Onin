@@ -44,7 +44,7 @@
 
   let settingsOpen = $state(false);
 
-  let inputElement: HTMLInputElement;
+  let inputElement: HTMLInputElement = $state()!;
 
   export function focus() {
     requestInputFocusWithRetry();
