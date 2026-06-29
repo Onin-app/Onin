@@ -7,6 +7,11 @@
    */
   import { ArrowLeft, Gear } from "phosphor-svelte";
   import type { Snippet } from "svelte";
+  import { onMount } from "svelte";
+  import {
+    requestInputFocusWithRetry,
+    focusExtensionInputTrigger,
+  } from "$lib/stores/focusInput";
   import ExtensionSettingsDrawer from "./ExtensionSettingsDrawer.svelte";
 
   interface Props {
@@ -42,8 +47,24 @@
   let inputElement: HTMLInputElement;
 
   export function focus() {
-    inputElement?.focus();
+    requestInputFocusWithRetry();
   }
+
+  let initialTrigger = $state<number | null>(null);
+
+  $effect(() => {
+    const triggerVal = $focusExtensionInputTrigger;
+    if (initialTrigger === null) {
+      initialTrigger = triggerVal;
+      // 首次初始化挂载时（例如普通内部路由跳转）：只执行单次的原生 DOM 聚焦，不启动定时器重试，彻底杜绝与快捷键冲突
+      if (typeof document !== "undefined") {
+        inputElement?.focus();
+      }
+    } else if (triggerVal > initialTrigger) {
+      // 只有当全局信号发生实际递增（快捷键唤起）时，才独占启动带有重试的聚焦引擎
+      focus();
+    }
+  });
 
   const handleInput = (e: Event) => {
     const target = e.target as HTMLInputElement;
@@ -89,6 +110,7 @@
     >
       <input
         bind:this={inputElement}
+        id="extension-search-input"
         class="h-[34px] min-w-0 flex-1 bg-transparent text-2xl focus:ring-0 focus:outline-none active:ring-0 active:outline-none {disabled
           ? 'cursor-not-allowed text-neutral-400 dark:text-neutral-500'
           : ''}"
