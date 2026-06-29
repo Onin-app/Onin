@@ -13,9 +13,9 @@
     "macOSPrivateApi": true,
     "windows": [
       {
-        "width": 800,
+        "width": 960,
         "title": "Onin",
-        "height": 400,
+        "height": 600,
         "dragDropEnabled": true,
         "alwaysOnTop": true,
         "center": true,

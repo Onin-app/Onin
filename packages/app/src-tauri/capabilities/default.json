@@ -36,7 +36,8 @@
     "os:default",
     "aptabase:allow-track-event",
     "updater:default",
-    "process:allow-restart"
+    "process:allow-restart",
+    "window-state:default"
   ],
   "remote": {
     "urls": ["http://localhost:*", "http://127.0.0.1:*"]

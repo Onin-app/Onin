@@ -84,6 +84,7 @@ sentry-tracing = "0.46.2"
 
 url = "2.5"
 tauri-plugin-os = "2"
+tauri-plugin-window-state = "2"
 tauri-plugin-aptabase = { git = "https://github.com/aptabase/tauri-plugin-aptabase" }
 tokio-cron-scheduler = "0.13"
 axum = "0.7"
