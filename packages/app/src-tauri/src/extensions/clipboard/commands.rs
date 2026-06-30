@@ -134,7 +134,7 @@ pub fn get_clipboard_history(state: State<'_, ClipboardHistory>) -> Vec<Clipboar
 
 fn write_to_clipboard(app: &tauri::AppHandle, item: &ClipboardItem) -> Result<(), String> {
     let mut last_err = String::new();
-    for i in 0..5 {
+    for _i in 0..5 {
         match write_to_clipboard_inner(app, item) {
             Ok(_) => return Ok(()),
             Err(e) => {
@@ -143,7 +143,7 @@ fn write_to_clipboard(app: &tauri::AppHandle, item: &ClipboardItem) -> Result<()
                 {
                     eprintln!(
                         "[Clipboard] write failed (attempt {}): {}. Retrying in 50ms...",
-                        i + 1,
+                        _i + 1,
                         last_err
                     );
                     std::thread::sleep(std::time::Duration::from_millis(50));

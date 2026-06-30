@@ -1207,11 +1207,6 @@ fn split_nul_paths(bytes: &[u8]) -> Vec<PathBuf> {
         .collect()
 }
 
-#[cfg(any(target_os = "macos", target_os = "linux"))]
-fn command_exists(command: &str) -> bool {
-    Command::new(command).arg("--version").output().is_ok()
-}
-
 fn paths_equal(a: &str, b: &str) -> bool {
     normalize_path_key(a) == normalize_path_key(b)
 }

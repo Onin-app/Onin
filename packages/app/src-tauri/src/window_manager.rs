@@ -45,7 +45,7 @@ fn get_cursor_position() -> Option<(i32, i32)> {
         use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
 
         let source = CGEventSource::new(CGEventSourceStateID::CombinedSessionState);
-        let event = source.ok().and_then(|src| CGEvent::new(Some(src)).ok());
+        let event = source.ok().and_then(|src| CGEvent::new(src).ok());
         if let Some(event) = event {
             let point = event.location();
             Some((point.x as i32, point.y as i32))

@@ -43,10 +43,6 @@ pub fn focus_window(window: &Window) {
     let _ = window.set_focus();
 }
 
-pub fn is_frontmost_self(app: &AppHandle) -> bool {
-    get_frontmost_app_bundle_id().as_deref() == current_app_bundle_id(app).as_deref()
-}
-
 pub fn previous_bundle_id(app: &AppHandle) -> Option<String> {
     app.try_state::<PreviousForegroundApp>()
         .and_then(|state| state.0.lock().ok().and_then(|guard| guard.clone()))
