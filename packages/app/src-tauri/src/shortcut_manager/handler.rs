@@ -72,8 +72,7 @@ fn execute_shortcut_action(app: &AppHandle, app_shortcut: &crate::shared_types::
                 }
                 Ok(false) => {
                     crate::focus_manager::capture_previous_foreground(app);
-                    crate::focus_manager::focus_webview_window(&window);
-                    let _ = window.emit("window_visibility", &true);
+                    crate::window_manager::show_main_window(app);
                 }
                 Err(e) => eprintln!("Error checking window visibility: {}", e),
             }
