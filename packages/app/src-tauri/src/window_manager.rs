@@ -22,6 +22,129 @@ pub struct HideTaskState {
 }
 
 // ============================================================================
+// 鼠标定位与显示器匹配
+// ============================================================================
+
+/// 获取鼠标在全局坐标系下的当前位置
+fn get_cursor_position() -> Option<(i32, i32)> {
+    #[cfg(target_os = "windows")]
+    {
+        use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
+        let mut point = windows::Win32::Foundation::POINT::default();
+        unsafe {
+            if GetCursorPos(&mut point).is_ok() {
+                Some((point.x, point.y))
+            } else {
+                None
+            }
+        }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        use core_graphics::event::CGEvent;
+        use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
+
+        let source = CGEventSource::new(CGEventSourceStateID::CombinedSessionState);
+        let event = source.ok().and_then(|src| CGEvent::new(Some(src)).ok());
+        if let Some(event) = event {
+            let point = event.location();
+            Some((point.x as i32, point.y as i32))
+        } else {
+            None
+        }
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        None
+    }
+}
+
+/// 匹配鼠标坐标所在的显示器
+fn find_monitor_for_cursor(
+    monitors: &[tauri::Monitor],
+    cursor_pos: (i32, i32),
+) -> Option<&tauri::Monitor> {
+    #[cfg(target_os = "windows")]
+    {
+        let (cx, cy) = cursor_pos;
+        for monitor in monitors {
+            let m_pos = monitor.position();
+            let m_size = monitor.size();
+            let min_x = m_pos.x;
+            let max_x = m_pos.x + m_size.width as i32;
+            let min_y = m_pos.y;
+            let max_y = m_pos.y + m_size.height as i32;
+
+            if cx >= min_x && cx < max_x && cy >= min_y && cy < max_y {
+                return Some(monitor);
+            }
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let (cx, cy) = cursor_pos;
+        let cx_f = cx as f64;
+        let cy_f = cy as f64;
+
+        for monitor in monitors {
+            let m_pos = monitor.position();
+            let m_size = monitor.size();
+            let sf = monitor.scale_factor();
+
+            // 在 macOS 上，CGEvent 坐标为逻辑像素，而 Monitor 坐标为物理像素，需进行转换
+            let min_x = m_pos.x as f64 / sf;
+            let max_x = min_x + m_size.width as f64 / sf;
+            let min_y = m_pos.y as f64 / sf;
+            let max_y = min_y + m_size.height as f64 / sf;
+
+            if cx_f >= min_x && cx_f < max_x && cy_f >= min_y && cy_f < max_y {
+                return Some(monitor);
+            }
+        }
+    }
+
+    // 兜底返回第一个可用的显示器
+    monitors.first()
+}
+
+/// 将窗口移动到鼠标所在的显示器并居中
+pub fn move_window_to_cursor_monitor(window: &tauri::WebviewWindow) {
+    let monitors = match window.available_monitors() {
+        Ok(m) => m,
+        Err(e) => {
+            eprintln!("[window_manager] 无法获取显示器列表: {}", e);
+            return;
+        }
+    };
+
+    if monitors.is_empty() {
+        return;
+    }
+
+    if let Some(cursor_pos) = get_cursor_position() {
+        if let Some(monitor) = find_monitor_for_cursor(&monitors, cursor_pos) {
+            let monitor_pos = monitor.position();
+            let monitor_size = monitor.size();
+
+            // 获取窗口当前大小，如果获取不到则使用默认大小 (960, 600)
+            let window_size = window
+                .outer_size()
+                .unwrap_or(tauri::PhysicalSize::new(960, 600));
+
+            // 计算居中坐标 (物理像素)
+            let new_x = monitor_pos.x + (monitor_size.width as i32 - window_size.width as i32) / 2;
+            let new_y =
+                monitor_pos.y + (monitor_size.height as i32 - window_size.height as i32) / 2;
+
+            if let Err(e) = window.set_position(tauri::PhysicalPosition::new(new_x, new_y)) {
+                eprintln!("[window_manager] 移动窗口失败: {}", e);
+            }
+        }
+    }
+}
+
+// ============================================================================
 // Tauri 命令
 // ============================================================================
 
@@ -74,11 +197,13 @@ pub fn show_main_window(app: &AppHandle) {
         tauri::async_runtime::spawn(async move {
             cancel_hide_task(&app_handle_clone).await;
         });
-        let _ = window.show();
-        let _ = window.unminimize();
-        let _ = window.set_focus();
-        // 与 focus_webview_window 一致：通过 eval 确保 WebView2 键盘焦点
-        let _ = window.eval("window.focus()");
+
+        // 移动窗口到鼠标所在的显示器
+        move_window_to_cursor_monitor(&window);
+
+        // 使用 focus_webview_window 实现统一且强力的显示和聚焦
+        crate::focus_manager::focus_webview_window(&window);
+
         let _ = window.emit("window_visibility", &true);
     }
 }

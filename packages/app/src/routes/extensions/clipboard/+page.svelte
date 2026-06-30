@@ -98,8 +98,10 @@
     }
   };
 
+  // 提前发起异步历史数据获取，与路由转场并行，以在窗口显现时能立刻呈现列表响应键盘
+  fetchHistory();
+
   onMount(async () => {
-    fetchHistory();
     headerRef?.focus();
 
     // Listen for updates from backend

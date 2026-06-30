@@ -599,9 +599,13 @@
   </div>
 {/snippet}
 
-<div class="flex h-full w-full flex-col p-3 select-none">
+<div
+  class="relative flex h-full w-full flex-col overflow-hidden select-none"
+  data-tauri-drag-region
+>
   <ExtensionHeader
     showSearch={false}
+    extensionId="ocr"
     title="OCR"
     onBack={handleBack}
     right={rightSnippet}

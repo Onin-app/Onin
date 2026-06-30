@@ -499,9 +499,14 @@
   });
 </script>
 
-<div class="flex h-full w-full flex-col overflow-hidden">
+<div
+  class="relative flex h-full w-full flex-col overflow-hidden"
+  data-tauri-drag-region
+>
   <ExtensionHeader
     bind:this={headerRef}
+    extensionId="file_search"
+    title="文件搜索"
     placeholder="搜索文件或文件夹..."
     bind:value={searchQuery}
     onInput={handleSearch}

@@ -7,6 +7,7 @@
   import FileSearchSettings from "$lib/components/settings/FileSearchSettings.svelte";
   import OcrSettings from "$lib/components/settings/OcrSettings.svelte";
   import PhosphorIcon from "$lib/components/PhosphorIcon.svelte";
+  import ExtensionSettingsDrawer from "$lib/components/ExtensionSettingsDrawer.svelte";
 
   interface ExtensionCommandInfo {
     code: string;
@@ -70,6 +71,16 @@
   }
 
   onMount(loadExtensions);
+
+  let settingsDrawerOpen = $state(false);
+  let activeExtensionId = $state("");
+  let activeExtensionName = $state("");
+
+  function openExtensionSettings(id: string, name: string) {
+    activeExtensionId = id;
+    activeExtensionName = name;
+    settingsDrawerOpen = true;
+  }
 </script>
 
 <AppScrollArea class="h-full w-full" viewportClass="h-full w-full">
@@ -140,17 +151,31 @@
                 </p>
               </div>
 
-              <Switch.Root
-                checked={extension.enabled}
-                disabled={savingId === extension.id}
-                onCheckedChange={(enabled) =>
-                  toggleExtension(extension, enabled)}
-                class="peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:ring-offset-2 focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-neutral-900 data-[state=unchecked]:bg-neutral-200 dark:focus-visible:ring-neutral-300 dark:data-[state=checked]:bg-neutral-50 dark:data-[state=unchecked]:bg-neutral-700"
-              >
-                <Switch.Thumb
-                  class="pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0 dark:bg-neutral-950"
-                />
-              </Switch.Root>
+              <div class="flex items-center gap-2.5">
+                {#if extension.id === "file_search" || extension.id === "ocr"}
+                  <button
+                    class="rounded-lg p-1.5 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+                    onclick={() =>
+                      openExtensionSettings(extension.id, extension.name)}
+                    title="设置"
+                    aria-label="设置"
+                  >
+                    <PhosphorIcon icon="gear" class="h-4.5 w-4.5" />
+                  </button>
+                {/if}
+
+                <Switch.Root
+                  checked={extension.enabled}
+                  disabled={savingId === extension.id}
+                  onCheckedChange={(enabled) =>
+                    toggleExtension(extension, enabled)}
+                  class="peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:ring-offset-2 focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-neutral-900 data-[state=unchecked]:bg-neutral-200 dark:focus-visible:ring-neutral-300 dark:data-[state=checked]:bg-neutral-50 dark:data-[state=unchecked]:bg-neutral-700"
+                >
+                  <Switch.Thumb
+                    class="pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0 dark:bg-neutral-950"
+                  />
+                </Switch.Root>
+              </div>
             </div>
 
             <div
@@ -171,47 +196,15 @@
                 {/each}
               </div>
             </div>
-
-            {#if extension.id === "file_search"}
-              <details
-                class="group mt-4 border-t border-neutral-100 pt-3 dark:border-neutral-800"
-              >
-                <summary
-                  class="flex cursor-pointer list-none items-center justify-between text-xs font-medium text-neutral-500 transition-colors hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
-                >
-                  <span>设置</span>
-                  <PhosphorIcon
-                    icon="caretDown"
-                    class="h-4 w-4 transition-transform group-open:rotate-180"
-                  />
-                </summary>
-                <div class="pt-1">
-                  <FileSearchSettings />
-                </div>
-              </details>
-            {/if}
-
-            {#if extension.id === "ocr"}
-              <details
-                class="group mt-4 border-t border-neutral-100 pt-3 dark:border-neutral-800"
-              >
-                <summary
-                  class="flex cursor-pointer list-none items-center justify-between text-xs font-medium text-neutral-500 transition-colors hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
-                >
-                  <span>设置</span>
-                  <PhosphorIcon
-                    icon="caretDown"
-                    class="h-4 w-4 transition-transform group-open:rotate-180"
-                  />
-                </summary>
-                <div class="pt-1">
-                  <OcrSettings />
-                </div>
-              </details>
-            {/if}
           </article>
         {/each}
       </section>
     {/if}
   </main>
 </AppScrollArea>
+
+<ExtensionSettingsDrawer
+  bind:open={settingsDrawerOpen}
+  extensionId={activeExtensionId}
+  extensionName={activeExtensionName}
+/>

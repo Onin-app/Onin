@@ -2,7 +2,11 @@
   import { onMount } from "svelte";
   import { listen } from "@tauri-apps/api/event";
   import { escapeHandler } from "$lib/stores/escapeHandler";
-  import { requestInputFocus } from "$lib/stores/focusInput";
+  import {
+    requestInputFocus,
+    requestInputFocusWithRetry,
+    requestExtensionInputFocus,
+  } from "$lib/stores/focusInput";
   import { detachWindowShortcut } from "$lib/stores/shortcuts";
   import { get } from "svelte/store";
   import { invoke } from "@tauri-apps/api/core";
@@ -135,6 +139,7 @@
                 const routeName = extensionId.replace(/_/g, "");
                 goto(`/extensions/${routeName}`).then(() => {
                   invoke("show_main_window_cmd");
+                  requestExtensionInputFocus();
                 });
                 return;
               }

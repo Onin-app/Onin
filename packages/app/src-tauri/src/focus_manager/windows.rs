@@ -69,34 +69,6 @@ pub fn focus_webview_window(window: &WebviewWindow) {
     }
 
     let _ = window.eval("window.focus()");
-
-    // 多轮延迟重试：WebView2 子控件可能在 show 之后才异步创建/初始化，
-    // 单次 focus_webview_child 可能找不到目标。在 50ms / 150ms / 300ms
-    // 三个时间窗口各做一次 FindWindowExW → SetFocus + eval 的组合拳。
-    let window1 = window.clone();
-    tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-        let _ = window1.eval("window.focus()");
-        if let Ok(hwnd) = window1.hwnd() {
-            focus_webview_child(hwnd.0 as isize);
-        }
-    });
-    let window2 = window.clone();
-    tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_millis(150)).await;
-        let _ = window2.eval("window.focus()");
-        if let Ok(hwnd) = window2.hwnd() {
-            focus_webview_child(hwnd.0 as isize);
-        }
-    });
-    let window3 = window.clone();
-    tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
-        let _ = window3.eval("window.focus()");
-        if let Ok(hwnd) = window3.hwnd() {
-            focus_webview_child(hwnd.0 as isize);
-        }
-    });
 }
 
 pub fn focus_window(window: &Window) {

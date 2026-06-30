@@ -5,8 +5,14 @@
    * Extension 页面通用 header 组件
    * 包含返回按钮、搜索输入框和可选的右侧插槽
    */
-  import { ArrowLeft } from "phosphor-svelte";
+  import { ArrowLeft, Gear } from "phosphor-svelte";
   import type { Snippet } from "svelte";
+  import { onMount } from "svelte";
+  import {
+    requestInputFocusWithRetry,
+    focusExtensionInputTrigger,
+  } from "$lib/stores/focusInput";
+  import ExtensionSettingsDrawer from "./ExtensionSettingsDrawer.svelte";
 
   interface Props {
     icon?: string;
@@ -19,6 +25,7 @@
     onBack?: () => void;
     onKeyDown?: (e: KeyboardEvent) => void;
     right?: Snippet;
+    extensionId?: string;
   }
 
   let {
@@ -32,13 +39,32 @@
     onBack,
     onKeyDown,
     right,
+    extensionId,
   }: Props = $props();
 
-  let inputElement: HTMLInputElement;
+  let settingsOpen = $state(false);
+
+  let inputElement: HTMLInputElement = $state()!;
 
   export function focus() {
-    inputElement?.focus();
+    requestInputFocusWithRetry();
   }
+
+  let initialTrigger = $state<number | null>(null);
+
+  $effect(() => {
+    const triggerVal = $focusExtensionInputTrigger;
+    if (initialTrigger === null) {
+      initialTrigger = triggerVal;
+      // 首次初始化挂载时（例如普通内部路由跳转）：只执行单次的原生 DOM 聚焦，不启动定时器重试，彻底杜绝与快捷键冲突
+      if (typeof document !== "undefined") {
+        inputElement?.focus();
+      }
+    } else if (triggerVal > initialTrigger) {
+      // 只有当全局信号发生实际递增（快捷键唤起）时，才独占启动带有重试的聚焦引擎
+      focus();
+    }
+  });
 
   const handleInput = (e: Event) => {
     const target = e.target as HTMLInputElement;
@@ -84,6 +110,7 @@
     >
       <input
         bind:this={inputElement}
+        id="extension-search-input"
         class="h-[34px] min-w-0 flex-1 bg-transparent text-2xl focus:ring-0 focus:outline-none active:ring-0 active:outline-none {disabled
           ? 'cursor-not-allowed text-neutral-400 dark:text-neutral-500'
           : ''}"
@@ -105,10 +132,30 @@
     </div>
   {/if}
 
-  <!-- Right Slot -->
-  <div class="flex-shrink-0">
+  <!-- Right Slot & Settings Button -->
+  <div class="flex flex-shrink-0 items-center gap-2">
     {#if right}
       {@render right()}
     {/if}
+    {#if extensionId}
+      {#if right}
+        <span class="h-4 w-[1px] bg-neutral-200 dark:bg-neutral-800"></span>
+      {/if}
+      <button
+        class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-neutral-600 transition-all hover:bg-neutral-200 active:scale-95 dark:text-neutral-400 dark:hover:bg-neutral-700"
+        onclick={() => (settingsOpen = true)}
+        aria-label="扩展设置"
+      >
+        <Gear class="size-5" />
+      </button>
+    {/if}
   </div>
 </div>
+
+{#if extensionId}
+  <ExtensionSettingsDrawer
+    bind:open={settingsOpen}
+    {extensionId}
+    extensionName={title || ""}
+  />
+{/if}
