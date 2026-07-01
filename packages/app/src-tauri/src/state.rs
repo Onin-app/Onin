@@ -57,6 +57,7 @@ pub fn setup_managed_state(builder: tauri::Builder<tauri::Wry>) -> tauri::Builde
         .manage(
             crate::extensions::screen_recorder::commands::RecorderAppState {
                 engine: crate::extensions::screen_recorder::create_platform_engine(),
+                config: std::sync::Mutex::new(Default::default()),
             },
         )
 }

@@ -36,7 +36,8 @@ mod toast_overlay;
 mod tray_manager;
 mod unified_launch_manager;
 mod usage_tracker;
-mod window_manager;
+// TODO: 提升至 pub(crate) 预留供给后续屏幕录像扩展或自定义扩展控制窗口层次与焦点管理重构使用
+pub(crate) mod window_manager;
 
 #[cfg(target_os = "macos")]
 mod macos_dialog;

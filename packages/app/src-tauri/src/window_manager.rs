@@ -25,8 +25,8 @@ pub struct HideTaskState {
 // 鼠标定位与显示器匹配
 // ============================================================================
 
-/// 获取鼠标在全局坐标系下的当前位置
-fn get_cursor_position() -> Option<(i32, i32)> {
+// TODO: 提升至 pub(crate) 预留供给后续录屏扩展或跨显示器定位逻辑等自定义扩展进行鼠标坐标抓取使用
+pub(crate) fn get_cursor_position() -> Option<(i32, i32)> {
     #[cfg(target_os = "windows")]
     {
         use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
@@ -59,8 +59,8 @@ fn get_cursor_position() -> Option<(i32, i32)> {
     }
 }
 
-/// 匹配鼠标坐标所在的显示器
-fn find_monitor_for_cursor(
+// TODO: 提升至 pub(crate) 预留供给后续跨窗口层次切换、显示器映射及关联时匹配鼠标所在屏幕使用
+pub(crate) fn find_monitor_for_cursor(
     monitors: &[tauri::Monitor],
     cursor_pos: (i32, i32),
 ) -> Option<&tauri::Monitor> {

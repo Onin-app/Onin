@@ -2,8 +2,16 @@ use super::engine::{RecordConfig, RecordStateSnapshot, ScreenRecordEngine};
 use std::sync::Arc;
 use tauri::{command, AppHandle, Manager, State};
 
+#[cfg(target_os = "windows")]
+use base64::Engine;
+#[cfg(target_os = "windows")]
+use std::io::Cursor;
+#[cfg(target_os = "windows")]
+use windows::Win32::Graphics::Gdi::*;
+
 pub struct RecorderAppState {
     pub engine: Arc<dyn ScreenRecordEngine>,
+    pub config: std::sync::Mutex<RecordConfig>,
 }
 
 fn get_recordings_dir(app: &AppHandle) -> Result<std::path::PathBuf, String> {
@@ -125,4 +133,190 @@ pub fn show_recorder_bar_window(app: AppHandle) {
         let _ = win.show();
         let _ = win.set_focus();
     }
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MonitorInfo {
+    pub name: String,
+    pub width: u32,
+    pub height: u32,
+    pub is_primary: bool,
+    pub thumbnail: String,
+}
+
+#[cfg(target_os = "windows")]
+fn capture_monitor_thumbnail(monitor: &tauri::Monitor) -> Result<String, String> {
+    let size = monitor.size();
+    let width = size.width;
+    let height = size.height;
+
+    unsafe {
+        // 1. 获取物理显示器设备名称，转为 UTF-16 宽字符以供给 CreateDCW 使用
+        let name_str = monitor.name().map(|v| v.as_str()).unwrap_or("");
+        let name_wide: Vec<u16> = name_str.encode_utf16().chain(std::iter::once(0)).collect();
+
+        // 2. 利用 CreateDCW 获取该专属独立物理屏幕的 DC
+        // 从而直接在当前显示器的硬件显存画布上完成高速复制，避开拉取全屏幕虚拟桌面 DC 的庞大性能消耗
+        let display_hdc = CreateDCW(None, windows::core::PCWSTR(name_wide.as_ptr()), None, None);
+
+        if display_hdc.0 == 0 {
+            return Err(format!("Failed to CreateDCW for monitor: {}", name_str));
+        }
+
+        // 3. 创建兼容 DC 和 compatible bitmap
+        let mem_hdc = CreateCompatibleDC(display_hdc);
+        if mem_hdc.0 == 0 {
+            let _ = DeleteDC(display_hdc);
+            return Err("Failed to create compatible dc".to_string());
+        }
+
+        let bitmap = CreateCompatibleBitmap(display_hdc, width as i32, height as i32);
+        if bitmap.0 == 0 {
+            let _ = DeleteDC(mem_hdc);
+            let _ = DeleteDC(display_hdc);
+            return Err("Failed to create compatible bitmap".to_string());
+        }
+
+        let old_obj = SelectObject(mem_hdc, bitmap);
+
+        // 4. 从该独立显示器的局点 (0, 0) 直接高速复制
+        let ok = BitBlt(
+            mem_hdc,
+            0,
+            0,
+            width as i32,
+            height as i32,
+            display_hdc,
+            0,
+            0,
+            SRCCOPY,
+        );
+
+        if ok.is_err() {
+            SelectObject(mem_hdc, old_obj);
+            let _ = DeleteObject(bitmap);
+            let _ = DeleteDC(mem_hdc);
+            let _ = DeleteDC(display_hdc);
+            return Err("BitBlt failed".to_string());
+        }
+
+        // 5. 获取 DIB 位图字节
+        let mut bmi = BITMAPINFO {
+            bmiHeader: BITMAPINFOHEADER {
+                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: width as i32,
+                biHeight: -(height as i32), // 负数代表自上而下
+                biPlanes: 1,
+                biBitCount: 32,
+                biCompression: BI_RGB.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let mut bgra = vec![0u8; (width * height * 4) as usize];
+        let lines = GetDIBits(
+            mem_hdc,
+            bitmap,
+            0,
+            height,
+            Some(bgra.as_mut_ptr() as *mut _),
+            &mut bmi,
+            DIB_RGB_COLORS,
+        );
+
+        // 6. 清理 GDI 资源，display_hdc 必须通过 DeleteDC 销毁
+        SelectObject(mem_hdc, old_obj);
+        let _ = DeleteObject(bitmap);
+        let _ = DeleteDC(mem_hdc);
+        let _ = DeleteDC(display_hdc);
+
+        if lines == 0 {
+            return Err("GetDIBits failed".to_string());
+        }
+
+        // 5. 转换 BGRA 为 RGBA
+        for chunk in bgra.chunks_exact_mut(4) {
+            let b = chunk[0];
+            let r = chunk[2];
+            chunk[0] = r;
+            chunk[2] = b;
+        }
+
+        // 6. 用 image 库进行缩放和压缩
+        if let Some(img_buf) =
+            image::ImageBuffer::<image::Rgba<u8>, _>::from_raw(width, height, bgra)
+        {
+            // 计算缩放比例，目标宽度 280 物理像素
+            let target_w = 280;
+            let target_h = ((height as f32 / width as f32) * target_w as f32) as u32;
+
+            let thumb = image::imageops::thumbnail(&img_buf, target_w, target_h);
+
+            let mut png_data = Cursor::new(Vec::new());
+            if thumb
+                .write_to(&mut png_data, image::ImageFormat::Png)
+                .is_ok()
+            {
+                let base64_str =
+                    base64::engine::general_purpose::STANDARD.encode(png_data.get_ref());
+                return Ok(format!("data:image/png;base64,{}", base64_str));
+            }
+        }
+
+        Err("Failed to compress thumbnail".to_string())
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn capture_monitor_thumbnail(_monitor: &tauri::Monitor) -> Result<String, String> {
+    Ok("".to_string())
+}
+
+#[command]
+pub fn get_available_monitors(app: AppHandle) -> Result<Vec<MonitorInfo>, String> {
+    let monitors = app.available_monitors().map_err(|e| e.to_string())?;
+
+    let mut infos = Vec::new();
+    for (i, m) in monitors.iter().enumerate() {
+        let name = m
+            .name()
+            .map(|n| n.to_string())
+            .unwrap_or_else(|| format!("显示器 {}", i + 1));
+        let size = m.size();
+        let is_primary = if let Ok(Some(pm)) = app.primary_monitor() {
+            pm.name() == m.name()
+        } else {
+            false
+        };
+
+        // 捕获缩略图，若失败则返回空字符串
+        let thumbnail = capture_monitor_thumbnail(m).unwrap_or_default();
+
+        infos.push(MonitorInfo {
+            name,
+            width: size.width,
+            height: size.height,
+            is_primary,
+            thumbnail,
+        });
+    }
+    Ok(infos)
+}
+
+#[command]
+pub fn save_recorder_config(
+    state: State<'_, RecorderAppState>,
+    config: RecordConfig,
+) -> Result<(), String> {
+    let mut current_config = state.config.lock().map_err(|e| e.to_string())?;
+    *current_config = config;
+    Ok(())
+}
+
+#[command]
+pub fn get_recorder_config(state: State<'_, RecorderAppState>) -> Result<RecordConfig, String> {
+    let current_config = state.config.lock().map_err(|e| e.to_string())?;
+    Ok(current_config.clone())
 }

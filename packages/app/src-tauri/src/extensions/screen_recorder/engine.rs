@@ -5,9 +5,22 @@ use std::path::Path;
 #[serde(rename_all = "camelCase")]
 pub struct RecordConfig {
     pub fps: u32,
-    pub record_audio: bool,        // 是否录制麦克风
-    pub record_system_sound: bool, // 是否录制系统声卡声音
-    pub exclude_own_window: bool,  // 是否排除 Onin 自身窗口
+    pub record_audio: bool, // [Placeholder] 是否录制麦克风，目前由前端选项保存，为音频录像流扩展预留
+    pub record_system_sound: bool, // [Placeholder] 是否录制系统声卡声音，为音频混音后续扩展预留
+    pub exclude_own_window: bool, // 是否排除 Onin 自身窗口，目前由前端主动执行隐藏窗口，保留此参数记录
+    pub monitor_index: Option<i32>, // 选中的屏幕索引，None/Some(-1) 为跟随鼠标
+}
+
+impl Default for RecordConfig {
+    fn default() -> Self {
+        Self {
+            fps: 30,
+            record_audio: true,
+            record_system_sound: false,
+            exclude_own_window: true,
+            monitor_index: Some(0),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]

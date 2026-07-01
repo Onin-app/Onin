@@ -121,14 +121,36 @@ pub fn show_screen_recorder_bar(app: &AppHandle) -> Result<(), String> {
 
     let window = builder.build().map_err(|e| e.to_string())?;
 
-    // 居中定位在屏幕顶部偏下
-    if let Ok(Some(monitor)) = app.primary_monitor() {
-        let size = monitor.size();
-        let scale = monitor.scale_factor();
-        let x = (size.width as f64 / scale - 380.0) / 2.0;
-        let y = 76.0;
-        let _ = window.set_position(tauri::LogicalPosition::new(x, y));
+    // 居中定位在当前主窗口所在的显示器上
+    let mut target_monitor = None;
+    if let Some(main_win) = app.get_webview_window("main") {
+        if let Ok(Some(monitor)) = main_win.current_monitor() {
+            target_monitor = Some(monitor);
+        }
     }
+
+    let monitor = match target_monitor {
+        Some(m) => m,
+        None => {
+            if let Ok(Some(m)) = app.primary_monitor() {
+                m
+            } else {
+                return Ok(());
+            }
+        }
+    };
+
+    let size = monitor.size();
+    let scale = monitor.scale_factor();
+    let position = monitor.position();
+
+    // 转换成全局逻辑坐标
+    let monitor_logical_x = position.x as f64 / scale;
+    let monitor_logical_y = position.y as f64 / scale;
+
+    let x = monitor_logical_x + (size.width as f64 / scale - 380.0) / 2.0;
+    let y = monitor_logical_y + 76.0;
+    let _ = window.set_position(tauri::LogicalPosition::new(x, y));
 
     Ok(())
 }

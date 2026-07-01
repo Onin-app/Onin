@@ -221,6 +221,9 @@ pub fn get_invoke_handler(
         crate::extensions::screen_recorder::commands::open_video_file,
         crate::extensions::screen_recorder::commands::delete_video_file,
         crate::extensions::screen_recorder::commands::show_recorder_bar_window,
+        crate::extensions::screen_recorder::commands::get_available_monitors,
+        crate::extensions::screen_recorder::commands::save_recorder_config,
+        crate::extensions::screen_recorder::commands::get_recorder_config,
     ]
 }
 

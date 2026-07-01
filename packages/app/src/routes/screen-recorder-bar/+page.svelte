@@ -21,10 +21,41 @@
   }
 
   // 录制配置
+  let isInitialized = $state(false);
   let recordAudio = $state(true);
   let recordSystemSound = $state(false);
   let excludeOwnWindow = $state(true);
   let fps = $state(30);
+  let selectedMonitorIndex = $state(0); // 默认选择第一块屏幕
+  let saveTimeout = $state<number | undefined>(undefined);
+
+  // 延迟 300ms 异步防抖保存配置，过滤开关连击引发的系统 IPC 及磁盘 I/O 阻塞
+  function debouncedSaveConfig() {
+    if (!isInitialized) return;
+    if (saveTimeout) clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(async () => {
+      try {
+        const config = {
+          fps,
+          recordAudio,
+          recordSystemSound,
+          excludeOwnWindow,
+          monitorIndex: selectedMonitorIndex,
+        };
+        localStorage.setItem(
+          "onin_screen_recorder_config",
+          JSON.stringify(config),
+        );
+        await invoke("save_recorder_config", { config });
+      } catch (e) {
+        console.error("Failed to save config in bar:", e);
+      }
+    }, 300) as unknown as number;
+  }
+
+  $effect(() => {
+    debouncedSaveConfig();
+  });
 
   // 录制状态
   let isRecording = $state(false);
@@ -72,6 +103,7 @@
         recordAudio,
         recordSystemSound,
         excludeOwnWindow,
+        monitorIndex: selectedMonitorIndex,
       };
 
       outputFilePath = await invoke<string>("start_screen_record", { config });
@@ -130,9 +162,26 @@
     }
   }
 
-  onMount(() => {
+  onMount(async () => {
     pollState();
     timerId = setInterval(pollState, 1000);
+
+    // 从 Rust 全局唯一的可信数据源加载配置，解决跨 Webview 窗口本地存储同步缺陷
+    try {
+      const config = await invoke<any>("get_recorder_config");
+      fps = config.fps ?? 30;
+      recordAudio = config.recordAudio ?? true;
+      recordSystemSound = config.recordSystemSound ?? false;
+      excludeOwnWindow = config.excludeOwnWindow ?? true;
+      selectedMonitorIndex = config.monitorIndex ?? 0;
+      if (selectedMonitorIndex === -1) {
+        selectedMonitorIndex = 0;
+      }
+    } catch (e) {
+      console.error("Failed to load screen recorder config in bar:", e);
+    } finally {
+      isInitialized = true;
+    }
 
     // 渲染完毕后通知 Rust 显示当前专属独立窗口，彻底防止白屏闪烁
     invoke("show_recorder_bar_window").catch(console.error);
@@ -141,6 +190,9 @@
   onDestroy(() => {
     if (timerId) {
       clearInterval(timerId);
+    }
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
     }
   });
 </script>

@@ -6,6 +6,8 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use windows::core::PCWSTR;
+use windows::Win32::Foundation::POINT;
+use windows::Win32::Graphics::Gdi::{MonitorFromPoint, MONITOR_DEFAULTTONULL};
 use windows::Win32::Media::MediaFoundation::*;
 
 use windows_capture::{
@@ -275,18 +277,82 @@ impl ScreenRecordEngine for WindowsRecordEngine {
         &self,
         config: &RecordConfig,
         output_path: &Path,
-        _app: &tauri::AppHandle,
+        app: &tauri::AppHandle,
     ) -> Result<(), String> {
         let mut state = self.state.lock().unwrap();
         if *state != RecordState::Idle {
             return Err("Engine is already recording or paused".into());
         }
+        // 1. 获取目标显示器
+        let idx = config.monitor_index.unwrap_or(-1);
+        let selected_monitor = if idx == -1 {
+            // 跟随鼠标录屏：自动捕捉当前鼠标指针所在的显示器
+            unsafe {
+                let mut point = POINT::default();
+                if windows::Win32::UI::WindowsAndMessaging::GetCursorPos(&mut point).is_ok() {
+                    let hmonitor = MonitorFromPoint(point, MONITOR_DEFAULTTONULL);
+                    if !hmonitor.is_invalid() {
+                        Some(Monitor::from_raw_hmonitor(
+                            hmonitor.0 as *mut std::ffi::c_void,
+                        ))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
+        } else {
+            let win_monitors = Monitor::enumerate()
+                .map_err(|e| format!("Failed to enumerate monitors: {:?}", e))?;
 
-        // 1. 获取主屏幕参数（分辨率）
-        let primary_monitor =
-            Monitor::primary().map_err(|e| format!("Failed to get primary monitor: {:?}", e))?;
-        let width = primary_monitor.width().map_err(|e| e.to_string())?;
-        let height = primary_monitor.height().map_err(|e| e.to_string())?;
+            // 1. 优先尝试通过设备名称比对进行精确屏幕关联
+            let tauri_monitors = app.available_monitors().unwrap_or_default();
+            let target_clean_name = if idx >= 0 && (idx as usize) < tauri_monitors.len() {
+                tauri_monitors[idx as usize]
+                    .name()
+                    .map(|n| clean_monitor_name(n))
+            } else {
+                None
+            };
+
+            let mut matched = None;
+            if let Some(ref clean_name) = target_clean_name {
+                matched = win_monitors
+                    .iter()
+                    .find(|m| {
+                        m.device_name()
+                            .map(|n| clean_monitor_name(&n) == *clean_name)
+                            .unwrap_or(false)
+                    })
+                    .cloned();
+            }
+
+            // 2. 名称比对匹配失败时的 fallback：安全退化至系统主显示器 (Primary Monitor)
+            // 彻底规避不同 API 之间直接取索引导致的屏幕顺序不一致错位漏洞
+            matched.or_else(|| {
+                win_monitors
+                    .iter()
+                    .find(|m| {
+                        if let Ok(pri) = Monitor::primary() {
+                            m.as_raw_hmonitor() == pri.as_raw_hmonitor()
+                        } else {
+                            false
+                        }
+                    })
+                    .cloned()
+            })
+        };
+
+        let selected_monitor = match selected_monitor {
+            Some(m) => m,
+            None => {
+                Monitor::primary().map_err(|e| format!("Failed to get primary monitor: {:?}", e))?
+            }
+        };
+
+        let width = selected_monitor.width().map_err(|e| e.to_string())?;
+        let height = selected_monitor.height().map_err(|e| e.to_string())?;
 
         // 2. 初始化 Media Foundation 编码写入器
         let writer = MFSinkWriterWrapper::new(output_path, width, height, config.fps)?;
@@ -298,7 +364,7 @@ impl ScreenRecordEngine for WindowsRecordEngine {
         // 3. 配置录像捕捉设置
         // windows-capture 的 settings 配置
         let settings = Settings::new(
-            primary_monitor,
+            selected_monitor.clone(),
             CursorCaptureSettings::WithCursor,
             DrawBorderSettings::WithoutBorder,
             SecondaryWindowSettings::Default,
@@ -320,10 +386,8 @@ impl ScreenRecordEngine for WindowsRecordEngine {
                     )
                 ) {
                     // 低版本 Windows 10/11 不支持禁用黄色录屏框，进行 Fallback 降级，开启边框重试
-                    let primary_monitor_fallback = Monitor::primary()
-                        .map_err(|err| format!("Failed to get primary monitor: {}", err))?;
                     let fallback_settings = Settings::new(
-                        primary_monitor_fallback,
+                        selected_monitor.clone(),
                         CursorCaptureSettings::WithCursor,
                         DrawBorderSettings::Default, // 使用系统默认配置，避开低版本系统缺失接口的底层调用
                         SecondaryWindowSettings::Default,
@@ -461,4 +525,11 @@ impl ScreenRecordEngine for WindowsRecordEngine {
             duration_secs: elapsed.as_secs(),
         }
     }
+}
+
+fn clean_monitor_name(name: &str) -> String {
+    name.chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .collect::<String>()
+        .to_lowercase()
 }
