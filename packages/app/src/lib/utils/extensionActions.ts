@@ -135,6 +135,12 @@ export const EXTENSION_ACTION_MAP: Record<string, ExtensionAction> = {
     type: "navigate",
     route: () => "/extensions/ocr",
   },
+
+  // ── 录屏 ──────────────────────────────────────────────────────────────────
+  "screen_recorder:record": {
+    type: "navigate",
+    route: () => "/extensions/screen-recorder",
+  },
 };
 
 // ============================================================================

@@ -210,3 +210,9 @@ pub async fn finish_color_picker(app: AppHandle, hex: Option<String>) -> Result<
 
     Ok(())
 }
+
+/// 打开录屏浮动控制栏小窗口
+#[command]
+pub async fn show_screen_recorder_bar(app: AppHandle) -> Result<(), String> {
+    crate::extensions::screen_recorder::show_screen_recorder_bar(&app)
+}

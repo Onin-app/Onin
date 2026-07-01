@@ -210,6 +210,17 @@ pub fn get_invoke_handler(
         crate::ai_manager::commands::get_providers_registry,
         crate::ai_manager::commands::sync_providers_registry,
         open_file_or_folder_dialog,
+        // Screen Recorder commands
+        extension::api::show_screen_recorder_bar,
+        crate::extensions::screen_recorder::commands::start_screen_record,
+        crate::extensions::screen_recorder::commands::stop_screen_record,
+        crate::extensions::screen_recorder::commands::pause_screen_record,
+        crate::extensions::screen_recorder::commands::resume_screen_record,
+        crate::extensions::screen_recorder::commands::get_screen_record_state,
+        crate::extensions::screen_recorder::commands::get_recorded_videos,
+        crate::extensions::screen_recorder::commands::open_video_file,
+        crate::extensions::screen_recorder::commands::delete_video_file,
+        crate::extensions::screen_recorder::commands::show_recorder_bar_window,
     ]
 }
 

@@ -53,4 +53,10 @@ pub fn setup_managed_state(builder: tauri::Builder<tauri::Wry>) -> tauri::Builde
         })
         // 文件搜索运行状态
         .manage(file_search::FileSearchState::default())
+        // 录屏扩展状态
+        .manage(
+            crate::extensions::screen_recorder::commands::RecorderAppState {
+                engine: crate::extensions::screen_recorder::create_platform_engine(),
+            },
+        )
 }

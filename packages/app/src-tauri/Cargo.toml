@@ -50,10 +50,15 @@ windows = { version = "0.57", features = [
   "Media_Ocr",
   "Storage_Streams",
   "Globalization",
+  "Win32_Media_MediaFoundation",
+  "Win32_Graphics_Direct3D11",
+  "Win32_Graphics_Direct3D",
+  "Win32_Graphics_Dxgi",
 ] }
 base64 = "0.22"
 async-trait = "0.1"
 futures = "0.3" # 用于并发处理 futures
+cpal = "0.15"
 
 image = "0.25"
 # Add `sync` for Mutex and `fs` for async file operations.
@@ -98,6 +103,7 @@ evalexpr = "12"
 [target.'cfg(windows)'.dependencies]
 everything-ipc = "0.1.2"
 winreg = "0.55"
+windows-capture = "1.5.0"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
