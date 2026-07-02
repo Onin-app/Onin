@@ -9,6 +9,8 @@ pub struct RecordConfig {
     pub record_system_sound: bool, // [Placeholder] 是否录制系统声卡声音，为音频混音后续扩展预留
     pub exclude_own_window: bool, // 是否排除 Onin 自身窗口，目前由前端主动执行隐藏窗口，保留此参数记录
     pub monitor_index: Option<i32>, // 选中的屏幕索引，None/Some(-1) 为跟随鼠标
+    pub save_folder_type: Option<String>, // 保存文件夹类型："video" | "download" | "desktop" | "custom"
+    pub custom_save_folder: Option<String>, // 自定义保存路径
 }
 
 impl Default for RecordConfig {
@@ -19,6 +21,8 @@ impl Default for RecordConfig {
             record_system_sound: false,
             exclude_own_window: true,
             monitor_index: Some(0),
+            save_folder_type: Some("video".to_string()),
+            custom_save_folder: None,
         }
     }
 }

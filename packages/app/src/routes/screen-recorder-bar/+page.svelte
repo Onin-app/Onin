@@ -27,6 +27,10 @@
   let excludeOwnWindow = $state(true);
   let fps = $state(30);
   let selectedMonitorIndex = $state(0); // 默认选择第一块屏幕
+  let saveFolderType = $state<"video" | "download" | "desktop" | "custom">(
+    "video",
+  );
+  let customSaveFolder = $state("");
   let saveTimeout = $state<number | undefined>(undefined);
 
   // 延迟 300ms 异步防抖保存配置，过滤开关连击引发的系统 IPC 及磁盘 I/O 阻塞
@@ -41,6 +45,8 @@
           recordSystemSound,
           excludeOwnWindow,
           monitorIndex: selectedMonitorIndex,
+          saveFolderType,
+          customSaveFolder,
         };
         localStorage.setItem(
           "onin_screen_recorder_config",
@@ -104,6 +110,8 @@
         recordSystemSound,
         excludeOwnWindow,
         monitorIndex: selectedMonitorIndex,
+        saveFolderType,
+        customSaveFolder,
       };
 
       outputFilePath = await invoke<string>("start_screen_record", { config });
@@ -177,6 +185,8 @@
       if (selectedMonitorIndex === -1) {
         selectedMonitorIndex = 0;
       }
+      saveFolderType = config.saveFolderType ?? "video";
+      customSaveFolder = config.customSaveFolder ?? "";
     } catch (e) {
       console.error("Failed to load screen recorder config in bar:", e);
     } finally {

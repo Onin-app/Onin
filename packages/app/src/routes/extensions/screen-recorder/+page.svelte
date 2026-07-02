@@ -3,6 +3,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { open } from "@tauri-apps/plugin-dialog";
   import { VideoCamera, Trash, Play, Spinner } from "phosphor-svelte";
   import { Switch, Tabs } from "bits-ui";
   import AppScrollArea from "$lib/components/AppScrollArea.svelte";
@@ -22,6 +23,8 @@
     recordSystemSound?: boolean;
     excludeOwnWindow?: boolean;
     monitorIndex?: number;
+    saveFolderType?: "video" | "download" | "desktop" | "custom";
+    customSaveFolder?: string;
   }
 
   interface MonitorInfo {
@@ -39,6 +42,10 @@
   let excludeOwnWindow = $state(true);
   let fps = $state(30);
   let selectedMonitorIndex = $state(0); // 默认选择第一块屏幕
+  let saveFolderType = $state<"video" | "download" | "desktop" | "custom">(
+    "video",
+  );
+  let customSaveFolder = $state("");
   let saveTimeout = $state<number | undefined>(undefined);
 
   let monitors = $state<MonitorInfo[]>([]);
@@ -71,6 +78,10 @@
       if (selectedMonitorIndex === -1) {
         selectedMonitorIndex = 0;
       }
+      saveFolderType =
+        rustConfig.saveFolderType ?? localConfig?.saveFolderType ?? "video";
+      customSaveFolder =
+        rustConfig.customSaveFolder ?? localConfig?.customSaveFolder ?? "";
     } catch (e) {
       console.error("Failed to load screen recorder config:", e);
     }
@@ -88,6 +99,8 @@
           recordSystemSound,
           excludeOwnWindow,
           monitorIndex: selectedMonitorIndex,
+          saveFolderType,
+          customSaveFolder,
         };
         localStorage.setItem(
           "onin_screen_recorder_config",
@@ -132,6 +145,68 @@
     }
   }
 
+  async function saveConfigImmediately() {
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+      saveTimeout = undefined;
+    }
+    try {
+      const config: ScreenRecorderConfig = {
+        fps,
+        recordAudio,
+        recordSystemSound,
+        excludeOwnWindow,
+        monitorIndex: selectedMonitorIndex,
+        saveFolderType,
+        customSaveFolder,
+      };
+      localStorage.setItem(
+        "onin_screen_recorder_config",
+        JSON.stringify(config),
+      );
+      await invoke("save_recorder_config", { config });
+    } catch (e) {
+      console.error("Failed to save screen recorder config immediately:", e);
+    }
+  }
+
+  let choosingDirectory = false;
+  async function chooseCustomDirectory() {
+    if (choosingDirectory) return;
+    choosingDirectory = true;
+    await invoke("acquire_window_close_lock");
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: "选择录屏视频保存目录",
+      });
+      if (selected && !Array.isArray(selected)) {
+        customSaveFolder = selected;
+        saveFolderType = "custom";
+        await saveConfigImmediately();
+        await loadVideos();
+      }
+    } catch (e) {
+      console.error("Failed to choose custom folder:", e);
+    } finally {
+      choosingDirectory = false;
+      await invoke("release_window_close_lock");
+    }
+  }
+
+  async function handleFolderTypeChange(
+    type: "video" | "download" | "desktop" | "custom",
+  ) {
+    if (type === "custom") {
+      await chooseCustomDirectory();
+    } else {
+      saveFolderType = type;
+      await saveConfigImmediately();
+      await loadVideos();
+    }
+  }
+
   // 开始录制
   async function handleStartRecord() {
     try {
@@ -142,6 +217,8 @@
         recordSystemSound,
         excludeOwnWindow,
         monitorIndex: selectedMonitorIndex,
+        saveFolderType,
+        customSaveFolder,
       };
       localStorage.setItem(
         "onin_screen_recorder_config",
@@ -204,11 +281,12 @@
     return `${y}/${m}/${d} ${hh}:${mm}:${ss}`;
   }
 
-  onMount(async () => {
-    await loadConfig();
+  onMount(() => {
+    loadConfig().then(() => {
+      isInitialized = true;
+    });
     loadMonitors();
     loadVideos();
-    isInitialized = true;
 
     // 定时刷新显示器缩略图（改为10秒一次，且仅在录屏配置页激活、主窗口可见时刷新，消除截图带来的系统能耗峰值）
     const monitorInterval = setInterval(() => {
@@ -235,12 +313,7 @@
   class="relative flex h-full w-full flex-col overflow-hidden select-none"
   data-tauri-drag-region
 >
-  <ExtensionHeader
-    showSearch={false}
-    title="屏幕录制"
-    icon={VideoCamera}
-    onBack={handleBack}
-  />
+  <ExtensionHeader showSearch={false} title="屏幕录制" onBack={handleBack} />
 
   <div class="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden px-8 pb-6">
     <Tabs.Root bind:value={activeTab} class="flex h-full flex-col">
@@ -449,6 +522,73 @@
                         />
                       </Switch.Root>
                     </div>
+                  </div>
+                </div>
+
+                <!-- 细分隔线 -->
+                <div
+                  class="h-px bg-neutral-200/50 dark:bg-neutral-800/40"
+                ></div>
+
+                <!-- 视频保存位置 -->
+                <div class="flex flex-col gap-2.5">
+                  <span
+                    class="text-xs font-bold text-neutral-500 dark:text-neutral-400"
+                    >视频保存位置</span
+                  >
+                  <div class="flex flex-col gap-2">
+                    <div
+                      class="flex rounded-lg border border-neutral-200/40 bg-neutral-100 p-0.5 dark:border-neutral-800/40 dark:bg-neutral-950/40"
+                    >
+                      <button
+                        class="flex-1 rounded-md py-1.5 text-center text-xs font-semibold transition-all {saveFolderType ===
+                        'video'
+                          ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
+                          : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
+                        onclick={() => handleFolderTypeChange("video")}
+                        >视频目录</button
+                      >
+                      <button
+                        class="flex-1 rounded-md py-1.5 text-center text-xs font-semibold transition-all {saveFolderType ===
+                        'download'
+                          ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
+                          : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
+                        onclick={() => handleFolderTypeChange("download")}
+                        >下载目录</button
+                      >
+                      <button
+                        class="flex-1 rounded-md py-1.5 text-center text-xs font-semibold transition-all {saveFolderType ===
+                        'desktop'
+                          ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
+                          : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
+                        onclick={() => handleFolderTypeChange("desktop")}
+                        >桌面</button
+                      >
+                      <button
+                        class="flex-1 rounded-md py-1.5 text-center text-xs font-semibold transition-all {saveFolderType ===
+                        'custom'
+                          ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
+                          : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
+                        onclick={() => handleFolderTypeChange("custom")}
+                        >其他位置</button
+                      >
+                    </div>
+
+                    {#if saveFolderType === "custom" && customSaveFolder}
+                      <div
+                        class="flex items-center justify-between rounded-lg border border-neutral-200/30 bg-neutral-100/50 px-3 py-1.5 text-[10px] text-neutral-600 dark:border-neutral-800/30 dark:bg-neutral-950/20 dark:text-neutral-400"
+                      >
+                        <span
+                          class="truncate font-mono"
+                          title={customSaveFolder}>{customSaveFolder}</span
+                        >
+                        <button
+                          class="ml-2 shrink-0 cursor-pointer font-semibold text-red-600 hover:text-red-500"
+                          onclick={() => handleFolderTypeChange("custom")}
+                          >修改</button
+                        >
+                      </div>
+                    {/if}
                   </div>
                 </div>
               </div>

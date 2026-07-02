@@ -14,13 +14,30 @@ pub struct RecorderAppState {
     pub config: std::sync::Mutex<RecordConfig>,
 }
 
-fn get_recordings_dir(app: &AppHandle) -> Result<std::path::PathBuf, String> {
-    app.path()
-        .video_dir()
-        .or_else(|_| app.path().download_dir())
-        .or_else(|_| app.path().app_data_dir())
-        .map_err(|e| format!("Failed to resolve system directories: {}", e))
-        .map(|path| path.join("Onin_Recordings"))
+fn get_recordings_dir(
+    app: &AppHandle,
+    config: &RecordConfig,
+) -> Result<std::path::PathBuf, String> {
+    let folder_type = config.save_folder_type.as_deref().unwrap_or("video");
+    let path = match folder_type {
+        "download" => app.path().download_dir().map(|p| p.join("Onin_Recordings")),
+        "desktop" => app.path().desktop_dir().map(|p| p.join("Onin_Recordings")),
+        "custom" => {
+            if let Some(ref custom_path) = config.custom_save_folder {
+                let p = std::path::PathBuf::from(custom_path);
+                if p.exists() && p.is_dir() {
+                    Ok(p)
+                } else {
+                    app.path().video_dir().map(|p| p.join("Onin_Recordings"))
+                }
+            } else {
+                app.path().video_dir().map(|p| p.join("Onin_Recordings"))
+            }
+        }
+        _ => app.path().video_dir().map(|p| p.join("Onin_Recordings")),
+    }
+    .map_err(|e| format!("Failed to resolve directory: {}", e))?;
+    Ok(path)
 }
 
 #[command]
@@ -29,7 +46,7 @@ pub async fn start_screen_record(
     state: State<'_, RecorderAppState>,
     config: RecordConfig,
 ) -> Result<String, String> {
-    let video_dir = get_recordings_dir(&app)?;
+    let video_dir = get_recordings_dir(&app, &config)?;
 
     // 确保录屏文件夹存在
     std::fs::create_dir_all(&video_dir)
@@ -74,36 +91,44 @@ pub struct RecordedVideo {
 }
 
 #[command]
-pub fn get_recorded_videos(app: AppHandle) -> Result<Vec<RecordedVideo>, String> {
-    let video_dir = get_recordings_dir(&app)?;
+pub fn get_recorded_videos(
+    app: AppHandle,
+    state: State<'_, RecorderAppState>,
+) -> Result<Vec<RecordedVideo>, String> {
+    let config = state.config.lock().map_err(|e| e.to_string())?;
+    let video_dir = get_recordings_dir(&app, &config)?;
 
     if !video_dir.exists() {
         return Ok(Vec::new());
     }
 
+    let re = regex::Regex::new(r"^Onin_\d{8}_\d{6}\.mp4$").unwrap();
+
     let mut videos = Vec::new();
     if let Ok(entries) = std::fs::read_dir(video_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.is_file() && path.extension().is_some_and(|ext| ext == "mp4") {
-                if let Ok(metadata) = entry.metadata() {
-                    let name = entry.file_name().to_string_lossy().to_string();
-                    let size_bytes = metadata.len();
-                    let created_time = metadata
-                        .created()
-                        .or_else(|_| metadata.modified())
-                        .map(|t| {
-                            t.duration_since(std::time::SystemTime::UNIX_EPOCH)
-                                .unwrap_or_default()
-                                .as_millis() as u64
-                        })
-                        .unwrap_or(0);
-                    videos.push(RecordedVideo {
-                        name,
-                        path: path.to_string_lossy().to_string(),
-                        size_bytes,
-                        created_time,
-                    });
+            if path.is_file() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if re.is_match(&name) {
+                    if let Ok(metadata) = entry.metadata() {
+                        let size_bytes = metadata.len();
+                        let created_time = metadata
+                            .created()
+                            .or_else(|_| metadata.modified())
+                            .map(|t| {
+                                t.duration_since(std::time::SystemTime::UNIX_EPOCH)
+                                    .unwrap_or_default()
+                                    .as_millis() as u64
+                            })
+                            .unwrap_or(0);
+                        videos.push(RecordedVideo {
+                            name,
+                            path: path.to_string_lossy().to_string(),
+                            size_bytes,
+                            created_time,
+                        });
+                    }
                 }
             }
         }
