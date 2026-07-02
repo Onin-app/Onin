@@ -224,6 +224,7 @@ pub fn get_invoke_handler(
         crate::extensions::screen_recorder::commands::get_available_monitors,
         crate::extensions::screen_recorder::commands::save_recorder_config,
         crate::extensions::screen_recorder::commands::get_recorder_config,
+        crate::extensions::screen_recorder::commands::get_available_windows,
     ]
 }
 

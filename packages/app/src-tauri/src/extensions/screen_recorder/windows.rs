@@ -19,6 +19,7 @@ use windows_capture::{
         ColorFormat, CursorCaptureSettings, DirtyRegionSettings, DrawBorderSettings,
         MinimumUpdateIntervalSettings, SecondaryWindowSettings, Settings,
     },
+    window::Window,
 };
 
 // 辅助打包函数，用于设置 MF_MT_FRAME_SIZE 和 MF_MT_FRAME_RATE
@@ -120,7 +121,13 @@ impl MFSinkWriterWrapper {
         }
     }
 
-    fn write_frame(&mut self, frame_data: &[u8], timestamp: Instant) -> Result<(), String> {
+    fn write_frame(
+        &mut self,
+        frame_data: &[u8],
+        frame_width: u32,
+        frame_height: u32,
+        timestamp: Instant,
+    ) -> Result<(), String> {
         unsafe {
             if self.start_time.is_none() {
                 self.start_time = Some(timestamp);
@@ -144,16 +151,30 @@ impl MFSinkWriterWrapper {
                 )
                 .map_err(|e| format!("Buffer Lock failed: {:?}", e))?;
 
-            let row_pitch = (self.width * 4) as usize;
-            for y in 0..self.height as usize {
-                let src_offset = (self.height as usize - 1 - y) * row_pitch;
-                let dest_offset = y * row_pitch;
-                std::ptr::copy_nonoverlapping(
-                    frame_data.as_ptr().add(src_offset),
-                    p_data.add(dest_offset),
-                    row_pitch,
-                );
+            // 将整个缓冲区填充为 0 (黑色背景)，以防捕获源的宽高比配置小
+            std::ptr::write_bytes(p_data, 0, buffer_len as usize);
+
+            let src_row_pitch = (frame_width * 4) as usize;
+            let dest_row_pitch = (self.width * 4) as usize;
+            let copy_width_bytes = (self.width.min(frame_width) * 4) as usize;
+            let copy_height = self.height.min(frame_height) as usize;
+
+            for y in 0..copy_height {
+                // 翻转 Y 轴拷贝
+                let src_offset = (frame_height as usize - 1 - y) * src_row_pitch;
+                let dest_offset = y * dest_row_pitch;
+
+                if src_offset + copy_width_bytes <= frame_data.len()
+                    && dest_offset + copy_width_bytes <= buffer_len as usize
+                {
+                    std::ptr::copy_nonoverlapping(
+                        frame_data.as_ptr().add(src_offset),
+                        p_data.add(dest_offset),
+                        copy_width_bytes,
+                    );
+                }
             }
+
             buffer
                 .SetCurrentLength(buffer_len)
                 .map_err(|e| format!("SetCurrentLength failed: {:?}", e))?;
@@ -225,6 +246,9 @@ impl GraphicsCaptureApiHandler for CaptureHandler {
             return Ok(());
         }
 
+        let frame_width = frame.width();
+        let frame_height = frame.height();
+
         // 获取视频去填充后的原始像素 (BGRA 格式)
         let mut frame_buffer = frame
             .buffer()
@@ -235,7 +259,7 @@ impl GraphicsCaptureApiHandler for CaptureHandler {
 
         let mut writer_guard = self.writer.lock().unwrap();
         if let Some(ref mut writer) = *writer_guard {
-            writer.write_frame(no_padding_slice, Instant::now())?;
+            writer.write_frame(no_padding_slice, frame_width, frame_height, Instant::now())?;
         }
 
         Ok(())
@@ -283,145 +307,177 @@ impl ScreenRecordEngine for WindowsRecordEngine {
         if *state != RecordState::Idle {
             return Err("Engine is already recording or paused".into());
         }
-        // 1. 获取目标显示器
-        let idx = config.monitor_index.unwrap_or(-1);
-        let selected_monitor = if idx == -1 {
-            // 跟随鼠标录屏：自动捕捉当前鼠标指针所在的显示器
-            unsafe {
-                let mut point = POINT::default();
-                if windows::Win32::UI::WindowsAndMessaging::GetCursorPos(&mut point).is_ok() {
-                    let hmonitor = MonitorFromPoint(point, MONITOR_DEFAULTTONULL);
-                    if !hmonitor.is_invalid() {
-                        Some(Monitor::from_raw_hmonitor(
-                            hmonitor.0 as *mut std::ffi::c_void,
-                        ))
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
+
+        // 1. 判断并获取捕获目标以及尺寸
+        let is_window_mode = config.record_target_type.as_deref() == Some("window")
+            && config.window_handle.is_some();
+
+        let (width, height) = if is_window_mode {
+            let hwnd_str = config
+                .window_handle
+                .as_deref()
+                .ok_or("No window handle provided")?;
+            let hwnd_val = hwnd_str
+                .parse::<isize>()
+                .map_err(|e| format!("Invalid window handle format: {}", e))?;
+            let (w, h) = get_window_size(hwnd_val);
+            if w == 0 || h == 0 {
+                return Err("Failed to get window size or window is closed".into());
             }
+            (w, h)
         } else {
-            let win_monitors = Monitor::enumerate()
-                .map_err(|e| format!("Failed to enumerate monitors: {:?}", e))?;
-
-            // 1. 优先尝试通过设备名称比对进行精确屏幕关联
-            let tauri_monitors = app.available_monitors().unwrap_or_default();
-            let target_clean_name = if idx >= 0 && (idx as usize) < tauri_monitors.len() {
-                tauri_monitors[idx as usize]
-                    .name()
-                    .map(|n| clean_monitor_name(n))
-            } else {
-                None
-            };
-
-            let mut matched = None;
-            if let Some(ref clean_name) = target_clean_name {
-                matched = win_monitors
-                    .iter()
-                    .find(|m| {
-                        m.device_name()
-                            .map(|n| clean_monitor_name(&n) == *clean_name)
-                            .unwrap_or(false)
-                    })
-                    .cloned();
-            }
-
-            // 2. 名称比对匹配失败时的 fallback：安全退化至系统主显示器 (Primary Monitor)
-            // 彻底规避不同 API 之间直接取索引导致的屏幕顺序不一致错位漏洞
-            matched.or_else(|| {
-                win_monitors
-                    .iter()
-                    .find(|m| {
-                        if let Ok(pri) = Monitor::primary() {
-                            m.as_raw_hmonitor() == pri.as_raw_hmonitor()
-                        } else {
-                            false
-                        }
-                    })
-                    .cloned()
-            })
+            let idx = config.monitor_index.unwrap_or(-1);
+            let monitor = get_selected_monitor(idx, app)?;
+            let w = monitor.width().map_err(|e| e.to_string())? as u32;
+            let h = monitor.height().map_err(|e| e.to_string())? as u32;
+            (w, h)
         };
 
-        let selected_monitor = match selected_monitor {
-            Some(m) => m,
-            None => {
-                Monitor::primary().map_err(|e| format!("Failed to get primary monitor: {:?}", e))?
-            }
-        };
+        // 强制偶数化对齐，防止硬件 H.264 编码器因奇数分辨率引发 MF_E_INVALIDMEDIATYPE (0xC00D36B4) 错误
+        let width = width & !1;
+        let height = height & !1;
 
-        let width = selected_monitor.width().map_err(|e| e.to_string())?;
-        let height = selected_monitor.height().map_err(|e| e.to_string())?;
-
-        // 2. 初始化 Media Foundation 编码写入器
+        // 2. 初始化 Media Foundation 编码写入器并保存到 self.writer
         let writer = MFSinkWriterWrapper::new(output_path, width, height, config.fps)?;
         {
             let mut writer_guard = self.writer.lock().unwrap();
             *writer_guard = Some(writer);
         }
 
-        // 3. 配置录像捕捉设置
-        // windows-capture 的 settings 配置
-        let settings = Settings::new(
-            selected_monitor.clone(),
-            CursorCaptureSettings::WithCursor,
-            DrawBorderSettings::WithoutBorder,
-            SecondaryWindowSettings::Default,
-            MinimumUpdateIntervalSettings::Default,
-            DirtyRegionSettings::Default,
-            ColorFormat::Bgra8,
-            (self.writer.clone(), self.is_paused.clone()),
-        );
+        // 3. 根据捕获模式分别实例化 settings 并启动捕获线程
+        let capture_control = if is_window_mode {
+            let hwnd_str = config
+                .window_handle
+                .as_deref()
+                .ok_or("No window handle provided")?;
+            let hwnd_val = hwnd_str
+                .parse::<isize>()
+                .map_err(|e| format!("Invalid window handle format: {}", e))?;
+            let hwnd = hwnd_val as *mut std::ffi::c_void;
+            let window = Window::from_raw_hwnd(hwnd);
 
-        // 4. 异步启动画面捕获线程 (start_free_threaded 不会阻塞主线程并返回控制句柄)
-        self.is_paused.store(false, Ordering::SeqCst);
-        let capture_control = match CaptureHandler::start_free_threaded(settings) {
-            Ok(control) => control,
-            Err(e) => {
-                if matches!(
-                    e,
-                    windows_capture::capture::GraphicsCaptureApiError::GraphicsCaptureApiError(
-                        windows_capture::graphics_capture_api::Error::BorderConfigUnsupported
-                    )
-                ) {
-                    // 低版本 Windows 10/11 不支持禁用黄色录屏框，进行 Fallback 降级，开启边框重试
-                    let fallback_settings = Settings::new(
-                        selected_monitor.clone(),
-                        CursorCaptureSettings::WithCursor,
-                        DrawBorderSettings::Default, // 使用系统默认配置，避开低版本系统缺失接口的底层调用
-                        SecondaryWindowSettings::Default,
-                        MinimumUpdateIntervalSettings::Default,
-                        DirtyRegionSettings::Default,
-                        ColorFormat::Bgra8,
-                        (self.writer.clone(), self.is_paused.clone()),
-                    );
-                    match CaptureHandler::start_free_threaded(fallback_settings) {
-                        Ok(control) => control,
-                        Err(fallback_err) => {
-                            // 清理并 finalize 已经创建的 SinkWriter，防止 Media Foundation 泄漏
-                            let mut writer_guard = self.writer.lock().unwrap();
-                            if let Some(w) = writer_guard.take() {
-                                let _ = w.finalize();
+            let settings = Settings::new(
+                window.clone(),
+                CursorCaptureSettings::WithCursor,
+                DrawBorderSettings::WithoutBorder,
+                SecondaryWindowSettings::Default,
+                MinimumUpdateIntervalSettings::Default,
+                DirtyRegionSettings::Default,
+                ColorFormat::Bgra8,
+                (self.writer.clone(), self.is_paused.clone()),
+            );
+
+            self.is_paused.store(false, Ordering::SeqCst);
+            match CaptureHandler::start_free_threaded(settings) {
+                Ok(control) => control,
+                Err(e) => {
+                    if matches!(
+                        e,
+                        windows_capture::capture::GraphicsCaptureApiError::GraphicsCaptureApiError(
+                            windows_capture::graphics_capture_api::Error::BorderConfigUnsupported
+                        )
+                    ) {
+                        let fallback_settings = Settings::new(
+                            window,
+                            CursorCaptureSettings::WithCursor,
+                            DrawBorderSettings::Default,
+                            SecondaryWindowSettings::Default,
+                            MinimumUpdateIntervalSettings::Default,
+                            DirtyRegionSettings::Default,
+                            ColorFormat::Bgra8,
+                            (self.writer.clone(), self.is_paused.clone()),
+                        );
+                        match CaptureHandler::start_free_threaded(fallback_settings) {
+                            Ok(control) => control,
+                            Err(fallback_err) => {
+                                let mut writer_guard = self.writer.lock().unwrap();
+                                if let Some(w) = writer_guard.take() {
+                                    let _ = w.finalize();
+                                }
+                                let err_msg = fallback_err.to_string();
+                                if err_msg.contains("Failed to convert item to GraphicsCaptureItem")
+                                {
+                                    return Err("启动窗口捕获失败：目标窗口不支持录像。\n\n常见原因：\n1. 目标窗口已被用户关闭或销毁；\n2. 目标窗口是以管理员权限运行的（可尝试以管理员身份重新运行 Onin）；\n3. 目标窗口由于 Windows 系统的安全保护策略被禁止录制。".into());
+                                }
+                                return Err(format!(
+                                    "Failed to start window capture with fallback: {}",
+                                    err_msg
+                                ));
                             }
-                            return Err(format!(
-                                "Failed to start windows-capture with fallback: {}",
-                                fallback_err
-                            ));
                         }
+                    } else {
+                        let mut writer_guard = self.writer.lock().unwrap();
+                        if let Some(w) = writer_guard.take() {
+                            let _ = w.finalize();
+                        }
+                        let err_msg = e.to_string();
+                        if err_msg.contains("Failed to convert item to GraphicsCaptureItem") {
+                            return Err("启动窗口捕获失败：目标窗口不支持录像。\n\n常见原因：\n1. 目标窗口已被用户关闭或销毁；\n2. 目标窗口是以管理员权限运行的（可尝试以管理员身份重新运行 Onin）；\n3. 目标窗口由于 Windows 系统的安全保护策略被禁止录制。".into());
+                        }
+                        return Err(format!("Failed to start window capture: {}", err_msg));
                     }
-                } else {
-                    // 清理并 finalize 已经创建的 SinkWriter，防止 Media Foundation 泄漏
-                    let mut writer_guard = self.writer.lock().unwrap();
-                    if let Some(w) = writer_guard.take() {
-                        let _ = w.finalize();
+                }
+            }
+        } else {
+            let idx = config.monitor_index.unwrap_or(-1);
+            let monitor = get_selected_monitor(idx, app)?;
+
+            let settings = Settings::new(
+                monitor.clone(),
+                CursorCaptureSettings::WithCursor,
+                DrawBorderSettings::WithoutBorder,
+                SecondaryWindowSettings::Default,
+                MinimumUpdateIntervalSettings::Default,
+                DirtyRegionSettings::Default,
+                ColorFormat::Bgra8,
+                (self.writer.clone(), self.is_paused.clone()),
+            );
+
+            self.is_paused.store(false, Ordering::SeqCst);
+            match CaptureHandler::start_free_threaded(settings) {
+                Ok(control) => control,
+                Err(e) => {
+                    if matches!(
+                        e,
+                        windows_capture::capture::GraphicsCaptureApiError::GraphicsCaptureApiError(
+                            windows_capture::graphics_capture_api::Error::BorderConfigUnsupported
+                        )
+                    ) {
+                        let fallback_settings = Settings::new(
+                            monitor,
+                            CursorCaptureSettings::WithCursor,
+                            DrawBorderSettings::Default,
+                            SecondaryWindowSettings::Default,
+                            MinimumUpdateIntervalSettings::Default,
+                            DirtyRegionSettings::Default,
+                            ColorFormat::Bgra8,
+                            (self.writer.clone(), self.is_paused.clone()),
+                        );
+                        match CaptureHandler::start_free_threaded(fallback_settings) {
+                            Ok(control) => control,
+                            Err(fallback_err) => {
+                                let mut writer_guard = self.writer.lock().unwrap();
+                                if let Some(w) = writer_guard.take() {
+                                    let _ = w.finalize();
+                                }
+                                return Err(format!(
+                                    "Failed to start monitor capture with fallback: {}",
+                                    fallback_err
+                                ));
+                            }
+                        }
+                    } else {
+                        let mut writer_guard = self.writer.lock().unwrap();
+                        if let Some(w) = writer_guard.take() {
+                            let _ = w.finalize();
+                        }
+                        return Err(format!("Failed to start monitor capture: {}", e));
                     }
-                    return Err(format!("Failed to start windows-capture: {}", e));
                 }
             }
         };
 
-        // 5. 更新状态和时间计数
+        // 4. 更新状态和时间计数
         {
             let mut capture_control_guard = self.capture_thread_control.lock().unwrap();
             *capture_control_guard = Some(capture_control);
@@ -532,4 +588,90 @@ fn clean_monitor_name(name: &str) -> String {
         .filter(|c| c.is_ascii_alphanumeric())
         .collect::<String>()
         .to_lowercase()
+}
+
+fn get_selected_monitor(idx: i32, app: &tauri::AppHandle) -> Result<Monitor, String> {
+    let selected_monitor = if idx == -1 {
+        // 跟随鼠标录屏：自动捕捉当前鼠标指针所在的显示器
+        unsafe {
+            let mut point = POINT::default();
+            if windows::Win32::UI::WindowsAndMessaging::GetCursorPos(&mut point).is_ok() {
+                let hmonitor = MonitorFromPoint(point, MONITOR_DEFAULTTONULL);
+                if !hmonitor.is_invalid() {
+                    Some(Monitor::from_raw_hmonitor(
+                        hmonitor.0 as *mut std::ffi::c_void,
+                    ))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        }
+    } else {
+        let win_monitors =
+            Monitor::enumerate().map_err(|e| format!("Failed to enumerate monitors: {:?}", e))?;
+
+        // 1. 优先尝试通过设备名称比对进行精确屏幕关联
+        let tauri_monitors = app.available_monitors().unwrap_or_default();
+        let target_clean_name = if idx >= 0 && (idx as usize) < tauri_monitors.len() {
+            tauri_monitors[idx as usize]
+                .name()
+                .map(|n| clean_monitor_name(n))
+        } else {
+            None
+        };
+
+        let mut matched = None;
+        if let Some(ref clean_name) = target_clean_name {
+            matched = win_monitors
+                .iter()
+                .find(|m| {
+                    m.device_name()
+                        .map(|n| clean_monitor_name(&n) == *clean_name)
+                        .unwrap_or(false)
+                })
+                .cloned();
+        }
+
+        // 2. 名称比对匹配失败时的 fallback：安全退化至系统主显示器 (Primary Monitor)
+        matched.or_else(|| {
+            win_monitors
+                .iter()
+                .find(|m| {
+                    if let Ok(pri) = Monitor::primary() {
+                        m.as_raw_hmonitor() == pri.as_raw_hmonitor()
+                    } else {
+                        false
+                    }
+                })
+                .cloned()
+        })
+    };
+
+    let selected_monitor = match selected_monitor {
+        Some(m) => m,
+        None => {
+            Monitor::primary().map_err(|e| format!("Failed to get primary monitor: {:?}", e))?
+        }
+    };
+
+    Ok(selected_monitor)
+}
+
+fn get_window_size(hwnd_val: isize) -> (u32, u32) {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::WindowsAndMessaging::GetWindowRect;
+    let hwnd = HWND(hwnd_val);
+    let mut rect = windows::Win32::Foundation::RECT::default();
+    unsafe {
+        if GetWindowRect(hwnd, &mut rect).is_ok() {
+            let w = rect.right - rect.left;
+            let h = rect.bottom - rect.top;
+            if w > 0 && h > 0 {
+                return (w as u32, h as u32);
+            }
+        }
+    }
+    (0, 0)
 }

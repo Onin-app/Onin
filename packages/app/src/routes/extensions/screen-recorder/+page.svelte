@@ -25,6 +25,8 @@
     monitorIndex?: number;
     saveFolderType?: "video" | "download" | "desktop" | "custom";
     customSaveFolder?: string;
+    recordTargetType?: "screen" | "window";
+    windowHandle?: string | null;
   }
 
   interface MonitorInfo {
@@ -33,6 +35,14 @@
     height: number;
     isPrimary: boolean;
     thumbnail: string;
+  }
+
+  interface WindowInfo {
+    handle: string;
+    title: string;
+    processName: string;
+    width: number;
+    height: number;
   }
 
   // 录屏配置 (Svelte 5 Runes)
@@ -47,6 +57,11 @@
   );
   let customSaveFolder = $state("");
   let saveTimeout = $state<number | undefined>(undefined);
+
+  let recordTargetType = $state<"screen" | "window">("screen");
+  let selectedWindowHandle = $state<string | null>(null);
+  let windows = $state<WindowInfo[]>([]);
+  let isLoadingWindows = $state(false);
 
   let monitors = $state<MonitorInfo[]>([]);
   let activeTab = $state("record");
@@ -82,6 +97,12 @@
         rustConfig.saveFolderType ?? localConfig?.saveFolderType ?? "video";
       customSaveFolder =
         rustConfig.customSaveFolder ?? localConfig?.customSaveFolder ?? "";
+      recordTargetType =
+        rustConfig.recordTargetType ??
+        localConfig?.recordTargetType ??
+        "screen";
+      selectedWindowHandle =
+        rustConfig.windowHandle ?? localConfig?.windowHandle ?? null;
     } catch (e) {
       console.error("Failed to load screen recorder config:", e);
     }
@@ -101,6 +122,8 @@
           monitorIndex: selectedMonitorIndex,
           saveFolderType,
           customSaveFolder,
+          recordTargetType,
+          windowHandle: selectedWindowHandle,
         };
         localStorage.setItem(
           "onin_screen_recorder_config",
@@ -127,6 +150,26 @@
       }
     } catch (e) {
       console.error("Failed to load monitors:", e);
+    }
+  }
+
+  // 获取可用窗口
+  async function loadWindows() {
+    isLoadingWindows = true;
+    try {
+      windows = await invoke<WindowInfo[]>("get_available_windows");
+      if (selectedWindowHandle !== null) {
+        const exists = windows.some((w) => w.handle === selectedWindowHandle);
+        if (!exists && windows.length > 0) {
+          selectedWindowHandle = windows[0].handle;
+        }
+      } else if (windows.length > 0) {
+        selectedWindowHandle = windows[0].handle;
+      }
+    } catch (e) {
+      console.error("Failed to load windows:", e);
+    } finally {
+      isLoadingWindows = false;
     }
   }
 
@@ -159,6 +202,8 @@
         monitorIndex: selectedMonitorIndex,
         saveFolderType,
         customSaveFolder,
+        recordTargetType,
+        windowHandle: selectedWindowHandle,
       };
       localStorage.setItem(
         "onin_screen_recorder_config",
@@ -219,6 +264,8 @@
         monitorIndex: selectedMonitorIndex,
         saveFolderType,
         customSaveFolder,
+        recordTargetType,
+        windowHandle: selectedWindowHandle,
       };
       localStorage.setItem(
         "onin_screen_recorder_config",
@@ -286,19 +333,25 @@
       isInitialized = true;
     });
     loadMonitors();
+    loadWindows();
     loadVideos();
 
-    // 定时刷新显示器缩略图（改为10秒一次，且仅在录屏配置页激活、主窗口可见时刷新，消除截图带来的系统能耗峰值）
+    // 定时刷新列表（改为10秒一次，且仅在录屏配置页激活、主窗口可见时刷新）
     const monitorInterval = setInterval(() => {
       if (document.visibilityState === "visible" && activeTab === "record") {
-        loadMonitors();
+        if (recordTargetType === "screen") {
+          loadMonitors();
+        } else {
+          loadWindows();
+        }
       }
     }, 10000);
 
-    // 监听主窗口重新聚焦的事件，自动刷新视频列表
+    // 监听主窗口重新聚焦的事件，自动刷新视频列表和来源列表
     const unlistenPromise = listen("tauri://focus", () => {
       loadVideos();
       loadMonitors();
+      loadWindows();
     });
 
     return () => {
@@ -345,263 +398,403 @@
           class="flex h-full justify-center overflow-hidden"
         >
           <div
-            class="flex h-full w-[560px] flex-col rounded-2xl border border-neutral-200/80 bg-white/40 p-5 shadow-xs backdrop-blur-md dark:border-neutral-800/80 dark:bg-neutral-900/40"
+            class="flex h-full w-full rounded-2xl border border-neutral-200/80 bg-white/40 p-5 shadow-xs backdrop-blur-md dark:border-neutral-800/80 dark:bg-neutral-900/40"
           >
-            <!-- 配置滚动主体 -->
-            <AppScrollArea
-              class="min-h-0 flex-1 pr-0.5"
-              viewportClass="h-full w-full"
-            >
-              <div class="flex flex-col gap-5 pr-3.5 pb-4">
-                <!-- 选择显示器 (平铺大缩略图网格) -->
-                <div class="flex flex-col gap-2">
-                  <span
-                    class="text-xs font-bold text-neutral-800 dark:text-neutral-200"
-                  >
-                    选择录像屏幕
-                  </span>
-                  <div
-                    class="grid gap-4.5 {monitors.length > 1
-                      ? 'grid-cols-2'
-                      : 'grid-cols-1'}"
-                  >
-                    {#each monitors as monitor, i}
-                      <!-- svelte-ignore a11y_click_events_have_key_events -->
-                      <!-- svelte-ignore a11y_no_static_element_interactions -->
-                      <div
-                        class="relative aspect-[16/10] w-full cursor-pointer overflow-hidden rounded-xl border shadow-xs transition-all duration-200 hover:scale-[1.015]
-                          {selectedMonitorIndex === i
-                          ? 'border-red-600 shadow-[0_0_10px_rgba(220,38,38,0.22)]'
-                          : 'border-neutral-200 bg-neutral-100/40 dark:border-neutral-800 dark:bg-neutral-950/20'}"
-                        onclick={() => (selectedMonitorIndex = i)}
-                      >
-                        <!-- 缩略图图画 -->
-                        {#if monitor.thumbnail}
-                          <img
-                            src={monitor.thumbnail}
-                            alt={monitor.name}
-                            class="h-full w-full object-cover"
-                          />
-                        {:else}
-                          <div
-                            class="flex h-full w-full items-center justify-center bg-neutral-100 text-neutral-400 dark:bg-neutral-950/40"
-                          >
-                            <span class="text-[9px]">正在捕获首帧...</span>
-                          </div>
-                        {/if}
-
-                        <!-- 屏幕名称分辨率悬浮条 -->
-                        <div
-                          class="absolute right-0 bottom-0 left-0 flex items-center justify-between bg-black/60 px-2.5 py-1 text-white backdrop-blur-xs"
-                        >
-                          <span class="truncate text-[9.5px] font-bold">
-                            {monitor.isPrimary ? "主显示器" : `显示器 ${i + 1}`}
-                          </span>
-                          <span
-                            class="font-mono text-[8.5px] font-semibold opacity-90"
-                          >
-                            {monitor.width} x {monitor.height}
-                          </span>
-                        </div>
-
-                        <!-- 选中对勾 -->
-                        {#if selectedMonitorIndex === i}
-                          <div
-                            class="absolute top-2 right-2 rounded-full bg-red-600 p-0.5 text-white shadow-xs"
-                          >
-                            <svg
-                              class="size-3.5 fill-none stroke-current stroke-2"
-                              viewBox="0 0 24 24"
-                            >
-                              <polyline points="20 6 9 17 4 12"></polyline>
-                            </svg>
-                          </div>
-                        {/if}
-                      </div>
-                    {/each}
-                  </div>
-                </div>
-
-                <!-- 细分隔线 -->
-                <div
-                  class="h-px bg-neutral-200/50 dark:bg-neutral-800/40"
-                ></div>
-
-                <!-- 参数配置 (横向两栏布局) -->
-                <div class="grid grid-cols-2 gap-x-6 gap-y-4">
-                  <!-- 左半边：帧率选择 -->
-                  <div class="flex flex-col gap-2.5">
+            <!-- 左右两栏容器 -->
+            <div class="flex h-full w-full gap-6">
+              <!-- 左侧栏：录制来源选择 (屏幕或窗口) -->
+              <div class="flex h-full min-w-0 flex-1 flex-col justify-between">
+                <div class="flex h-full min-h-0 flex-col gap-3">
+                  {#if recordTargetType === "screen"}
+                    <!-- 屏幕录制来源选择 -->
                     <span
-                      class="text-xs font-bold text-neutral-500 dark:text-neutral-400"
-                      >FPS 帧率</span
+                      class="shrink-0 text-xs font-bold text-neutral-800 dark:text-neutral-200"
                     >
-                    <div
-                      class="flex rounded-lg border border-neutral-200/40 bg-neutral-100 p-0.5 dark:border-neutral-800/40 dark:bg-neutral-950/40"
+                      选择录像屏幕
+                    </span>
+                    <!-- 显示器列表滚动区 -->
+                    <AppScrollArea
+                      class="min-h-0 flex-1 pr-1"
+                      viewportClass="h-full w-full"
                     >
-                      <button
-                        class="flex-1 rounded-md py-1.5 text-center text-xs font-semibold transition-all {fps ===
-                        30
-                          ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
-                          : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
-                        onclick={() => (fps = 30)}>30 FPS</button
-                      >
-                      <button
-                        class="flex-1 rounded-md py-1.5 text-center text-xs font-semibold transition-all {fps ===
-                        60
-                          ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
-                          : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
-                        onclick={() => (fps = 60)}>60 FPS</button
-                      >
-                    </div>
-                  </div>
-
-                  <!-- 右半边：开关组 -->
-                  <div class="flex flex-col gap-3.5">
-                    <!-- 麦克风 -->
-                    <div class="flex items-center justify-between">
-                      <div class="flex flex-col">
-                        <span
-                          class="text-xs font-semibold text-neutral-800 dark:text-neutral-200"
-                          >麦克风音频</span
-                        >
-                        <span
-                          class="text-[9.5px] text-neutral-400 dark:text-neutral-500"
-                          >录制外界谈话声音</span
-                        >
-                      </div>
-                      <Switch.Root
-                        bind:checked={recordAudio}
-                        class="peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-red-600 data-[state=unchecked]:bg-neutral-200 dark:data-[state=unchecked]:bg-neutral-800"
-                      >
-                        <Switch.Thumb
-                          class="pointer-events-none block h-4 w-4 rounded-full bg-white shadow-md ring-0 transition-transform data-[state=checked]:translate-x-4.5 data-[state=unchecked]:translate-x-0.5 dark:bg-neutral-100"
-                        />
-                      </Switch.Root>
-                    </div>
-
-                    <!-- 系统声卡 -->
-                    <div class="flex items-center justify-between">
-                      <div class="flex flex-col">
-                        <span
-                          class="text-xs font-semibold text-neutral-800 dark:text-neutral-200"
-                          >系统声卡声音</span
-                        >
-                        <span
-                          class="text-[9.5px] text-neutral-400 dark:text-neutral-500"
-                          >录制播放的系统音量</span
-                        >
-                      </div>
-                      <Switch.Root
-                        bind:checked={recordSystemSound}
-                        class="peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-red-600 data-[state=unchecked]:bg-neutral-200 dark:data-[state=unchecked]:bg-neutral-800"
-                      >
-                        <Switch.Thumb
-                          class="pointer-events-none block h-4 w-4 rounded-full bg-white shadow-md ring-0 transition-transform data-[state=checked]:translate-x-4.5 data-[state=unchecked]:translate-x-0.5 dark:bg-neutral-100"
-                        />
-                      </Switch.Root>
-                    </div>
-
-                    <!-- 排除自身 -->
-                    <div class="flex items-center justify-between">
-                      <div class="flex flex-col">
-                        <span
-                          class="text-xs font-semibold text-neutral-800 dark:text-neutral-200"
-                          >排除本程序</span
-                        >
-                        <span
-                          class="text-[9.5px] text-neutral-400 dark:text-neutral-500"
-                          >录像时不显示主窗口</span
-                        >
-                      </div>
-                      <Switch.Root
-                        bind:checked={excludeOwnWindow}
-                        class="peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-red-600 data-[state=unchecked]:bg-neutral-200 dark:data-[state=unchecked]:bg-neutral-800"
-                      >
-                        <Switch.Thumb
-                          class="pointer-events-none block h-4 w-4 rounded-full bg-white shadow-md ring-0 transition-transform data-[state=checked]:translate-x-4.5 data-[state=unchecked]:translate-x-0.5 dark:bg-neutral-100"
-                        />
-                      </Switch.Root>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 细分隔线 -->
-                <div
-                  class="h-px bg-neutral-200/50 dark:bg-neutral-800/40"
-                ></div>
-
-                <!-- 视频保存位置 -->
-                <div class="flex flex-col gap-2.5">
-                  <span
-                    class="text-xs font-bold text-neutral-500 dark:text-neutral-400"
-                    >视频保存位置</span
-                  >
-                  <div class="flex flex-col gap-2">
-                    <div
-                      class="flex rounded-lg border border-neutral-200/40 bg-neutral-100 p-0.5 dark:border-neutral-800/40 dark:bg-neutral-950/40"
-                    >
-                      <button
-                        class="flex-1 rounded-md py-1.5 text-center text-xs font-semibold transition-all {saveFolderType ===
-                        'video'
-                          ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
-                          : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
-                        onclick={() => handleFolderTypeChange("video")}
-                        >视频目录</button
-                      >
-                      <button
-                        class="flex-1 rounded-md py-1.5 text-center text-xs font-semibold transition-all {saveFolderType ===
-                        'download'
-                          ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
-                          : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
-                        onclick={() => handleFolderTypeChange("download")}
-                        >下载目录</button
-                      >
-                      <button
-                        class="flex-1 rounded-md py-1.5 text-center text-xs font-semibold transition-all {saveFolderType ===
-                        'desktop'
-                          ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
-                          : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
-                        onclick={() => handleFolderTypeChange("desktop")}
-                        >桌面</button
-                      >
-                      <button
-                        class="flex-1 rounded-md py-1.5 text-center text-xs font-semibold transition-all {saveFolderType ===
-                        'custom'
-                          ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
-                          : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
-                        onclick={() => handleFolderTypeChange("custom")}
-                        >其他位置</button
-                      >
-                    </div>
-
-                    {#if saveFolderType === "custom" && customSaveFolder}
                       <div
-                        class="flex items-center justify-between rounded-lg border border-neutral-200/30 bg-neutral-100/50 px-3 py-1.5 text-[10px] text-neutral-600 dark:border-neutral-800/30 dark:bg-neutral-950/20 dark:text-neutral-400"
+                        class="grid gap-4 {monitors.length > 1
+                          ? 'grid-cols-2'
+                          : 'grid-cols-1'}"
                       >
-                        <span
-                          class="truncate font-mono"
-                          title={customSaveFolder}>{customSaveFolder}</span
-                        >
-                        <button
-                          class="ml-2 shrink-0 cursor-pointer font-semibold text-red-600 hover:text-red-500"
-                          onclick={() => handleFolderTypeChange("custom")}
-                          >修改</button
-                        >
+                        {#each monitors as monitor, i}
+                          <!-- svelte-ignore a11y_click_events_have_key_events -->
+                          <!-- svelte-ignore a11y_no_static_element_interactions -->
+                          <div
+                            class="relative aspect-[16/10] w-full cursor-pointer overflow-hidden rounded-xl border shadow-xs transition-all duration-200 hover:scale-[1.015]
+                              {selectedMonitorIndex === i
+                              ? 'border-red-600 shadow-[0_0_10px_rgba(220,38,38,0.22)]'
+                              : 'border-neutral-200 bg-neutral-100/40 dark:border-neutral-800 dark:bg-neutral-950/20'}"
+                            onclick={() => (selectedMonitorIndex = i)}
+                          >
+                            {#if monitor.thumbnail}
+                              <img
+                                src={monitor.thumbnail}
+                                alt={monitor.name}
+                                class="h-full w-full object-cover"
+                              />
+                            {:else}
+                              <div
+                                class="flex h-full w-full items-center justify-center bg-neutral-100 text-neutral-400 dark:bg-neutral-950/40"
+                              >
+                                <span class="text-[9px]">正在捕获首帧...</span>
+                              </div>
+                            {/if}
+
+                            <!-- 屏幕悬浮条 -->
+                            <div
+                              class="absolute right-0 bottom-0 left-0 flex items-center justify-between bg-black/60 px-2.5 py-1 text-white backdrop-blur-xs"
+                            >
+                              <span class="truncate text-[9.5px] font-bold">
+                                {monitor.isPrimary
+                                  ? "主显示器"
+                                  : `显示器 ${i + 1}`}
+                              </span>
+                              <span
+                                class="font-mono text-[8.5px] font-semibold opacity-90"
+                              >
+                                {monitor.width} x {monitor.height}
+                              </span>
+                            </div>
+
+                            <!-- 选中对勾 -->
+                            {#if selectedMonitorIndex === i}
+                              <div
+                                class="absolute top-2 right-2 rounded-full bg-red-600 p-0.5 text-white shadow-xs"
+                              >
+                                <svg
+                                  class="size-3.5 fill-none stroke-current stroke-2"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                              </div>
+                            {/if}
+                          </div>
+                        {/each}
                       </div>
-                    {/if}
-                  </div>
+                    </AppScrollArea>
+                  {:else}
+                    <!-- 窗口录制来源选择 -->
+                    <div class="flex shrink-0 items-center justify-between">
+                      <span
+                        class="text-xs font-bold text-neutral-800 dark:text-neutral-200"
+                      >
+                        选择录像窗口
+                      </span>
+                      <button
+                        class="cursor-pointer text-[10px] font-semibold text-red-600 hover:text-red-500"
+                        onclick={loadWindows}
+                        disabled={isLoadingWindows}
+                      >
+                        {#if isLoadingWindows}
+                          正在刷新...
+                        {:else}
+                          刷新列表
+                        {/if}
+                      </button>
+                    </div>
+
+                    <AppScrollArea
+                      class="min-h-0 flex-1 pr-1"
+                      viewportClass="h-full w-full"
+                    >
+                      {#if isLoadingWindows && windows.length === 0}
+                        <div
+                          class="flex h-full min-h-[200px] items-center justify-center rounded-xl border border-neutral-200 bg-neutral-100/40 text-xs text-neutral-400 dark:border-neutral-800 dark:bg-neutral-950/20"
+                        >
+                          正在加载系统窗口...
+                        </div>
+                      {:else if windows.length === 0}
+                        <div
+                          class="flex h-full min-h-[200px] items-center justify-center rounded-xl border border-neutral-200 bg-neutral-100/40 text-xs text-neutral-400 dark:border-neutral-800 dark:bg-neutral-950/20"
+                        >
+                          没有找到可录制的窗口
+                        </div>
+                      {:else}
+                        <div class="flex flex-col gap-2">
+                          {#each windows as win}
+                            <!-- svelte-ignore a11y_click_events_have_key_events -->
+                            <!-- svelte-ignore a11y_no_static_element_interactions -->
+                            <div
+                              class="flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2 transition-all duration-150
+                                {selectedWindowHandle === win.handle
+                                ? 'border-red-600 bg-red-50/5 dark:bg-red-950/5'
+                                : 'border-neutral-200 bg-neutral-100/30 hover:bg-neutral-100/60 dark:border-neutral-800 dark:bg-neutral-950/10 dark:hover:bg-neutral-950/20'}"
+                              onclick={() => {
+                                selectedWindowHandle = win.handle;
+                                debouncedSaveConfig();
+                              }}
+                            >
+                              <div
+                                class="flex min-w-0 flex-grow flex-col gap-0.5"
+                              >
+                                <span
+                                  class="truncate text-xs font-semibold text-neutral-800 dark:text-neutral-200"
+                                  title={win.title}
+                                >
+                                  {win.title}
+                                </span>
+                                <span
+                                  class="font-mono text-[9px] text-neutral-400 dark:text-neutral-500"
+                                >
+                                  {win.processName} • {win.width} x {win.height}
+                                </span>
+                              </div>
+                              {#if selectedWindowHandle === win.handle}
+                                <div
+                                  class="flex size-3.5 shrink-0 items-center justify-center rounded-full bg-red-600 text-[9px] text-white"
+                                >
+                                  ✓
+                                </div>
+                              {/if}
+                            </div>
+                          {/each}
+                        </div>
+                      {/if}
+                    </AppScrollArea>
+                  {/if}
                 </div>
               </div>
-            </AppScrollArea>
 
-            <!-- 启动录像按钮 (固定在卡片底部) -->
-            <button
-              class="mt-4 flex flex-shrink-0 items-center justify-center gap-2 rounded-xl bg-red-600 py-3 text-sm font-semibold text-white shadow-xs transition-all hover:bg-red-500 active:scale-95"
-              onclick={handleStartRecord}
-            >
-              <span class="size-2 animate-pulse rounded-full bg-white"></span>
-              开始屏幕录制
-            </button>
+              <!-- 右侧栏：控制配置 -->
+              <div
+                class="flex w-[280px] shrink-0 flex-col justify-between border-l border-neutral-200/50 pl-5 dark:border-neutral-800/40"
+              >
+                <!-- 配置列表 -->
+                <AppScrollArea
+                  class="min-h-0 flex-1 pr-0.5"
+                  viewportClass="h-full w-full"
+                >
+                  <div class="flex flex-col gap-4 pb-4">
+                    <!-- 1. 录制模式 -->
+                    <div class="flex flex-col gap-1">
+                      <span
+                        class="text-[10px] font-bold text-neutral-400 dark:text-neutral-500"
+                      >
+                        录制模式
+                      </span>
+                      <div
+                        class="flex rounded-lg border border-neutral-200/40 bg-neutral-100 p-0.5 dark:border-neutral-800/40 dark:bg-neutral-950/40"
+                      >
+                        <button
+                          class="flex-1 rounded-md py-1 text-center text-xs font-semibold transition-all {recordTargetType ===
+                          'screen'
+                            ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
+                            : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
+                          onclick={() => (recordTargetType = "screen")}
+                        >
+                          屏幕录制
+                        </button>
+                        <button
+                          class="flex-1 rounded-md py-1 text-center text-xs font-semibold transition-all {recordTargetType ===
+                          'window'
+                            ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
+                            : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
+                          onclick={() => {
+                            recordTargetType = "window";
+                            loadWindows();
+                          }}
+                        >
+                          窗口录制
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- 2. FPS 帧率 -->
+                    <div class="flex flex-col gap-1">
+                      <span
+                        class="text-[10px] font-bold text-neutral-400 dark:text-neutral-500"
+                      >
+                        FPS 帧率
+                      </span>
+                      <div
+                        class="flex rounded-lg border border-neutral-200/40 bg-neutral-100 p-0.5 dark:border-neutral-800/40 dark:bg-neutral-950/40"
+                      >
+                        <button
+                          class="flex-1 rounded-md py-1 text-center text-xs font-semibold transition-all {fps ===
+                          30
+                            ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
+                            : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
+                          onclick={() => (fps = 30)}
+                        >
+                          30 FPS
+                        </button>
+                        <button
+                          class="flex-1 rounded-md py-1 text-center text-xs font-semibold transition-all {fps ===
+                          60
+                            ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
+                            : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
+                          onclick={() => (fps = 60)}
+                        >
+                          60 FPS
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- 3. 功能开关组 -->
+                    <div class="flex flex-col gap-3">
+                      <!-- 麦克风 -->
+                      <div class="flex items-center justify-between">
+                        <div class="flex flex-col">
+                          <span
+                            class="text-xs font-semibold text-neutral-800 dark:text-neutral-200"
+                          >
+                            麦克风音频
+                          </span>
+                          <span
+                            class="text-[9px] text-neutral-400 dark:text-neutral-500"
+                          >
+                            录制外界谈话声音
+                          </span>
+                        </div>
+                        <Switch.Root
+                          bind:checked={recordAudio}
+                          class="peer inline-flex h-4.5 w-8 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-red-600 data-[state=unchecked]:bg-neutral-200 dark:data-[state=unchecked]:bg-neutral-800"
+                        >
+                          <Switch.Thumb
+                            class="pointer-events-none block h-3.5 w-3.5 rounded-full bg-white shadow-md ring-0 transition-transform data-[state=checked]:translate-x-3.5 data-[state=unchecked]:translate-x-0.5 dark:bg-neutral-100"
+                          />
+                        </Switch.Root>
+                      </div>
+
+                      <!-- 系统声卡 -->
+                      <div class="flex items-center justify-between">
+                        <div class="flex flex-col">
+                          <span
+                            class="text-xs font-semibold text-neutral-800 dark:text-neutral-200"
+                          >
+                            系统声卡声音
+                          </span>
+                          <span
+                            class="text-[9px] text-neutral-400 dark:text-neutral-500"
+                          >
+                            录制系统播放音量
+                          </span>
+                        </div>
+                        <Switch.Root
+                          bind:checked={recordSystemSound}
+                          class="peer inline-flex h-4.5 w-8 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-red-600 data-[state=unchecked]:bg-neutral-200 dark:data-[state=unchecked]:bg-neutral-800"
+                        >
+                          <Switch.Thumb
+                            class="pointer-events-none block h-3.5 w-3.5 rounded-full bg-white shadow-md ring-0 transition-transform data-[state=checked]:translate-x-3.5 data-[state=unchecked]:translate-x-0.5 dark:bg-neutral-100"
+                          />
+                        </Switch.Root>
+                      </div>
+
+                      <!-- 排除自身 -->
+                      <div class="flex items-center justify-between">
+                        <div class="flex flex-col">
+                          <span
+                            class="text-xs font-semibold text-neutral-800 dark:text-neutral-200"
+                          >
+                            排除本程序
+                          </span>
+                          <span
+                            class="text-[9px] text-neutral-400 dark:text-neutral-500"
+                          >
+                            录像时不显示本窗口
+                          </span>
+                        </div>
+                        <Switch.Root
+                          bind:checked={excludeOwnWindow}
+                          class="peer inline-flex h-4.5 w-8 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-red-600 data-[state=unchecked]:bg-neutral-200 dark:data-[state=unchecked]:bg-neutral-800"
+                        >
+                          <Switch.Thumb
+                            class="pointer-events-none block h-3.5 w-3.5 rounded-full bg-white shadow-md ring-0 transition-transform data-[state=checked]:translate-x-3.5 data-[state=unchecked]:translate-x-0.5 dark:bg-neutral-100"
+                          />
+                        </Switch.Root>
+                      </div>
+                    </div>
+
+                    <!-- 4. 保存位置 -->
+                    <div class="flex flex-col gap-1">
+                      <span
+                        class="text-[10px] font-bold text-neutral-400 dark:text-neutral-500"
+                      >
+                        视频保存位置
+                      </span>
+                      <div class="flex flex-col gap-1.5">
+                        <div
+                          class="flex flex-wrap gap-1 rounded-lg border border-neutral-200/40 bg-neutral-100 p-0.5 dark:border-neutral-800/40 dark:bg-neutral-950/40"
+                        >
+                          <button
+                            class="min-w-[50px] flex-1 rounded-md py-1 text-center text-[10px] font-semibold transition-all {saveFolderType ===
+                            'video'
+                              ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
+                              : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
+                            onclick={() => handleFolderTypeChange("video")}
+                          >
+                            视频
+                          </button>
+                          <button
+                            class="min-w-[50px] flex-1 rounded-md py-1 text-center text-[10px] font-semibold transition-all {saveFolderType ===
+                            'download'
+                              ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
+                              : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
+                            onclick={() => handleFolderTypeChange("download")}
+                          >
+                            下载
+                          </button>
+                          <button
+                            class="min-w-[50px] flex-1 rounded-md py-1 text-center text-[10px] font-semibold transition-all {saveFolderType ===
+                            'desktop'
+                              ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
+                              : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
+                            onclick={() => handleFolderTypeChange("desktop")}
+                          >
+                            桌面
+                          </button>
+                          <button
+                            class="min-w-[50px] flex-1 rounded-md py-1 text-center text-[10px] font-semibold transition-all {saveFolderType ===
+                            'custom'
+                              ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
+                              : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
+                            onclick={() => handleFolderTypeChange("custom")}
+                          >
+                            自定义
+                          </button>
+                        </div>
+
+                        {#if saveFolderType === "custom" && customSaveFolder}
+                          <div
+                            class="flex items-center justify-between rounded-lg border border-neutral-200/30 bg-neutral-100/50 px-2 py-1 text-[9px] text-neutral-600 dark:border-neutral-800/30 dark:bg-neutral-950/20 dark:text-neutral-400"
+                          >
+                            <span
+                              class="max-w-[150px] truncate font-mono"
+                              title={customSaveFolder}
+                            >
+                              {customSaveFolder}
+                            </span>
+                            <button
+                              class="ml-1 shrink-0 cursor-pointer font-semibold text-red-600 hover:text-red-500"
+                              onclick={() => handleFolderTypeChange("custom")}
+                            >
+                              修改
+                            </button>
+                          </div>
+                        {/if}
+                      </div>
+                    </div>
+                  </div>
+                </AppScrollArea>
+
+                <!-- 5. 启动录制按钮 -->
+                <button
+                  class="mt-4 flex flex-shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl bg-red-600 py-2.5 text-xs font-semibold text-white shadow-xs transition-all hover:bg-red-500 active:scale-95"
+                  onclick={handleStartRecord}
+                >
+                  <span class="size-2 animate-pulse rounded-full bg-white"
+                  ></span>
+                  开始屏幕录制
+                </button>
+              </div>
+            </div>
           </div>
         </Tabs.Content>
 
@@ -610,7 +803,9 @@
           value="history"
           class="flex h-full justify-center overflow-hidden"
         >
-          <div class="flex h-full w-[640px] flex-col">
+          <div
+            class="flex h-full w-full flex-col rounded-2xl border border-neutral-200/80 bg-white/40 p-5 shadow-xs backdrop-blur-md dark:border-neutral-800/80 dark:bg-neutral-900/40"
+          >
             {#if isLoading}
               <div
                 class="flex flex-grow flex-col items-center justify-center gap-3 text-xs text-neutral-500"

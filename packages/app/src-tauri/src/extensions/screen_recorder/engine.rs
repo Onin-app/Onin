@@ -11,6 +11,8 @@ pub struct RecordConfig {
     pub monitor_index: Option<i32>, // 选中的屏幕索引，None/Some(-1) 为跟随鼠标
     pub save_folder_type: Option<String>, // 保存文件夹类型："video" | "download" | "desktop" | "custom"
     pub custom_save_folder: Option<String>, // 自定义保存路径
+    pub record_target_type: Option<String>, // 录制目标类型："screen" | "window"
+    pub window_handle: Option<String>,    // 选中的窗口句柄字符串形式 (HWND)
 }
 
 impl Default for RecordConfig {
@@ -23,6 +25,8 @@ impl Default for RecordConfig {
             monitor_index: Some(0),
             save_folder_type: Some("video".to_string()),
             custom_save_folder: None,
+            record_target_type: Some("screen".to_string()),
+            window_handle: None,
         }
     }
 }

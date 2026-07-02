@@ -345,3 +345,113 @@ pub fn get_recorder_config(state: State<'_, RecorderAppState>) -> Result<RecordC
     let current_config = state.config.lock().map_err(|e| e.to_string())?;
     Ok(current_config.clone())
 }
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WindowInfo {
+    pub handle: String,
+    pub title: String,
+    pub process_name: String,
+    pub width: u32,
+    pub height: u32,
+}
+
+#[command]
+pub fn get_available_windows(_app: AppHandle) -> Result<Vec<WindowInfo>, String> {
+    #[cfg(target_os = "windows")]
+    {
+        use windows_capture::window::Window;
+        let win_list = Window::enumerate().map_err(|e| e.to_string())?;
+        let mut infos = Vec::new();
+        for w in win_list {
+            if !w.is_valid() {
+                continue;
+            }
+            let title = match w.title() {
+                Ok(t) if !t.trim().is_empty() => t,
+                _ => continue,
+            };
+            let process_name = w.process_name().unwrap_or_default();
+            let process_name_lower = process_name.to_lowercase();
+
+            // 过滤自身应用窗口（Onin）
+            if process_name_lower.contains("onin") || title.contains("Onin") {
+                continue;
+            }
+
+            let hwnd_ptr = w.as_raw_hwnd();
+            use windows::Win32::Foundation::HWND;
+            let hwnd = HWND(hwnd_ptr as isize);
+            if !is_real_window(hwnd) {
+                continue;
+            }
+
+            let (width, height) = get_window_size(hwnd_ptr as isize);
+            if width == 0 || height == 0 {
+                continue;
+            }
+
+            let handle = (hwnd_ptr as isize).to_string();
+
+            infos.push(WindowInfo {
+                handle,
+                title,
+                process_name,
+                width,
+                height,
+            });
+        }
+        Ok(infos)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Ok(Vec::new())
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn get_window_size(hwnd_val: isize) -> (u32, u32) {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::WindowsAndMessaging::GetWindowRect;
+    let hwnd = HWND(hwnd_val);
+    let mut rect = windows::Win32::Foundation::RECT::default();
+    unsafe {
+        if GetWindowRect(hwnd, &mut rect).is_ok() {
+            let w = rect.right - rect.left;
+            let h = rect.bottom - rect.top;
+            if w > 0 && h > 0 {
+                return (w as u32, h as u32);
+            }
+        }
+    }
+    (0, 0)
+}
+
+#[cfg(target_os = "windows")]
+fn is_real_window(hwnd: windows::Win32::Foundation::HWND) -> bool {
+    use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED};
+    use windows::Win32::UI::WindowsAndMessaging::IsWindowVisible;
+
+    unsafe {
+        // 1. 窗口必须是可见的
+        if !IsWindowVisible(hwnd).as_bool() {
+            return false;
+        }
+
+        // 2. 检查窗口是否被 DWM 遮蔽 (Cloaked)
+        // 被遮蔽的窗口包括：隐藏的 UWP 后台挂起窗口 (比如已关闭的设置窗口)、虚拟桌面上的其他窗口等
+        let mut cloaked: u32 = 0;
+        let attribute_size = std::mem::size_of::<u32>() as u32;
+        let res = DwmGetWindowAttribute(
+            hwnd,
+            DWMWA_CLOAKED,
+            &mut cloaked as *mut u32 as *mut std::ffi::c_void,
+            attribute_size,
+        );
+        if res.is_ok() && cloaked != 0 {
+            return false;
+        }
+    }
+
+    true
+}

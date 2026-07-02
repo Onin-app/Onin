@@ -32,6 +32,8 @@
   );
   let customSaveFolder = $state("");
   let saveTimeout = $state<number | undefined>(undefined);
+  let recordTargetType = $state<"screen" | "window">("screen");
+  let selectedWindowHandle = $state<string | null>(null);
 
   // 延迟 300ms 异步防抖保存配置，过滤开关连击引发的系统 IPC 及磁盘 I/O 阻塞
   function debouncedSaveConfig() {
@@ -47,6 +49,8 @@
           monitorIndex: selectedMonitorIndex,
           saveFolderType,
           customSaveFolder,
+          recordTargetType,
+          windowHandle: selectedWindowHandle,
         };
         localStorage.setItem(
           "onin_screen_recorder_config",
@@ -112,6 +116,8 @@
         monitorIndex: selectedMonitorIndex,
         saveFolderType,
         customSaveFolder,
+        recordTargetType,
+        windowHandle: selectedWindowHandle,
       };
 
       outputFilePath = await invoke<string>("start_screen_record", { config });
@@ -187,6 +193,8 @@
       }
       saveFolderType = config.saveFolderType ?? "video";
       customSaveFolder = config.customSaveFolder ?? "";
+      recordTargetType = config.recordTargetType ?? "screen";
+      selectedWindowHandle = config.windowHandle ?? null;
     } catch (e) {
       console.error("Failed to load screen recorder config in bar:", e);
     } finally {
