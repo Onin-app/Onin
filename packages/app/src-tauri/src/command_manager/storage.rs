@@ -36,8 +36,38 @@ pub async fn generate_and_save_commands(app: &AppHandle) -> Vec<Command> {
     initial_commands.extend(plugin_commands);
     let dynamic_commands = generators::get_initial_dynamic_commands(app);
     initial_commands.extend(dynamic_commands);
-    save_commands(app, &initial_commands);
-    initial_commands
+
+    // 读取旧命令，保留用户自定义的关键字(keywords)和二次确认设置等配置
+    let path = get_commands_file_path(app);
+    let final_commands = if path.exists() {
+        if let Ok(json_str) = fs::read_to_string(&path) {
+            if let Ok(old_commands) = serde_json::from_str::<Vec<Command>>(&json_str) {
+                let mut old_map: HashMap<String, Command> = old_commands
+                    .into_iter()
+                    .map(|c| (c.name.clone(), c))
+                    .collect();
+
+                let mut merged = Vec::new();
+                for mut new_cmd in initial_commands {
+                    if let Some(old_cmd) = old_map.remove(&new_cmd.name) {
+                        new_cmd.keywords = old_cmd.keywords;
+                        new_cmd.requires_confirmation = old_cmd.requires_confirmation;
+                    }
+                    merged.push(new_cmd);
+                }
+                merged
+            } else {
+                initial_commands
+            }
+        } else {
+            initial_commands
+        }
+    } else {
+        initial_commands
+    };
+
+    save_commands(app, &final_commands);
+    final_commands
 }
 
 /// 加载命令
