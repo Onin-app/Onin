@@ -34,6 +34,8 @@ struct MFSinkWriterWrapper {
     height: u32,
     fps: u32,
     start_time: Option<Instant>,
+    rect_x: u32,
+    rect_y: u32,
 }
 
 // 手动实现 Send & Sync，使 COM 指针可以在线程间共享和传递
@@ -41,7 +43,14 @@ unsafe impl Send for MFSinkWriterWrapper {}
 unsafe impl Sync for MFSinkWriterWrapper {}
 
 impl MFSinkWriterWrapper {
-    fn new(output_path: &Path, width: u32, height: u32, fps: u32) -> Result<Self, String> {
+    fn new(
+        output_path: &Path,
+        width: u32,
+        height: u32,
+        fps: u32,
+        rect_x: u32,
+        rect_y: u32,
+    ) -> Result<Self, String> {
         unsafe {
             // 初始化 Media Foundation
             MFStartup(MF_VERSION, MFSTARTUP_FULL)
@@ -117,6 +126,8 @@ impl MFSinkWriterWrapper {
                 height,
                 fps,
                 start_time: None,
+                rect_x,
+                rect_y,
             })
         }
     }
@@ -156,22 +167,24 @@ impl MFSinkWriterWrapper {
 
             let src_row_pitch = (frame_width * 4) as usize;
             let dest_row_pitch = (self.width * 4) as usize;
-            let copy_width_bytes = (self.width.min(frame_width) * 4) as usize;
-            let copy_height = self.height.min(frame_height) as usize;
+            let copy_width_bytes = (self.width * 4) as usize;
 
-            for y in 0..copy_height {
-                // 翻转 Y 轴拷贝
-                let src_offset = (frame_height as usize - 1 - y) * src_row_pitch;
-                let dest_offset = y * dest_row_pitch;
+            for y in 0..self.height {
+                // 计算翻转 Y 轴后的源坐标
+                let src_y = frame_height as i32 - 1 - (self.rect_y + y) as i32;
+                if src_y >= 0 && src_y < frame_height as i32 {
+                    let src_offset = (src_y as usize) * src_row_pitch + (self.rect_x as usize * 4);
+                    let dest_offset = (y as usize) * dest_row_pitch;
 
-                if src_offset + copy_width_bytes <= frame_data.len()
-                    && dest_offset + copy_width_bytes <= buffer_len as usize
-                {
-                    std::ptr::copy_nonoverlapping(
-                        frame_data.as_ptr().add(src_offset),
-                        p_data.add(dest_offset),
-                        copy_width_bytes,
-                    );
+                    if src_offset + copy_width_bytes <= frame_data.len()
+                        && dest_offset + copy_width_bytes <= buffer_len as usize
+                    {
+                        std::ptr::copy_nonoverlapping(
+                            frame_data.as_ptr().add(src_offset),
+                            p_data.add(dest_offset),
+                            copy_width_bytes,
+                        );
+                    }
                 }
             }
 
@@ -311,8 +324,26 @@ impl ScreenRecordEngine for WindowsRecordEngine {
         // 1. 判断并获取捕获目标以及尺寸
         let is_window_mode = config.record_target_type.as_deref() == Some("window")
             && config.window_handle.is_some();
+        let is_area_mode =
+            config.record_target_type.as_deref() == Some("area") && config.area_rect.is_some();
 
-        let (width, height) = if is_window_mode {
+        let (width, height, rect_x, rect_y) = if is_area_mode {
+            let area = config.area_rect.as_ref().ok_or("No area rect provided")?;
+            let idx = config.monitor_index.unwrap_or(0);
+            let tauri_monitors = app.available_monitors().unwrap_or_default();
+            let scale_factor = if idx >= 0 && (idx as usize) < tauri_monitors.len() {
+                tauri_monitors[idx as usize].scale_factor()
+            } else {
+                1.0
+            };
+
+            let p_x = (area.x as f64 * scale_factor).round() as u32;
+            let p_y = (area.y as f64 * scale_factor).round() as u32;
+            let p_w = (area.width as f64 * scale_factor).round() as u32;
+            let p_h = (area.height as f64 * scale_factor).round() as u32;
+
+            (p_w, p_h, p_x, p_y)
+        } else if is_window_mode {
             let hwnd_str = config
                 .window_handle
                 .as_deref()
@@ -324,21 +355,22 @@ impl ScreenRecordEngine for WindowsRecordEngine {
             if w == 0 || h == 0 {
                 return Err("Failed to get window size or window is closed".into());
             }
-            (w, h)
+            (w, h, 0, 0)
         } else {
             let idx = config.monitor_index.unwrap_or(-1);
             let monitor = get_selected_monitor(idx, app)?;
             let w = monitor.width().map_err(|e| e.to_string())? as u32;
             let h = monitor.height().map_err(|e| e.to_string())? as u32;
-            (w, h)
+            (w, h, 0, 0)
         };
 
-        // 强制偶数化对齐，防止硬件 H.264 编码器因奇数分辨率引发 MF_E_INVALIDMEDIATYPE (0xC00D36B4) 错误
+        // 强制偶数化对齐，防止硬件 H.264 幕编码器因奇数分辨率引发 MF_E_INVALIDMEDIATYPE (0xC00D36B4) 错误
         let width = width & !1;
         let height = height & !1;
 
         // 2. 初始化 Media Foundation 编码写入器并保存到 self.writer
-        let writer = MFSinkWriterWrapper::new(output_path, width, height, config.fps)?;
+        let writer =
+            MFSinkWriterWrapper::new(output_path, width, height, config.fps, rect_x, rect_y)?;
         {
             let mut writer_guard = self.writer.lock().unwrap();
             *writer_guard = Some(writer);

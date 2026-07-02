@@ -216,3 +216,9 @@ pub async fn finish_color_picker(app: AppHandle, hex: Option<String>) -> Result<
 pub async fn show_screen_recorder_bar(app: AppHandle) -> Result<(), String> {
     crate::extensions::screen_recorder::show_screen_recorder_bar(&app)
 }
+
+/// 打开区域选择遮罩窗口
+#[command]
+pub async fn show_screen_recorder_area(app: AppHandle, monitor_index: i32) -> Result<(), String> {
+    crate::extensions::screen_recorder::show_screen_recorder_area(&app, monitor_index)
+}

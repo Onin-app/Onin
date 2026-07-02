@@ -212,6 +212,7 @@ pub fn get_invoke_handler(
         open_file_or_folder_dialog,
         // Screen Recorder commands
         extension::api::show_screen_recorder_bar,
+        extension::api::show_screen_recorder_area,
         crate::extensions::screen_recorder::commands::start_screen_record,
         crate::extensions::screen_recorder::commands::stop_screen_record,
         crate::extensions::screen_recorder::commands::pause_screen_record,

@@ -72,7 +72,13 @@ pub async fn resume_screen_record(state: State<'_, RecorderAppState>) -> Result<
 }
 
 #[command]
-pub async fn stop_screen_record(state: State<'_, RecorderAppState>) -> Result<(), String> {
+pub async fn stop_screen_record(
+    app: tauri::AppHandle,
+    state: State<'_, RecorderAppState>,
+) -> Result<(), String> {
+    if let Some(w) = app.get_webview_window("screen-recorder-area-indicator") {
+        let _ = w.close();
+    }
     state.engine.stop()
 }
 
@@ -168,6 +174,7 @@ pub struct MonitorInfo {
     pub height: u32,
     pub is_primary: bool,
     pub thumbnail: String,
+    pub scale_factor: f64,
 }
 
 #[cfg(target_os = "windows")]
@@ -310,6 +317,7 @@ pub fn get_available_monitors(app: AppHandle) -> Result<Vec<MonitorInfo>, String
             .map(|n| n.to_string())
             .unwrap_or_else(|| format!("显示器 {}", i + 1));
         let size = m.size();
+        let scale_factor = m.scale_factor();
         let is_primary = if let Ok(Some(pm)) = app.primary_monitor() {
             pm.name() == m.name()
         } else {
@@ -325,6 +333,7 @@ pub fn get_available_monitors(app: AppHandle) -> Result<Vec<MonitorInfo>, String
             height: size.height,
             is_primary,
             thumbnail,
+            scale_factor,
         });
     }
     Ok(infos)

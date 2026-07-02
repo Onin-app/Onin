@@ -8,6 +8,8 @@
     "google-translate-w-ui",
     "color-picker-overlay*",
     "screen-recorder-bar*",
+    "screen-recorder-area*",
+    "screen-recorder-area-indicator*",
     "toast-overlay"
   ],
   "permissions": [

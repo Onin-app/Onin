@@ -3,6 +3,15 @@ use std::path::Path;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct AreaRect {
+    pub x: i32,
+    pub y: i32,
+    pub width: i32,
+    pub height: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RecordConfig {
     pub fps: u32,
     pub record_audio: bool, // [Placeholder] 是否录制麦克风，目前由前端选项保存，为音频录像流扩展预留
@@ -11,8 +20,9 @@ pub struct RecordConfig {
     pub monitor_index: Option<i32>, // 选中的屏幕索引，None/Some(-1) 为跟随鼠标
     pub save_folder_type: Option<String>, // 保存文件夹类型："video" | "download" | "desktop" | "custom"
     pub custom_save_folder: Option<String>, // 自定义保存路径
-    pub record_target_type: Option<String>, // 录制目标类型："screen" | "window"
+    pub record_target_type: Option<String>, // 录制目标类型："screen" | "window" | "area"
     pub window_handle: Option<String>,    // 选中的窗口句柄字符串形式 (HWND)
+    pub area_rect: Option<AreaRect>,      // 选中的录制区域 (逻辑坐标)
 }
 
 impl Default for RecordConfig {
@@ -27,6 +37,7 @@ impl Default for RecordConfig {
             custom_save_folder: None,
             record_target_type: Some("screen".to_string()),
             window_handle: None,
+            area_rect: None,
         }
     }
 }

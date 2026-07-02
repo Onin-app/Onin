@@ -25,8 +25,9 @@
     monitorIndex?: number;
     saveFolderType?: "video" | "download" | "desktop" | "custom";
     customSaveFolder?: string;
-    recordTargetType?: "screen" | "window";
+    recordTargetType?: "screen" | "window" | "area";
     windowHandle?: string | null;
+    areaRect?: { x: number; y: number; width: number; height: number } | null;
   }
 
   interface MonitorInfo {
@@ -58,8 +59,14 @@
   let customSaveFolder = $state("");
   let saveTimeout = $state<number | undefined>(undefined);
 
-  let recordTargetType = $state<"screen" | "window">("screen");
+  let recordTargetType = $state<"screen" | "window" | "area">("screen");
   let selectedWindowHandle = $state<string | null>(null);
+  let areaRect = $state<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
   let windows = $state<WindowInfo[]>([]);
   let isLoadingWindows = $state(false);
 
@@ -103,6 +110,7 @@
         "screen";
       selectedWindowHandle =
         rustConfig.windowHandle ?? localConfig?.windowHandle ?? null;
+      areaRect = rustConfig.areaRect ?? localConfig?.areaRect ?? null;
     } catch (e) {
       console.error("Failed to load screen recorder config:", e);
     }
@@ -124,6 +132,7 @@
           customSaveFolder,
           recordTargetType,
           windowHandle: selectedWindowHandle,
+          areaRect,
         };
         localStorage.setItem(
           "onin_screen_recorder_config",
@@ -204,6 +213,7 @@
         customSaveFolder,
         recordTargetType,
         windowHandle: selectedWindowHandle,
+        areaRect,
       };
       localStorage.setItem(
         "onin_screen_recorder_config",
@@ -252,9 +262,45 @@
     }
   }
 
+  // 调整录屏区域
+  async function handleAdjustArea() {
+    try {
+      const config: ScreenRecorderConfig = {
+        fps,
+        recordAudio,
+        recordSystemSound,
+        excludeOwnWindow,
+        monitorIndex: selectedMonitorIndex,
+        saveFolderType,
+        customSaveFolder,
+        recordTargetType,
+        windowHandle: selectedWindowHandle,
+        areaRect,
+      };
+      localStorage.setItem(
+        "onin_screen_recorder_config",
+        JSON.stringify(config),
+      );
+      await invoke("save_recorder_config", { config });
+      await invoke("show_screen_recorder_area", {
+        monitorIndex: selectedMonitorIndex,
+      });
+      const win = getCurrentWindow();
+      await win.hide();
+    } catch (e) {
+      alert("启动区域选择失败: " + e);
+    }
+  }
+
   // 开始录制
   async function handleStartRecord() {
     try {
+      if (recordTargetType === "area") {
+        // 区域录屏模式，无论任何时候，点击开始录屏都是直接呼出区域选择遮罩
+        await handleAdjustArea();
+        return;
+      }
+
       // 录制前确保即时保存了最新的配置到 Rust 全局状态中，供 Bar 加载时获取
       const config: ScreenRecorderConfig = {
         fps,
@@ -266,6 +312,7 @@
         customSaveFolder,
         recordTargetType,
         windowHandle: selectedWindowHandle,
+        areaRect,
       };
       localStorage.setItem(
         "onin_screen_recorder_config",
@@ -405,7 +452,7 @@
               <!-- 左侧栏：录制来源选择 (屏幕或窗口) -->
               <div class="flex h-full min-w-0 flex-1 flex-col justify-between">
                 <div class="flex h-full min-h-0 flex-col gap-3">
-                  {#if recordTargetType === "screen"}
+                  {#if recordTargetType === "screen" || recordTargetType === "area"}
                     <!-- 屏幕录制来源选择 -->
                     <span
                       class="shrink-0 text-xs font-bold text-neutral-800 dark:text-neutral-200"
@@ -583,7 +630,7 @@
                         class="flex rounded-lg border border-neutral-200/40 bg-neutral-100 p-0.5 dark:border-neutral-800/40 dark:bg-neutral-950/40"
                       >
                         <button
-                          class="flex-1 rounded-md py-1 text-center text-xs font-semibold transition-all {recordTargetType ===
+                          class="flex-1 rounded-md py-1 text-center text-[10px] font-semibold transition-all {recordTargetType ===
                           'screen'
                             ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
                             : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
@@ -592,7 +639,7 @@
                           屏幕录制
                         </button>
                         <button
-                          class="flex-1 rounded-md py-1 text-center text-xs font-semibold transition-all {recordTargetType ===
+                          class="flex-1 rounded-md py-1 text-center text-[10px] font-semibold transition-all {recordTargetType ===
                           'window'
                             ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
                             : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
@@ -602,6 +649,17 @@
                           }}
                         >
                           窗口录制
+                        </button>
+                        <button
+                          class="flex-1 rounded-md py-1 text-center text-[10px] font-semibold transition-all {recordTargetType ===
+                          'area'
+                            ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
+                            : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
+                          onclick={() => {
+                            recordTargetType = "area";
+                          }}
+                        >
+                          区域录制
                         </button>
                       </div>
                     </div>
