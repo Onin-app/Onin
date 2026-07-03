@@ -28,6 +28,9 @@
     recordTargetType?: "screen" | "window" | "area";
     windowHandle?: string | null;
     areaRect?: { x: number; y: number; width: number; height: number } | null;
+    showMouseClick?: boolean;
+    showMouseCursor?: boolean;
+    showKeys?: boolean;
   }
 
   interface MonitorInfo {
@@ -51,6 +54,9 @@
   let recordAudio = $state(true);
   let recordSystemSound = $state(false);
   let excludeOwnWindow = $state(true);
+  let showMouseClick = $state(false);
+  let showMouseCursor = $state(true);
+  let showKeys = $state(false);
   let fps = $state(30);
   let selectedMonitorIndex = $state(0); // 默认选择第一块屏幕
   let saveFolderType = $state<"video" | "download" | "desktop" | "custom">(
@@ -95,6 +101,11 @@
         rustConfig.recordSystemSound ?? localConfig?.recordSystemSound ?? false;
       excludeOwnWindow =
         rustConfig.excludeOwnWindow ?? localConfig?.excludeOwnWindow ?? true;
+      showMouseClick =
+        rustConfig.showMouseClick ?? localConfig?.showMouseClick ?? false;
+      showMouseCursor =
+        rustConfig.showMouseCursor ?? localConfig?.showMouseCursor ?? true;
+      showKeys = rustConfig.showKeys ?? localConfig?.showKeys ?? false;
       selectedMonitorIndex =
         rustConfig.monitorIndex ?? localConfig?.monitorIndex ?? 0;
       if (selectedMonitorIndex === -1) {
@@ -127,6 +138,9 @@
           recordAudio,
           recordSystemSound,
           excludeOwnWindow,
+          showMouseClick,
+          showMouseCursor,
+          showKeys,
           monitorIndex: selectedMonitorIndex,
           saveFolderType,
           customSaveFolder,
@@ -695,78 +709,167 @@
                       </div>
                     </div>
 
-                    <!-- 3. 功能开关组 -->
-                    <div class="flex flex-col gap-3">
-                      <!-- 麦克风 -->
-                      <div class="flex items-center justify-between">
-                        <div class="flex flex-col">
-                          <span
-                            class="text-xs font-semibold text-neutral-800 dark:text-neutral-200"
+                    <!-- 3. 声音设置 -->
+                    <div class="flex flex-col gap-1.5">
+                      <span
+                        class="text-[10px] font-bold text-neutral-400 dark:text-neutral-500"
+                      >
+                        声音设置
+                      </span>
+                      <div class="flex flex-col gap-3">
+                        <!-- 麦克风 -->
+                        <div class="flex items-center justify-between">
+                          <div class="flex flex-col">
+                            <span
+                              class="text-xs font-semibold text-neutral-800 dark:text-neutral-200"
+                            >
+                              麦克风音频
+                            </span>
+                            <span
+                              class="text-[9px] text-neutral-400 dark:text-neutral-500"
+                            >
+                              录制外界谈话声音
+                            </span>
+                          </div>
+                          <Switch.Root
+                            bind:checked={recordAudio}
+                            class="peer inline-flex h-4.5 w-8 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-red-600 data-[state=unchecked]:bg-neutral-200 dark:data-[state=unchecked]:bg-neutral-800"
                           >
-                            麦克风音频
-                          </span>
-                          <span
-                            class="text-[9px] text-neutral-400 dark:text-neutral-500"
-                          >
-                            录制外界谈话声音
-                          </span>
+                            <Switch.Thumb
+                              class="pointer-events-none block h-3.5 w-3.5 rounded-full bg-white shadow-md ring-0 transition-transform data-[state=checked]:translate-x-3.5 data-[state=unchecked]:translate-x-0.5 dark:bg-neutral-100"
+                            />
+                          </Switch.Root>
                         </div>
-                        <Switch.Root
-                          bind:checked={recordAudio}
-                          class="peer inline-flex h-4.5 w-8 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-red-600 data-[state=unchecked]:bg-neutral-200 dark:data-[state=unchecked]:bg-neutral-800"
-                        >
-                          <Switch.Thumb
-                            class="pointer-events-none block h-3.5 w-3.5 rounded-full bg-white shadow-md ring-0 transition-transform data-[state=checked]:translate-x-3.5 data-[state=unchecked]:translate-x-0.5 dark:bg-neutral-100"
-                          />
-                        </Switch.Root>
-                      </div>
 
-                      <!-- 系统声卡 -->
-                      <div class="flex items-center justify-between">
-                        <div class="flex flex-col">
-                          <span
-                            class="text-xs font-semibold text-neutral-800 dark:text-neutral-200"
+                        <!-- 系统声卡 -->
+                        <div class="flex items-center justify-between">
+                          <div class="flex flex-col">
+                            <span
+                              class="text-xs font-semibold text-neutral-800 dark:text-neutral-200"
+                            >
+                              系统声卡声音
+                            </span>
+                            <span
+                              class="text-[9px] text-neutral-400 dark:text-neutral-500"
+                            >
+                              录制系统播放音量
+                            </span>
+                          </div>
+                          <Switch.Root
+                            bind:checked={recordSystemSound}
+                            class="peer inline-flex h-4.5 w-8 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-red-600 data-[state=unchecked]:bg-neutral-200 dark:data-[state=unchecked]:bg-neutral-800"
                           >
-                            系统声卡声音
-                          </span>
-                          <span
-                            class="text-[9px] text-neutral-400 dark:text-neutral-500"
-                          >
-                            录制系统播放音量
-                          </span>
+                            <Switch.Thumb
+                              class="pointer-events-none block h-3.5 w-3.5 rounded-full bg-white shadow-md ring-0 transition-transform data-[state=checked]:translate-x-3.5 data-[state=unchecked]:translate-x-0.5 dark:bg-neutral-100"
+                            />
+                          </Switch.Root>
                         </div>
-                        <Switch.Root
-                          bind:checked={recordSystemSound}
-                          class="peer inline-flex h-4.5 w-8 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-red-600 data-[state=unchecked]:bg-neutral-200 dark:data-[state=unchecked]:bg-neutral-800"
-                        >
-                          <Switch.Thumb
-                            class="pointer-events-none block h-3.5 w-3.5 rounded-full bg-white shadow-md ring-0 transition-transform data-[state=checked]:translate-x-3.5 data-[state=unchecked]:translate-x-0.5 dark:bg-neutral-100"
-                          />
-                        </Switch.Root>
                       </div>
+                    </div>
 
-                      <!-- 排除自身 -->
-                      <div class="flex items-center justify-between">
-                        <div class="flex flex-col">
-                          <span
-                            class="text-xs font-semibold text-neutral-800 dark:text-neutral-200"
+                    <!-- 4. 显示与操作设置 -->
+                    <div class="flex flex-col gap-1.5">
+                      <span
+                        class="text-[10px] font-bold text-neutral-400 dark:text-neutral-500"
+                      >
+                        显示与操作设置
+                      </span>
+                      <div class="flex flex-col gap-3">
+                        <!-- 排除自身 -->
+                        <div class="flex items-center justify-between">
+                          <div class="flex flex-col">
+                            <span
+                              class="text-xs font-semibold text-neutral-800 dark:text-neutral-200"
+                            >
+                              排除本程序
+                            </span>
+                            <span
+                              class="text-[9px] text-neutral-400 dark:text-neutral-500"
+                            >
+                              录像时不显示本窗口
+                            </span>
+                          </div>
+                          <Switch.Root
+                            bind:checked={excludeOwnWindow}
+                            class="peer inline-flex h-4.5 w-8 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-red-600 data-[state=unchecked]:bg-neutral-200 dark:data-[state=unchecked]:bg-neutral-800"
                           >
-                            排除本程序
-                          </span>
-                          <span
-                            class="text-[9px] text-neutral-400 dark:text-neutral-500"
-                          >
-                            录像时不显示本窗口
-                          </span>
+                            <Switch.Thumb
+                              class="pointer-events-none block h-3.5 w-3.5 rounded-full bg-white shadow-md ring-0 transition-transform data-[state=checked]:translate-x-3.5 data-[state=unchecked]:translate-x-0.5 dark:bg-neutral-100"
+                            />
+                          </Switch.Root>
                         </div>
-                        <Switch.Root
-                          bind:checked={excludeOwnWindow}
-                          class="peer inline-flex h-4.5 w-8 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-red-600 data-[state=unchecked]:bg-neutral-200 dark:data-[state=unchecked]:bg-neutral-800"
-                        >
-                          <Switch.Thumb
-                            class="pointer-events-none block h-3.5 w-3.5 rounded-full bg-white shadow-md ring-0 transition-transform data-[state=checked]:translate-x-3.5 data-[state=unchecked]:translate-x-0.5 dark:bg-neutral-100"
-                          />
-                        </Switch.Root>
+
+                        <!-- 录制鼠标指针 -->
+                        <div class="flex items-center justify-between">
+                          <div class="flex flex-col">
+                            <span
+                              class="text-xs font-semibold text-neutral-800 dark:text-neutral-200"
+                            >
+                              录制鼠标指针
+                            </span>
+                            <span
+                              class="text-[9px] text-neutral-400 dark:text-neutral-500"
+                            >
+                              在视频中显示鼠标光标
+                            </span>
+                          </div>
+                          <Switch.Root
+                            bind:checked={showMouseCursor}
+                            class="peer inline-flex h-4.5 w-8 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-red-600 data-[state=unchecked]:bg-neutral-200 dark:data-[state=unchecked]:bg-neutral-800"
+                          >
+                            <Switch.Thumb
+                              class="pointer-events-none block h-3.5 w-3.5 rounded-full bg-white shadow-md ring-0 transition-transform data-[state=checked]:translate-x-3.5 data-[state=unchecked]:translate-x-0.5 dark:bg-neutral-100"
+                            />
+                          </Switch.Root>
+                        </div>
+
+                        <!-- 显示点击效果 -->
+                        <div class="flex items-center justify-between">
+                          <div class="flex flex-col">
+                            <span
+                              class="text-xs font-semibold text-neutral-800 dark:text-neutral-200"
+                            >
+                              显示点击效果
+                            </span>
+                            <span
+                              class="text-[9px] text-neutral-400 dark:text-neutral-500"
+                            >
+                              点击时显示波纹动画
+                            </span>
+                          </div>
+                          <Switch.Root
+                            bind:checked={showMouseClick}
+                            class="peer inline-flex h-4.5 w-8 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-red-600 data-[state=unchecked]:bg-neutral-200 dark:data-[state=unchecked]:bg-neutral-800"
+                          >
+                            <Switch.Thumb
+                              class="pointer-events-none block h-3.5 w-3.5 rounded-full bg-white shadow-md ring-0 transition-transform data-[state=checked]:translate-x-3.5 data-[state=unchecked]:translate-x-0.5 dark:bg-neutral-100"
+                            />
+                          </Switch.Root>
+                        </div>
+
+                        <!-- 显示键盘按键 -->
+                        <div class="flex items-center justify-between">
+                          <div class="flex flex-col">
+                            <span
+                              class="text-xs font-semibold text-neutral-800 dark:text-neutral-200"
+                            >
+                              显示键盘按键
+                            </span>
+                            <span
+                              class="text-[9px] text-neutral-400 dark:text-neutral-500"
+                            >
+                              在视频底部显示最近按键
+                            </span>
+                          </div>
+                          <Switch.Root
+                            bind:checked={showKeys}
+                            class="peer inline-flex h-4.5 w-8 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-red-600 data-[state=unchecked]:bg-neutral-200 dark:data-[state=unchecked]:bg-neutral-800"
+                          >
+                            <Switch.Thumb
+                              class="pointer-events-none block h-3.5 w-3.5 rounded-full bg-white shadow-md ring-0 transition-transform data-[state=checked]:translate-x-3.5 data-[state=unchecked]:translate-x-0.5 dark:bg-neutral-100"
+                            />
+                          </Switch.Root>
+                        </div>
                       </div>
                     </div>
 

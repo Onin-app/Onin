@@ -23,6 +23,16 @@ pub struct RecordConfig {
     pub record_target_type: Option<String>, // 录制目标类型："screen" | "window" | "area"
     pub window_handle: Option<String>,    // 选中的窗口句柄字符串形式 (HWND)
     pub area_rect: Option<AreaRect>,      // 选中的录制区域 (逻辑坐标)
+    #[serde(default)]
+    pub show_mouse_click: bool,
+    #[serde(default = "default_show_mouse_cursor")]
+    pub show_mouse_cursor: bool,
+    #[serde(default)]
+    pub show_keys: bool,
+}
+
+fn default_show_mouse_cursor() -> bool {
+    true
 }
 
 impl Default for RecordConfig {
@@ -38,6 +48,9 @@ impl Default for RecordConfig {
             record_target_type: Some("screen".to_string()),
             window_handle: None,
             area_rect: None,
+            show_mouse_click: false,
+            show_mouse_cursor: true,
+            show_keys: false,
         }
     }
 }

@@ -25,6 +25,9 @@
   let recordAudio = $state(true);
   let recordSystemSound = $state(false);
   let excludeOwnWindow = $state(true);
+  let showMouseClick = $state(false);
+  let showMouseCursor = $state(true);
+  let showKeys = $state(false);
   let fps = $state(30);
   let selectedMonitorIndex = $state(0); // 默认选择第一块屏幕
   let saveFolderType = $state<"video" | "download" | "desktop" | "custom">(
@@ -52,6 +55,9 @@
           recordAudio,
           recordSystemSound,
           excludeOwnWindow,
+          showMouseClick,
+          showMouseCursor,
+          showKeys,
           monitorIndex: selectedMonitorIndex,
           saveFolderType,
           customSaveFolder,
@@ -120,6 +126,9 @@
         recordAudio,
         recordSystemSound,
         excludeOwnWindow,
+        showMouseClick,
+        showMouseCursor,
+        showKeys,
         monitorIndex: selectedMonitorIndex,
         saveFolderType,
         customSaveFolder,
@@ -195,6 +204,9 @@
       recordAudio = config.recordAudio ?? true;
       recordSystemSound = config.recordSystemSound ?? false;
       excludeOwnWindow = config.excludeOwnWindow ?? true;
+      showMouseClick = config.showMouseClick ?? false;
+      showMouseCursor = config.showMouseCursor ?? true;
+      showKeys = config.showKeys ?? false;
       selectedMonitorIndex = config.monitorIndex ?? 0;
       if (selectedMonitorIndex === -1) {
         selectedMonitorIndex = 0;
