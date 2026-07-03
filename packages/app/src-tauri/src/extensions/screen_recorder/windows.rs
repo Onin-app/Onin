@@ -5,6 +5,7 @@ use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use std::sync::mpsc::{sync_channel, SyncSender, TrySendError};
 
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::{COLORREF, LPARAM, LRESULT, POINT, WPARAM};
@@ -13,8 +14,8 @@ use windows::Win32::Graphics::Gdi::{
     DeleteObject, FillRect, GetDC, GetDIBits, GetMonitorInfoW, GetTextExtentPoint32W,
     MonitorFromPoint, ReleaseDC, SelectObject, SetBkMode, SetTextColor, TextOutW, BACKGROUND_MODE,
     BITMAPINFO, BITMAPINFOHEADER, BI_RGB, CLEARTYPE_QUALITY, CLIP_DEFAULT_PRECIS, DEFAULT_CHARSET,
-    DEFAULT_PITCH, DIB_USAGE, FF_DONTCARE, FW_BOLD, HMONITOR, MONITORINFO, MONITOR_DEFAULTTONULL,
-    OUT_DEFAULT_PRECIS,
+    DEFAULT_PITCH, FF_DONTCARE, FW_BOLD, HMONITOR, MONITORINFO, MONITOR_DEFAULTTONULL,
+    OUT_DEFAULT_PRECIS, DIB_RGB_COLORS,
 };
 use windows::Win32::Media::MediaFoundation::*;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
@@ -40,6 +41,84 @@ use windows_capture::{
     },
     window::Window,
 };
+
+// ============================================================================
+// 帧数据 Buffer 复用池与后台编码消息
+// ============================================================================
+
+struct MFFrameSample {
+    sample: IMFSample,
+    buffer: IMFMediaBuffer,
+    buffer_len: u32,
+}
+
+unsafe impl Send for MFFrameSample {}
+unsafe impl Sync for MFFrameSample {}
+
+fn create_mf_sample(buffer_len: u32) -> Result<MFFrameSample, String> {
+    unsafe {
+        let buffer = MFCreateMemoryBuffer(buffer_len)
+            .map_err(|e| format!("MFCreateMemoryBuffer failed: {:?}", e))?;
+        buffer.SetCurrentLength(buffer_len)
+            .map_err(|e| format!("SetCurrentLength failed: {:?}", e))?;
+
+        let sample = MFCreateSample()
+            .map_err(|e| format!("MFCreateSample failed: {:?}", e))?;
+        sample.AddBuffer(&buffer)
+            .map_err(|e| format!("AddBuffer failed: {:?}", e))?;
+
+        Ok(MFFrameSample {
+            sample,
+            buffer,
+            buffer_len,
+        })
+    }
+}
+
+struct BufferPool {
+    pool: Mutex<Vec<MFFrameSample>>,
+    buffer_size: usize,
+}
+
+impl BufferPool {
+    fn new(buffer_size: usize, capacity: usize) -> Result<Self, String> {
+        let mut pool = Vec::with_capacity(capacity);
+        for _ in 0..capacity {
+            let frame_sample = create_mf_sample(buffer_size as u32)?;
+            pool.push(frame_sample);
+        }
+        Ok(Self {
+            pool: Mutex::new(pool),
+            buffer_size,
+        })
+    }
+
+    fn acquire(&self) -> Result<MFFrameSample, String> {
+        let mut pool = self.pool.lock().unwrap();
+        if let Some(sample) = pool.pop() {
+            Ok(sample)
+        } else {
+            create_mf_sample(self.buffer_size as u32)
+        }
+    }
+
+    fn release(&self, sample: MFFrameSample) {
+        let mut pool = self.pool.lock().unwrap();
+        if pool.len() < 30 {
+            pool.push(sample);
+        }
+    }
+}
+
+enum EncoderMessage {
+    Frame {
+        frame_sample: MFFrameSample,
+        frame_width: u32,
+        frame_height: u32,
+        timestamp: Instant,
+    },
+    Exit,
+}
 
 // 辅助打包函数，用于设置 MF_MT_FRAME_SIZE 和 MF_MT_FRAME_RATE
 fn pack_u32_to_u64(high: u32, low: u32) -> u64 {
@@ -224,6 +303,13 @@ struct Ripple {
     is_right: bool,
 }
 
+struct CachedKeyText {
+    text: String,
+    width: i32,
+    height: i32,
+    pixels: Vec<u8>,
+}
+
 struct MFSinkWriterWrapper {
     sink_writer: IMFSinkWriter,
     video_stream_index: u32,
@@ -242,6 +328,7 @@ struct MFSinkWriterWrapper {
     last_lbutton: bool,
     last_rbutton: bool,
     ripples: Vec<Ripple>,
+    cached_key_text: Option<CachedKeyText>,
 }
 
 unsafe impl Send for MFSinkWriterWrapper {}
@@ -340,15 +427,30 @@ impl MFSinkWriterWrapper {
                 last_lbutton: false,
                 last_rbutton: false,
                 ripples: Vec::new(),
+                cached_key_text: None,
             })
         }
     }
 
-    fn write_frame(
+    fn draw_overlays(
         &mut self,
-        frame_data: &[u8],
-        frame_width: u32,
-        frame_height: u32,
+        p_data: *mut u8,
+        _frame_width: u32,
+        _frame_height: u32,
+        _timestamp: Instant,
+    ) {
+        if self.show_mouse_click {
+            self.draw_mouse_clicks(p_data);
+        }
+
+        if self.show_keys {
+            self.draw_keys_overlay(p_data);
+        }
+    }
+
+    fn write_sample(
+        &mut self,
+        sample: &IMFSample,
         timestamp: Instant,
     ) -> Result<(), String> {
         unsafe {
@@ -356,66 +458,6 @@ impl MFSinkWriterWrapper {
                 self.start_time = Some(timestamp);
             }
             let elapsed = timestamp.duration_since(self.start_time.unwrap_or(timestamp));
-
-            let buffer_len = self.width * self.height * 4;
-            let buffer = MFCreateMemoryBuffer(buffer_len)
-                .map_err(|e| format!("MFCreateMemoryBuffer failed: {:?}", e))?;
-
-            let mut p_data: *mut u8 = std::ptr::null_mut();
-            let mut max_length = 0u32;
-            let mut current_length = 0u32;
-            buffer
-                .Lock(
-                    &mut p_data,
-                    Some(&mut max_length),
-                    Some(&mut current_length),
-                )
-                .map_err(|e| format!("Buffer Lock failed: {:?}", e))?;
-
-            std::ptr::write_bytes(p_data, 0, buffer_len as usize);
-
-            let src_row_pitch = (frame_width * 4) as usize;
-            let dest_row_pitch = (self.width * 4) as usize;
-            let copy_width_bytes = (self.width * 4) as usize;
-
-            for y in 0..self.height {
-                let src_y = frame_height as i32 - 1 - (self.rect_y + y) as i32;
-                if src_y >= 0 && src_y < frame_height as i32 {
-                    let src_offset = (src_y as usize) * src_row_pitch + (self.rect_x as usize * 4);
-                    let dest_offset = (y as usize) * dest_row_pitch;
-
-                    if src_offset + copy_width_bytes <= frame_data.len()
-                        && dest_offset + copy_width_bytes <= buffer_len as usize
-                    {
-                        std::ptr::copy_nonoverlapping(
-                            frame_data.as_ptr().add(src_offset),
-                            p_data.add(dest_offset),
-                            copy_width_bytes,
-                        );
-                    }
-                }
-            }
-
-            // 软渲染定制效果 overlays
-            if self.show_mouse_click {
-                self.draw_mouse_clicks(p_data);
-            }
-
-            if self.show_keys {
-                self.draw_keys_overlay(p_data);
-            }
-
-            buffer
-                .SetCurrentLength(buffer_len)
-                .map_err(|e| format!("SetCurrentLength failed: {:?}", e))?;
-            buffer
-                .Unlock()
-                .map_err(|e| format!("Buffer Unlock failed: {:?}", e))?;
-
-            let sample = MFCreateSample().map_err(|e| format!("MFCreateSample failed: {:?}", e))?;
-            sample
-                .AddBuffer(&buffer)
-                .map_err(|e| format!("AddBuffer failed: {:?}", e))?;
 
             let sample_time = (elapsed.as_nanos() / 100) as i64;
             sample
@@ -427,7 +469,7 @@ impl MFSinkWriterWrapper {
                 .map_err(|e| format!("SetSampleDuration failed: {:?}", e))?;
 
             self.sink_writer
-                .WriteSample(self.video_stream_index, &sample)
+                .WriteSample(self.video_stream_index, sample)
                 .map_err(|e| format!("WriteSample failed: {:?}", e))?;
 
             Ok(())
@@ -555,9 +597,9 @@ impl MFSinkWriterWrapper {
 
                         if in_outer_ring || in_inner_ring || in_halo {
                             let offset = ((py as u32 * self.width) + px as u32) as usize * 4;
-                            let src_r = 60;
-                            let src_g = 130;
-                            let src_b = 255;
+                            let src_r = 60u32;
+                            let src_g = 130u32;
+                            let src_b = 255u32;
 
                             let current_alpha = if in_outer_ring || in_inner_ring {
                                 alpha
@@ -565,20 +607,17 @@ impl MFSinkWriterWrapper {
                                 alpha * 0.45
                             };
 
-                            unsafe {
-                                let dest_b = *p_data.add(offset) as f32;
-                                let dest_g = *p_data.add(offset + 1) as f32;
-                                let dest_r = *p_data.add(offset + 2) as f32;
+                            let alpha_q8 = (current_alpha * 256.0) as u32;
+                            let inv_alpha_q8 = 256 - alpha_q8;
 
-                                *p_data.add(offset) = (src_b as f32 * current_alpha
-                                    + dest_b * (1.0 - current_alpha))
-                                    as u8;
-                                *p_data.add(offset + 1) = (src_g as f32 * current_alpha
-                                    + dest_g * (1.0 - current_alpha))
-                                    as u8;
-                                *p_data.add(offset + 2) = (src_r as f32 * current_alpha
-                                    + dest_r * (1.0 - current_alpha))
-                                    as u8;
+                            unsafe {
+                                let dest_b = *p_data.add(offset) as u32;
+                                let dest_g = *p_data.add(offset + 1) as u32;
+                                let dest_r = *p_data.add(offset + 2) as u32;
+
+                                *p_data.add(offset) = ((src_b * alpha_q8 + dest_b * inv_alpha_q8) >> 8) as u8;
+                                *p_data.add(offset + 1) = ((src_g * alpha_q8 + dest_g * inv_alpha_q8) >> 8) as u8;
+                                *p_data.add(offset + 2) = ((src_r * alpha_q8 + dest_r * inv_alpha_q8) >> 8) as u8;
                             }
                         }
                     }
@@ -616,26 +655,23 @@ impl MFSinkWriterWrapper {
 
                         if in_ring || in_halo {
                             let offset = ((py as u32 * self.width) + px as u32) as usize * 4;
-                            let src_r = 255;
-                            let src_g = 60;
-                            let src_b = 60;
+                            let src_r = 255u32;
+                            let src_g = 60u32;
+                            let src_b = 60u32;
 
                             let current_alpha = if in_ring { alpha } else { alpha * 0.45 };
 
-                            unsafe {
-                                let dest_b = *p_data.add(offset) as f32;
-                                let dest_g = *p_data.add(offset + 1) as f32;
-                                let dest_r = *p_data.add(offset + 2) as f32;
+                            let alpha_q8 = (current_alpha * 256.0) as u32;
+                            let inv_alpha_q8 = 256 - alpha_q8;
 
-                                *p_data.add(offset) = (src_b as f32 * current_alpha
-                                    + dest_b * (1.0 - current_alpha))
-                                    as u8;
-                                *p_data.add(offset + 1) = (src_g as f32 * current_alpha
-                                    + dest_g * (1.0 - current_alpha))
-                                    as u8;
-                                *p_data.add(offset + 2) = (src_r as f32 * current_alpha
-                                    + dest_r * (1.0 - current_alpha))
-                                    as u8;
+                            unsafe {
+                                let dest_b = *p_data.add(offset) as u32;
+                                let dest_g = *p_data.add(offset + 1) as u32;
+                                let dest_r = *p_data.add(offset + 2) as u32;
+
+                                *p_data.add(offset) = ((src_b * alpha_q8 + dest_b * inv_alpha_q8) >> 8) as u8;
+                                *p_data.add(offset + 1) = ((src_g * alpha_q8 + dest_g * inv_alpha_q8) >> 8) as u8;
+                                *p_data.add(offset + 2) = ((src_r * alpha_q8 + dest_r * inv_alpha_q8) >> 8) as u8;
                             }
                         }
                     }
@@ -644,7 +680,7 @@ impl MFSinkWriterWrapper {
         }
     }
 
-    fn draw_keys_overlay(&self, p_data: *mut u8) {
+    fn draw_keys_overlay(&mut self, p_data: *mut u8) {
         let key_info = {
             let state_guard = KEYBOARD_STATE.lock().unwrap();
             state_guard.clone()
@@ -664,194 +700,212 @@ impl MFSinkWriterWrapper {
         }
     }
 
-    fn draw_keyboard_overlay(&self, p_data: *mut u8, text: &str, alpha: f32) {
-        let wide_text: Vec<u16> = text.encode_utf16().chain(Some(0)).collect();
+    fn draw_keyboard_overlay(&mut self, p_data: *mut u8, text: &str, alpha: f32) {
+        let mut hit_cache = false;
 
-        unsafe {
-            let screen_hdc = GetDC(None);
-            if screen_hdc.is_invalid() {
-                return;
+        if let Some(ref cached) = self.cached_key_text {
+            if cached.text == text {
+                hit_cache = true;
             }
-            let mem_hdc = CreateCompatibleDC(screen_hdc);
-            if mem_hdc.is_invalid() {
-                let _ = ReleaseDC(None, screen_hdc);
-                return;
-            }
+        }
 
-            let font_height = 36;
-            let font = CreateFontW(
-                font_height,
-                0,
-                0,
-                0,
-                FW_BOLD.0 as i32,
-                0,
-                0,
-                0,
-                DEFAULT_CHARSET.0 as u32,
-                OUT_DEFAULT_PRECIS.0 as u32,
-                CLIP_DEFAULT_PRECIS.0 as u32,
-                CLEARTYPE_QUALITY.0 as u32,
-                DEFAULT_PITCH.0 as u32 | FF_DONTCARE.0 as u32,
-                windows::core::w!("Segoe UI"),
-            );
+        if !hit_cache {
+            let wide_text: Vec<u16> = text.encode_utf16().chain(Some(0)).collect();
+            unsafe {
+                let screen_hdc = GetDC(None);
+                if !screen_hdc.is_invalid() {
+                    let mem_hdc = CreateCompatibleDC(screen_hdc);
+                    if !mem_hdc.is_invalid() {
+                        let font_height = 36;
+                        let font = CreateFontW(
+                            font_height,
+                            0,
+                            0,
+                            0,
+                            FW_BOLD.0 as i32,
+                            0,
+                            0,
+                            0,
+                            DEFAULT_CHARSET.0 as u32,
+                            OUT_DEFAULT_PRECIS.0 as u32,
+                            CLIP_DEFAULT_PRECIS.0 as u32,
+                            CLEARTYPE_QUALITY.0 as u32,
+                            DEFAULT_PITCH.0 as u32 | FF_DONTCARE.0 as u32,
+                            windows::core::w!("Segoe UI"),
+                        );
 
-            let old_font = SelectObject(mem_hdc, font);
+                        let old_font = SelectObject(mem_hdc, font);
 
-            let mut text_size = windows::Win32::Foundation::SIZE::default();
-            let text_len = wide_text.len() - 1;
-            if GetTextExtentPoint32W(mem_hdc, &wide_text[..text_len], &mut text_size).as_bool() {
-                let text_width = text_size.cx;
-                let text_height = text_size.cy;
+                        let mut text_size = windows::Win32::Foundation::SIZE::default();
+                        let text_len = wide_text.len() - 1;
+                        if GetTextExtentPoint32W(mem_hdc, &wide_text[..text_len], &mut text_size).as_bool() {
+                            let text_width = text_size.cx;
+                            let text_height = text_size.cy;
 
-                let hbmp = CreateCompatibleBitmap(screen_hdc, text_width, text_height);
-                if !hbmp.is_invalid() {
-                    let old_bmp = SelectObject(mem_hdc, hbmp);
+                            let hbmp = CreateCompatibleBitmap(screen_hdc, text_width, text_height);
+                            if !hbmp.is_invalid() {
+                                let old_bmp = SelectObject(mem_hdc, hbmp);
 
-                    let black_brush = CreateSolidBrush(COLORREF(0));
-                    let rect = windows::Win32::Foundation::RECT {
-                        left: 0,
-                        top: 0,
-                        right: text_width,
-                        bottom: text_height,
-                    };
-                    FillRect(mem_hdc, &rect, black_brush);
-                    let _ = DeleteObject(black_brush);
+                                let black_brush = CreateSolidBrush(COLORREF(0));
+                                let rect = windows::Win32::Foundation::RECT {
+                                    left: 0,
+                                    top: 0,
+                                    right: text_width,
+                                    bottom: text_height,
+                                };
+                                FillRect(mem_hdc, &rect, black_brush);
+                                let _ = DeleteObject(black_brush);
 
-                    let _ = SetTextColor(mem_hdc, COLORREF(0x00FFFFFF));
-                    let _ = SetBkMode(mem_hdc, BACKGROUND_MODE(1));
-                    let _ = TextOutW(mem_hdc, 0, 0, &wide_text[..text_len]);
+                                let _ = SetTextColor(mem_hdc, COLORREF(0x00FFFFFF));
+                                let _ = SetBkMode(mem_hdc, BACKGROUND_MODE(1));
+                                let _ = TextOutW(mem_hdc, 0, 0, &wide_text[..text_len]);
 
-                    let mut bmp_info = BITMAPINFO::default();
-                    bmp_info.bmiHeader.biSize = std::mem::size_of::<BITMAPINFOHEADER>() as u32;
-                    bmp_info.bmiHeader.biWidth = text_width;
-                    bmp_info.bmiHeader.biHeight = -text_height;
-                    bmp_info.bmiHeader.biPlanes = 1;
-                    bmp_info.bmiHeader.biBitCount = 32;
-                    bmp_info.bmiHeader.biCompression = BI_RGB.0 as u32;
+                                let mut bmp_info = BITMAPINFO::default();
+                                bmp_info.bmiHeader.biSize = std::mem::size_of::<BITMAPINFOHEADER>() as u32;
+                                bmp_info.bmiHeader.biWidth = text_width;
+                                bmp_info.bmiHeader.biHeight = -text_height;
+                                bmp_info.bmiHeader.biPlanes = 1;
+                                bmp_info.bmiHeader.biBitCount = 32;
+                                bmp_info.bmiHeader.biCompression = BI_RGB.0 as u32;
 
-                    let mut bmp_pixels = vec![0u8; (text_width * text_height * 4) as usize];
-                    GetDIBits(
-                        mem_hdc,
-                        hbmp,
-                        0,
-                        text_height as u32,
-                        Some(bmp_pixels.as_mut_ptr() as *mut _),
-                        &mut bmp_info,
-                        DIB_USAGE(0),
-                    );
+                                let mut bmp_pixels = vec![0u8; (text_width * text_height * 4) as usize];
+                                GetDIBits(
+                                    mem_hdc,
+                                    hbmp,
+                                    0,
+                                    text_height as u32,
+                                    Some(bmp_pixels.as_mut_ptr() as *mut _),
+                                    &mut bmp_info,
+                                    DIB_RGB_COLORS,
+                                );
 
-                    let padding_x = 32;
-                    let padding_y = 16;
-                    let box_width = text_width + padding_x * 2;
-                    let box_height = text_height + padding_y * 2;
+                                self.cached_key_text = Some(CachedKeyText {
+                                    text: text.to_string(),
+                                    width: text_width,
+                                    height: text_height,
+                                    pixels: bmp_pixels,
+                                });
 
-                    // 暂时将按键显示放在左下角 (box_x = 70, 距离底部 = 70)
-                    let box_x = 70;
-                    let box_y = self.height as i32 - box_height - 70;
-
-                    let radius = 16;
-                    let bg_opacity = 0.72 * alpha;
-
-                    for y in 0..box_height {
-                        // 镜像反转行映射
-                        let py = self.height as i32 - 1 - (box_y + y);
-                        if py < 0 || py >= self.height as i32 {
-                            continue;
-                        }
-                        for x in 0..box_width {
-                            let px = box_x + x;
-                            if px < 0 || px >= self.width as i32 {
-                                continue;
-                            }
-
-                            let mut inside = true;
-                            if x < radius && y < radius {
-                                let dx = radius - x;
-                                let dy = radius - y;
-                                if dx * dx + dy * dy > radius * radius {
-                                    inside = false;
-                                }
-                            } else if x >= box_width - radius && y < radius {
-                                let dx = x - (box_width - radius);
-                                let dy = radius - y;
-                                if dx * dx + dy * dy > radius * radius {
-                                    inside = false;
-                                }
-                            } else if x < radius && y >= box_height - radius {
-                                let dx = radius - x;
-                                let dy = y - (box_height - radius);
-                                if dx * dx + dy * dy > radius * radius {
-                                    inside = false;
-                                }
-                            } else if x >= box_width - radius && y >= box_height - radius {
-                                let dx = x - (box_width - radius);
-                                let dy = y - (box_height - radius);
-                                if dx * dx + dy * dy > radius * radius {
-                                    inside = false;
-                                }
-                            }
-
-                            if inside {
-                                let dest_offset =
-                                    ((py as u32 * self.width) + px as u32) as usize * 4;
-                                let factor = 1.0 - bg_opacity;
-                                *p_data.add(dest_offset) =
-                                    (*p_data.add(dest_offset) as f32 * factor) as u8;
-                                *p_data.add(dest_offset + 1) =
-                                    (*p_data.add(dest_offset + 1) as f32 * factor) as u8;
-                                *p_data.add(dest_offset + 2) =
-                                    (*p_data.add(dest_offset + 2) as f32 * factor) as u8;
+                                SelectObject(mem_hdc, old_bmp);
+                                let _ = DeleteObject(hbmp);
                             }
                         }
+
+                        SelectObject(mem_hdc, old_font);
+                        let _ = DeleteObject(font);
+                        let _ = DeleteDC(mem_hdc);
                     }
-
-                    let text_start_x = box_x + padding_x;
-                    let text_start_y = box_y + padding_y;
-
-                    for y in 0..text_height {
-                        // 镜像反转行映射
-                        let py = self.height as i32 - 1 - (text_start_y + y);
-                        if py < 0 || py >= self.height as i32 {
-                            continue;
-                        }
-                        for x in 0..text_width {
-                            let px = text_start_x + x;
-                            if px < 0 || px >= self.width as i32 {
-                                continue;
-                            }
-
-                            let bmp_offset = ((y * text_width) + x) as usize * 4;
-                            let intensity = bmp_pixels[bmp_offset + 2] as f32 / 255.0;
-
-                            if intensity > 0.0 {
-                                let dest_offset =
-                                    ((py as u32 * self.width) + px as u32) as usize * 4;
-                                let current_alpha = intensity * alpha;
-
-                                let dest_b = *p_data.add(dest_offset) as f32;
-                                let dest_g = *p_data.add(dest_offset + 1) as f32;
-                                let dest_r = *p_data.add(dest_offset + 2) as f32;
-
-                                *p_data.add(dest_offset) =
-                                    (255.0 * current_alpha + dest_b * (1.0 - current_alpha)) as u8;
-                                *p_data.add(dest_offset + 1) =
-                                    (255.0 * current_alpha + dest_g * (1.0 - current_alpha)) as u8;
-                                *p_data.add(dest_offset + 2) =
-                                    (255.0 * current_alpha + dest_r * (1.0 - current_alpha)) as u8;
-                            }
-                        }
-                    }
-
-                    SelectObject(mem_hdc, old_bmp);
-                    let _ = DeleteObject(hbmp);
+                    let _ = ReleaseDC(None, screen_hdc);
                 }
             }
+        }
 
-            SelectObject(mem_hdc, old_font);
-            let _ = DeleteObject(font);
-            let _ = DeleteDC(mem_hdc);
-            let _ = ReleaseDC(None, screen_hdc);
+        if let Some(ref cached) = self.cached_key_text {
+            let bmp_pixels = &cached.pixels;
+            let text_width = cached.width;
+            let text_height = cached.height;
+
+            let padding_x = 32;
+            let padding_y = 16;
+            let box_width = text_width + padding_x * 2;
+            let box_height = text_height + padding_y * 2;
+
+            let box_x = 70;
+            let box_y = self.height as i32 - box_height - 70;
+
+            let radius = 16;
+            let bg_opacity = 0.72 * alpha;
+            let factor_q8 = ((1.0 - bg_opacity) * 256.0) as u32;
+            let text_alpha_q8_base = (alpha * 256.0) as u32;
+
+            unsafe {
+                for y in 0..box_height {
+                    let py = self.height as i32 - 1 - (box_y + y);
+                    if py < 0 || py >= self.height as i32 {
+                        continue;
+                    }
+                    for x in 0..box_width {
+                        let px = box_x + x;
+                        if px < 0 || px >= self.width as i32 {
+                            continue;
+                        }
+
+                        let mut inside = true;
+                        if x < radius && y < radius {
+                            let dx = radius - x;
+                            let dy = radius - y;
+                            if dx * dx + dy * dy > radius * radius {
+                                inside = false;
+                            }
+                        } else if x >= box_width - radius && y < radius {
+                            let dx = x - (box_width - radius);
+                            let dy = radius - y;
+                            if dx * dx + dy * dy > radius * radius {
+                                inside = false;
+                            }
+                        } else if x < radius && y >= box_height - radius {
+                            let dx = radius - x;
+                            let dy = y - (box_height - radius);
+                            if dx * dx + dy * dy > radius * radius {
+                                inside = false;
+                            }
+                        } else if x >= box_width - radius && y >= box_height - radius {
+                            let dx = x - (box_width - radius);
+                            let dy = y - (box_height - radius);
+                            if dx * dx + dy * dy > radius * radius {
+                                inside = false;
+                            }
+                        }
+
+                        if inside {
+                            let dest_offset = ((py as u32 * self.width) + px as u32) as usize * 4;
+                            let b = *p_data.add(dest_offset) as u32;
+                            let g = *p_data.add(dest_offset + 1) as u32;
+                            let r = *p_data.add(dest_offset + 2) as u32;
+
+                            *p_data.add(dest_offset) = ((b * factor_q8) >> 8) as u8;
+                            *p_data.add(dest_offset + 1) = ((g * factor_q8) >> 8) as u8;
+                            *p_data.add(dest_offset + 2) = ((r * factor_q8) >> 8) as u8;
+                        }
+                    }
+                }
+
+                let text_start_x = box_x + padding_x;
+                let text_start_y = box_y + padding_y;
+
+                for y in 0..text_height {
+                    let py = self.height as i32 - 1 - (text_start_y + y);
+                    if py < 0 || py >= self.height as i32 {
+                        continue;
+                    }
+                    for x in 0..text_width {
+                        let px = text_start_x + x;
+                        if px < 0 || px >= self.width as i32 {
+                            continue;
+                        }
+
+                        let bmp_offset = ((y * text_width) + x) as usize * 4;
+                        let intensity = bmp_pixels[bmp_offset + 2] as u32;
+
+                        if intensity > 0 {
+                            let dest_offset = ((py as u32 * self.width) + px as u32) as usize * 4;
+                            let alpha_q8 = (intensity * text_alpha_q8_base) / 255;
+                            let inv_alpha_q8 = 256 - alpha_q8;
+
+                            let dest_b = *p_data.add(dest_offset) as u32;
+                            let dest_g = *p_data.add(dest_offset + 1) as u32;
+                            let dest_r = *p_data.add(dest_offset + 2) as u32;
+
+                            *p_data.add(dest_offset) =
+                                ((255 * alpha_q8 + dest_b * inv_alpha_q8) >> 8) as u8;
+                            *p_data.add(dest_offset + 1) =
+                                ((255 * alpha_q8 + dest_g * inv_alpha_q8) >> 8) as u8;
+                            *p_data.add(dest_offset + 2) =
+                                ((255 * alpha_q8 + dest_r * inv_alpha_q8) >> 8) as u8;
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -871,17 +925,38 @@ impl MFSinkWriterWrapper {
 // ============================================================================
 
 struct CaptureHandler {
-    writer: Arc<Mutex<Option<MFSinkWriterWrapper>>>,
+    sender: SyncSender<EncoderMessage>,
+    buffer_pool: Arc<BufferPool>,
     is_paused: Arc<AtomicBool>,
+    width: u32,
+    height: u32,
+    rect_x: u32,
+    rect_y: u32,
 }
 
 impl GraphicsCaptureApiHandler for CaptureHandler {
-    type Flags = (Arc<Mutex<Option<MFSinkWriterWrapper>>>, Arc<AtomicBool>);
+    type Flags = (
+        SyncSender<EncoderMessage>,
+        Arc<BufferPool>,
+        Arc<AtomicBool>,
+        u32,
+        u32,
+        u32,
+        u32,
+    );
     type Error = String;
 
     fn new(ctx: Context<Self::Flags>) -> Result<Self, Self::Error> {
-        let (writer, is_paused) = ctx.flags;
-        Ok(Self { writer, is_paused })
+        let (sender, buffer_pool, is_paused, width, height, rect_x, rect_y) = ctx.flags;
+        Ok(Self {
+            sender,
+            buffer_pool,
+            is_paused,
+            width,
+            height,
+            rect_x,
+            rect_y,
+        })
     }
 
     fn on_frame_arrived(
@@ -889,8 +964,8 @@ impl GraphicsCaptureApiHandler for CaptureHandler {
         frame: &mut Frame,
         _capture_control: InternalCaptureControl,
     ) -> Result<(), Self::Error> {
-        // 如果处于暂停状态，直接跳过帧
-        if self.is_paused.load(Ordering::SeqCst) {
+        // 使用 Acquire 内存序替换 SeqCst，消除多核强内存屏障开销
+        if self.is_paused.load(Ordering::Acquire) {
             return Ok(());
         }
 
@@ -905,9 +980,55 @@ impl GraphicsCaptureApiHandler for CaptureHandler {
             .as_nopadding_buffer()
             .map_err(|e| format!("Remove padding failed: {:?}", e))?;
 
-        let mut writer_guard = self.writer.lock().unwrap();
-        if let Some(ref mut writer) = *writer_guard {
-            writer.write_frame(no_padding_slice, frame_width, frame_height, Instant::now())?;
+        // 从 BufferPool 中获取一个已预分配的复用 MFFrameSample
+        let frame_sample = self.buffer_pool.acquire().map_err(|e| e.to_string())?;
+
+        // 直接锁定 IMFMediaBuffer 指针进行 in-place 垂直翻转和裁剪拷贝 (这是唯一的一次内存拷贝！)
+        unsafe {
+            let mut p_data: *mut u8 = std::ptr::null_mut();
+            frame_sample.buffer.Lock(&mut p_data, None, None)
+                .map_err(|e| format!("IMFMediaBuffer Lock failed: {:?}", e))?;
+
+            let src_row_pitch = (frame_width * 4) as usize;
+            let dest_row_pitch = (self.width * 4) as usize;
+            let copy_width_bytes = (self.width * 4) as usize;
+
+            for y in 0..self.height {
+                let src_y = frame_height as i32 - 1 - (self.rect_y + y) as i32;
+                if src_y >= 0 && src_y < frame_height as i32 {
+                    let src_offset = (src_y as usize) * src_row_pitch + (self.rect_x as usize * 4);
+                    let dest_offset = (y as usize) * dest_row_pitch;
+
+                    if src_offset + copy_width_bytes <= no_padding_slice.len()
+                        && dest_offset + copy_width_bytes <= frame_sample.buffer_len as usize
+                    {
+                        std::ptr::copy_nonoverlapping(
+                            no_padding_slice.as_ptr().add(src_offset),
+                            p_data.add(dest_offset),
+                            copy_width_bytes,
+                        );
+                    }
+                }
+            }
+
+            frame_sample.buffer.Unlock()
+                .map_err(|e| format!("IMFMediaBuffer Unlock failed: {:?}", e))?;
+        }
+
+        // 发送给后台编码线程
+        if let Err(e) = self.sender.try_send(EncoderMessage::Frame {
+            frame_sample,
+            frame_width,
+            frame_height,
+            timestamp: Instant::now(),
+        }) {
+            match e {
+                TrySendError::Full(EncoderMessage::Frame { frame_sample, .. }) => {
+                    // 积压丢帧，释放归还池中
+                    self.buffer_pool.release(frame_sample);
+                }
+                _ => {}
+            }
         }
 
         Ok(())
@@ -926,9 +1047,10 @@ pub struct WindowsRecordEngine {
     state: Arc<Mutex<RecordState>>,
     start_time: Arc<Mutex<Option<Instant>>>,
     accumulated_duration: Arc<Mutex<Duration>>,
-    writer: Arc<Mutex<Option<MFSinkWriterWrapper>>>,
     is_paused: Arc<AtomicBool>,
     capture_thread_control: Arc<Mutex<Option<CaptureControl<CaptureHandler, String>>>>,
+    encoder_thread: Mutex<Option<std::thread::JoinHandle<Result<(), String>>>>,
+    sender: Mutex<Option<SyncSender<EncoderMessage>>>,
 }
 
 impl WindowsRecordEngine {
@@ -937,9 +1059,10 @@ impl WindowsRecordEngine {
             state: Arc::new(Mutex::new(RecordState::Idle)),
             start_time: Arc::new(Mutex::new(None)),
             accumulated_duration: Arc::new(Mutex::new(Duration::ZERO)),
-            writer: Arc::new(Mutex::new(None)),
             is_paused: Arc::new(AtomicBool::new(false)),
             capture_thread_control: Arc::new(Mutex::new(None)),
+            encoder_thread: Mutex::new(None),
+            sender: Mutex::new(None),
         }
     }
 }
@@ -1020,7 +1143,7 @@ impl ScreenRecordEngine for WindowsRecordEngine {
             None
         };
 
-        // 2. 初始化 Media Foundation 编码写入器并保存到 self.writer
+        // 2. 初始化 Media Foundation 编码写入器并启动后台编码线程
         let writer = MFSinkWriterWrapper::new(
             output_path,
             width,
@@ -1034,10 +1157,54 @@ impl ScreenRecordEngine for WindowsRecordEngine {
             monitor_x,
             monitor_y,
         )?;
-        {
-            let mut writer_guard = self.writer.lock().unwrap();
-            *writer_guard = Some(writer);
-        }
+
+        let buffer_size = (width * height * 4) as usize;
+        let buffer_pool = Arc::new(BufferPool::new(buffer_size, 30)?);
+        let (sender, receiver) = sync_channel::<EncoderMessage>(30);
+
+        let buffer_pool_clone = buffer_pool.clone();
+        let handle = std::thread::spawn(move || {
+            let mut writer = writer;
+            while let Ok(msg) = receiver.recv() {
+                match msg {
+                    EncoderMessage::Frame {
+                        frame_sample,
+                        frame_width,
+                        frame_height,
+                        timestamp,
+                    } => {
+                        unsafe {
+                            let mut p_data: *mut u8 = std::ptr::null_mut();
+                            if frame_sample.buffer.Lock(&mut p_data, None, None).is_ok() {
+                                writer.draw_overlays(p_data, frame_width, frame_height, timestamp);
+                                let _ = frame_sample.buffer.Unlock();
+                            }
+                        }
+                        let _ = writer.write_sample(&frame_sample.sample, timestamp);
+                        buffer_pool_clone.release(frame_sample);
+                    }
+                    EncoderMessage::Exit => {
+                        break;
+                    }
+                }
+            }
+            writer.finalize()?;
+            Ok::<(), String>(())
+        });
+
+        *self.encoder_thread.lock().unwrap() = Some(handle);
+        *self.sender.lock().unwrap() = Some(sender.clone());
+
+        let cleanup_encoder = || {
+            let sender = self.sender.lock().unwrap().take();
+            if let Some(s) = sender {
+                let _ = s.send(EncoderMessage::Exit);
+            }
+            let handle = self.encoder_thread.lock().unwrap().take();
+            if let Some(h) = handle {
+                let _ = h.join();
+            }
+        };
 
         let cursor_settings = if config.show_mouse_cursor {
             CursorCaptureSettings::WithCursor
@@ -1045,15 +1212,31 @@ impl ScreenRecordEngine for WindowsRecordEngine {
             CursorCaptureSettings::WithoutCursor
         };
 
+        let flags = (
+            sender.clone(),
+            buffer_pool.clone(),
+            self.is_paused.clone(),
+            width,
+            height,
+            rect_x,
+            rect_y,
+        );
+
         // 3. 根据捕获模式分别实例化 settings 并启动捕获线程
         let capture_control = if is_window_mode {
             let hwnd_str = config
                 .window_handle
                 .as_deref()
-                .ok_or("No window handle provided")?;
+                .ok_or_else(|| {
+                    cleanup_encoder();
+                    "No window handle provided".to_string()
+                })?;
             let hwnd_val = hwnd_str
                 .parse::<isize>()
-                .map_err(|e| format!("Invalid window handle format: {}", e))?;
+                .map_err(|e| {
+                    cleanup_encoder();
+                    format!("Invalid window handle format: {}", e)
+                })?;
             let hwnd = hwnd_val as *mut std::ffi::c_void;
             let window = Window::from_raw_hwnd(hwnd);
 
@@ -1065,10 +1248,10 @@ impl ScreenRecordEngine for WindowsRecordEngine {
                 MinimumUpdateIntervalSettings::Default,
                 DirtyRegionSettings::Default,
                 ColorFormat::Bgra8,
-                (self.writer.clone(), self.is_paused.clone()),
+                flags.clone(),
             );
 
-            self.is_paused.store(false, Ordering::SeqCst);
+            self.is_paused.store(false, Ordering::Release);
             match CaptureHandler::start_free_threaded(settings) {
                 Ok(control) => control,
                 Err(e) => {
@@ -1086,15 +1269,12 @@ impl ScreenRecordEngine for WindowsRecordEngine {
                             MinimumUpdateIntervalSettings::Default,
                             DirtyRegionSettings::Default,
                             ColorFormat::Bgra8,
-                            (self.writer.clone(), self.is_paused.clone()),
+                            flags.clone(),
                         );
                         match CaptureHandler::start_free_threaded(fallback_settings) {
                             Ok(control) => control,
                             Err(fallback_err) => {
-                                let mut writer_guard = self.writer.lock().unwrap();
-                                if let Some(w) = writer_guard.take() {
-                                    let _ = w.finalize();
-                                }
+                                cleanup_encoder();
                                 let err_msg = fallback_err.to_string();
                                 if err_msg.contains("Failed to convert item to GraphicsCaptureItem")
                                 {
@@ -1107,10 +1287,7 @@ impl ScreenRecordEngine for WindowsRecordEngine {
                             }
                         }
                     } else {
-                        let mut writer_guard = self.writer.lock().unwrap();
-                        if let Some(w) = writer_guard.take() {
-                            let _ = w.finalize();
-                        }
+                        cleanup_encoder();
                         let err_msg = e.to_string();
                         if err_msg.contains("Failed to convert item to GraphicsCaptureItem") {
                             return Err("启动窗口捕获失败：目标窗口不支持录像。\n\n常见原因：\n1. 目标窗口已被用户关闭或销毁；\n2. 目标窗口是以管理员权限运行的（可尝试以管理员身份重新运行 Onin）；\n3. 目标窗口由于 Windows 系统的安全保护策略被禁止录制。".into());
@@ -1121,7 +1298,10 @@ impl ScreenRecordEngine for WindowsRecordEngine {
             }
         } else {
             let idx = config.monitor_index.unwrap_or(-1);
-            let monitor = get_selected_monitor(idx, app)?;
+            let monitor = get_selected_monitor(idx, app).map_err(|e| {
+                cleanup_encoder();
+                e
+            })?;
 
             let settings = Settings::new(
                 monitor.clone(),
@@ -1131,10 +1311,10 @@ impl ScreenRecordEngine for WindowsRecordEngine {
                 MinimumUpdateIntervalSettings::Default,
                 DirtyRegionSettings::Default,
                 ColorFormat::Bgra8,
-                (self.writer.clone(), self.is_paused.clone()),
+                flags.clone(),
             );
 
-            self.is_paused.store(false, Ordering::SeqCst);
+            self.is_paused.store(false, Ordering::Release);
             match CaptureHandler::start_free_threaded(settings) {
                 Ok(control) => control,
                 Err(e) => {
@@ -1152,15 +1332,12 @@ impl ScreenRecordEngine for WindowsRecordEngine {
                             MinimumUpdateIntervalSettings::Default,
                             DirtyRegionSettings::Default,
                             ColorFormat::Bgra8,
-                            (self.writer.clone(), self.is_paused.clone()),
+                            flags.clone(),
                         );
                         match CaptureHandler::start_free_threaded(fallback_settings) {
                             Ok(control) => control,
                             Err(fallback_err) => {
-                                let mut writer_guard = self.writer.lock().unwrap();
-                                if let Some(w) = writer_guard.take() {
-                                    let _ = w.finalize();
-                                }
+                                cleanup_encoder();
                                 return Err(format!(
                                     "Failed to start monitor capture with fallback: {}",
                                     fallback_err
@@ -1168,10 +1345,7 @@ impl ScreenRecordEngine for WindowsRecordEngine {
                             }
                         }
                     } else {
-                        let mut writer_guard = self.writer.lock().unwrap();
-                        if let Some(w) = writer_guard.take() {
-                            let _ = w.finalize();
-                        }
+                        cleanup_encoder();
                         return Err(format!("Failed to start monitor capture: {}", e));
                     }
                 }
@@ -1205,7 +1379,7 @@ impl ScreenRecordEngine for WindowsRecordEngine {
             return Err("Engine is not recording".into());
         }
 
-        self.is_paused.store(true, Ordering::SeqCst);
+        self.is_paused.store(true, Ordering::Release);
         *state = RecordState::Paused;
 
         // 累加已记录的时间
@@ -1225,7 +1399,7 @@ impl ScreenRecordEngine for WindowsRecordEngine {
             return Err("Engine is not paused".into());
         }
 
-        self.is_paused.store(false, Ordering::SeqCst);
+        self.is_paused.store(false, Ordering::Release);
         *state = RecordState::Recording;
 
         let mut start_time_guard = self.start_time.lock().unwrap();
@@ -1255,11 +1429,16 @@ impl ScreenRecordEngine for WindowsRecordEngine {
             }
         }
 
-        // 2. 完成并封存视频写入
-        {
-            let mut writer_guard = self.writer.lock().unwrap();
-            if let Some(writer) = writer_guard.take() {
-                writer.finalize()?;
+        // 2. 发送 Exit 信号给后台编码线程并 join 等待其退出
+        let sender = self.sender.lock().unwrap().take();
+        if let Some(s) = sender {
+            let _ = s.send(EncoderMessage::Exit);
+        }
+
+        let handle = self.encoder_thread.lock().unwrap().take();
+        if let Some(h) = handle {
+            if let Ok(res) = h.join() {
+                res?;
             }
         }
 
