@@ -31,6 +31,8 @@ pub struct RecordConfig {
     pub show_keys: bool,
     #[serde(default = "default_countdown")]
     pub countdown: u32,
+    #[serde(default = "default_video_quality")]
+    pub video_quality: String,
 }
 
 fn default_show_mouse_cursor() -> bool {
@@ -39,6 +41,10 @@ fn default_show_mouse_cursor() -> bool {
 
 fn default_countdown() -> u32 {
     3
+}
+
+fn default_video_quality() -> String {
+    "hd".to_string()
 }
 
 impl Default for RecordConfig {
@@ -58,6 +64,7 @@ impl Default for RecordConfig {
             show_mouse_cursor: true,
             show_keys: false,
             countdown: 3,
+            video_quality: "hd".to_string(),
         }
     }
 }

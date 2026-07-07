@@ -32,6 +32,7 @@
     showMouseCursor?: boolean;
     showKeys?: boolean;
     countdown?: number;
+    videoQuality?: "sd" | "hd" | "uhd";
   }
 
   interface MonitorInfo {
@@ -59,6 +60,7 @@
   let showMouseCursor = $state(true);
   let showKeys = $state(false);
   let countdown = $state(3);
+  let videoQuality = $state<"sd" | "hd" | "uhd">("hd");
   let fps = $state(30);
   let selectedMonitorIndex = $state(0); // 默认选择第一块屏幕
   let saveFolderType = $state<"video" | "download" | "desktop" | "custom">(
@@ -80,6 +82,26 @@
 
   let monitors = $state<MonitorInfo[]>([]);
   let activeTab = $state("record");
+
+  function getRecorderConfig(): ScreenRecorderConfig {
+    return {
+      fps,
+      recordAudio,
+      recordSystemSound,
+      excludeOwnWindow,
+      showMouseClick,
+      showMouseCursor,
+      showKeys,
+      monitorIndex: selectedMonitorIndex,
+      saveFolderType,
+      customSaveFolder,
+      recordTargetType,
+      windowHandle: selectedWindowHandle,
+      areaRect,
+      countdown,
+      videoQuality,
+    };
+  }
 
   // 融合从 Rust 全局内存及 LocalStorage 持久化加载配置，解决配置读取路径分裂和清除失效漏洞
   async function loadConfig() {
@@ -125,6 +147,8 @@
         rustConfig.windowHandle ?? localConfig?.windowHandle ?? null;
       areaRect = rustConfig.areaRect ?? localConfig?.areaRect ?? null;
       countdown = rustConfig.countdown ?? localConfig?.countdown ?? 3;
+      videoQuality =
+        rustConfig.videoQuality ?? localConfig?.videoQuality ?? "hd";
     } catch (e) {
       console.error("Failed to load screen recorder config:", e);
     }
@@ -136,22 +160,7 @@
     if (saveTimeout) clearTimeout(saveTimeout);
     saveTimeout = setTimeout(async () => {
       try {
-        const config: ScreenRecorderConfig = {
-          fps,
-          recordAudio,
-          recordSystemSound,
-          excludeOwnWindow,
-          showMouseClick,
-          showMouseCursor,
-          showKeys,
-          monitorIndex: selectedMonitorIndex,
-          saveFolderType,
-          customSaveFolder,
-          recordTargetType,
-          windowHandle: selectedWindowHandle,
-          areaRect,
-          countdown,
-        };
+        const config = getRecorderConfig();
         localStorage.setItem(
           "onin_screen_recorder_config",
           JSON.stringify(config),
@@ -221,19 +230,7 @@
       saveTimeout = undefined;
     }
     try {
-      const config: ScreenRecorderConfig = {
-        fps,
-        recordAudio,
-        recordSystemSound,
-        excludeOwnWindow,
-        monitorIndex: selectedMonitorIndex,
-        saveFolderType,
-        customSaveFolder,
-        recordTargetType,
-        windowHandle: selectedWindowHandle,
-        areaRect,
-        countdown,
-      };
+      const config = getRecorderConfig();
       localStorage.setItem(
         "onin_screen_recorder_config",
         JSON.stringify(config),
@@ -284,18 +281,7 @@
   // 调整录屏区域
   async function handleAdjustArea() {
     try {
-      const config: ScreenRecorderConfig = {
-        fps,
-        recordAudio,
-        recordSystemSound,
-        excludeOwnWindow,
-        monitorIndex: selectedMonitorIndex,
-        saveFolderType,
-        customSaveFolder,
-        recordTargetType,
-        windowHandle: selectedWindowHandle,
-        areaRect,
-      };
+      const config = getRecorderConfig();
       localStorage.setItem(
         "onin_screen_recorder_config",
         JSON.stringify(config),
@@ -321,19 +307,7 @@
       }
 
       // 录制前确保即时保存了最新的配置到 Rust 全局状态中，供 Bar 加载时获取
-      const config: ScreenRecorderConfig = {
-        fps,
-        recordAudio,
-        recordSystemSound,
-        excludeOwnWindow,
-        monitorIndex: selectedMonitorIndex,
-        saveFolderType,
-        customSaveFolder,
-        recordTargetType,
-        windowHandle: selectedWindowHandle,
-        areaRect,
-        countdown,
-      };
+      const config = getRecorderConfig();
       localStorage.setItem(
         "onin_screen_recorder_config",
         JSON.stringify(config),
@@ -715,7 +689,47 @@
                       </div>
                     </div>
 
-                    <!-- 3. 声音设置 -->
+                    <!-- 3. 画面清晰度 -->
+                    <div class="flex flex-col gap-1">
+                      <span
+                        class="text-[10px] font-bold text-neutral-400 dark:text-neutral-500"
+                      >
+                        画面清晰度
+                      </span>
+                      <div
+                        class="flex rounded-lg border border-neutral-200/40 bg-neutral-100 p-0.5 dark:border-neutral-800/40 dark:bg-neutral-950/40"
+                      >
+                        <button
+                          class="flex-1 rounded-md py-1 text-center text-xs font-semibold transition-all {videoQuality ===
+                          'sd'
+                            ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
+                            : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
+                          onclick={() => (videoQuality = "sd")}
+                        >
+                          标清 2M
+                        </button>
+                        <button
+                          class="flex-1 rounded-md py-1 text-center text-xs font-semibold transition-all {videoQuality ===
+                          'hd'
+                            ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
+                            : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
+                          onclick={() => (videoQuality = "hd")}
+                        >
+                          高清 5M
+                        </button>
+                        <button
+                          class="flex-1 rounded-md py-1 text-center text-xs font-semibold transition-all {videoQuality ===
+                          'uhd'
+                            ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
+                            : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
+                          onclick={() => (videoQuality = "uhd")}
+                        >
+                          超清 10M
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- 4. 声音设置 -->
                     <div class="flex flex-col gap-1.5">
                       <span
                         class="text-[10px] font-bold text-neutral-400 dark:text-neutral-500"
@@ -773,7 +787,7 @@
                       </div>
                     </div>
 
-                    <!-- 4. 显示与操作设置 -->
+                    <!-- 5. 显示与操作设置 -->
                     <div class="flex flex-col gap-1.5">
                       <span
                         class="text-[10px] font-bold text-neutral-400 dark:text-neutral-500"

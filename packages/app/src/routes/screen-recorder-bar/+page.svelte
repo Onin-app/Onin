@@ -45,6 +45,27 @@
   } | null>(null);
   let countdown = $state(3);
   let countdownRemaining = $state(0);
+  let videoQuality = $state<"sd" | "hd" | "uhd">("hd");
+
+  function getRecorderConfig() {
+    return {
+      fps,
+      recordAudio,
+      recordSystemSound,
+      excludeOwnWindow,
+      showMouseClick,
+      showMouseCursor,
+      showKeys,
+      monitorIndex: selectedMonitorIndex,
+      saveFolderType,
+      customSaveFolder,
+      recordTargetType,
+      windowHandle: selectedWindowHandle,
+      areaRect,
+      countdown,
+      videoQuality,
+    };
+  }
 
   // 延迟 300ms 异步防抖保存配置，过滤开关连击引发的系统 IPC 及磁盘 I/O 阻塞
   function debouncedSaveConfig() {
@@ -52,22 +73,7 @@
     if (saveTimeout) clearTimeout(saveTimeout);
     saveTimeout = setTimeout(async () => {
       try {
-        const config = {
-          fps,
-          recordAudio,
-          recordSystemSound,
-          excludeOwnWindow,
-          showMouseClick,
-          showMouseCursor,
-          showKeys,
-          monitorIndex: selectedMonitorIndex,
-          saveFolderType,
-          customSaveFolder,
-          recordTargetType,
-          windowHandle: selectedWindowHandle,
-          areaRect,
-          countdown,
-        };
+        const config = getRecorderConfig();
         localStorage.setItem(
           "onin_screen_recorder_config",
           JSON.stringify(config),
@@ -153,22 +159,7 @@
 
   async function startRecordingImmediately() {
     try {
-      const config = {
-        fps,
-        recordAudio,
-        recordSystemSound,
-        excludeOwnWindow,
-        showMouseClick,
-        showMouseCursor,
-        showKeys,
-        monitorIndex: selectedMonitorIndex,
-        saveFolderType,
-        customSaveFolder,
-        recordTargetType,
-        windowHandle: selectedWindowHandle,
-        areaRect,
-        countdown,
-      };
+      const config = getRecorderConfig();
 
       outputFilePath = await invoke<string>("start_screen_record", { config });
       isRecording = true;
@@ -251,6 +242,7 @@
       selectedWindowHandle = config.windowHandle ?? null;
       areaRect = config.areaRect ?? null;
       countdown = config.countdown ?? 3;
+      videoQuality = config.videoQuality ?? "hd";
     } catch (e) {
       console.error("Failed to load screen recorder config in bar:", e);
     } finally {

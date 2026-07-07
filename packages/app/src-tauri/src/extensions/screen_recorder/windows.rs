@@ -201,8 +201,13 @@ impl MFSinkWriterWrapper {
             out_media_type
                 .SetGUID(&MF_MT_SUBTYPE, &MFVideoFormat_H264)
                 .map_err(|e| format!("SetGUID Subtype H264 failed: {:?}", e))?;
+            let bitrate = match config.video_quality.as_str() {
+                "sd" => 2_000_000,
+                "uhd" => 10_000_000,
+                _ => 5_000_000,
+            };
             out_media_type
-                .SetUINT32(&MF_MT_AVG_BITRATE, 5_000_000)
+                .SetUINT32(&MF_MT_AVG_BITRATE, bitrate)
                 .map_err(|e| format!("SetUINT32 AvgBitRate failed: {:?}", e))?;
             out_media_type
                 .SetUINT32(&MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive.0 as u32)
