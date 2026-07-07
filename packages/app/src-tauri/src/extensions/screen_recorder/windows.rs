@@ -284,6 +284,11 @@ impl MFSinkWriterWrapper {
                 in_audio_type
                     .SetUINT32(&MF_MT_AUDIO_BLOCK_ALIGNMENT, 8) // 2 channels * 4 bytes
                     .map_err(|e| format!("SetUINT32 Input Audio BlockAlignment failed: {:?}", e))?;
+                in_audio_type
+                    .SetUINT32(&MF_MT_AUDIO_AVG_BYTES_PER_SECOND, 384000) // 48000 * 8
+                    .map_err(|e| {
+                        format!("SetUINT32 Input Audio AvgBytesPerSecond failed: {:?}", e)
+                    })?;
 
                 let idx = sink_writer
                     .AddStream(&out_audio_type)
