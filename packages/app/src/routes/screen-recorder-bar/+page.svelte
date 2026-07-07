@@ -43,6 +43,8 @@
     width: number;
     height: number;
   } | null>(null);
+  let countdown = $state(3);
+  let countdownRemaining = $state(0);
 
   // 延迟 300ms 异步防抖保存配置，过滤开关连击引发的系统 IPC 及磁盘 I/O 阻塞
   function debouncedSaveConfig() {
@@ -64,6 +66,7 @@
           recordTargetType,
           windowHandle: selectedWindowHandle,
           areaRect,
+          countdown,
         };
         localStorage.setItem(
           "onin_screen_recorder_config",
@@ -118,8 +121,37 @@
     }
   }
 
+  let countdownTimerId: any = null;
+
   // 开始录制
   async function handleStart() {
+    if (countdownRemaining > 0 || isRecording) return;
+
+    if (countdown > 0) {
+      countdownRemaining = countdown;
+      countdownTimerId = setInterval(async () => {
+        countdownRemaining -= 1;
+        if (countdownRemaining <= 0) {
+          clearInterval(countdownTimerId);
+          countdownTimerId = null;
+          await startRecordingImmediately();
+        }
+      }, 1000);
+    } else {
+      await startRecordingImmediately();
+    }
+  }
+
+  // 取消倒计时
+  function cancelCountdown() {
+    if (countdownTimerId) {
+      clearInterval(countdownTimerId);
+      countdownTimerId = null;
+    }
+    countdownRemaining = 0;
+  }
+
+  async function startRecordingImmediately() {
     try {
       const config = {
         fps,
@@ -135,6 +167,7 @@
         recordTargetType,
         windowHandle: selectedWindowHandle,
         areaRect,
+        countdown,
       };
 
       outputFilePath = await invoke<string>("start_screen_record", { config });
@@ -183,6 +216,7 @@
   // 取消并关闭
   async function handleCancel() {
     try {
+      cancelCountdown();
       if (isRecording) {
         await invoke("stop_screen_record");
       }
@@ -216,6 +250,7 @@
       recordTargetType = config.recordTargetType ?? "screen";
       selectedWindowHandle = config.windowHandle ?? null;
       areaRect = config.areaRect ?? null;
+      countdown = config.countdown ?? 3;
     } catch (e) {
       console.error("Failed to load screen recorder config in bar:", e);
     } finally {
@@ -224,6 +259,18 @@
 
     // 渲染完毕后通知 Rust 显示当前专属独立窗口，彻底防止白屏闪烁
     invoke("show_recorder_bar_window").catch(console.error);
+
+    // 如果刚拉起时处于 idle 且为区域录屏，自动开始录屏并支持倒计时
+    try {
+      const snapshot = await invoke<RecordStateSnapshot>(
+        "get_screen_record_state",
+      );
+      if (snapshot.state === "idle" && recordTargetType === "area") {
+        handleStart();
+      }
+    } catch (e) {
+      console.error("Failed to check recording state for auto start:", e);
+    }
   });
 
   onDestroy(() => {
@@ -245,7 +292,47 @@
     class="box-sizing-border flex h-[72px] w-[360px] items-center rounded-2xl border border-neutral-800 bg-neutral-950/90 px-5 text-white shadow-xl backdrop-blur-md select-none dark:bg-neutral-950/90"
     data-tauri-drag-region
   >
-    {#if !isRecording}
+    {#if countdownRemaining > 0}
+      <!-- 倒计时区 -->
+      <div
+        class="flex h-full flex-grow items-center justify-between"
+        data-tauri-drag-region
+      >
+        <div class="flex items-center gap-2.5" data-tauri-drag-region>
+          <span class="relative flex size-2.5">
+            <span
+              class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"
+            ></span>
+            <span class="relative inline-flex size-2.5 rounded-full bg-red-500"
+            ></span>
+          </span>
+          <span
+            class="text-xs font-semibold text-neutral-400"
+            data-tauri-drag-region>准备录制中...</span
+          >
+        </div>
+
+        {#key countdownRemaining}
+          <div
+            class="animate-scale-in flex h-full items-center justify-center"
+            data-tauri-drag-region
+          >
+            <span
+              class="font-mono text-2xl font-black tracking-wider text-red-500"
+              >{countdownRemaining}</span
+            >
+          </div>
+        {/key}
+
+        <button
+          class="flex cursor-pointer items-center justify-center rounded-lg bg-neutral-800 px-3 py-1.5 text-xs font-semibold text-neutral-300 transition-all hover:bg-neutral-700 hover:text-white active:scale-95"
+          onclick={cancelCountdown}
+          title="取消录制"
+        >
+          <span>取消</span>
+        </button>
+      </div>
+    {:else if !isRecording}
       <!-- 准备配置区 -->
       <div class="flex h-full flex-1 items-center gap-5" data-tauri-drag-region>
         <div
@@ -359,5 +446,20 @@
     padding: 0;
     overflow: hidden;
     background: transparent !important;
+  }
+
+  @keyframes scaleIn {
+    0% {
+      transform: scale(1.6);
+      opacity: 0.3;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  :global(.animate-scale-in) {
+    animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 </style>

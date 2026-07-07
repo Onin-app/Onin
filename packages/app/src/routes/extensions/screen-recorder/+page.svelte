@@ -31,6 +31,7 @@
     showMouseClick?: boolean;
     showMouseCursor?: boolean;
     showKeys?: boolean;
+    countdown?: number;
   }
 
   interface MonitorInfo {
@@ -57,6 +58,7 @@
   let showMouseClick = $state(false);
   let showMouseCursor = $state(true);
   let showKeys = $state(false);
+  let countdown = $state(3);
   let fps = $state(30);
   let selectedMonitorIndex = $state(0); // 默认选择第一块屏幕
   let saveFolderType = $state<"video" | "download" | "desktop" | "custom">(
@@ -122,6 +124,7 @@
       selectedWindowHandle =
         rustConfig.windowHandle ?? localConfig?.windowHandle ?? null;
       areaRect = rustConfig.areaRect ?? localConfig?.areaRect ?? null;
+      countdown = rustConfig.countdown ?? localConfig?.countdown ?? 3;
     } catch (e) {
       console.error("Failed to load screen recorder config:", e);
     }
@@ -147,6 +150,7 @@
           recordTargetType,
           windowHandle: selectedWindowHandle,
           areaRect,
+          countdown,
         };
         localStorage.setItem(
           "onin_screen_recorder_config",
@@ -228,6 +232,7 @@
         recordTargetType,
         windowHandle: selectedWindowHandle,
         areaRect,
+        countdown,
       };
       localStorage.setItem(
         "onin_screen_recorder_config",
@@ -327,6 +332,7 @@
         recordTargetType,
         windowHandle: selectedWindowHandle,
         areaRect,
+        countdown,
       };
       localStorage.setItem(
         "onin_screen_recorder_config",
@@ -870,6 +876,55 @@
                             />
                           </Switch.Root>
                         </div>
+                      </div>
+                    </div>
+
+                    <!-- 录制倒计时 -->
+                    <div class="flex flex-col gap-1">
+                      <span
+                        class="text-[10px] font-bold text-neutral-400 dark:text-neutral-500"
+                      >
+                        录制倒计时
+                      </span>
+                      <div
+                        class="flex rounded-lg border border-neutral-200/40 bg-neutral-100 p-0.5 dark:border-neutral-800/40 dark:bg-neutral-950/40"
+                      >
+                        <button
+                          class="flex-grow rounded-md py-1 text-center text-[10px] font-semibold transition-all {countdown ===
+                          0
+                            ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
+                            : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
+                          onclick={() => (countdown = 0)}
+                        >
+                          无
+                        </button>
+                        <button
+                          class="flex-grow rounded-md py-1 text-center text-[10px] font-semibold transition-all {countdown ===
+                          3
+                            ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
+                            : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
+                          onclick={() => (countdown = 3)}
+                        >
+                          3 秒
+                        </button>
+                        <button
+                          class="flex-grow rounded-md py-1 text-center text-[10px] font-semibold transition-all {countdown ===
+                          5
+                            ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
+                            : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
+                          onclick={() => (countdown = 5)}
+                        >
+                          5 秒
+                        </button>
+                        <button
+                          class="flex-grow rounded-md py-1 text-center text-[10px] font-semibold transition-all {countdown ===
+                          10
+                            ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
+                            : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
+                          onclick={() => (countdown = 10)}
+                        >
+                          10 秒
+                        </button>
                       </div>
                     </div>
 

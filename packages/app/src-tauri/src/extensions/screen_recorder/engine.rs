@@ -29,10 +29,16 @@ pub struct RecordConfig {
     pub show_mouse_cursor: bool,
     #[serde(default)]
     pub show_keys: bool,
+    #[serde(default = "default_countdown")]
+    pub countdown: u32,
 }
 
 fn default_show_mouse_cursor() -> bool {
     true
+}
+
+fn default_countdown() -> u32 {
+    3
 }
 
 impl Default for RecordConfig {
@@ -51,6 +57,7 @@ impl Default for RecordConfig {
             show_mouse_click: false,
             show_mouse_cursor: true,
             show_keys: false,
+            countdown: 3,
         }
     }
 }

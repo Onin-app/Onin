@@ -314,13 +314,10 @@
         JSON.stringify(config),
       );
 
-      // 3. 直接调用后台录像开启命令
-      await invoke("start_screen_record", { config });
-
-      // 4. 拉起控制计时小浮条 Bar
+      // 3. 拉起控制计时小浮条 Bar
       await invoke("show_screen_recorder_bar");
 
-      // 5. 关掉自身
+      // 4. 关掉自身
       const current = getCurrentWebviewWindow();
       await current.close();
     } catch (e) {
