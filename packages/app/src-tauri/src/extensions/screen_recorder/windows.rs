@@ -522,11 +522,19 @@ impl GraphicsCaptureApiHandler for CaptureHandler {
                 .Lock(&mut p_data, None, None)
                 .map_err(|e| format!("IMFMediaBuffer Lock failed: {:?}", e))?;
 
+            let copy_w = std::cmp::min(self.width, frame_width);
+            let copy_h = std::cmp::min(self.height, frame_height);
+            let copy_width_bytes = (copy_w * 4) as usize;
+
             let src_row_pitch = (frame_width * 4) as usize;
             let dest_row_pitch = (self.width * 4) as usize;
-            let copy_width_bytes = (self.width * 4) as usize;
 
-            for y in 0..self.height {
+            // 如果实际帧大小和录像设定尺寸不一致，先对目标缓冲区执行清零（填充为黑色），防止上一帧像素残留或花屏
+            if frame_width != self.width || frame_height != self.height {
+                std::ptr::write_bytes(p_data, 0, frame_sample.buffer_len as usize);
+            }
+
+            for y in 0..copy_h {
                 let src_y = frame_height as i32 - 1 - (self.rect_y + y) as i32;
                 if src_y >= 0 && src_y < frame_height as i32 {
                     let src_offset = (src_y as usize) * src_row_pitch + (self.rect_x as usize * 4);

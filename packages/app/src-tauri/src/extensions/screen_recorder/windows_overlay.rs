@@ -5,6 +5,9 @@ use std::time::{Duration, Instant};
 use std::sync::atomic::Ordering;
 use windows::Win32::Foundation::{COLORREF, LPARAM, LRESULT, POINT, WPARAM};
 use windows::Win32::Graphics::Gdi::*;
+use windows::Win32::UI::HiDpi::{
+    SetThreadDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
+};
 use windows::Win32::UI::Input::KeyboardAndMouse::*;
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, GetMessageW, PostThreadMessageW, SetWindowsHookExW, UnhookWindowsHookEx, HHOOK,
@@ -34,6 +37,7 @@ struct KeyState {
 static KEYBOARD_STATE: Lazy<Mutex<Option<KeyState>>> = Lazy::new(|| Mutex::new(None));
 static KEYBOARD_HOOK: Mutex<Option<HHOOK>> = Mutex::new(None);
 static HOOK_THREAD_ID: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+static KEYBOARD_THREAD: Mutex<Option<std::thread::JoinHandle<()>>> = Mutex::new(None);
 
 fn is_key_pressed(vk: i32) -> bool {
     unsafe { (GetKeyState(vk) as u16 & 0x8000) != 0 }
@@ -150,7 +154,7 @@ pub fn start_keyboard_hook() {
         *state_guard = None;
     }
 
-    std::thread::spawn(|| unsafe {
+    let handle = std::thread::spawn(|| unsafe {
         let hook = SetWindowsHookExW(WH_KEYBOARD_LL, Some(low_level_keyboard_proc), None, 0);
         if let Ok(h) = hook {
             *KEYBOARD_HOOK.lock().unwrap() = Some(h);
@@ -161,22 +165,39 @@ pub fn start_keyboard_hook() {
 
             let mut msg = MSG::default();
             while GetMessageW(&mut msg, None, 0, 0).0 > 0 {}
+
+            // 在同一个线程中安全注销钩子，符合 Win32 线程敏感的 API 规范
+            let mut hook_guard = KEYBOARD_HOOK.lock().unwrap();
+            if let Some(h_val) = hook_guard.take() {
+                let _ = UnhookWindowsHookEx(h_val);
+            }
         }
     });
+    *KEYBOARD_THREAD.lock().unwrap() = Some(handle);
 }
 
 pub fn stop_keyboard_hook() {
-    let hook = KEYBOARD_HOOK.lock().unwrap().take();
-    if let Some(h) = hook {
-        unsafe {
-            let _ = UnhookWindowsHookEx(h);
-        }
-    }
     let tid = HOOK_THREAD_ID.swap(0, Ordering::SeqCst);
     if tid != 0 {
         unsafe {
-            let _ = PostThreadMessageW(tid, WM_QUIT, None, None);
+            let mut sent = false;
+            // 尝试重试发送 WM_QUIT，防止目标线程尚未运行到 GetMessageW 导致消息队列未建好而发送失败
+            for _ in 0..10 {
+                if PostThreadMessageW(tid, WM_QUIT, None, None).is_ok() {
+                    sent = true;
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(2));
+            }
+            if !sent {
+                eprintln!("Failed to post WM_QUIT to keyboard hook thread");
+            }
         }
+    }
+
+    let handle = KEYBOARD_THREAD.lock().unwrap().take();
+    if let Some(h) = handle {
+        let _ = h.join();
     }
 }
 
@@ -197,15 +218,21 @@ pub fn draw_mouse_clicks(
     let l_down = unsafe { (GetAsyncKeyState(VK_LBUTTON.0 as i32) as u16 & 0x8000) != 0 };
     let r_down = unsafe { (GetAsyncKeyState(VK_RBUTTON.0 as i32) as u16 & 0x8000) != 0 };
 
+    let prev_context =
+        unsafe { SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) };
+
     let mut point = POINT::default();
     let got_pos =
         unsafe { windows::Win32::UI::WindowsAndMessaging::GetCursorPos(&mut point).is_ok() };
 
+    let mut rx = -1;
+    let mut ry = -1;
+
     if got_pos {
-        let (rx, ry) = if is_window_mode {
+        let (x, y) = if is_window_mode {
             let mut rect = windows::Win32::Foundation::RECT::default();
-            let mut rx = -1;
-            let mut ry = -1;
+            let mut rx_val = -1;
+            let mut ry_val = -1;
             if let Some(hwnd) = window_handle {
                 unsafe {
                     if windows::Win32::UI::WindowsAndMessaging::GetWindowRect(
@@ -227,36 +254,42 @@ pub fn draw_mouse_clicks(
                             1.0
                         };
 
-                        rx = ((point.x - rect.left) as f32 * win_scale_x) as i32;
-                        ry = (height as i32 - 1)
+                        rx_val = ((point.x - rect.left) as f32 * win_scale_x) as i32;
+                        ry_val = (height as i32 - 1)
                             - ((point.y - rect.top) as f32 * win_scale_y) as i32;
                     }
                 }
             }
-            (rx, ry)
+            (rx_val, ry_val)
         } else {
-            let rx = point.x - monitor_x - rect_x as i32;
-            let ry = (height as i32 - 1) - (point.y - monitor_y - rect_y as i32);
-            (rx, ry)
+            let rx_val = point.x - monitor_x - rect_x as i32;
+            let ry_val = (height as i32 - 1) - (point.y - monitor_y - rect_y as i32);
+            (rx_val, ry_val)
         };
+        rx = x;
+        ry = y;
+    }
 
-        if rx >= 0 && rx < width as i32 && ry >= 0 && ry < height as i32 {
-            if l_down && !*last_lbutton {
-                ripples.push(Ripple {
-                    x: rx,
-                    y: ry,
-                    start_time: Instant::now(),
-                    is_right: false,
-                });
-            }
-            if r_down && !*last_rbutton {
-                ripples.push(Ripple {
-                    x: rx,
-                    y: ry,
-                    start_time: Instant::now(),
-                    is_right: true,
-                });
-            }
+    unsafe {
+        let _ = SetThreadDpiAwarenessContext(prev_context);
+    }
+
+    if rx >= 0 && rx < width as i32 && ry >= 0 && ry < height as i32 {
+        if l_down && !*last_lbutton {
+            ripples.push(Ripple {
+                x: rx,
+                y: ry,
+                start_time: Instant::now(),
+                is_right: false,
+            });
+        }
+        if r_down && !*last_rbutton {
+            ripples.push(Ripple {
+                x: rx,
+                y: ry,
+                start_time: Instant::now(),
+                is_right: true,
+            });
         }
     }
 
