@@ -380,6 +380,18 @@ fn hide_main_window_for_capture(main: &tauri::WebviewWindow) {
     }
 }
 
+/// Hides the main window and waits until DWM has applied the change.
+///
+/// Screen capture must run on the UI thread, so a fixed delay can still race
+/// with composition under load. This helper is shared by capture features that
+/// need to keep the launcher out of their image.
+pub async fn prepare_main_window_for_capture(main: &tauri::WebviewWindow) {
+    let main_hwnd = main.hwnd().ok().map(|hwnd| hwnd.0 as isize);
+    let probe_rect = main_hwnd.and_then(get_probe_rect_for_hwnd);
+    hide_main_window_for_capture(main);
+    wait_for_dwm_after_hide(main_hwnd, probe_rect).await;
+}
+
 #[derive(Clone, Copy)]
 struct CaptureRect {
     x: i32,
@@ -697,7 +709,7 @@ fn capture_all_screens(
 }
 
 /// 截取指定屏幕并保留为 RGBA 像素数据
-fn capture_monitor(monitor: &Monitor) -> Result<ColorPickerCapture, String> {
+pub fn capture_monitor(monitor: &Monitor) -> Result<ColorPickerCapture, String> {
     let started = Instant::now();
     let size = monitor.size();
     let scale_factor = monitor.scale_factor();

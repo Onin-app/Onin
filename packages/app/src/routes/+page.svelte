@@ -25,6 +25,7 @@
   import { Theme, type LaunchableItem } from "$lib/type";
   import { theme, getTheme } from "$lib/utils/theme";
   import { startColorPickerFlow } from "$lib/utils/colorPicker";
+  import { takeScreenshot } from "$lib/utils/screenshot";
   import {
     resolveExtensionAction,
     buildNavigateRoute,
@@ -395,6 +396,11 @@
         break;
       case "color-pick":
         await startColorPickCommand();
+        break;
+      case "screenshot":
+        if (await takeScreenshot()) {
+          resetLauncherAndClose();
+        }
         break;
     }
   };

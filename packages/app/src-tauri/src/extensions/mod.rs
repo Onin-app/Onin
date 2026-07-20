@@ -13,5 +13,6 @@ pub mod filesearch;
 pub mod ocr;
 pub mod preset_keywords;
 pub mod screen_recorder;
+pub mod screenshot;
 pub mod translator;
 pub mod web;

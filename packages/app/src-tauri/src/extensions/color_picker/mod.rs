@@ -41,6 +41,16 @@ pub fn get_color_picker_image(label: Option<String>) -> Result<Vec<u8>, String> 
 }
 
 #[cfg(target_os = "windows")]
+pub fn capture_monitor(monitor: &tauri::Monitor) -> Result<ColorPickerCapture, String> {
+    windows::capture_monitor(monitor)
+}
+
+#[cfg(target_os = "windows")]
+pub async fn prepare_main_window_for_capture(main: &tauri::WebviewWindow) {
+    windows::prepare_main_window_for_capture(main).await
+}
+
+#[cfg(target_os = "windows")]
 pub fn clear_capture_cache() {
     windows::clear_capture_cache();
 }

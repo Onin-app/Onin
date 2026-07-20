@@ -183,6 +183,7 @@ pub fn get_invoke_handler(
         extension::api::get_color_picker_image,
         extension::api::focus_color_picker_overlay,
         extension::api::finish_color_picker,
+        crate::extensions::screenshot::take_screenshot,
         // Keyboard simulation
         system_commands::simulate_paste,
         // Translator Extension

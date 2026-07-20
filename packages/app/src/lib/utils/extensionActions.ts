@@ -54,7 +54,16 @@ type ColorPickAction = {
   type: "color-pick";
 };
 
-export type ExtensionAction = NavigateAction | ExecuteAction | ColorPickAction;
+/** 直接截图到系统剪贴板。 */
+type ScreenshotAction = {
+  type: "screenshot";
+};
+
+export type ExtensionAction =
+  | NavigateAction
+  | ExecuteAction
+  | ColorPickAction
+  | ScreenshotAction;
 
 // ============================================================================
 // 注册表
@@ -140,6 +149,11 @@ export const EXTENSION_ACTION_MAP: Record<string, ExtensionAction> = {
   "screen_recorder:record": {
     type: "navigate",
     route: () => "/extensions/screen-recorder",
+  },
+
+  // ── 截图 ──────────────────────────────────────────────────────────────────
+  "screenshot:capture": {
+    type: "screenshot",
   },
 };
 

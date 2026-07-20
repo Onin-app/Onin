@@ -14,7 +14,7 @@ extern "system" {
 }
 
 #[cfg(target_os = "windows")]
-fn set_image_windows(png_bytes: &[u8]) -> Result<(), String> {
+pub fn write_png_to_clipboard(png_bytes: &[u8]) -> Result<(), String> {
     use windows::Win32::Foundation::{HANDLE, HWND};
     use windows::Win32::Graphics::Gdi::{BITMAPINFOHEADER, BI_RGB};
     use windows::Win32::System::DataExchange::{
@@ -28,7 +28,7 @@ fn set_image_windows(png_bytes: &[u8]) -> Result<(), String> {
     const CF_DIB: u32 = 8;
 
     eprintln!(
-        "[Clipboard] set_image_windows: writing {} bytes",
+        "[Clipboard] write_png_to_clipboard: writing {} bytes",
         png_bytes.len()
     );
 
@@ -123,7 +123,7 @@ fn set_image_windows(png_bytes: &[u8]) -> Result<(), String> {
         CloseClipboard().map_err(|_| "CloseClipboard failed".to_string())?;
     }
 
-    eprintln!("[Clipboard] set_image_windows: OK");
+    eprintln!("[Clipboard] write_png_to_clipboard: OK");
     Ok(())
 }
 
@@ -209,7 +209,7 @@ fn write_to_clipboard_inner(app: &tauri::AppHandle, item: &ClipboardItem) -> Res
                         if let Ok(bytes) = std::fs::read(&image_file) {
                             #[cfg(target_os = "windows")]
                             {
-                                if set_image_windows(&bytes).is_ok() {
+                                if write_png_to_clipboard(&bytes).is_ok() {
                                     served = true;
                                 }
                             }
@@ -243,7 +243,7 @@ fn write_to_clipboard_inner(app: &tauri::AppHandle, item: &ClipboardItem) -> Res
 
                     #[cfg(target_os = "windows")]
                     {
-                        set_image_windows(&bytes)?;
+                        write_png_to_clipboard(&bytes)?;
                     }
                     #[cfg(not(target_os = "windows"))]
                     {
