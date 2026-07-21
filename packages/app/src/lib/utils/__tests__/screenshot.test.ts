@@ -20,13 +20,11 @@ describe("takeScreenshot", () => {
     mockShowToastOverlay.mockResolvedValue(undefined);
   });
 
-  it("captures the screen and reports success", async () => {
+  it("starts region selection", async () => {
     await expect(takeScreenshot()).resolves.toBe(true);
 
-    expect(mockInvoke).toHaveBeenCalledWith("take_screenshot");
-    expect(mockShowToastOverlay).toHaveBeenCalledWith("截图已复制到剪贴板", {
-      kind: "success",
-    });
+    expect(mockInvoke).toHaveBeenCalledWith("start_screenshot_selection");
+    expect(mockShowToastOverlay).not.toHaveBeenCalled();
   });
 
   it("handles capture failures and reports them", async () => {
@@ -34,7 +32,7 @@ describe("takeScreenshot", () => {
 
     await expect(takeScreenshot()).resolves.toBe(false);
 
-    expect(mockShowToastOverlay).toHaveBeenCalledWith("截图失败，请重试", {
+    expect(mockShowToastOverlay).toHaveBeenCalledWith("无法启动截图，请重试", {
       kind: "error",
     });
   });
