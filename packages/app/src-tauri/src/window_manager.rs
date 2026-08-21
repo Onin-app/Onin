@@ -73,11 +73,11 @@ pub(crate) fn get_cursor_position() -> Option<(i32, i32)> {
 // TODO: 提升至 pub(crate) 预留供给后续跨窗口层次切换、显示器映射及关联时匹配鼠标所在屏幕使用
 pub(crate) fn find_monitor_for_cursor(
     monitors: &[tauri::Monitor],
-    cursor_pos: (i32, i32),
+    _cursor_pos: (i32, i32),
 ) -> Option<&tauri::Monitor> {
     #[cfg(target_os = "windows")]
     {
-        let (cx, cy) = cursor_pos;
+        let (cx, cy) = _cursor_pos;
         for monitor in monitors {
             let m_pos = monitor.position();
             let m_size = monitor.size();
@@ -94,7 +94,7 @@ pub(crate) fn find_monitor_for_cursor(
 
     #[cfg(target_os = "macos")]
     {
-        let (cx, cy) = cursor_pos;
+        let (cx, cy) = _cursor_pos;
         let cx_f = cx as f64;
         let cy_f = cy as f64;
 

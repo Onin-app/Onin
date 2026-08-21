@@ -1166,6 +1166,17 @@ fn search_macos(query: &str, limit: usize) -> Result<Vec<PlatformFile>, String> 
 }
 
 #[cfg(target_os = "linux")]
+fn command_exists(name: &str) -> bool {
+    // 与 macOS 分支检查 mdfind 的方式一致：能成功启动进程即认为命令存在
+    Command::new(name)
+        .arg("--version")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .output()
+        .is_ok()
+}
+
+#[cfg(target_os = "linux")]
 fn search_linux(query: &str, limit: usize) -> Result<Vec<PlatformFile>, String> {
     let command = if command_exists("plocate") {
         "plocate"
