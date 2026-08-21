@@ -193,10 +193,8 @@ pub async fn finish_color_picker(app: AppHandle, hex: Option<String>) -> Result<
         tokio::time::sleep(std::time::Duration::from_millis(80)).await;
 
         if should_restore_main {
-            if let Some(main) = app_clone.get_webview_window("main") {
-                let _ = main.show();
-                let _ = main.set_focus();
-            }
+            // 统一走窗口状态机入口，保证唤醒时序一致
+            crate::window_manager::request_show(&app_clone);
         }
 
         tokio::time::sleep(std::time::Duration::from_millis(32)).await;
@@ -209,4 +207,16 @@ pub async fn finish_color_picker(app: AppHandle, hex: Option<String>) -> Result<
     });
 
     Ok(())
+}
+
+/// 打开录屏浮动控制栏小窗口
+#[command]
+pub async fn show_screen_recorder_bar(app: AppHandle) -> Result<(), String> {
+    crate::extensions::screen_recorder::show_screen_recorder_bar(&app)
+}
+
+/// 打开区域选择遮罩窗口
+#[command]
+pub async fn show_screen_recorder_area(app: AppHandle, monitor_index: i32) -> Result<(), String> {
+    crate::extensions::screen_recorder::show_screen_recorder_area(&app, monitor_index)
 }

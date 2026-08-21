@@ -14,7 +14,7 @@ extern "system" {
 }
 
 #[cfg(target_os = "windows")]
-fn set_image_windows(png_bytes: &[u8]) -> Result<(), String> {
+pub fn write_png_to_clipboard(png_bytes: &[u8]) -> Result<(), String> {
     use windows::Win32::Foundation::{HANDLE, HWND};
     use windows::Win32::Graphics::Gdi::{BITMAPINFOHEADER, BI_RGB};
     use windows::Win32::System::DataExchange::{
@@ -28,7 +28,7 @@ fn set_image_windows(png_bytes: &[u8]) -> Result<(), String> {
     const CF_DIB: u32 = 8;
 
     eprintln!(
-        "[Clipboard] set_image_windows: writing {} bytes",
+        "[Clipboard] write_png_to_clipboard: writing {} bytes",
         png_bytes.len()
     );
 
@@ -123,7 +123,7 @@ fn set_image_windows(png_bytes: &[u8]) -> Result<(), String> {
         CloseClipboard().map_err(|_| "CloseClipboard failed".to_string())?;
     }
 
-    eprintln!("[Clipboard] set_image_windows: OK");
+    eprintln!("[Clipboard] write_png_to_clipboard: OK");
     Ok(())
 }
 
@@ -134,7 +134,7 @@ pub fn get_clipboard_history(state: State<'_, ClipboardHistory>) -> Vec<Clipboar
 
 fn write_to_clipboard(app: &tauri::AppHandle, item: &ClipboardItem) -> Result<(), String> {
     let mut last_err = String::new();
-    for i in 0..5 {
+    for _i in 0..5 {
         match write_to_clipboard_inner(app, item) {
             Ok(_) => return Ok(()),
             Err(e) => {
@@ -143,7 +143,7 @@ fn write_to_clipboard(app: &tauri::AppHandle, item: &ClipboardItem) -> Result<()
                 {
                     eprintln!(
                         "[Clipboard] write failed (attempt {}): {}. Retrying in 50ms...",
-                        i + 1,
+                        _i + 1,
                         last_err
                     );
                     std::thread::sleep(std::time::Duration::from_millis(50));
@@ -209,7 +209,7 @@ fn write_to_clipboard_inner(app: &tauri::AppHandle, item: &ClipboardItem) -> Res
                         if let Ok(bytes) = std::fs::read(&image_file) {
                             #[cfg(target_os = "windows")]
                             {
-                                if set_image_windows(&bytes).is_ok() {
+                                if write_png_to_clipboard(&bytes).is_ok() {
                                     served = true;
                                 }
                             }
@@ -243,7 +243,7 @@ fn write_to_clipboard_inner(app: &tauri::AppHandle, item: &ClipboardItem) -> Res
 
                     #[cfg(target_os = "windows")]
                     {
-                        set_image_windows(&bytes)?;
+                        write_png_to_clipboard(&bytes)?;
                     }
                     #[cfg(not(target_os = "windows"))]
                     {

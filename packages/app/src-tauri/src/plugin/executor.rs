@@ -182,17 +182,13 @@ pub fn show_plugin_inline(
     plugin_url: String,
 ) -> Result<(), String> {
     // 尝试恢复主窗口可见性；失败不应阻塞插件打开流程。
+    // 统一走窗口状态机入口（request_show），保证唤醒时序一致。
     if let Some(main_window) = app
         .get_webview_window("main")
         .or_else(|| app.webview_windows().values().next().cloned())
     {
         if let Ok(false) = main_window.is_visible() {
-            if let Err(e) = main_window.show() {
-                eprintln!("[plugin/executor] 警告: 显示主窗口失败: {}", e);
-            }
-            if let Err(e) = main_window.set_focus() {
-                eprintln!("[plugin/executor] 警告: 聚焦主窗口失败: {}", e);
-            }
+            crate::window_manager::request_show(app);
         }
     }
 

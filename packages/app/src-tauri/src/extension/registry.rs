@@ -53,6 +53,8 @@ pub fn get_all_extensions() -> Vec<&'static dyn Extension> {
         &extensions::translator::TRANSLATOR_EXTENSION,
         &extensions::ai::AI_EXTENSION,
         &extensions::ocr::OCR_EXTENSION,
+        &extensions::screen_recorder::SCREEN_RECORDER_EXTENSION,
+        &extensions::screenshot::SCREENSHOT_EXTENSION,
     ]
 }
 

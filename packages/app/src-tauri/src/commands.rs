@@ -183,6 +183,11 @@ pub fn get_invoke_handler(
         extension::api::get_color_picker_image,
         extension::api::focus_color_picker_overlay,
         extension::api::finish_color_picker,
+        crate::extensions::screenshot::start_screenshot_selection,
+        crate::extensions::screenshot::get_screenshot_overlay_info,
+        crate::extensions::screenshot::copy_screenshot_region,
+        crate::extensions::screenshot::save_screenshot_region,
+        crate::extensions::screenshot::finish_screenshot_selection,
         // Keyboard simulation
         system_commands::simulate_paste,
         // Translator Extension
@@ -210,6 +215,22 @@ pub fn get_invoke_handler(
         crate::ai_manager::commands::get_providers_registry,
         crate::ai_manager::commands::sync_providers_registry,
         open_file_or_folder_dialog,
+        // Screen Recorder commands
+        extension::api::show_screen_recorder_bar,
+        extension::api::show_screen_recorder_area,
+        crate::extensions::screen_recorder::commands::start_screen_record,
+        crate::extensions::screen_recorder::commands::stop_screen_record,
+        crate::extensions::screen_recorder::commands::pause_screen_record,
+        crate::extensions::screen_recorder::commands::resume_screen_record,
+        crate::extensions::screen_recorder::commands::get_screen_record_state,
+        crate::extensions::screen_recorder::commands::get_recorded_videos,
+        crate::extensions::screen_recorder::commands::open_video_file,
+        crate::extensions::screen_recorder::commands::delete_video_file,
+        crate::extensions::screen_recorder::commands::show_recorder_bar_window,
+        crate::extensions::screen_recorder::commands::get_available_monitors,
+        crate::extensions::screen_recorder::commands::save_recorder_config,
+        crate::extensions::screen_recorder::commands::get_recorder_config,
+        crate::extensions::screen_recorder::commands::get_available_windows,
     ]
 }
 

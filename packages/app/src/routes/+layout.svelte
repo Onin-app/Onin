@@ -16,6 +16,7 @@
   import { setupPluginConsoleListener } from "$lib/plugin-console";
   import { Toaster, toast } from "svelte-sonner";
   import { startColorPickerFlow } from "$lib/utils/colorPicker";
+  import { takeScreenshot } from "$lib/utils/screenshot";
   import WindowResizer from "$lib/components/WindowResizer.svelte";
   import UpdateDialog from "$lib/components/UpdateDialog.svelte";
   import type { AppConfig } from "$lib/type";
@@ -126,6 +127,11 @@
               restoreMainWindow: false,
               useToastOverlay: true,
             });
+            return;
+          }
+
+          if (commandName === "extension:screenshot:capture") {
+            await takeScreenshot();
             return;
           }
 

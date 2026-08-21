@@ -53,5 +53,9 @@ pub static PRESET_KEYWORDS: LazyLock<HashMap<&'static str, &'static [&'static st
             "extension:ocr:recognize",
             &["ocr", "识别文字", "文字识别"][..],
         );
+        m.insert(
+            "extension:screenshot:capture",
+            &["screenshot", "screen capture", "截图", "截屏"][..],
+        );
         m
     });

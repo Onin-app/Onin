@@ -39,11 +39,6 @@ pub fn focus_window(window: &Window) {
 }
 
 #[cfg(target_os = "macos")]
-pub fn is_frontmost_self(app: &AppHandle) -> bool {
-    platform::is_frontmost_self(app)
-}
-
-#[cfg(target_os = "macos")]
 pub fn previous_bundle_id(app: &AppHandle) -> Option<String> {
     platform::previous_bundle_id(app)
 }

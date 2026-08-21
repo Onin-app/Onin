@@ -3,7 +3,7 @@
 //! 这个模块将所有分散在 lib.rs 中的 `.manage()` 调用汇总到一个地方，
 //! 使状态管理更加集中和清晰。
 
-use std::sync::atomic::{AtomicBool, AtomicU32};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64};
 use std::sync::Mutex;
 
 use crate::{
@@ -39,10 +39,11 @@ pub fn setup_managed_state(builder: tauri::Builder<tauri::Wry>) -> tauri::Builde
         // 窗口管理状态
         .manage(window_manager::WindowState {
             hiding_initiated_by_command: AtomicBool::new(false),
+            show_generation: AtomicU64::new(0),
         })
         .manage(window_manager::WindowCloseLockState(AtomicU32::new(0)))
         .manage(window_manager::HideTaskState {
-            handle: tokio::sync::Mutex::new(None),
+            handle: std::sync::Mutex::new(None),
         })
         // 托盘管理状态
         .manage(tray_manager::TrayVisibilityState(Mutex::new(true)))
@@ -53,4 +54,11 @@ pub fn setup_managed_state(builder: tauri::Builder<tauri::Wry>) -> tauri::Builde
         })
         // 文件搜索运行状态
         .manage(file_search::FileSearchState::default())
+        // 录屏扩展状态
+        .manage(
+            crate::extensions::screen_recorder::commands::RecorderAppState {
+                engine: crate::extensions::screen_recorder::create_platform_engine(),
+                config: std::sync::Mutex::new(Default::default()),
+            },
+        )
 }

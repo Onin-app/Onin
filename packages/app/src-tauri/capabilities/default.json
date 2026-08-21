@@ -7,6 +7,10 @@
     "translator-*",
     "google-translate-w-ui",
     "color-picker-overlay*",
+    "screenshot-selection",
+    "screen-recorder-bar*",
+    "screen-recorder-area*",
+    "screen-recorder-area-indicator*",
     "toast-overlay"
   ],
   "permissions": [

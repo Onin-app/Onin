@@ -856,63 +856,67 @@
                 {#each config.providers as provider, index (provider.id)}
                   {@const defaultModelInfo = getModelInfo(provider)}
                   <div
-                    class="group relative flex cursor-pointer items-center justify-between px-4 py-3 transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800/30"
-                    onclick={() => setActive(provider.id)}
+                    class="group relative flex items-center transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800/30"
                   >
-                    <!-- Left indicator & Info -->
-                    <div class="flex min-w-0 items-center gap-2.5">
-                      <!-- Active dot indicator -->
-                      <div class="flex w-4 items-center justify-center">
-                        {#if config.active_provider_id === provider.id}
-                          <span class="relative flex h-2 w-2">
+                    <button
+                      type="button"
+                      class="flex min-w-0 flex-1 cursor-pointer items-center justify-between px-4 py-3 text-left focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-neutral-400 dark:focus-visible:outline-neutral-500"
+                      aria-pressed={config.active_provider_id === provider.id}
+                      onclick={() => setActive(provider.id)}
+                    >
+                      <!-- Left indicator & Info -->
+                      <div class="flex min-w-0 items-center gap-2.5">
+                        <!-- Active dot indicator -->
+                        <div class="flex w-4 items-center justify-center">
+                          {#if config.active_provider_id === provider.id}
+                            <span class="relative flex h-2 w-2">
+                              <span
+                                class="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"
+                              ></span>
+                              <span
+                                class="relative inline-flex h-2 w-2 rounded-full bg-green-500"
+                              ></span>
+                            </span>
+                          {:else}
                             <span
-                              class="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"
+                              class="h-2 w-2 rounded-full bg-neutral-200 transition-colors group-hover:bg-neutral-300 dark:bg-neutral-700 dark:group-hover:bg-neutral-600"
                             ></span>
-                            <span
-                              class="relative inline-flex h-2 w-2 rounded-full bg-green-500"
-                            ></span>
-                          </span>
-                        {:else}
-                          <span
-                            class="h-2 w-2 rounded-full bg-neutral-200 transition-colors group-hover:bg-neutral-300 dark:bg-neutral-700 dark:group-hover:bg-neutral-600"
-                          ></span>
-                        {/if}
-                      </div>
+                          {/if}
+                        </div>
 
-                      <!-- Text details -->
-                      <div class="min-w-0">
-                        <div class="flex items-center gap-2">
-                          <span
-                            class="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100"
-                          >
-                            {provider.display_name || provider.name}
-                          </span>
-                          <span
-                            class="rounded border border-solid border-neutral-200/50 bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:border-neutral-700/50 dark:bg-neutral-800 dark:text-neutral-400"
-                          >
-                            {provider.api_key ? "API 密钥" : "免密钥"}
-                          </span>
+                        <!-- Text details -->
+                        <div class="min-w-0">
+                          <div class="flex items-center gap-2">
+                            <span
+                              class="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100"
+                            >
+                              {provider.display_name || provider.name}
+                            </span>
+                            <span
+                              class="rounded border border-solid border-neutral-200/50 bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:border-neutral-700/50 dark:bg-neutral-800 dark:text-neutral-400"
+                            >
+                              {provider.api_key ? "API 密钥" : "免密钥"}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <!-- Middle: Default Model display -->
-                    <div class="hidden items-center gap-2 sm:flex">
-                      {#if provider.default_model}
-                        <code
-                          class="rounded-md border border-neutral-200/60 bg-neutral-50 px-2 py-0.5 font-mono text-[11px] text-neutral-700 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-300"
-                        >
-                          {provider.default_model}
-                        </code>
-                      {/if}
-                    </div>
+                      <!-- Middle: Default Model display -->
+                      <div class="hidden items-center gap-2 sm:flex">
+                        {#if provider.default_model}
+                          <code
+                            class="rounded-md border border-neutral-200/60 bg-neutral-50 px-2 py-0.5 font-mono text-[11px] text-neutral-700 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-300"
+                          >
+                            {provider.default_model}
+                          </code>
+                        {/if}
+                      </div>
+                    </button>
 
                     <!-- Right actions -->
-                    <div
-                      class="flex items-center gap-3"
-                      onclick={(e) => e.stopPropagation()}
-                    >
+                    <div class="flex items-center gap-3 pr-4">
                       <button
+                        type="button"
                         class="text-xs text-neutral-500 transition-colors hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200"
                         onclick={() => startEdit(index)}
                       >
@@ -922,6 +926,7 @@
                         >|</span
                       >
                       <button
+                        type="button"
                         class="text-xs text-red-500 transition-colors hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
                         onclick={() => deleteProvider(index)}
                       >
