@@ -1,6 +1,6 @@
 {
   "name": "app",
-  "version": "1.28.0",
+  "version": "1.28.1",
   "private": true,
   "description": "Onin main application",
   "type": "module",
