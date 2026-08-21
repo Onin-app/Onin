@@ -67,7 +67,7 @@
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRFRjZFRkY2RDIyMDM0MTYKUldRV05DRFM5dS8yVG8vWkRCdVAyWC9OMGgwNEo0cnFLNW1VV1AzZjFQSVNnbW9zQTdUQUVyVHgK",
       "endpoints": [
         "https://github.com/Onin-app/Onin/releases/latest/download/latest.json",
-        "https://github.com/b-yp/Onin/releases/latest/download/latest.json"
+        "https://onin-app.oss-cn-beijing.aliyuncs.com/releases/latest.json"
       ]
     }
   }
