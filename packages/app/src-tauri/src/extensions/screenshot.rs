@@ -7,9 +7,13 @@ use crate::extension::registry::Extension;
 use crate::extension::types::{
     ExtensionCommand, ExtensionManifest, ExtensionPreview, ExtensionResult,
 };
+#[cfg(target_os = "windows")]
 use image::{codecs::png::PngEncoder, ColorType, ImageEncoder, RgbaImage};
 use serde::Serialize;
 use std::sync::{LazyLock, Mutex};
+#[cfg(not(target_os = "windows"))]
+use tauri::{AppHandle, Manager, Monitor};
+#[cfg(target_os = "windows")]
 use tauri::{AppHandle, Manager, Monitor, WebviewUrl, WebviewWindowBuilder};
 
 const OVERLAY_LABEL: &str = "screenshot-selection";
@@ -162,8 +166,16 @@ pub fn get_screenshot_overlay_info() -> Result<ScreenshotOverlayInfo, String> {
 
 #[tauri::command]
 pub async fn copy_screenshot_region(app: AppHandle, rect: ScreenshotRect) -> Result<(), String> {
-    let png = capture_region_png(&app, rect).await?;
-    crate::extensions::clipboard::commands::write_png_to_clipboard(&png)
+    #[cfg(target_os = "windows")]
+    {
+        let png = capture_region_png(&app, rect).await?;
+        crate::extensions::clipboard::commands::write_png_to_clipboard(&png)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (&app, &rect);
+        Err("当前平台暂不支持区域截图".to_string())
+    }
 }
 
 #[tauri::command]
@@ -172,12 +184,20 @@ pub async fn save_screenshot_region(
     rect: ScreenshotRect,
     path: String,
 ) -> Result<(), String> {
-    let png = capture_region_png(&app, rect).await?;
-    let path = std::path::PathBuf::from(path);
-    if path.as_os_str().is_empty() {
-        return Err("请选择保存位置".to_string());
+    #[cfg(target_os = "windows")]
+    {
+        let png = capture_region_png(&app, rect).await?;
+        let path = std::path::PathBuf::from(path);
+        if path.as_os_str().is_empty() {
+            return Err("请选择保存位置".to_string());
+        }
+        std::fs::write(&path, png).map_err(|err| format!("保存截图失败: {err}"))
     }
-    std::fs::write(&path, png).map_err(|err| format!("保存截图失败: {err}"))
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (&app, &rect, &path);
+        Err("当前平台暂不支持区域截图".to_string())
+    }
 }
 
 #[tauri::command]
@@ -194,6 +214,7 @@ pub fn finish_screenshot_selection(app: AppHandle, restore_launcher: bool) {
     }
 }
 
+#[cfg(target_os = "windows")]
 async fn capture_region_png(app: &AppHandle, rect: ScreenshotRect) -> Result<Vec<u8>, String> {
     let session = ACTIVE_SESSION
         .lock()
@@ -214,6 +235,7 @@ async fn capture_region_png(app: &AppHandle, rect: ScreenshotRect) -> Result<Vec
     result
 }
 
+#[cfg(target_os = "windows")]
 fn encode_region(session: &ScreenshotSession, rect: ScreenshotRect) -> Result<Vec<u8>, String> {
     let size = session.monitor.size();
     let x = logical_to_physical(rect.x, session.scale_factor, size.width)?;
@@ -240,6 +262,7 @@ fn encode_region(session: &ScreenshotSession, rect: ScreenshotRect) -> Result<Ve
     Ok(png)
 }
 
+#[cfg(target_os = "windows")]
 fn logical_to_physical(value: f64, scale: f64, maximum: u32) -> Result<u32, String> {
     if !value.is_finite() || value < 0.0 {
         return Err("截图区域无效".to_string());
@@ -247,6 +270,7 @@ fn logical_to_physical(value: f64, scale: f64, maximum: u32) -> Result<u32, Stri
     Ok((value * scale).round().clamp(0.0, maximum as f64) as u32)
 }
 
+#[cfg(target_os = "windows")]
 fn logical_length(value: f64, scale: f64, maximum: u32) -> Result<u32, String> {
     if !value.is_finite() || value <= 0.0 {
         return Err("请先拖动选择截图区域".to_string());
@@ -257,7 +281,7 @@ fn logical_length(value: f64, scale: f64, maximum: u32) -> Result<u32, String> {
     Ok((value * scale).round().clamp(1.0, maximum as f64) as u32)
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "windows"))]
 mod tests {
     use super::*;
 
