@@ -7,7 +7,10 @@
     requestInputFocusWithRetry,
     requestExtensionInputFocus,
   } from "$lib/stores/focusInput";
-  import { detachWindowShortcut } from "$lib/stores/shortcuts";
+  import {
+    detachWindowShortcut,
+    toggleWindowShortcut,
+  } from "$lib/stores/shortcuts";
   import { get } from "svelte/store";
   import { invoke } from "@tauri-apps/api/core";
   import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -48,6 +51,7 @@
   // Subscribe to shortcuts store to trigger auto-loading
   // The subscription itself triggers the load in the store's start function
   $detachWindowShortcut;
+  $toggleWindowShortcut;
 
   // Focus input when navigating to main page
   $effect(() => {
@@ -97,6 +101,38 @@
       }
     };
     window.addEventListener("keydown", handleLayoutEscape, true);
+
+    // Alt+Space 兜底处理（Windows）：
+    // 全局快捷键 Alt+Space 是通过 RegisterHotKey(MOD_ALT|VK_SPACE, MOD_NOREPEAT) 注册的，
+    // 按住 Alt 再次按 Space 时不会再触发 WM_HOTKEY（MOD_NOREPEAT 关闭自动重复），
+    // 按键会作为普通 SYSKEY 落到当前聚焦的窗口（WebView），导致空格被打进输入框
+    // 而窗口不隐藏。此处在 capture 阶段拦截 Alt+Space：
+    // - 阻止空格输入
+    // - 仅当"显示/隐藏窗口"快捷键确实是 Alt+Space 时，执行与全局快捷键一致的隐藏逻辑
+    const handleAltSpace = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
+      if (!e.altKey || (e.code !== "Space" && e.key !== " ")) return;
+      // 输入法组合期间不拦截，避免干扰中文等输入
+      if (e.isComposing) return;
+
+      // 设置页录制快捷键时按 Alt+Space 不应关闭窗口
+      if (
+        e.target instanceof Element &&
+        (e.target as Element).closest("[data-shortcut-recorder]")
+      ) {
+        return;
+      }
+
+      const toggle = get(toggleWindowShortcut);
+      if (!toggle || toggle.replace(/\s/g, "").toLowerCase() !== "alt+space") {
+        return;
+      }
+
+      e.preventDefault();
+      e.stopPropagation();
+      invoke("close_main_window");
+    };
+    window.addEventListener("keydown", handleAltSpace, true);
 
     const listenersPromise = (async () => {
       const unlistenVisibility = await listen<boolean>(
@@ -253,6 +289,7 @@
         clearInterval(autoUpdateIntervalId);
       }
       window.removeEventListener("keydown", handleLayoutEscape, true);
+      window.removeEventListener("keydown", handleAltSpace, true);
       listenersPromise
         .then(
           ({

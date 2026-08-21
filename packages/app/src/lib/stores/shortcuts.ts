@@ -36,3 +36,24 @@ function createDetachWindowShortcutStore() {
 }
 
 export const detachWindowShortcut = createDetachWindowShortcutStore();
+
+/**
+ * Create a custom store for the toggle window shortcut (显示/隐藏窗口)
+ * Automatically loads on first subscription
+ */
+function createToggleWindowShortcutStore() {
+  const { subscribe, set } = writable<string>("", (set) => {
+    invoke<string>("get_toggle_shortcut")
+      .then((shortcut) => set(shortcut))
+      .catch((e) => console.error("Failed to load toggle window shortcut:", e));
+
+    return () => {};
+  });
+
+  return {
+    subscribe,
+    set, // 暴露 set 方法以支持保存后同步更新
+  };
+}
+
+export const toggleWindowShortcut = createToggleWindowShortcutStore();

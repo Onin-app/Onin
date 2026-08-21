@@ -8,7 +8,10 @@
 
   import { theme, toggleTheme } from "$lib/utils/theme";
   import { Theme, type SortMode, type AppConfig } from "$lib/type";
-  import { detachWindowShortcut } from "$lib/stores/shortcuts";
+  import {
+    detachWindowShortcut,
+    toggleWindowShortcut,
+  } from "$lib/stores/shortcuts";
 
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import SetItem from "./SetItem.svelte";
@@ -112,6 +115,7 @@
   const saveToggleShortcut = async () => {
     try {
       await invoke("set_toggle_shortcut", { shortcutStr: shortcut });
+      toggleWindowShortcut.set(shortcut);
       toast.success("快捷键已保存");
     } catch (error) {
       console.error("Failed to set toggle shortcut:", error);

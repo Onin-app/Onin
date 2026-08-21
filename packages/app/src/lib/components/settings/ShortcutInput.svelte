@@ -190,6 +190,7 @@
     <input
       type="text"
       readonly
+      data-shortcut-recorder
       value={formatShortcutForDisplay(value)}
       onkeydown={handleKeydown}
       onfocus={handleFocus}
