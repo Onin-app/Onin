@@ -193,10 +193,8 @@ pub async fn finish_color_picker(app: AppHandle, hex: Option<String>) -> Result<
         tokio::time::sleep(std::time::Duration::from_millis(80)).await;
 
         if should_restore_main {
-            if let Some(main) = app_clone.get_webview_window("main") {
-                let _ = main.show();
-                let _ = main.set_focus();
-            }
+            // 统一走窗口状态机入口，保证唤醒时序一致
+            crate::window_manager::request_show(&app_clone);
         }
 
         tokio::time::sleep(std::time::Duration::from_millis(32)).await;

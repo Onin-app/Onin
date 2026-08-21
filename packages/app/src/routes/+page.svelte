@@ -588,9 +588,8 @@
     // 获取应用列表
     await appListManager.fetchApps();
 
-    // 初始启动时，窗口默认可见但可能不会触发 window_visibility 事件，所以在此主动请求一次焦点
-    // 并且向后端发送命令激进地获取前台权限
-    await invoke("force_focus");
+    // 初始启动时，窗口默认可见但可能不会触发 window_visibility 事件，所以在此主动请求一次焦点。
+    // OS 前台由 Rust 侧激活序列保证，这里只负责 DOM 聚焦。
     if (!plugin.state.showPluginInline) {
       requestInputFocusWithRetry();
     }
@@ -600,11 +599,14 @@
       "window_visibility",
       async (event) => {
         if (event.payload) {
-          // 立即启动聚焦重试，不等待任何异步操作。
-          // clipboard / extension 预览等异步操作可能耗时数百毫秒，
-          // 若等到它们完成才聚焦，OS 可能已将焦点分配给其他窗口。
+          // 立即启动聚焦，不等待任何异步操作。
+          // OS 前台夺取由 Rust 侧 request_show 的确定性激活 + 后台验证重试保证；
+          // 窗口真正获得系统焦点时，onFocusChanged 会再触发一轮 DOM 聚焦，
+          // 这里先做一次 DOM 就绪聚焦，二者互为补充。
           if (!plugin.state.showPluginInline) {
             requestInputFocusWithRetry();
+          } else {
+            invoke("focus_inline_plugin").catch(console.error);
           }
 
           await clipboard.autoPasteClipboard(
@@ -612,13 +614,6 @@
           );
           updateMatchedCommands();
           await updateExtensionManagerPreview(); // 更新 Extension 预览（如计算器）
-          if (!plugin.state.showPluginInline) {
-            await invoke("force_focus").catch(console.error);
-            // force_focus 之后再做一轮聚焦，此时 OS 层面已强抢前台
-            requestInputFocusWithRetry();
-          } else {
-            invoke("focus_inline_plugin").catch(console.error);
-          }
         } else {
           cancelInputFocusRetry();
         }

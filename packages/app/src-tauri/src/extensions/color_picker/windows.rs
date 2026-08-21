@@ -103,16 +103,12 @@ pub async fn start_color_picker(
     let captures = capture_all_screens(&app).map_err(|e| {
         println!("[color-picker] capture failed: {e}");
         // 截图失败，恢复主窗口
-        if let Some(main) = app.get_webview_window("main") {
-            let _ = main.show();
-        }
+        crate::window_manager::request_show(&app);
         e
     })?;
 
     if captures.is_empty() {
-        if let Some(main) = app.get_webview_window("main") {
-            let _ = main.show();
-        }
+        crate::window_manager::request_show(&app);
         return Err("无法获取屏幕".to_string());
     }
 
@@ -674,10 +670,8 @@ pub fn active_overlay_labels() -> Vec<String> {
 }
 
 fn show_main_window(app: &tauri::AppHandle) {
-    if let Some(main) = app.get_webview_window("main") {
-        let _ = main.show();
-        let _ = main.set_focus();
-    }
+    // 统一走窗口状态机入口，保证唤醒时序一致
+    crate::window_manager::request_show(app);
 }
 
 fn overlay_label(index: usize) -> String {

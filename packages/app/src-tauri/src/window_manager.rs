@@ -1,4 +1,5 @@
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
+use std::sync::Mutex;
 use std::time::Duration;
 use tauri::{App, AppHandle, Emitter, Listener, Manager, State};
 use tokio::time::sleep;
@@ -7,9 +8,15 @@ use tokio::time::sleep;
 // 状态定义
 // ============================================================================
 
-/// 追踪窗口是否被命令隐藏，用于防止失焦时重复隐藏
+/// 窗口可见性状态机状态
+///
+/// - `hiding_initiated_by_command`：隐藏是否由命令/快捷键触发（防止失焦时重复隐藏）
+/// - `show_generation`：显示代数。每次 `request_show` 递增；智能隐藏任务据此判断
+///   自己是否已过期——若期间窗口被重新唤起（代数变化），必须放弃隐藏，否则会把
+///   刚显示出来的窗口再次隐藏，导致"唤醒后无法获取焦点"。
 pub struct WindowState {
     pub hiding_initiated_by_command: AtomicBool,
+    pub show_generation: AtomicU64,
 }
 
 /// 防止窗口在某些操作（如对话框打开）期间关闭
@@ -17,8 +24,12 @@ pub struct WindowState {
 pub struct WindowCloseLockState(pub AtomicU32);
 
 /// 持有隐藏任务的句柄，以便可以取消
+///
+/// 使用 `std::sync::Mutex` 而非 tokio Mutex：取消必须同步完成
+/// （`request_show` 在显示窗口前必须确保陈旧隐藏任务已 abort），
+/// 不能在异步竞态中"尽力而为"。
 pub struct HideTaskState {
-    pub handle: tokio::sync::Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
+    pub handle: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
 }
 
 // ============================================================================
@@ -163,67 +174,117 @@ pub fn release_window_close_lock(state: State<WindowCloseLockState>) {
 }
 
 /// 隐藏主窗口命令
+///
+/// 统一入口：所有"收起主窗口"的路径（Esc、快捷键 toggle、前端调用）都走这里，
+/// 保证时序一致：先标记命令隐藏 → 恢复上一个前台窗口 → 再 hide。
 #[tauri::command]
-pub fn close_main_window(app: tauri::AppHandle, state: State<WindowState>) {
-    // Restore focus to the previous foreground window before hiding,
-    // consistent with the toggle shortcut (Alt+Space) behavior.
-    // Without this, Esc-close leaves the foreground in an unpredictable
-    // state, causing the next Alt+Space open to fail to acquire focus.
-    crate::focus_manager::restore_previous_foreground(&app);
+pub fn close_main_window(app: tauri::AppHandle, _state: State<WindowState>) {
+    request_hide(&app);
+}
 
-    // Try get_webview_window first
+/// 统一的"显示主窗口"入口
+///
+/// 所有唤醒路径（全局快捷键、托盘、Esc 返回、macOS 激活、前端命令）都必须走这里：
+/// 1. 在显示之前捕获当前前台窗口（保证 restore 有据可依）
+/// 2. 递增显示代数并同步取消待定的智能隐藏任务（杜绝陈旧任务杀死本次唤醒）
+/// 3. 移动窗口到鼠标所在显示器
+/// 4. 执行统一激活序列（显示 + 确定性抢前台 + 后台异步验证）
+/// 5. 通知前端
+pub fn request_show(app: &AppHandle) {
+    // 1. 捕获当前前台窗口（必须在显示之前）
+    crate::focus_manager::capture_previous_foreground(app);
+
     if let Some(window) = app.get_webview_window("main") {
+        // 2. 递增代数 + 同步取消待定隐藏任务
+        let state: State<WindowState> = app.state();
+        state.show_generation.fetch_add(1, Ordering::SeqCst);
         state
             .hiding_initiated_by_command
-            .store(true, Ordering::Relaxed);
-        window.hide().ok();
-        window.emit("window_visibility", &false).unwrap_or_default();
+            .store(false, Ordering::Relaxed);
+        cancel_hide_task_sync(app);
+
+        // 3. 移动窗口到鼠标所在的显示器
+        move_window_to_cursor_monitor(&window);
+
+        // 4. 统一激活序列（显示 + 抢前台 + 后台验证）
+        crate::focus_manager::focus_webview_window(&window);
+
+        // 5. 通知前端
+        let _ = window.emit("window_visibility", &true);
     } else if let Some(window) = app.get_window("main") {
-        // Fallback to get_window
+        let state: State<WindowState> = app.state();
+        state.show_generation.fetch_add(1, Ordering::SeqCst);
         state
             .hiding_initiated_by_command
-            .store(true, Ordering::Relaxed);
-        window.hide().ok();
-        window.emit("window_visibility", &false).unwrap_or_default();
+            .store(false, Ordering::Relaxed);
+        cancel_hide_task_sync(app);
+
+        crate::focus_manager::focus_window(&window);
+        let _ = window.emit("window_visibility", &true);
     } else {
-        eprintln!("[window_manager] Main window not found for closing");
+        eprintln!("[window_manager] Main window not found for showing");
+    }
+}
+
+/// 统一的"隐藏主窗口"入口（快捷键 toggle 使用，逻辑与 close_main_window 一致）
+pub fn request_hide(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let was_visible = window.is_visible().unwrap_or(false);
+        if !was_visible {
+            return;
+        }
+        // 只有窗口聚焦时才标记——若窗口本就无焦点，hide 不会产生 blur，打标记只会
+        // 留下陈旧状态，被下一次无关的 blur 错误消费。
+        if window.is_focused().unwrap_or(false) {
+            let state: State<WindowState> = app.state();
+            state
+                .hiding_initiated_by_command
+                .store(true, Ordering::Relaxed);
+        }
+        crate::focus_manager::restore_previous_foreground(app);
+        window.hide().ok();
+        let _ = window.emit("window_visibility", &false);
+    } else if let Some(window) = app.get_window("main") {
+        let was_visible = window.is_visible().unwrap_or(false);
+        if was_visible {
+            crate::focus_manager::restore_previous_foreground(app);
+            window.hide().ok();
+            let _ = window.emit("window_visibility", &false);
+        }
+    } else {
+        eprintln!("[window_manager] Main window not found for hiding");
     }
 }
 
 #[allow(dead_code)]
 pub fn show_main_window(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
-        let app_handle_clone = app.clone();
-        tauri::async_runtime::spawn(async move {
-            cancel_hide_task(&app_handle_clone).await;
-        });
-
-        // 移动窗口到鼠标所在的显示器
-        move_window_to_cursor_monitor(&window);
-
-        // 使用 focus_webview_window 实现统一且强力的显示和聚焦
-        crate::focus_manager::focus_webview_window(&window);
-
-        let _ = window.emit("window_visibility", &true);
-    }
+    request_show(app);
 }
 
 /// 暴露给前端的显示主窗口命令
 #[tauri::command]
 pub fn show_main_window_cmd(app: tauri::AppHandle) {
-    show_main_window(&app);
+    request_show(&app);
 }
 
 // ============================================================================
 // 辅助函数
 // ============================================================================
 
-/// 取消任何挂起的隐藏任务
-async fn cancel_hide_task(app: &AppHandle) {
+/// 同步取消任何挂起的隐藏任务
+///
+/// 必须在显示窗口之前完成：若待定的智能隐藏任务在窗口刚显示、焦点尚未落地时触发，
+/// 会把窗口再次隐藏，导致唤醒失败。使用 `JoinHandle::abort()` 立即取消，
+/// 不依赖异步竞态。
+fn cancel_hide_task_sync(app: &AppHandle) {
     let state: State<HideTaskState> = app.state();
-    let mut handle_guard = state.handle.lock().await;
-    if let Some(handle) = handle_guard.take() {
-        handle.abort();
+    // 绑定到具名局部变量：if-let scrutinee 的临时值（持有 MutexGuard 的 Result）
+    // 会被延长到块末尾才析构，晚于 `state` 的 drop，导致借用超期（E0597）。
+    let lock_result = state.handle.lock();
+    if let Ok(mut guard) = lock_result {
+        if let Some(handle) = guard.take() {
+            handle.abort();
+        }
     }
 }
 
@@ -249,11 +310,7 @@ fn setup_file_drop_listeners(window: &tauri::WebviewWindow, app_handle: &AppHand
     window.listen("tauri://file-drop-hover", move |_event| {
         let lock_state: State<WindowCloseLockState> = app_handle_hover.state();
         lock_state.0.fetch_add(1, Ordering::Relaxed);
-
-        let app_handle_clone = app_handle_hover_cancel.clone();
-        tauri::async_runtime::spawn(async move {
-            cancel_hide_task(&app_handle_clone).await;
-        });
+        cancel_hide_task_sync(&app_handle_hover_cancel);
     });
 
     // 文件放下：释放锁
@@ -277,15 +334,25 @@ fn setup_file_drop_listeners(window: &tauri::WebviewWindow, app_handle: &AppHand
 ///
 /// 短延迟后隐藏窗口，具有以下特性：
 /// - 50ms 延迟防止闪烁
+/// - 隐藏前检查"显示代数"：若期间窗口被重新唤起（`request_show` 递增了代数），
+///   说明这是一次过期的隐藏任务，必须放弃——否则会把刚显示出来的窗口再次隐藏，
+///   直接导致"唤醒后无法获取焦点"
 /// - 隐藏前最终检查窗口状态（焦点和锁定）
 /// - 文件拖拽期间由 WindowCloseLockState 保护
 fn spawn_smart_hide_task(
     window: tauri::WebviewWindow,
     app_handle: AppHandle,
+    show_generation_at_blur: u64,
 ) -> tauri::async_runtime::JoinHandle<()> {
     tauri::async_runtime::spawn(async move {
         // 短延迟后尝试隐藏
         sleep(Duration::from_millis(50)).await;
+
+        // 代数守卫：期间若有新的显示请求，放弃隐藏
+        let window_state: State<WindowState> = app_handle.state();
+        if window_state.show_generation.load(Ordering::SeqCst) != show_generation_at_blur {
+            return;
+        }
 
         // 最终检查并隐藏
         let lock_state: State<WindowCloseLockState> = app_handle.state();
@@ -319,26 +386,25 @@ fn spawn_smart_hide_task(
             if window.is_visible().unwrap_or(false) {
                 window.hide().ok();
                 window.emit("window_visibility", &false).unwrap_or_default();
-            } else {
             }
-        } else {
         }
 
         // 清理任务句柄
         let hide_task_state: State<HideTaskState> = app_handle.state();
-        let mut handle_guard = hide_task_state.handle.lock().await;
-        *handle_guard = None;
+        let lock_result = hide_task_state.handle.lock();
+        if let Ok(mut handle_guard) = lock_result {
+            *handle_guard = None;
+        }
     })
 }
 
-/// 存储隐藏任务句柄
+/// 存储隐藏任务句柄（同步，避免与取消操作竞态）
 fn store_hide_task_handle(app_handle: &AppHandle, handle: tauri::async_runtime::JoinHandle<()>) {
-    let app_handle_clone = app_handle.clone();
-    tauri::async_runtime::spawn(async move {
-        let hide_task_state: State<HideTaskState> = app_handle_clone.state();
-        let mut handle_guard = hide_task_state.handle.lock().await;
-        *handle_guard = Some(handle);
-    });
+    let state: State<HideTaskState> = app_handle.state();
+    let lock_result = state.handle.lock();
+    if let Ok(mut guard) = lock_result {
+        *guard = Some(handle);
+    }
 }
 
 // ============================================================================
@@ -348,10 +414,7 @@ fn store_hide_task_handle(app_handle: &AppHandle, handle: tauri::async_runtime::
 /// 处理窗口获得焦点
 fn handle_window_focused(app_handle: &AppHandle) {
     // 取消隐藏任务
-    let app_handle_clone = app_handle.clone();
-    tauri::async_runtime::spawn(async move {
-        cancel_hide_task(&app_handle_clone).await;
-    });
+    cancel_hide_task_sync(app_handle);
 }
 
 /// 处理窗口失去焦点
@@ -369,15 +432,15 @@ fn handle_window_blur(app_handle: &AppHandle, window: &tauri::WebviewWindow) {
         .hiding_initiated_by_command
         .swap(false, Ordering::Relaxed)
     {
-        let app_handle_clone = app_handle.clone();
-        tauri::async_runtime::spawn(async move {
-            cancel_hide_task(&app_handle_clone).await;
-        });
+        cancel_hide_task_sync(app_handle);
         return;
     }
 
+    // 记录本次失焦时的显示代数，智能隐藏任务据此判断自己是否过期
+    let generation = window_state.show_generation.load(Ordering::SeqCst);
+
     // 启动智能隐藏任务
-    let handle = spawn_smart_hide_task(window.clone(), app_handle.clone());
+    let handle = spawn_smart_hide_task(window.clone(), app_handle.clone(), generation);
     store_hide_task_handle(app_handle, handle);
 }
 

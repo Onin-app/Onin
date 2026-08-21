@@ -2,7 +2,7 @@ use std::sync::Mutex;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    App, AppHandle, Manager, State,
+    App, AppHandle, State,
 };
 
 pub const TRAY_ICON_ID: &str = "main_tray_icon";
@@ -44,11 +44,9 @@ pub fn setup_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
                 button_state: MouseButtonState::Up,
                 ..
             } => {
+                // 统一走 request_show：捕获前窗 → 递增代数 → 取消隐藏任务 → 激活序列
                 let app = tray.app_handle();
-                if let Some(window) = app.get_webview_window("main") {
-                    crate::focus_manager::capture_previous_foreground(&app);
-                    crate::focus_manager::focus_webview_window(&window);
-                }
+                crate::window_manager::request_show(&app);
             }
             _ => {}
         })

@@ -189,10 +189,8 @@ pub fn finish_screenshot_selection(app: AppHandle, restore_launcher: bool) {
         *session = None;
     }
     if restore_launcher {
-        if let Some(main) = app.get_webview_window("main") {
-            let _ = main.show();
-            let _ = main.set_focus();
-        }
+        // 统一走窗口状态机入口，保证唤醒时序一致
+        crate::window_manager::request_show(&app);
     }
 }
 

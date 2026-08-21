@@ -1,10 +1,16 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::{App, AppHandle, Manager, WebviewWindow, Window};
-use windows::Win32::Foundation::HWND;
+use windows::Win32::Foundation::{BOOL, HWND, LPARAM};
 use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    SendInput, SetFocus, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
+    KEYEVENTF_KEYUP, VK_MENU,
+};
 use windows::Win32::UI::WindowsAndMessaging::{
-    AllowSetForegroundWindow, BringWindowToTop, GetForegroundWindow, GetWindowThreadProcessId,
-    IsIconic, SetForegroundWindow, ShowWindow, ASFW_ANY, SW_RESTORE, SW_SHOW,
+    AllowSetForegroundWindow, BringWindowToTop, EnumChildWindows, GetClassNameW,
+    GetForegroundWindow, GetWindowThreadProcessId, IsIconic, SetForegroundWindow, ShowWindow,
+    ASFW_ANY, SW_RESTORE, SW_SHOW,
 };
 
 pub struct PreviousForegroundWindow(pub Mutex<Option<isize>>);
@@ -55,20 +61,38 @@ pub fn restore_previous_foreground(app: &AppHandle) {
     }
 }
 
+/// 统一焦点入口：显示窗口 + 确定性前台激活 + 后台异步验证。
+///
+/// 分层设计（事件驱动，不再依赖前端轮询 document.hasFocus()）：
+/// 1. 同步段（主线程，微秒级）：显示窗口，并立即执行确定性激活配方
+///    （ALT 键模拟 + AttachThreadInput + SetForegroundWindow），处理常见情况。
+/// 2. 异步验证段（后台定时器，不阻塞主线程消息泵）：WebView2 渲染与 OS 激活
+///    存在几十毫秒的过渡期，前台可能被抢占或 SetForegroundWindow 被前台锁拒绝。
+///    后台在 40/120/300ms 各验证一次，失败则用 ALT 键技巧重试；
+///    确认成为前台后，再对 WebView2 子控件 SetFocus，并把焦点交给页面。
 pub fn focus_webview_window(window: &WebviewWindow) {
     let _ = window.unminimize();
     let _ = window.show();
 
     if let Ok(hwnd) = window.hwnd() {
-        force_set_foreground_window(hwnd.0 as isize);
+        activate_window(hwnd.0 as isize);
     }
 
-    // 直接对 WebView2 子控件 SetFocus
-    if let Ok(hwnd) = window.hwnd() {
-        focus_webview_child(hwnd.0 as isize);
-    }
+    let window_verify = window.clone();
+    tauri::async_runtime::spawn(async move {
+        let Ok(hwnd) = window_verify.hwnd() else {
+            return;
+        };
+        let hwnd_isize = hwnd.0 as isize;
 
-    let _ = window.eval("window.focus()");
+        if !verify_foreground_with_retry(&window_verify, hwnd_isize).await {
+            return;
+        }
+
+        // 前台已确认：聚焦 WebView2 子控件（键盘焦点落点），并通知页面
+        focus_webview_child(hwnd_isize);
+        let _ = window_verify.eval("window.focus()");
+    });
 }
 
 pub fn focus_window(window: &Window) {
@@ -76,24 +100,54 @@ pub fn focus_window(window: &Window) {
     let _ = window.show();
 
     if let Ok(hwnd) = window.hwnd() {
-        let isize_hwnd = hwnd.0 as isize;
-        force_set_foreground_window(isize_hwnd);
+        activate_window(hwnd.0 as isize);
     }
 
     let _ = window.set_focus();
 }
 
-/// 强制将指定窗口带到前台，处理 Windows 的防抢焦点限制。
+/// 后台验证窗口是否已成为前台；失败时用 ALT 键技巧重试。
 ///
-/// 为避免主线程同步 Win32 SetFocus 到 WebView2 子 HWND 造成死锁/阻塞，
-/// 这里只负责系统窗口层面的前台抢权：
-/// - AttachThreadInput 临时附着到当前前台线程，绕过防抢焦点限制。
-/// - BringWindowToTop、ShowWindow 和 SetForegroundWindow 强力激活宿主窗口。
-/// - WebView2 子控件的键盘焦点由 focus_webview_child 单独处理。
+/// 注意：此函数在 tokio 后台线程上执行，所有 Win32 调用均不依赖调用线程归属，
+/// 且不会阻塞主线程的消息泵（阻塞消息泵会延迟 WebView2 的 WM_ACTIVATE 处理，
+/// 反而让激活更慢）。
+async fn verify_foreground_with_retry(window: &WebviewWindow, hwnd_isize: isize) -> bool {
+    const DELAYS_MS: [u64; 3] = [40, 120, 300];
+
+    for delay in DELAYS_MS {
+        tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
+
+        // 窗口若已被隐藏（用户快速切换/其他逻辑隐藏），放弃本次唤醒
+        if !window.is_visible().unwrap_or(false) {
+            return false;
+        }
+
+        let fg = unsafe { GetForegroundWindow() };
+        if fg.0 as isize == hwnd_isize {
+            return true;
+        }
+
+        // 前台被抢占或前台锁拒绝：ALT 键技巧 + 强置前台
+        unsafe {
+            let _ = AllowSetForegroundWindow(ASFW_ANY);
+            send_alt_key_trick();
+            let _ = BringWindowToTop(HWND(hwnd_isize as _));
+            let _ = SetForegroundWindow(HWND(hwnd_isize as _));
+        }
+    }
+
+    unsafe { GetForegroundWindow().0 as isize == hwnd_isize }
+}
+
+/// 确定性前台激活配方（同步段，主线程调用）。
 ///
-/// 内建验证+一次重试：SetForegroundWindow 在 Windows 上可能因前台锁超时静默失败，
-/// 特别是窗口刚被 show() 之后短暂处于过渡态时。验证后若仍未成为前台，则延迟后重试一次。
-fn force_set_foreground_window(hwnd_isize: isize) {
+/// 组合两种已被广泛验证的技术来绕过 Windows 的前台锁：
+/// - `SendInput` 模拟一次 ALT 键按下/抬起：让系统认为本进程刚收到用户输入，
+///   从而解除 SetForegroundWindow 的前台锁限制（PowerToys Run、Flow Launcher
+///   等启动器均使用此技巧）。
+/// - `AttachThreadInput` 将本窗口线程临时附着到当前前台线程：绕过"只有前台进程
+///   才能设置前台"的限制。
+fn activate_window(hwnd_isize: isize) {
     let hwnd_val = HWND(hwnd_isize as _);
 
     unsafe {
@@ -106,6 +160,7 @@ fn force_set_foreground_window(hwnd_isize: isize) {
         if foreground_thread != window_thread && foreground_thread != 0 {
             let _ = AttachThreadInput(window_thread, foreground_thread, true);
 
+            send_alt_key_trick();
             let _ = BringWindowToTop(hwnd_val);
             let _ = ShowWindow(hwnd_val, SW_SHOW);
             let _ = SetForegroundWindow(hwnd_val);
@@ -116,93 +171,101 @@ fn force_set_foreground_window(hwnd_isize: isize) {
             let _ = ShowWindow(hwnd_val, SW_SHOW);
             let _ = SetForegroundWindow(hwnd_val);
         }
-
-        // Verify the window really became foreground; retry once with a brief
-        // delay if it didn't — Windows may reject SetForegroundWindow when the
-        // target window is still transitioning from hidden to shown.
-        let fg = GetForegroundWindow();
-        if fg.0 != hwnd_val.0 {
-            std::thread::sleep(std::time::Duration::from_millis(15));
-            let _ = AllowSetForegroundWindow(ASFW_ANY);
-            let _ = BringWindowToTop(hwnd_val);
-            let _ = SetForegroundWindow(hwnd_val);
-        }
     }
 }
 
-/// 递归查找 WebView2 子控件并对其调用 SetFocus。
+/// 模拟一次 ALT 键按下并抬起（虚拟键码 VK_MENU）。
 ///
-/// Tauri 的 WebviewWindow::set_focus() 实际聚焦的是 tao 原生窗口，
-/// 键盘焦点无法传递到 WebView2 子控件。通过遍历子窗口树找到
-/// WebView2 的 HWND 并直接 SetFocus。
+/// 这是绕过 Windows 前台锁的经典技巧：系统在处理键盘输入时会放宽
+/// SetForegroundWindow 的限制，模拟一次按键后，本进程即被允许设置前台窗口。
+fn send_alt_key_trick() {
+    let inputs = [
+        INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: VK_MENU,
+                    wScan: 0,
+                    dwFlags: KEYBD_EVENT_FLAGS(0),
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        },
+        INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: VK_MENU,
+                    wScan: 0,
+                    dwFlags: KEYEVENTF_KEYUP,
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        },
+    ];
+
+    unsafe {
+        let _ = SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
+    }
+}
+
+/// 在 WebView2 子窗口树中查找键盘焦点落点并对其 SetFocus。
 ///
-/// WebView2 可能在不同的线程上（wry 创建的 webview 线程），
-/// 因此需要 AttachThreadInput 临时附着以允许跨线程 SetFocus。
-fn focus_webview_child(parent_isize: isize) {
-    extern "system" {
-        fn FindWindowExW(
-            parent: isize,
-            child_after: isize,
-            class: *const u16,
-            window: *const u16,
-        ) -> isize;
-        fn GetClassNameW(hwnd: isize, class: *mut u16, max_count: i32) -> i32;
-        fn SetFocus(hwnd: isize) -> isize;
-    }
-
-    unsafe fn focus_one(hwnd: isize) -> bool {
-        // Attach to the target window's thread so SetFocus can cross thread boundaries
-        let target_thread = GetWindowThreadProcessId(HWND(hwnd as _), None);
-        let current_thread = GetCurrentThreadId();
-        let need_detach = target_thread != 0 && target_thread != current_thread;
-
-        if need_detach {
-            let _ = AttachThreadInput(current_thread, target_thread, true);
-        }
-
-        let result = SetFocus(hwnd);
-
-        if need_detach {
-            let _ = AttachThreadInput(current_thread, target_thread, false);
-        }
-
-        result != 0
-    }
-
-    unsafe fn find_and_focus(parent: isize) -> bool {
-        let mut child = FindWindowExW(parent, 0, std::ptr::null(), std::ptr::null());
-        while child != 0 {
-            let mut buf = [0u16; 64];
-            let len = GetClassNameW(child, buf.as_mut_ptr(), buf.len() as i32);
-            if len > 0 {
-                let name = String::from_utf16_lossy(&buf[..len as usize]);
-                // WebView2 在不同版本/配置下可能有不同的类名前缀
-                if name.starts_with("Chrome_WidgetWin_")
-                    || name.contains("WebView")
-                    || name.contains("Edge")
-                {
-                    if focus_one(child) {
-                        return true;
-                    }
-                }
-                // 递归搜索子窗口（WebView2 可能嵌套多层）
-                if find_and_focus(child) {
-                    return true;
-                }
+/// Tauri 的 `WebviewWindow::set_focus()` 实际聚焦的是 tao 原生窗口，
+/// 键盘焦点无法传递到 WebView2 子控件。通过 `EnumChildWindows` 遍历
+/// 整个子窗口树（无需递归实现），优先聚焦 WebView2 的渲染宿主
+/// `Chrome_RenderWidgetHostHWND`，其次回退到任何 WebView/Edge 相关类名。
+///
+/// WebView2 子窗口可能运行在不同线程上，SetFocus 前需要 AttachThreadInput
+/// 临时附着以允许跨线程聚焦。
+fn focus_webview_child(parent_isize: isize) -> bool {
+    unsafe extern "system" fn enum_proc(hwnd: HWND, lparam: LPARAM) -> BOOL {
+        let target = lparam.0 as *mut AtomicBool;
+        let mut buf = [0u16; 256];
+        let len = GetClassNameW(hwnd, &mut buf);
+        if len > 0 {
+            let name = String::from_utf16_lossy(&buf[..len as usize]);
+            // 优先 WebView2 渲染宿主；其次任何 WebView/Edge 相关类名
+            let is_target = name == "Chrome_RenderWidgetHostHWND"
+                || name.starts_with("Chrome_WidgetWin_")
+                || name.contains("WebView")
+                || name.contains("Edge");
+            if is_target && focus_one(hwnd) {
+                (*target).store(true, Ordering::Relaxed);
+                return BOOL(0); // 停止枚举
             }
-            child = FindWindowExW(parent, child, std::ptr::null(), std::ptr::null());
         }
-        false
+        BOOL(1) // 继续枚举
     }
 
     unsafe {
-        // 先尝试查找 WebView2
-        if !find_and_focus(parent_isize) {
-            // 找不到特定子窗口时，直接 focus 第一个子窗口（兜底）
-            let child = FindWindowExW(parent_isize, 0, std::ptr::null(), std::ptr::null());
-            if child != 0 {
-                focus_one(child);
-            }
-        }
+        let target = AtomicBool::new(false);
+        let _ = EnumChildWindows(
+            HWND(parent_isize as _),
+            Some(enum_proc),
+            LPARAM(&target as *const AtomicBool as isize),
+        );
+        target.load(Ordering::Relaxed)
     }
+}
+
+/// 对指定 HWND 调用 SetFocus，必要时先 AttachThreadInput 以跨线程聚焦。
+unsafe fn focus_one(hwnd: HWND) -> bool {
+    let target_thread = GetWindowThreadProcessId(hwnd, None);
+    let current_thread = GetCurrentThreadId();
+    let need_detach = target_thread != 0 && target_thread != current_thread;
+
+    if need_detach {
+        let _ = AttachThreadInput(current_thread, target_thread, true);
+    }
+
+    let result = SetFocus(hwnd);
+
+    if need_detach {
+        let _ = AttachThreadInput(current_thread, target_thread, false);
+    }
+
+    result.0 != 0
 }
