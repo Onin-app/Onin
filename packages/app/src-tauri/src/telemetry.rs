@@ -29,6 +29,33 @@ fn filter_updater_noise(
     Some(event)
 }
 
+/// 过滤 tao（Tauri 的窗口事件循环库）在 Windows 上偶发的重入断言崩溃。
+///
+/// tao 的 `thread_event_target_callback` 在收到线程事件目标窗口的
+/// `WM_PAINT` 时会执行 `assert!(flush_paint_messages(None, ...))`；
+/// 当事件循环恰好处于"正在处理重绘事件"（HandlingRedrawEvents）阶段时，
+/// 该断言会失败并 panic。这是 tao 内部的时序竞态，常见于窗口快速创建/销毁、
+/// 嵌套消息循环（如系统菜单/对话框）或退出流程，应用侧无法规避。
+/// 该 panic 会被 tao 捕获后在主循环重新抛出导致进程退出，
+/// 这里将其从 GlitchTip 上报中剔除，避免噪音；
+/// `lib.rs::run` 中的 `catch_unwind` 会将其兜底为优雅退出。
+fn filter_tao_event_loop_race(
+    event: sentry::protocol::Event<'static>,
+) -> Option<sentry::protocol::Event<'static>> {
+    let is_tao_race_panic = event.exception.values.iter().any(|exc| {
+        exc.ty == "panic"
+            && exc
+                .value
+                .as_deref()
+                .map(|value| value.contains("flush_paint_messages"))
+                .unwrap_or(false)
+    });
+    if is_tao_race_panic {
+        return None;
+    }
+    Some(event)
+}
+
 pub fn init_glitchtip() -> Option<sentry::ClientInitGuard> {
     let dsn = option_env!("GLITCHTIP_DSN_NATIVE")
         .filter(|value| !value.trim().is_empty())
@@ -44,7 +71,9 @@ pub fn init_glitchtip() -> Option<sentry::ClientInitGuard> {
                 .map(Into::into),
             attach_stacktrace: true,
             send_default_pii: false,
-            before_send: Some(Arc::new(filter_updater_noise)),
+            before_send: Some(Arc::new(|event| {
+                filter_updater_noise(event).and_then(filter_tao_event_loop_race)
+            })),
             ..Default::default()
         },
     )))

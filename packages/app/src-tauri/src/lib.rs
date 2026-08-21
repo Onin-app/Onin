@@ -128,55 +128,71 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
-    app.run(|app_handle, _event| match _event {
-        tauri::RunEvent::ExitRequested { api, .. } => {
-            let webdav_config = {
-                let state = app_handle.state::<crate::app_config::AppConfigState>();
-                let x = match state.0.lock() {
-                    Ok(lock) => lock.webdav.clone(),
-                    Err(_) => crate::app_config::WebDavConfig::default(),
+    // tao 在 Windows 上偶发的事件循环重入断言（见 `telemetry::filter_tao_event_loop_race`）
+    // 会导致事件循环内部捕获 panic 后于主循环重新抛出；若不兜底，进程会直接崩溃退出。
+    // 这里捕获后记录日志并以非零退出码结束，保证可观测性同时避免硬崩溃。
+    let event_loop_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        app.run(|app_handle, _event| match _event {
+            tauri::RunEvent::ExitRequested { api, .. } => {
+                let webdav_config = {
+                    let state = app_handle.state::<crate::app_config::AppConfigState>();
+                    let x = match state.0.lock() {
+                        Ok(lock) => lock.webdav.clone(),
+                        Err(_) => crate::app_config::WebDavConfig::default(),
+                    };
+                    x
                 };
-                x
-            };
 
-            if webdav_config.enabled && webdav_config.sync_on_exit {
-                // 如果备份已完成，直接允许退出（不再拦截）
-                if SYNC_ON_EXIT_COMPLETED.load(Ordering::SeqCst) {
-                    return;
-                }
-
-                api.prevent_exit();
-
-                if IS_SYNCING_ON_EXIT.swap(true, Ordering::SeqCst) {
-                    return;
-                }
-
-                println!("[sync] 检测到退出自动备份已启用，正在执行自动上传备份...");
-
-                let app_handle_clone = app_handle.clone();
-                tauri::async_runtime::spawn(async move {
-                    match crate::sync::trigger_webdav_sync(
-                        app_handle_clone.clone(),
-                        "backup".to_string(),
-                    )
-                    .await
-                    {
-                        Ok(_) => println!("[sync] 退出自动备份成功！"),
-                        Err(e) => eprintln!("[sync] 退出自动备份失败: {}", e),
+                if webdav_config.enabled && webdav_config.sync_on_exit {
+                    // 如果备份已完成，直接允许退出（不再拦截）
+                    if SYNC_ON_EXIT_COMPLETED.load(Ordering::SeqCst) {
+                        return;
                     }
-                    SYNC_ON_EXIT_COMPLETED.store(true, Ordering::SeqCst);
-                    app_handle_clone.exit(0);
-                });
+
+                    api.prevent_exit();
+
+                    if IS_SYNCING_ON_EXIT.swap(true, Ordering::SeqCst) {
+                        return;
+                    }
+
+                    println!("[sync] 检测到退出自动备份已启用，正在执行自动上传备份...");
+
+                    let app_handle_clone = app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        match crate::sync::trigger_webdav_sync(
+                            app_handle_clone.clone(),
+                            "backup".to_string(),
+                        )
+                        .await
+                        {
+                            Ok(_) => println!("[sync] 退出自动备份成功！"),
+                            Err(e) => eprintln!("[sync] 退出自动备份失败: {}", e),
+                        }
+                        SYNC_ON_EXIT_COMPLETED.store(true, Ordering::SeqCst);
+                        app_handle_clone.exit(0);
+                    });
+                }
             }
-        }
-        #[cfg(target_os = "macos")]
-        tauri::RunEvent::Reopen { .. } => {
-            window_manager::show_main_window(app_handle);
-        }
-        #[cfg(target_os = "macos")]
-        tauri::RunEvent::Resumed => {
-            window_manager::show_main_window(app_handle);
-        }
-        _ => {}
-    });
+            #[cfg(target_os = "macos")]
+            tauri::RunEvent::Reopen { .. } => {
+                window_manager::show_main_window(app_handle);
+            }
+            #[cfg(target_os = "macos")]
+            tauri::RunEvent::Resumed => {
+                window_manager::show_main_window(app_handle);
+            }
+            _ => {}
+        });
+    }));
+
+    if let Err(payload) = event_loop_result {
+        let message = payload
+            .downcast_ref::<&str>()
+            .map(|s| s.to_string())
+            .or_else(|| payload.downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "unknown panic payload".to_string());
+        tracing::error!(target: "onin::lib", "event loop terminated by panic: {message}");
+        eprintln!("[onin] event loop terminated by panic: {message}");
+        std::process::exit(1);
+    }
 }
