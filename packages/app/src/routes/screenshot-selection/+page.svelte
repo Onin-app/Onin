@@ -25,7 +25,7 @@
     | "sw"
     | "w";
 
-  let surface: HTMLDivElement;
+  let surface: HTMLElement;
   let capture: CaptureInfo | null = null;
   let selection: Selection | null = null;
   let start: { x: number; y: number } | null = null;
