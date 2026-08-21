@@ -463,7 +463,18 @@ pub fn simulate_paste(app: AppHandle) -> Result<(), String> {
 }
 
 /// 允许前端在首次启动时强制接管焦点
+///
+/// 注意：这里不能声明为 `window: tauri::WebviewWindow`。
+/// 翻译器等扩展运行在纯 `Window` + 子 `Webview` 环境中（见
+/// `extensions/translator/commands.rs`），从这类 webview 发起的 invoke 会被 Tauri
+/// 以 "current webview is not a WebviewWindow" 拒绝，进而污染 Glitchtip 错误上报。
+/// 该命令的语义是"让应用主窗口强制接管前台焦点"，与调用方 webview 无关，
+/// 因此改为从 `AppHandle` 直接解析主窗口。
 #[tauri::command]
-pub fn force_focus(window: tauri::WebviewWindow) {
-    crate::focus_manager::focus_webview_window(&window);
+pub fn force_focus(app: tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        crate::focus_manager::focus_webview_window(&window);
+    } else if let Some(window) = app.get_window("main") {
+        crate::focus_manager::focus_window(&window);
+    }
 }
