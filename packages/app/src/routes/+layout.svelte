@@ -48,10 +48,10 @@
     duration?: number;
   }
 
-  // Subscribe to shortcuts store to trigger auto-loading
+  // Subscribe to detach shortcut store to trigger auto-loading
   // The subscription itself triggers the load in the store's start function
+  // (toggleWindowShortcut 在 store 模块加载时即 eager 加载，无需此处订阅)
   $detachWindowShortcut;
-  $toggleWindowShortcut;
 
   // Focus input when navigating to main page
   $effect(() => {
@@ -111,7 +111,14 @@
     // - 仅当"显示/隐藏窗口"快捷键确实是 Alt+Space 时，执行与全局快捷键一致的隐藏逻辑
     const handleAltSpace = (e: KeyboardEvent) => {
       if (e.defaultPrevented) return;
-      if (!e.altKey || (e.code !== "Space" && e.key !== " ")) return;
+
+      // 兼容不同输入法/浏览器下空格键的多种按键描述（code/key/keyCode）
+      const isSpace =
+        e.code === "Space" ||
+        e.key === " " ||
+        e.key === "Space" ||
+        e.keyCode === 32;
+      if (!e.altKey || !isSpace) return;
       // 输入法组合期间不拦截，避免干扰中文等输入
       if (e.isComposing) return;
 
