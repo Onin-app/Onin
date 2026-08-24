@@ -114,8 +114,7 @@
 
   const saveToggleShortcut = async () => {
     try {
-      await invoke("set_toggle_shortcut", { shortcutStr: shortcut });
-      toggleWindowShortcut.set(shortcut);
+      await toggleWindowShortcut.setShortcut(shortcut);
       toast.success("快捷键已保存");
     } catch (error) {
       console.error("Failed to set toggle shortcut:", error);
