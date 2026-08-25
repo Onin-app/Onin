@@ -7,28 +7,30 @@
 //! （WebView2）。实测该按键不会以可拦截的 DOM keydown 形式到达页面——空格字符由
 //! 浏览器进程直接插入输入框，前端 `preventDefault` 无效。
 //!
-//! 因此在 OS 层用 `WH_KEYBOARD_LL` 钩子拦截该组合，仅在满足以下条件时消费按键并
-//! 触发与全局快捷键一致的隐藏逻辑（`request_hide`）：
-//! 1. 按下的键是空格（`VK_SPACE`）且 Alt 处于按下状态（`LLKHF_ALTDOWN`）
-//! 2. 前台窗口属于本应用（主窗口 HWND 本身或其子窗口树；WebView2 的窗口可能
-//!    属于独立的 msedgewebview2.exe 进程，因此不能只比对进程 ID）
-//! 3. 主窗口当前可见（隐藏状态下放行，交给 `RegisterHotKey` 完成显示）
-//! 4. "显示/隐藏窗口"快捷键确实配置为 Alt+Space
+//! 因此在 OS 层用 `WH_KEYBOARD_LL` 钩子拦截该组合。实测前台窗口是 WebView2
+//! 浏览器进程（msedgewebview2.exe）的 `Chrome_WidgetWin_1` 窗口，既不属于本进程
+//! 也不是本窗口的后代，因此"前台判定"采用三重检查：同进程 / 主窗口祖先链 /
+//! 前台窗口矩形位于主窗口矩形内部（WebView2 窗口恰好覆盖主窗口客户区）。
 //!
-//! 窗口隐藏时钩子一律放行，保证首次 Alt+Space 仍能通过 `WM_HOTKEY` 显示窗口。
+//! 消费条件（全部满足才拦截并触发 `request_hide`）：
+//! 1. 空格键 + Alt 按下（`LLKHF_ALTDOWN`）
+//! 2. 主窗口当前可见（隐藏状态下放行，交给 `RegisterHotKey` 显示）
+//! 3. 前台窗口属于本应用（上述三重检查）
+//! 4. 非快捷键录制中（设置页录制 Alt+Space 时放行）
+//! 5. "显示/隐藏窗口"快捷键配置为 Alt+Space
 //!
-//! ## 诊断
-//! 每次遇到 Alt+Space 都会打印一行 `[Alt+Space hook]` 日志（各判定条件及结果），
-//! 用于定位放行原因；确认稳定后可将日志移除。
+//! ## 性能与稳定性
+//! `WH_KEYBOARD_LL` 回调期间系统键盘处理会暂停，回调必须极简且**禁止阻塞**
+//! （不得在回调内写日志/格式化/做重活），否则键盘输入会全局卡顿。
 
 use once_cell::sync::OnceCell;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager, State};
-use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
-use windows::Win32::UI::Input::KeyboardAndMouse::VK_SPACE;
+use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM};
+use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_MENU, VK_SPACE};
 use windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, GetClassNameW, GetForegroundWindow, GetMessageW, GetParent,
+    CallNextHookEx, GetForegroundWindow, GetMessageW, GetParent, GetWindowRect,
     GetWindowThreadProcessId, SetWindowsHookExW, UnhookWindowsHookEx, HHOOK, KBDLLHOOKSTRUCT,
     MSG, WH_KEYBOARD_LL, WM_KEYDOWN, WM_SYSKEYDOWN,
 };
@@ -42,9 +44,6 @@ static HOOK: Mutex<Option<HHOOK>> = Mutex::new(None);
 /// 设置页快捷键录制输入框聚焦期间置位，钩子跳过 Alt+Space（允许录制该组合）
 static RECORDING: AtomicBool = AtomicBool::new(false);
 
-/// 日志去重：同一毫秒内的重复事件只打一次（自动重复会刷屏）
-static LAST_LOG_MS: AtomicU64 = AtomicU64::new(0);
-
 /// `KBDLLHOOKSTRUCT.flags` 中表示 Alt 处于按下状态的标志位（LLKHF_ALTDOWN = 0x20）
 const LLKHF_ALTDOWN: u32 = 0x20;
 
@@ -53,32 +52,12 @@ pub fn set_recording(active: bool) {
     RECORDING.store(active, Ordering::Relaxed);
 }
 
-fn log_hook(msg: &str) {
-    let now_ms = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis() as u64)
-        .unwrap_or(0);
-    let last = LAST_LOG_MS.load(Ordering::Relaxed);
-    if now_ms.saturating_sub(last) >= 50 {
-        eprintln!("[Alt+Space hook] {msg}");
-        LAST_LOG_MS.store(now_ms, Ordering::Relaxed);
-    }
-}
-
-fn class_name(hwnd: HWND) -> String {
-    let mut buf = [0u16; 128];
-    let len = unsafe { GetClassNameW(hwnd, &mut buf) };
-    if len > 0 {
-        String::from_utf16_lossy(&buf[..len as usize])
-    } else {
-        String::new()
-    }
-}
-
-/// 前台窗口是否属于本应用：
-/// - 进程 ID 相同，或
-/// - 前台窗口就是主窗口，或
-/// - 前台窗口是主窗口的（子）窗口树成员（WebView2 子控件可能属于独立进程）
+/// 前台窗口是否属于本应用（三重检查）：
+/// 1. 前台窗口与本进程同 PID
+/// 2. 前台窗口（或其后代链）是主窗口
+/// 3. 前台窗口矩形位于主窗口矩形内部——WebView2 浏览器进程（msedgewebview2.exe）
+///    的前台窗口 `Chrome_WidgetWin_1` 既不同进程也非本窗口后代，但它恰好覆盖
+///    在主窗口客户区上，用矩形包含关系识别
 fn is_foreground_ours(main_hwnd: HWND) -> bool {
     let fg = unsafe { GetForegroundWindow() };
     if fg.0 == 0 {
@@ -91,7 +70,7 @@ fn is_foreground_ours(main_hwnd: HWND) -> bool {
         return true;
     }
 
-    // 从前景窗口向上回溯顶层窗口，与主窗口比对
+    // 从前景窗口向上回溯祖先链
     let mut current = fg;
     let mut guard = 0;
     while current.0 != 0 && guard < 32 {
@@ -105,7 +84,25 @@ fn is_foreground_ours(main_hwnd: HWND) -> bool {
         current = parent;
         guard += 1;
     }
-    current == main_hwnd
+
+    // 矩形包含检查（覆盖 WebView2 跨进程窗口）
+    if main_hwnd.0 != 0 {
+        let mut fg_rect = RECT::default();
+        let mut main_rect = RECT::default();
+        let fg_ok = unsafe { GetWindowRect(fg, &mut fg_rect) }.is_ok();
+        let main_ok = unsafe { GetWindowRect(main_hwnd, &mut main_rect) }.is_ok();
+        if fg_ok && main_ok {
+            if fg_rect.left >= main_rect.left
+                && fg_rect.top >= main_rect.top
+                && fg_rect.right <= main_rect.right
+                && fg_rect.bottom <= main_rect.bottom
+            {
+                return true;
+            }
+        }
+    }
+
+    false
 }
 
 unsafe extern "system" fn keyboard_proc(ncode: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
@@ -113,55 +110,44 @@ unsafe extern "system" fn keyboard_proc(ncode: i32, wparam: WPARAM, lparam: LPAR
         let msg = wparam.0 as u32;
         if msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN {
             let kbd = *(lparam.0 as *const KBDLLHOOKSTRUCT);
-            // 1) 空格键且 Alt 处于按下状态（系统键路径）
-            if kbd.vkCode == VK_SPACE.0 as u32 && (kbd.flags.0 & LLKHF_ALTDOWN) != 0 {
+            // 1) 空格键且 Alt 处于按下状态（系统键路径）。
+            //    注意：显示窗口时 focus_manager 会用 SendInput 注入一次 ALT 抬起，
+            //    可能把系统 Alt 状态复位（用户物理上仍按着 Alt），导致 LLKHF_ALTDOWN
+            //    丢失，因此用 GetAsyncKeyState 的物理状态作兜底。
+            let alt_down = (kbd.flags.0 & LLKHF_ALTDOWN) != 0
+                || unsafe { (GetAsyncKeyState(VK_MENU.0 as i32) as i16) < 0 };
+            if kbd.vkCode == VK_SPACE.0 as u32 && alt_down {
                 if let Some(app) = APP_HANDLE.get() {
+                    // 2) 主窗口可见时才有"隐藏"语义；隐藏状态下放行并自愈残留的录制标志，
+                    //    让首次 Alt+Space 交给 RegisterHotKey 完成显示
                     let main_visible = app
                         .get_webview_window("main")
                         .map(|w| w.is_visible().unwrap_or(false))
                         .unwrap_or(false);
-
-                    let main_hwnd = app
-                        .get_webview_window("main")
-                        .and_then(|w| w.hwnd().ok())
-                        .map(|h| HWND(h.0 as isize))
-                        .unwrap_or(HWND(0));
-
-                    let fg = unsafe { GetForegroundWindow() };
-                    let mut fg_pid: u32 = 0;
-                    unsafe { GetWindowThreadProcessId(fg, Some(&mut fg_pid)) };
-                    let our_pid = std::process::id();
-                    let fg_ours = is_foreground_ours(main_hwnd);
-                    let recording = RECORDING.load(Ordering::Relaxed);
-                    let gate = toggle_is_alt_space(app);
-
-                    log_hook(&format!(
-                        "msg={msg} flags={:#x} main_visible={main_visible} main_hwnd={main_hwnd:?} fg_hwnd={fg:?}({}) fg_pid={fg_pid} our_pid={our_pid} fg_ours={fg_ours} recording={recording} gate={gate}",
-                        kbd.flags.0,
-                        class_name(fg)
-                    ));
-
-                    // 2) 主窗口可见时才有"隐藏"语义；隐藏状态下放行并自愈残留的录制标志
                     if !main_visible {
                         RECORDING.store(false, Ordering::Relaxed);
                         return unsafe { CallNextHookEx(None, ncode, wparam, lparam) };
                     }
 
-                    // 3) 仅当本应用处于前台（避免劫持其他应用的 Alt+Space 系统菜单）
-                    if !fg_ours {
+                    // 3) 前台窗口属于本应用（避免劫持其他应用的 Alt+Space 系统菜单）
+                    let main_hwnd = app
+                        .get_webview_window("main")
+                        .and_then(|w| w.hwnd().ok())
+                        .map(|h| HWND(h.0 as isize))
+                        .unwrap_or(HWND(0));
+                    if !is_foreground_ours(main_hwnd) {
                         // 窗口失焦（可能未触发 DOM blur）时同样自愈录制标志
                         RECORDING.store(false, Ordering::Relaxed);
                         return unsafe { CallNextHookEx(None, ncode, wparam, lparam) };
                     }
 
                     // 4) 设置页录制快捷键期间放行，允许把 Alt+Space 录制成快捷键
-                    if recording {
+                    if RECORDING.load(Ordering::Relaxed) {
                         return unsafe { CallNextHookEx(None, ncode, wparam, lparam) };
                     }
 
                     // 5) 切换快捷键确实配置为 Alt+Space 时才拦截
-                    if gate {
-                        log_hook("CONSUMED -> request_hide");
+                    if toggle_is_alt_space(app) {
                         let app2 = app.clone();
                         let _ = app.run_on_main_thread(move || {
                             crate::window_manager::request_hide(&app2);
@@ -184,7 +170,7 @@ fn toggle_is_alt_space(app: &AppHandle) -> bool {
     match lock_result {
         Ok(shortcuts) => shortcuts.iter().any(|s| {
             s.command_name == "toggle_window"
-                && normalize_shortcut_string(&s.shortcut) == "alt+space"
+                && normalize_shortcut_string(&s.shortcut).eq_ignore_ascii_case("alt+space")
         }),
         Err(_) => false,
     }
@@ -201,7 +187,6 @@ pub fn install(app: &AppHandle) {
         let hook = SetWindowsHookExW(WH_KEYBOARD_LL, Some(keyboard_proc), None, 0);
         if let Ok(h) = hook {
             *HOOK.lock().unwrap() = Some(h);
-            eprintln!("[Alt+Space hook] installed");
             let mut msg = MSG::default();
             while GetMessageW(&mut msg, None, 0, 0).0 > 0 {}
             // 线程退出时注销钩子（进程退出前不会走到这里）
@@ -209,7 +194,7 @@ pub fn install(app: &AppHandle) {
                 let _ = UnhookWindowsHookEx(h_val);
             }
         } else {
-            eprintln!("[Alt+Space hook] FAILED to install WH_KEYBOARD_LL hook");
+            eprintln!("[shortcut_manager] Failed to install WH_KEYBOARD_LL hook");
         }
     });
 }
