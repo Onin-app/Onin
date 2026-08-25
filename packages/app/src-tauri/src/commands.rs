@@ -34,6 +34,7 @@ pub fn get_invoke_handler(
         shortcut_manager::commands::get_toggle_shortcut,
         shortcut_manager::commands::set_detach_window_shortcut,
         shortcut_manager::commands::get_detach_window_shortcut,
+        shortcut_manager::commands::set_shortcut_recording,
         // File command manager
         file_command_manager::get_file_commands,
         file_command_manager::add_file_commands,
