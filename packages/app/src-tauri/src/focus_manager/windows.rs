@@ -130,7 +130,9 @@ async fn verify_foreground_with_retry(window: &WebviewWindow, hwnd_isize: isize)
         // 前台被抢占或前台锁拒绝：ALT 键技巧 + 强置前台
         unsafe {
             let _ = AllowSetForegroundWindow(ASFW_ANY);
-            send_alt_key_trick();
+            if !is_alt_pressed() {
+                send_alt_key_trick();
+            }
             let _ = BringWindowToTop(HWND(hwnd_isize as _));
             let _ = SetForegroundWindow(HWND(hwnd_isize as _));
         }
@@ -160,7 +162,9 @@ fn activate_window(hwnd_isize: isize) {
         if foreground_thread != window_thread && foreground_thread != 0 {
             let _ = AttachThreadInput(window_thread, foreground_thread, true);
 
-            send_alt_key_trick();
+            if !is_alt_pressed() {
+                send_alt_key_trick();
+            }
             let _ = BringWindowToTop(hwnd_val);
             let _ = ShowWindow(hwnd_val, SW_SHOW);
             let _ = SetForegroundWindow(hwnd_val);
@@ -171,6 +175,13 @@ fn activate_window(hwnd_isize: isize) {
             let _ = ShowWindow(hwnd_val, SW_SHOW);
             let _ = SetForegroundWindow(hwnd_val);
         }
+    }
+}
+
+/// 检查物理 Alt 键当前是否处于按下状态
+fn is_alt_pressed() -> bool {
+    unsafe {
+        (windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState(VK_MENU.0 as i32) as i16) < 0
     }
 }
 

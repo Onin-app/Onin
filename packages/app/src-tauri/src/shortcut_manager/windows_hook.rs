@@ -31,8 +31,8 @@ use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM};
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_MENU, VK_SPACE};
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, GetForegroundWindow, GetMessageW, GetParent, GetWindowRect,
-    GetWindowThreadProcessId, SetWindowsHookExW, UnhookWindowsHookEx, HHOOK, KBDLLHOOKSTRUCT,
-    MSG, WH_KEYBOARD_LL, WM_KEYDOWN, WM_SYSKEYDOWN,
+    GetWindowThreadProcessId, SetWindowsHookExW, UnhookWindowsHookEx, HHOOK, KBDLLHOOKSTRUCT, MSG,
+    WH_KEYBOARD_LL, WM_KEYDOWN, WM_SYSKEYDOWN,
 };
 
 use super::state::ShortcutState;
@@ -110,50 +110,54 @@ unsafe extern "system" fn keyboard_proc(ncode: i32, wparam: WPARAM, lparam: LPAR
         let msg = wparam.0 as u32;
         if msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN {
             let kbd = *(lparam.0 as *const KBDLLHOOKSTRUCT);
-            // 1) 空格键且 Alt 处于按下状态（系统键路径）。
-            //    注意：显示窗口时 focus_manager 会用 SendInput 注入一次 ALT 抬起，
-            //    可能把系统 Alt 状态复位（用户物理上仍按着 Alt），导致 LLKHF_ALTDOWN
-            //    丢失，因此用 GetAsyncKeyState 的物理状态作兜底。
+            // 1) 空格键且 Alt 处于按下状态（系统键路径）
             let alt_down = (kbd.flags.0 & LLKHF_ALTDOWN) != 0
                 || unsafe { (GetAsyncKeyState(VK_MENU.0 as i32) as i16) < 0 };
             if kbd.vkCode == VK_SPACE.0 as u32 && alt_down {
                 if let Some(app) = APP_HANDLE.get() {
-                    // 2) 主窗口可见时才有"隐藏"语义；隐藏状态下放行并自愈残留的录制标志，
-                    //    让首次 Alt+Space 交给 RegisterHotKey 完成显示
-                    let main_visible = app
-                        .get_webview_window("main")
-                        .map(|w| w.is_visible().unwrap_or(false))
-                        .unwrap_or(false);
-                    if !main_visible {
-                        RECORDING.store(false, Ordering::Relaxed);
-                        return unsafe { CallNextHookEx(None, ncode, wparam, lparam) };
-                    }
-
-                    // 3) 前台窗口属于本应用（避免劫持其他应用的 Alt+Space 系统菜单）
-                    let main_hwnd = app
-                        .get_webview_window("main")
-                        .and_then(|w| w.hwnd().ok())
-                        .map(|h| HWND(h.0 as isize))
-                        .unwrap_or(HWND(0));
-                    if !is_foreground_ours(main_hwnd) {
-                        // 窗口失焦（可能未触发 DOM blur）时同样自愈录制标志
-                        RECORDING.store(false, Ordering::Relaxed);
-                        return unsafe { CallNextHookEx(None, ncode, wparam, lparam) };
-                    }
-
-                    // 4) 设置页录制快捷键期间放行，允许把 Alt+Space 录制成快捷键
+                    // 设置页录制快捷键期间放行，允许把 Alt+Space 录制成快捷键
                     if RECORDING.load(Ordering::Relaxed) {
                         return unsafe { CallNextHookEx(None, ncode, wparam, lparam) };
                     }
 
-                    // 5) 切换快捷键确实配置为 Alt+Space 时才拦截
+                    // 切换快捷键确实配置为 Alt+Space 时拦截处理
                     if toggle_is_alt_space(app) {
-                        let app2 = app.clone();
-                        let _ = app.run_on_main_thread(move || {
-                            crate::window_manager::request_hide(&app2);
-                        });
-                        // 消费按键：空格不会落入输入框，也不会触发其他处理
-                        return LRESULT(1);
+                        let main_visible = app
+                            .get_webview_window("main")
+                            .map(|w| w.is_visible().unwrap_or(false))
+                            .unwrap_or(false);
+
+                        if main_visible {
+                            // 主窗口可见时：前台属于本应用才隐藏
+                            let main_hwnd = app
+                                .get_webview_window("main")
+                                .and_then(|w| w.hwnd().ok())
+                                .map(|h| HWND(h.0 as isize))
+                                .unwrap_or(HWND(0));
+
+                            if is_foreground_ours(main_hwnd) {
+                                let app2 = app.clone();
+                                let _ = app.run_on_main_thread(move || {
+                                    crate::window_manager::request_hide(&app2);
+                                });
+                                // 消费按键：空格不会落入输入框，也不会触发其他处理
+                                return LRESULT(1);
+                            } else {
+                                // 窗口失焦时自愈录制标志
+                                RECORDING.store(false, Ordering::Relaxed);
+                            }
+                        } else {
+                            // 主窗口隐藏时：直接唤醒主窗口
+                            // 彻底支持"按住 Alt 不松开、连续按 Space 切换显示与隐藏"
+                            // 避免因 RegisterHotKey 的 MOD_NOREPEAT 导致无法再次触发
+                            RECORDING.store(false, Ordering::Relaxed);
+                            let app2 = app.clone();
+                            let _ = app.run_on_main_thread(move || {
+                                crate::window_manager::request_show(&app2);
+                            });
+                            // 消费按键：避免向其他前台程序发送 Alt+Space 系统菜单按键
+                            return LRESULT(1);
+                        }
                     }
                 }
             }
