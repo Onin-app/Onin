@@ -125,7 +125,7 @@ unsafe extern "system" fn keyboard_proc(ncode: i32, wparam: WPARAM, lparam: LPAR
                         .get_webview_window("main")
                         .and_then(|w| w.hwnd().ok())
                         .map(|h| HWND(h.0 as isize))
-                        .unwrap_or(HWND(std::ptr::null_mut()));
+                        .unwrap_or(HWND(0));
 
                     let fg = unsafe { GetForegroundWindow() };
                     let mut fg_pid: u32 = 0;
