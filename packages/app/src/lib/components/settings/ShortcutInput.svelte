@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Button } from "bits-ui";
+  import { invoke } from "@tauri-apps/api/core";
   import { platform } from "@tauri-apps/plugin-os";
 
   let {
@@ -152,10 +153,13 @@
   const handleFocus = () => {
     isFocused = true;
     previousShortcut = value;
+    // 通知后端：正在录制快捷键，Windows 的 Alt+Space 钩子需放行按键
+    invoke("set_shortcut_recording", { active: true }).catch(() => {});
   };
 
   const handleBlur = () => {
     isFocused = false;
+    invoke("set_shortcut_recording", { active: false }).catch(() => {});
     const modifiers = [
       "commandorcontrol",
       "control",

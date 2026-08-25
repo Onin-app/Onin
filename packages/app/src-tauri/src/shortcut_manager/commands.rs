@@ -9,6 +9,17 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 use super::state::ShortcutState;
 use super::storage;
 
+/// 设置快捷键录制状态（设置页录制快捷键输入框 focus/blur 时调用）
+///
+/// 录制期间 Windows 的 Alt+Space 低级键盘钩子会放行按键，避免设置页被误关闭。
+#[tauri::command]
+pub fn set_shortcut_recording(active: bool) {
+    #[cfg(target_os = "windows")]
+    super::windows_hook::set_recording(active);
+    #[cfg(not(target_os = "windows"))]
+    let _ = active;
+}
+
 /// 获取所有快捷键
 #[tauri::command]
 pub async fn get_shortcuts(

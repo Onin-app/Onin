@@ -14,6 +14,8 @@ mod handler;
 mod state;
 mod storage;
 mod utils;
+#[cfg(target_os = "windows")]
+pub mod windows_hook;
 
 // 重新导出公共接口
 pub use handler::handle_global_shortcut;
@@ -82,6 +84,13 @@ pub fn setup_shortcuts(app: &App) -> Result<(), Box<dyn std::error::Error>> {
                 eprintln!("Invalid shortcut format {}: {}", shortcut.shortcut, e);
             }
         }
+    }
+
+    // Windows：安装低级键盘钩子，拦截"按住 Alt 再按 Space"时无法触发 WM_HOTKEY
+    // 而落入 WebView2 输入框打出空格的系统键路径（详见 windows_hook 模块注释）
+    #[cfg(target_os = "windows")]
+    {
+        windows_hook::install(app.handle());
     }
 
     Ok(())
