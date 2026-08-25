@@ -102,7 +102,10 @@ fn is_our_process(hwnd: HWND) -> bool {
 
 fn toggle_is_alt_space(app: &AppHandle) -> bool {
     let state: State<ShortcutState> = app.state();
-    match state.shortcuts.lock() {
+    // 绑定到具名局部变量：match 直接锁取的临时值（持有 MutexGuard 的 Result）
+    // 会被延长到函数末尾才析构，晚于 `state` 的 drop，导致借用超期（E0597）。
+    let lock_result = state.shortcuts.lock();
+    match lock_result {
         Ok(shortcuts) => shortcuts.iter().any(|s| {
             s.command_name == "toggle_window"
                 && normalize_shortcut_string(&s.shortcut) == "alt+space"
