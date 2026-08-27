@@ -4,7 +4,6 @@
   import { escapeHandler } from "$lib/stores/escapeHandler";
   import {
     requestInputFocus,
-    requestInputFocusWithRetry,
     requestExtensionInputFocus,
   } from "$lib/stores/focusInput";
   import {
@@ -145,11 +144,12 @@
       const unlistenVisibility = await listen<boolean>(
         "window_visibility",
         (event) => {
-          // When window becomes visible, check if we are on the main page.
-          if (event.payload && page.route.id === "/") {
-            requestInputFocus();
-          }
           if (event.payload) {
+            if (page.route.id === "/") {
+              requestInputFocus();
+            } else {
+              requestExtensionInputFocus();
+            }
             // 窗口重新变为可见时（唤醒时），触发每日活跃心跳
             trackDailyActive();
           }

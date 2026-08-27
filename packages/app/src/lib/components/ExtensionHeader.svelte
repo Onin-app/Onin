@@ -9,8 +9,8 @@
   import type { Snippet } from "svelte";
   import { onMount } from "svelte";
   import {
-    requestInputFocusWithRetry,
     focusExtensionInputTrigger,
+    focusInputElement,
   } from "$lib/stores/focusInput";
   import ExtensionSettingsDrawer from "./ExtensionSettingsDrawer.svelte";
 
@@ -47,23 +47,12 @@
   let inputElement: HTMLInputElement = $state()!;
 
   export function focus() {
-    requestInputFocusWithRetry();
+    focusInputElement(inputElement);
   }
 
-  let initialTrigger = $state<number | null>(null);
-
   $effect(() => {
-    const triggerVal = $focusExtensionInputTrigger;
-    if (initialTrigger === null) {
-      initialTrigger = triggerVal;
-      // 首次初始化挂载时（例如普通内部路由跳转）：只执行单次的原生 DOM 聚焦，不启动定时器重试，彻底杜绝与快捷键冲突
-      if (typeof document !== "undefined") {
-        inputElement?.focus();
-      }
-    } else if (triggerVal > initialTrigger) {
-      // 只有当全局信号发生实际递增（快捷键唤起）时，才独占启动带有重试的聚焦引擎
-      focus();
-    }
+    $focusExtensionInputTrigger;
+    focusInputElement(inputElement);
   });
 
   const handleInput = (e: Event) => {
