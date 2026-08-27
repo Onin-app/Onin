@@ -61,38 +61,16 @@ pub fn restore_previous_foreground(app: &AppHandle) {
     }
 }
 
-/// 统一焦点入口：显示窗口 + 确定性前台激活 + 后台异步验证。
-///
-/// 分层设计（事件驱动，不再依赖前端轮询 document.hasFocus()）：
-/// 1. 同步段（主线程，微秒级）：显示窗口，并立即执行确定性激活配方
-///    （ALT 键模拟 + AttachThreadInput + SetForegroundWindow），处理常见情况。
-/// 2. 异步验证段（后台定时器，不阻塞主线程消息泵）：WebView2 渲染与 OS 激活
-///    存在几十毫秒的过渡期，前台可能被抢占或 SetForegroundWindow 被前台锁拒绝。
-///    后台在 40/120/300ms 各验证一次，失败则用 ALT 键技巧重试；
-///    确认成为前台后，再对 WebView2 子控件 SetFocus，并把焦点交给页面。
+/// 统一焦点入口：显示窗口 + 确定性前台激活 + 同步聚焦 WebView2 控件。
 pub fn focus_webview_window(window: &WebviewWindow) {
     let _ = window.unminimize();
     let _ = window.show();
 
     if let Ok(hwnd) = window.hwnd() {
-        activate_window(hwnd.0 as isize);
-    }
-
-    let window_verify = window.clone();
-    tauri::async_runtime::spawn(async move {
-        let Ok(hwnd) = window_verify.hwnd() else {
-            return;
-        };
         let hwnd_isize = hwnd.0 as isize;
-
-        if !verify_foreground_with_retry(&window_verify, hwnd_isize).await {
-            return;
-        }
-
-        // 前台已确认：聚焦 WebView2 子控件（键盘焦点落点），并通知页面
+        activate_window(hwnd_isize);
         focus_webview_child(hwnd_isize);
-        let _ = window_verify.eval("window.focus()");
-    });
+    }
 }
 
 pub fn focus_window(window: &Window) {
@@ -100,45 +78,12 @@ pub fn focus_window(window: &Window) {
     let _ = window.show();
 
     if let Ok(hwnd) = window.hwnd() {
-        activate_window(hwnd.0 as isize);
+        let hwnd_isize = hwnd.0 as isize;
+        activate_window(hwnd_isize);
+        focus_webview_child(hwnd_isize);
     }
 
     let _ = window.set_focus();
-}
-
-/// 后台验证窗口是否已成为前台；失败时用 ALT 键技巧重试。
-///
-/// 注意：此函数在 tokio 后台线程上执行，所有 Win32 调用均不依赖调用线程归属，
-/// 且不会阻塞主线程的消息泵（阻塞消息泵会延迟 WebView2 的 WM_ACTIVATE 处理，
-/// 反而让激活更慢）。
-async fn verify_foreground_with_retry(window: &WebviewWindow, hwnd_isize: isize) -> bool {
-    const DELAYS_MS: [u64; 3] = [40, 120, 300];
-
-    for delay in DELAYS_MS {
-        tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
-
-        // 窗口若已被隐藏（用户快速切换/其他逻辑隐藏），放弃本次唤醒
-        if !window.is_visible().unwrap_or(false) {
-            return false;
-        }
-
-        let fg = unsafe { GetForegroundWindow() };
-        if fg.0 as isize == hwnd_isize {
-            return true;
-        }
-
-        // 前台被抢占或前台锁拒绝：ALT 键技巧 + 强置前台
-        unsafe {
-            let _ = AllowSetForegroundWindow(ASFW_ANY);
-            if !is_alt_pressed() {
-                send_alt_key_trick();
-            }
-            let _ = BringWindowToTop(HWND(hwnd_isize as _));
-            let _ = SetForegroundWindow(HWND(hwnd_isize as _));
-        }
-    }
-
-    unsafe { GetForegroundWindow().0 as isize == hwnd_isize }
 }
 
 /// 确定性前台激活配方（同步段，主线程调用）。

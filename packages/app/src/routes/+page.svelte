@@ -32,11 +32,7 @@
     type ExtensionContext,
   } from "$lib/utils/extensionActions";
   import { escapeHandler } from "$lib/stores/escapeHandler";
-  import {
-    focusInputTrigger,
-    requestInputFocusWithRetry,
-    cancelInputFocusRetry,
-  } from "$lib/stores/focusInput";
+  import { focusInputTrigger, requestInputFocus } from "$lib/stores/focusInput";
   import { detachWindowShortcut } from "$lib/stores/shortcuts";
   import { hasNewVersion, latestVersion, appVersion } from "$lib/stores/update";
 
@@ -176,7 +172,7 @@
     if (plugin.state.showPluginInline) {
       invoke("acquire_window_close_lock").catch(console.error);
       await plugin.closePlugin();
-      requestInputFocusWithRetry();
+      requestInputFocus();
       setTimeout(() => {
         invoke("release_window_close_lock").catch(console.error);
       }, 200);
@@ -187,7 +183,6 @@
     clipboard.clearAttachments();
     matchedCommands = [];
     appListManager.resetToOriginList();
-    cancelInputFocusRetry();
 
     // 隐藏窗口前主动释放焦点，重置 activeElement 状态，防止混淆下次打开时的焦点判定
     if (typeof document !== "undefined" && document.activeElement) {
@@ -298,7 +293,7 @@
   const startColorPickCommand = async () => {
     await startColorPickerFlow({
       beforeStart: resetLauncherState,
-      onCancel: requestInputFocusWithRetry,
+      onCancel: requestInputFocus,
       closeOnSuccess: false,
       restoreMainWindow: false,
       useToastOverlay: true,
@@ -588,10 +583,9 @@
     // 获取应用列表
     await appListManager.fetchApps();
 
-    // 初始启动时，窗口默认可见但可能不会触发 window_visibility 事件，所以在此主动请求一次焦点。
-    // OS 前台由 Rust 侧激活序列保证，这里只负责 DOM 聚焦。
+    // 初始启动时主动请求一次焦点
     if (!plugin.state.showPluginInline) {
-      requestInputFocusWithRetry();
+      requestInputFocus();
     }
 
     // 监听窗口显示事件
@@ -599,12 +593,8 @@
       "window_visibility",
       async (event) => {
         if (event.payload) {
-          // 立即启动聚焦，不等待任何异步操作。
-          // OS 前台夺取由 Rust 侧 request_show 的确定性激活 + 后台验证重试保证；
-          // 窗口真正获得系统焦点时，onFocusChanged 会再触发一轮 DOM 聚焦，
-          // 这里先做一次 DOM 就绪聚焦，二者互为补充。
           if (!plugin.state.showPluginInline) {
-            requestInputFocusWithRetry();
+            requestInputFocus();
           } else {
             invoke("focus_inline_plugin").catch(console.error);
           }
@@ -614,8 +604,6 @@
           );
           updateMatchedCommands();
           await updateExtensionManagerPreview(); // 更新 Extension 预览（如计算器）
-        } else {
-          cancelInputFocusRetry();
         }
 
         // 转发可见性事件给插件
@@ -634,11 +622,6 @@
       ({ payload: focused }) => {
         if (plugin.state.showPluginInline) {
           plugin.sendLifecycleEvent(focused ? "focus" : "blur");
-        }
-        // 窗口真正获得系统焦点时（如 Alt+Space 唤起），确保搜索框有 DOM 焦点
-        // 这是比 window_visibility 更可靠的时机，WebView 此时已确定拿到焦点
-        if (focused && !plugin.state.showPluginInline) {
-          requestInputFocusWithRetry();
         }
       },
     );
