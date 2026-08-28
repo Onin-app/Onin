@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import { goto } from "$app/navigation";
+  import { page } from "$app/state";
   import { invoke } from "@tauri-apps/api/core";
   import { platform } from "@tauri-apps/plugin-os";
   import { toast } from "svelte-sonner";
@@ -455,6 +456,11 @@
   onMount(async () => {
     loadPlatform();
     headerRef?.focus();
+    const initialQuery = page.url.searchParams.get("q") || "";
+    if (initialQuery) {
+      searchQuery = initialQuery;
+      handleSearch(initialQuery);
+    }
     await refreshStatus();
     window.addEventListener("mousemove", handlePaneResize);
     window.addEventListener("mouseup", stopPaneResize);
