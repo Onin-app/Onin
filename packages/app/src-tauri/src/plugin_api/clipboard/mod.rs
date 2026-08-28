@@ -9,15 +9,15 @@
 //! - `commands`: Tauri 命令
 
 pub mod commands;
-mod monitor;
-mod timestamp;
-mod types;
+pub mod monitor;
+pub mod timestamp;
+pub mod types;
 
 // 重新导出公共接口
 pub use commands::{
     plugin_clipboard_clear, plugin_clipboard_get_metadata, plugin_clipboard_read_image,
     plugin_clipboard_read_text, plugin_clipboard_write_image, plugin_clipboard_write_text,
 };
-#[allow(unused_imports)]
-pub use monitor::start_clipboard_monitor;
+pub use monitor::init_clipboard_service;
+pub use timestamp::update_clipboard_timestamp;
 pub use types::{WriteImageOptions, WriteTextOptions};

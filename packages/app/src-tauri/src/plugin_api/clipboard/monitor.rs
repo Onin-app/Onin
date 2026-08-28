@@ -1,99 +1,29 @@
-//! 剪贴板监控模块
+//! 剪贴板自动清空与监控辅助模块
 
-use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager};
 
 use super::timestamp::{
-    update_clipboard_timestamp, APP_HANDLE, CLIPBOARD_MONITOR_STARTED, CLIPBOARD_TIMESTAMP,
-    WINDOW_HIDE_TIMESTAMP,
+    get_clipboard_timestamp, update_clipboard_timestamp, CLIPBOARD_TIMESTAMP, WINDOW_HIDE_TIMESTAMP,
 };
+use crate::app_config::AppConfigState;
 
-/// 启动剪贴板监控
-#[allow(dead_code)]
-pub fn start_clipboard_monitor(app: AppHandle) {
-    let mut started = CLIPBOARD_MONITOR_STARTED.lock().unwrap();
-    if *started {
-        return;
-    }
-    *started = true;
-    drop(started);
-
-    // 保存 AppHandle
-    {
-        let mut handle = APP_HANDLE.lock().unwrap();
-        *handle = Some(Arc::new(app.clone()));
-    }
-
+/// 初始化剪贴板辅助服务（初始化时间戳并启动自动清空检查任务）
+pub fn init_clipboard_service(app: &AppHandle) {
     // 初始化时间戳
     update_clipboard_timestamp();
 
-    // 启动剪贴板变化监控线程
-    std::thread::spawn(move || {
-        use clipboard_rs::{
-            ClipboardContext, ClipboardHandler, ClipboardWatcher, ClipboardWatcherContext,
-        };
-
-        struct ClipboardManager {
-            #[allow(dead_code)]
-            ctx: ClipboardContext,
-        }
-
-        impl ClipboardManager {
-            #[allow(dead_code)]
-            pub fn new() -> Result<Self, String> {
-                let ctx = ClipboardContext::new().map_err(|e| e.to_string())?;
-                Ok(ClipboardManager { ctx })
-            }
-        }
-
-        impl ClipboardHandler for ClipboardManager {
-            fn on_clipboard_change(&mut self) {
-                update_clipboard_timestamp();
-            }
-        }
-
-        match ClipboardManager::new() {
-            Ok(manager) => match ClipboardWatcherContext::new() {
-                Ok(mut watcher) => {
-                    watcher.add_handler(manager);
-                    watcher.start_watch();
-                }
-                Err(e) => {
-                    eprintln!("[Plugin API] Failed to initialize clipboard watcher: {}", e);
-                }
-            },
-            Err(e) => {
-                eprintln!(
-                    "[Plugin API] Failed to initialize clipboard manager (no display?): {}",
-                    e
-                );
-            }
-        }
-    });
-
-    // 启动定时清空检查线程
-    std::thread::spawn(move || {
-        start_auto_clear_thread();
-    });
+    // 启动跨平台通用的定时清空检查异步任务
+    start_auto_clear_task(app.clone());
 }
 
-/// 自动清空检查线程
-#[allow(dead_code)]
-fn start_auto_clear_thread() {
-    use super::timestamp::get_clipboard_timestamp;
-    use crate::app_config::AppConfigState;
+/// 自动清空检查任务
+fn start_auto_clear_task(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
+        loop {
+            interval.tick().await;
 
-    loop {
-        std::thread::sleep(std::time::Duration::from_secs(1));
-
-        // 获取 AppHandle
-        let app_handle = {
-            let handle = APP_HANDLE.lock().unwrap();
-            handle.as_ref().map(|h| Arc::clone(h))
-        };
-
-        if let Some(app) = app_handle {
             // 检查窗口是否隐藏
             let window_hidden = if let Some(window) = app.get_webview_window("main") {
                 !window.is_visible().unwrap_or(true)
@@ -103,53 +33,57 @@ fn start_auto_clear_thread() {
 
             // 只有在窗口隐藏时才执行自动清空逻辑
             if !window_hidden {
-                let mut hide_ts = WINDOW_HIDE_TIMESTAMP.lock().unwrap();
-                *hide_ts = None;
+                if let Ok(mut hide_ts) = WINDOW_HIDE_TIMESTAMP.lock() {
+                    *hide_ts = None;
+                }
                 continue;
             }
 
             // 记录窗口隐藏的时间戳
             let hide_timestamp = {
-                let mut hide_ts = WINDOW_HIDE_TIMESTAMP.lock().unwrap();
-                if hide_ts.is_none() {
-                    let now = SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap()
-                        .as_secs();
-                    *hide_ts = Some(now);
-                    now
+                if let Ok(mut hide_ts) = WINDOW_HIDE_TIMESTAMP.lock() {
+                    if hide_ts.is_none() {
+                        let now = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs();
+                        *hide_ts = Some(now);
+                        now
+                    } else {
+                        hide_ts.unwrap()
+                    }
                 } else {
-                    hide_ts.unwrap()
+                    continue;
                 }
             };
 
             // 获取配置
-            let config_state = app.state::<AppConfigState>();
-            let config = config_state.0.lock().unwrap();
-            let auto_clear_time_limit = config.auto_clear_time_limit;
-            drop(config);
+            let auto_clear_time_limit = match app.state::<AppConfigState>().0.lock() {
+                Ok(config) => config.auto_clear_time_limit,
+                Err(_) => 0,
+            };
 
             // 如果设置了自动清空时间限制
             if auto_clear_time_limit > 0 && get_clipboard_timestamp().is_some() {
                 let now = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
-                    .unwrap()
+                    .unwrap_or_default()
                     .as_secs();
 
-                let elapsed_since_hide = now - hide_timestamp;
+                let elapsed_since_hide = now.saturating_sub(hide_timestamp);
 
                 if elapsed_since_hide >= auto_clear_time_limit {
-                    if let Err(_e) = app.emit("clear_app_clipboard", ()) {
-                    } else {
-                    }
+                    let _ = app.emit("clear_app_clipboard", ());
 
                     // 重置时间戳
-                    let mut ts = CLIPBOARD_TIMESTAMP.lock().unwrap();
-                    *ts = 0;
-                    let mut hide_ts = WINDOW_HIDE_TIMESTAMP.lock().unwrap();
-                    *hide_ts = None;
+                    if let Ok(mut ts) = CLIPBOARD_TIMESTAMP.lock() {
+                        *ts = 0;
+                    }
+                    if let Ok(mut hide_ts) = WINDOW_HIDE_TIMESTAMP.lock() {
+                        *hide_ts = None;
+                    }
                 }
             }
         }
-    }
+    });
 }
