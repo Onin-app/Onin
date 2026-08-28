@@ -148,7 +148,6 @@
 
   const handleSearch = (value: string) => {
     searchQuery = value;
-    selectedIndex = 0;
     searchVersion += 1;
     const version = searchVersion;
     clearSearchTimers();
@@ -161,20 +160,17 @@
       return;
     }
 
-    results = [];
     hasMoreResults = false;
     isSearching = true;
     isLoadingMore = false;
     showSearchingIndicator = false;
-    const searchDelay = status.everything_ipc_available ? 25 : 180;
-    searchTimer = setTimeout(() => {
-      enqueueSearch(query, version, 0);
-    }, searchDelay);
+    // 立即发起检索，实现零延迟即打即搜
+    enqueueSearch(query, version, 0);
     loadingTimer = setTimeout(() => {
-      if (isSearching && results.length === 0) {
+      if (isSearching) {
         showSearchingIndicator = true;
       }
-    }, 140);
+    }, 150);
   };
 
   const applyQueryExample = (query: string) => {
@@ -228,10 +224,12 @@
         currentSearch.version === searchVersion &&
         currentSearch.query === searchQuery.trim()
       ) {
-        results =
-          currentSearch.offset === 0
-            ? uniqueFileSearchResults(response.items)
-            : mergeFileSearchResults(results, response.items);
+        if (currentSearch.offset === 0) {
+          results = uniqueFileSearchResults(response.items);
+          selectedIndex = 0;
+        } else {
+          results = mergeFileSearchResults(results, response.items);
+        }
         hasMoreResults = response.has_more;
         isSearching = false;
         isLoadingMore = false;
