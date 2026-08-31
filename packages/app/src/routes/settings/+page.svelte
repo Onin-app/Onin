@@ -14,7 +14,14 @@
     PuzzlePiece,
     Cloud,
     Database,
+    SidebarSimple,
   } from "phosphor-svelte";
+  import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+  } from "$lib/components/ui/tooltip";
 
   import GeneralSettings from "$lib/components/settings/GeneralSettings.svelte";
   import FileCommandSettings from "$lib/components/settings/FileCommandSettings.svelte";
@@ -94,14 +101,33 @@
 
   let activeSetting = $state<SettingItem>(settings[0]);
   let ActiveComponent = $derived(activeSetting.component);
+  let isCollapsed = $state(false);
 
   const handleEsc = () => {
     goto("/");
   };
 
+  const toggleCollapse = () => {
+    isCollapsed = !isCollapsed;
+    try {
+      localStorage.setItem("settings_sidebar_collapsed", String(isCollapsed));
+    } catch {
+      // ignore
+    }
+  };
+
   onMount(() => {
     // Register this page's ESC handler
     escapeHandler.set(handleEsc);
+
+    try {
+      const savedCollapsed = localStorage.getItem("settings_sidebar_collapsed");
+      if (savedCollapsed !== null) {
+        isCollapsed = savedCollapsed === "true";
+      }
+    } catch {
+      // ignore
+    }
 
     // 解析 query 参数，自动激活对应的设置面板
     const urlParams = new URLSearchParams(window.location.search);
@@ -131,44 +157,108 @@
     class="relative flex h-full w-full overflow-hidden rounded-xl bg-neutral-50 text-neutral-900 selection:bg-neutral-200 dark:bg-neutral-900 dark:text-neutral-100 dark:selection:bg-neutral-700"
     data-tauri-drag-region
   >
-    <aside
-      class="flex w-52 flex-col border-r border-neutral-200 bg-neutral-100/50 p-3 pt-6 dark:border-neutral-800 dark:bg-neutral-900/50"
-      data-tauri-drag-region
-    >
-      <div
-        class="mb-6 px-3 text-sm font-medium text-neutral-500"
+    <TooltipProvider delayDuration={150}>
+      <aside
+        class="flex flex-col border-r border-neutral-200 bg-neutral-100/50 pt-4 pb-3 transition-all duration-200 ease-in-out dark:border-neutral-800 dark:bg-neutral-900/50 {isCollapsed
+          ? 'w-16 px-2'
+          : 'w-52 p-3'}"
         data-tauri-drag-region
       >
-        设置
-      </div>
-      <nav class="flex flex-1 flex-col gap-1">
-        {#each settings as setting}
-          {@const Icon = setting.icon}
-          <Button.Root
-            class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors {activeSetting.id ===
-            setting.id
-              ? 'bg-white text-neutral-900 shadow-sm dark:bg-neutral-800 dark:text-white'
-              : 'text-neutral-600 hover:bg-neutral-200/50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white'}"
-            onclick={() => handleClickSetting(setting)}
-          >
-            <Icon size={18} />
-            {setting.name}
-          </Button.Root>
-        {/each}
-      </nav>
-
-      <div
-        class="mt-auto border-t border-neutral-200 pt-4 dark:border-neutral-800"
-      >
-        <Button.Root
-          class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-200/50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white"
-          onclick={() => goto("/plugins")}
+        <div
+          class="mb-4 flex items-center {isCollapsed
+            ? 'justify-center'
+            : 'justify-between px-2'} h-8"
+          data-tauri-drag-region
         >
-          <PlugsConnected size={18} />
-          插件管理
-        </Button.Root>
-      </div>
-    </aside>
+          {#if !isCollapsed}
+            <span
+              class="text-sm font-semibold text-neutral-500 select-none"
+              data-tauri-drag-region
+            >
+              设置
+            </span>
+          {/if}
+          <Tooltip>
+            <TooltipTrigger
+              class="flex h-7 w-7 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-200/60 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+              onclick={toggleCollapse}
+              aria-label={isCollapsed ? "展开侧边栏" : "折叠侧边栏"}
+            >
+              <SidebarSimple size={18} />
+            </TooltipTrigger>
+            <TooltipContent
+              side={isCollapsed ? "right" : "bottom"}
+              sideOffset={6}
+            >
+              {isCollapsed ? "展开侧边栏" : "折叠侧边栏"}
+            </TooltipContent>
+          </Tooltip>
+        </div>
+
+        <nav
+          class="flex flex-1 flex-col gap-1 overflow-x-hidden overflow-y-auto"
+        >
+          {#each settings as setting}
+            {@const Icon = setting.icon}
+            {#if isCollapsed}
+              <Tooltip>
+                <TooltipTrigger
+                  class="flex h-9 w-full items-center justify-center rounded-lg transition-colors {activeSetting.id ===
+                  setting.id
+                    ? 'bg-white text-neutral-900 shadow-sm dark:bg-neutral-800 dark:text-white'
+                    : 'text-neutral-600 hover:bg-neutral-200/50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white'}"
+                  onclick={() => handleClickSetting(setting)}
+                  aria-label={setting.name}
+                >
+                  <Icon size={18} />
+                </TooltipTrigger>
+                <TooltipContent side="right" sideOffset={10}>
+                  {setting.name}
+                </TooltipContent>
+              </Tooltip>
+            {:else}
+              <Button.Root
+                class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors {activeSetting.id ===
+                setting.id
+                  ? 'bg-white text-neutral-900 shadow-sm dark:bg-neutral-800 dark:text-white'
+                  : 'text-neutral-600 hover:bg-neutral-200/50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white'}"
+                onclick={() => handleClickSetting(setting)}
+              >
+                <Icon size={18} class="shrink-0" />
+                <span class="truncate">{setting.name}</span>
+              </Button.Root>
+            {/if}
+          {/each}
+        </nav>
+
+        <div
+          class="mt-auto border-t border-neutral-200 pt-3 dark:border-neutral-800"
+        >
+          {#if isCollapsed}
+            <Tooltip>
+              <TooltipTrigger
+                class="flex h-9 w-full items-center justify-center rounded-lg text-neutral-600 transition-colors hover:bg-neutral-200/50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white"
+                onclick={() => goto("/plugins")}
+                aria-label="插件管理"
+              >
+                <PlugsConnected size={18} />
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={10}>
+                插件管理
+              </TooltipContent>
+            </Tooltip>
+          {:else}
+            <Button.Root
+              class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-200/50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white"
+              onclick={() => goto("/plugins")}
+            >
+              <PlugsConnected size={18} class="shrink-0" />
+              <span class="truncate">插件管理</span>
+            </Button.Root>
+          {/if}
+        </div>
+      </aside>
+    </TooltipProvider>
 
     <div
       class="flex-1 overflow-hidden bg-white p-6 dark:bg-neutral-950"
