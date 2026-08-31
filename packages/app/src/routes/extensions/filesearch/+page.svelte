@@ -1,10 +1,11 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import { goto } from "$app/navigation";
+  import { page } from "$app/state";
   import { invoke } from "@tauri-apps/api/core";
   import { platform } from "@tauri-apps/plugin-os";
   import { toast } from "svelte-sonner";
-  import AppScrollArea from "$lib/components/AppScrollArea.svelte";
+  import { ScrollArea } from "$lib/components/ui/scroll-area";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import ExtensionHeader from "$lib/components/ExtensionHeader.svelte";
   import FilePreview from "$lib/components/FilePreview.svelte";
@@ -147,7 +148,6 @@
 
   const handleSearch = (value: string) => {
     searchQuery = value;
-    selectedIndex = 0;
     searchVersion += 1;
     const version = searchVersion;
     clearSearchTimers();
@@ -160,20 +160,17 @@
       return;
     }
 
-    results = [];
     hasMoreResults = false;
     isSearching = true;
     isLoadingMore = false;
     showSearchingIndicator = false;
-    const searchDelay = status.everything_ipc_available ? 25 : 180;
-    searchTimer = setTimeout(() => {
-      enqueueSearch(query, version, 0);
-    }, searchDelay);
+    // 立即发起检索，实现零延迟即打即搜
+    enqueueSearch(query, version, 0);
     loadingTimer = setTimeout(() => {
-      if (isSearching && results.length === 0) {
+      if (isSearching) {
         showSearchingIndicator = true;
       }
-    }, 140);
+    }, 150);
   };
 
   const applyQueryExample = (query: string) => {
@@ -227,10 +224,12 @@
         currentSearch.version === searchVersion &&
         currentSearch.query === searchQuery.trim()
       ) {
-        results =
-          currentSearch.offset === 0
-            ? uniqueFileSearchResults(response.items)
-            : mergeFileSearchResults(results, response.items);
+        if (currentSearch.offset === 0) {
+          results = uniqueFileSearchResults(response.items);
+          selectedIndex = 0;
+        } else {
+          results = mergeFileSearchResults(results, response.items);
+        }
         hasMoreResults = response.has_more;
         isSearching = false;
         isLoadingMore = false;
@@ -455,6 +454,11 @@
   onMount(async () => {
     loadPlatform();
     headerRef?.focus();
+    const initialQuery = page.url.searchParams.get("q") || "";
+    if (initialQuery) {
+      searchQuery = initialQuery;
+      handleSearch(initialQuery);
+    }
     await refreshStatus();
     window.addEventListener("mousemove", handlePaneResize);
     window.addEventListener("mouseup", stopPaneResize);
@@ -591,10 +595,7 @@
   {:else}
     <div id="file-search-split-shell" class="flex flex-1 overflow-hidden">
       <div class="flex min-w-0 flex-col" style={`width: ${listPaneWidth}%`}>
-        <AppScrollArea
-          class="h-full w-full"
-          viewportClass="h-full w-full p-1.5"
-        >
+        <ScrollArea class="h-full w-full" viewportClass="h-full w-full p-1.5">
           <div class="flex flex-col gap-1">
             {#each results as item, index (item.path)}
               <button
@@ -657,7 +658,7 @@
               </div>
             {/if}
           </div>
-        </AppScrollArea>
+        </ScrollArea>
       </div>
 
       <button
@@ -696,7 +697,7 @@
         </div>
 
         <div class="relative flex-1 overflow-hidden">
-          <AppScrollArea class="h-full w-full" viewportClass="h-full w-full">
+          <ScrollArea class="h-full w-full" viewportClass="h-full w-full">
             {#if selectedItem.item_type === "File"}
               <FilePreview
                 path={selectedItem.path}
@@ -773,7 +774,7 @@
                 </div>
               </div>
             {/if}
-          </AppScrollArea>
+          </ScrollArea>
         </div>
       </div>
     </div>

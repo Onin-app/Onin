@@ -106,6 +106,10 @@ pub struct AppConfig {
     /// OCR AI 模型 ID
     #[serde(default)]
     pub ocr_model_id: Option<String>,
+
+    /// 窗口透明度百分比 (30 - 100)，默认 100
+    #[serde(default = "default_window_opacity")]
+    pub window_opacity: u32,
 }
 
 fn default_auto_paste_time_limit() -> u64 {
@@ -132,6 +136,10 @@ fn default_ocr_default_engine() -> String {
     "local".to_string()
 }
 
+fn default_window_opacity() -> u32 {
+    100
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
@@ -148,6 +156,7 @@ impl Default for AppConfig {
             ocr_default_engine: default_ocr_default_engine(),
             ocr_provider_id: None,
             ocr_model_id: None,
+            window_opacity: default_window_opacity(),
         }
     }
 }

@@ -3,7 +3,10 @@
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
   import { platform } from "@tauri-apps/plugin-os";
-  import { Switch } from "bits-ui";
+  import { Button } from "$lib/components/ui/button";
+  import { Input } from "$lib/components/ui/input";
+  import { Switch } from "$lib/components/ui/switch";
+  import { Badge } from "$lib/components/ui/badge";
   import { toast } from "svelte-sonner";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import PhosphorIcon from "$lib/components/PhosphorIcon.svelte";
@@ -78,7 +81,7 @@
       config = await invoke<AppConfig>("get_app_config");
     } catch (error) {
       console.error("Failed to load file search config:", error);
-      toast.error("加载文件搜索设置失败");
+      toast.error("加载文件搜索配置失败");
     } finally {
       loading = false;
     }
@@ -88,19 +91,77 @@
     try {
       status = await invoke<FileSearchStatus>("get_file_search_status");
     } catch (error) {
-      console.error("Failed to load file search status:", error);
+      console.error("Failed to refresh file search status:", error);
     }
   }
 
-  async function setEverythingInstallCloseLock(locked: boolean) {
-    if (locked === everythingInstallCloseLockHeld) return;
+  async function setEverythingInstallCloseLock(acquire: boolean) {
+    if (acquire === everythingInstallCloseLockHeld) {
+      return;
+    }
 
-    everythingInstallCloseLockHeld = locked;
-    await invoke(
-      locked ? "acquire_window_close_lock" : "release_window_close_lock",
-    ).catch((error) => {
-      everythingInstallCloseLockHeld = !locked;
-      console.error("Failed to update Everything install window lock:", error);
+    try {
+      if (acquire) {
+        await invoke("acquire_window_close_lock");
+        everythingInstallCloseLockHeld = true;
+      } else {
+        await invoke("release_window_close_lock");
+        everythingInstallCloseLockHeld = false;
+      }
+    } catch (error) {
+      console.error(
+        "Failed to update window close lock for Everything install:",
+        error,
+      );
+    }
+  }
+
+  async function saveConfig(nextConfig: AppConfig) {
+    saving = true;
+    try {
+      await invoke("update_app_config", {
+        config: nextConfig,
+      });
+      config = nextConfig;
+      toast.success("文件搜索配置已保存");
+      await refreshStatus();
+    } catch (error) {
+      console.error("Failed to save file search config:", error);
+      toast.error("保存文件搜索配置失败");
+    } finally {
+      saving = false;
+    }
+  }
+
+  async function addExcludedPath(pathToAdd: string) {
+    const trimmed = pathToAdd.trim();
+    if (!trimmed || !config) return;
+
+    const currentPaths = config.file_search_excluded_paths ?? [];
+    if (currentPaths.includes(trimmed)) {
+      toast.info("该路径已在排除列表中");
+      excludeInput = "";
+      return;
+    }
+
+    const nextPaths = [...currentPaths, trimmed];
+    excludeInput = "";
+    await saveConfig({
+      ...config,
+      file_search_excluded_paths: nextPaths,
+    });
+  }
+
+  async function removeExcludedPath(pathToRemove: string) {
+    if (!config) return;
+
+    const nextPaths = (config.file_search_excluded_paths ?? []).filter(
+      (path) => path !== pathToRemove,
+    );
+
+    await saveConfig({
+      ...config,
+      file_search_excluded_paths: nextPaths,
     });
   }
 
@@ -108,64 +169,19 @@
     if (installingEverything) return;
 
     installingEverything = true;
-    const toastId = toast.loading("正在安装 Everything...");
     try {
-      await invoke("install_file_search_everything");
-      await refreshStatus();
+      await invoke("install_everything");
       installEverythingDialogOpen = false;
-      toast.success("Everything 已安装，文件搜索将优先使用 Everything", {
-        id: toastId,
-      });
+      toast.success(
+        "已发起 Everything 安装，请按系统提示完成安装并启动 Everything",
+      );
+      await refreshStatus();
     } catch (error) {
       console.error("Failed to install Everything:", error);
-      installEverythingDialogOpen = false;
-      toast.error(String(error), { id: toastId });
+      toast.error("安装 Everything 失败: " + String(error));
     } finally {
       installingEverything = false;
     }
-  }
-
-  async function saveConfig(nextConfig: AppConfig) {
-    if (saving) return;
-
-    saving = true;
-    try {
-      await invoke("update_app_config", { config: nextConfig });
-      config = nextConfig;
-      await refreshStatus();
-      toast.success("文件搜索设置已保存");
-    } catch (error) {
-      console.error("Failed to save file search config:", error);
-      toast.error("保存文件搜索设置失败");
-    } finally {
-      saving = false;
-    }
-  }
-
-  function normalizedList(paths: string[]) {
-    return Array.from(
-      new Set(paths.map((path) => path.trim()).filter(Boolean)),
-    );
-  }
-
-  async function addExcludedPath(path: string) {
-    if (!config) return;
-    const nextExcludedPaths = normalizedList([...excludedPaths, path]);
-    await saveConfig({
-      ...config,
-      file_search_excluded_paths: nextExcludedPaths,
-    });
-    excludeInput = "";
-  }
-
-  async function removeExcludedPath(path: string) {
-    if (!config) return;
-    await saveConfig({
-      ...config,
-      file_search_excluded_paths: excludedPaths.filter(
-        (excludedPath) => excludedPath !== path,
-      ),
-    });
   }
 
   async function chooseDirectory() {
@@ -214,150 +230,143 @@
 </script>
 
 {#if loading}
-  <div class="py-3 text-sm text-neutral-500 dark:text-neutral-400">
-    正在加载文件搜索设置...
-  </div>
+  <div class="text-muted-foreground py-3 text-sm">正在加载文件搜索设置...</div>
 {:else if config}
   <div class="flex flex-col gap-5">
-    <section class="border-t border-neutral-100 pt-4 dark:border-neutral-800">
+    <section class="border-border/50 border-t pt-4">
       <div class="mb-3 flex items-center justify-between gap-4">
         <div>
-          <h4
-            class="text-sm font-semibold text-neutral-950 dark:text-neutral-50"
-          >
-            排除路径
-          </h4>
-          <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+          <h4 class="text-foreground text-sm font-semibold">排除路径</h4>
+          <p class="text-muted-foreground mt-1 text-xs">
             匹配这些路径的文件和目录不会出现在搜索结果中。
           </p>
         </div>
-        <button
-          class="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800"
+        <Button
+          variant="outline"
+          size="sm"
+          class="h-8 gap-1.5 text-xs"
           disabled={choosingDirectory}
           onclick={chooseDirectory}
         >
           <PhosphorIcon icon="folderPlus" class="h-4 w-4" />
           选择目录
-        </button>
+        </Button>
       </div>
 
       <div class="mb-3 flex gap-2">
-        <input
-          class="min-w-0 flex-1 rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm outline-none focus:border-neutral-400 dark:border-neutral-700 dark:bg-neutral-950 dark:focus:border-neutral-500"
+        <Input
           placeholder="C:\Users\name\Downloads\tmp"
           bind:value={excludeInput}
           onkeydown={(event) => {
             if (event.key === "Enter") addExcludedPath(excludeInput);
           }}
+          class="h-9 text-sm"
         />
-        <button
-          class="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
+        <Button
           disabled={!excludeInput.trim()}
           onclick={() => addExcludedPath(excludeInput)}
+          class="h-9 px-4"
         >
           添加
-        </button>
+        </Button>
       </div>
 
       <div class="flex flex-col gap-2">
         {#each excludedPaths as path (path)}
           <div
-            class="flex items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 text-sm dark:bg-neutral-800"
+            class="bg-muted/40 flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"
           >
-            <PhosphorIcon icon="prohibit" class="h-4 w-4 shrink-0" />
-            <span class="min-w-0 flex-1 truncate font-mono text-xs">
+            <PhosphorIcon
+              icon="prohibit"
+              class="text-muted-foreground h-4 w-4 shrink-0"
+            />
+            <span
+              class="text-foreground min-w-0 flex-1 truncate font-mono text-xs"
+            >
               {path}
             </span>
-            <button
-              class="rounded p-1 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900 dark:hover:bg-neutral-700 dark:hover:text-neutral-100"
+            <Button
+              variant="ghost"
+              size="icon"
+              class="text-muted-foreground hover:text-destructive h-7 w-7"
               title="移除"
               onclick={() => removeExcludedPath(path)}
             >
               <PhosphorIcon icon="trash" class="h-4 w-4" />
-            </button>
+            </Button>
           </div>
         {:else}
-          <div class="text-sm text-neutral-500 dark:text-neutral-400">
-            暂无额外排除路径
-          </div>
+          <div class="text-sm text-muted-foreground">暂无额外排除路径</div>
         {/each}
       </div>
     </section>
 
     <section
-      class="flex items-center justify-between gap-4 border-t border-neutral-100 pt-4 dark:border-neutral-800"
+      class="border-border/50 flex items-center justify-between gap-4 border-t pt-4"
     >
       <div>
-        <h4 class="text-sm font-semibold text-neutral-950 dark:text-neutral-50">
-          隐藏文件
-        </h4>
-        <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+        <h4 class="text-foreground text-sm font-semibold">隐藏文件</h4>
+        <p class="text-muted-foreground mt-1 text-xs">
           开启后会显示以点号开头的文件和目录。
         </p>
       </div>
-      <Switch.Root
+      <Switch
         checked={config.file_search_include_hidden ?? false}
         onCheckedChange={updateIncludeHidden}
-        class="peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:ring-offset-2 focus-visible:outline-hidden data-[state=checked]:bg-neutral-900 data-[state=unchecked]:bg-neutral-200 dark:focus-visible:ring-neutral-300 dark:data-[state=checked]:bg-neutral-50 dark:data-[state=unchecked]:bg-neutral-700"
-      >
-        <Switch.Thumb
-          class="pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0 dark:bg-neutral-950"
-        />
-      </Switch.Root>
+      />
     </section>
 
-    <section class="border-t border-neutral-100 pt-4 dark:border-neutral-800">
+    <section class="border-border/50 border-t pt-4">
       <div>
         <div class="flex items-start justify-between gap-4">
           <div class="min-w-0">
-            <h4
-              class="text-sm font-semibold text-neutral-950 dark:text-neutral-50"
-            >
-              搜索后端
-            </h4>
-            <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+            <h4 class="text-foreground text-sm font-semibold">搜索后端</h4>
+            <p class="text-muted-foreground mt-1 text-xs">
               {backendDescription}
             </p>
           </div>
           {#if isWindows && status.everything_install_required}
-            <button
-              class="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-neutral-900 px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
+            <Button
+              size="sm"
+              class="h-8 shrink-0 gap-1.5 text-xs"
               disabled={installingEverything}
               onclick={() => (installEverythingDialogOpen = true)}
             >
               <PhosphorIcon icon="download" class="h-4 w-4" />
               安装 Everything
-            </button>
+            </Button>
           {/if}
         </div>
 
         <div class="mt-3 flex flex-wrap items-center gap-2">
-          <div
-            class="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-neutral-50 px-2 py-1 text-xs text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
+          <Badge
+            variant="secondary"
+            class="gap-1.5 px-2.5 py-1 text-xs font-normal"
           >
             <span
               class="h-1.5 w-1.5 rounded-full {status.is_searching
                 ? 'animate-pulse bg-amber-500'
                 : status.available
                   ? 'bg-emerald-500'
-                  : 'bg-red-500'}"
+                  : 'bg-destructive'}"
             ></span>
             <span>
               当前：{status.backend || "系统搜索"} · {status.available
                 ? "可用"
                 : "不可用"}
             </span>
-          </div>
+          </Badge>
           {#if isWindows}
-            <div
-              class="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-600 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-300"
+            <Badge
+              variant="outline"
+              class="gap-1.5 px-2.5 py-1 text-xs font-normal"
             >
               <span
                 class="h-1.5 w-1.5 rounded-full {status.everything_installed
                   ? status.everything_ipc_available
                     ? 'bg-emerald-500'
                     : 'bg-amber-500'
-                  : 'bg-neutral-300 dark:bg-neutral-600'}"
+                  : 'bg-muted-foreground'}"
               ></span>
               <span>
                 Everything：{status.everything_installed
@@ -366,17 +375,17 @@
                     : "已安装，等待后台启动"
                   : "未安装"}
               </span>
-            </div>
+            </Badge>
           {/if}
         </div>
         {#if isWindows && status.everything_install_required}
-          <p class="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
+          <p class="text-muted-foreground mt-2 text-xs">
             当前会继续使用 Windows Search。安装 Everything
             后可获得更快的全盘文件名搜索。
           </p>
         {/if}
         {#if status.last_error}
-          <p class="mt-2 text-xs text-red-500">{status.last_error}</p>
+          <p class="text-destructive mt-2 text-xs">{status.last_error}</p>
         {/if}
       </div>
     </section>

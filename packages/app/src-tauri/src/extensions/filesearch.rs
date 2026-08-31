@@ -1,6 +1,7 @@
 use crate::extension::registry::Extension;
 use crate::extension::types::{
     ExtensionCommand, ExtensionManifest, ExtensionPreview, ExtensionResult, ExtensionResultType,
+    StaticCommandMatch,
 };
 
 pub fn init(_app: &tauri::AppHandle) {}
@@ -16,7 +17,14 @@ pub static FILE_SEARCH_MANIFEST: ExtensionManifest = ExtensionManifest {
         description: Some("进入本地文件搜索模式"),
         icon: Some("folder"),
         keywords: &[],
-        matches: None,
+        matches: Some(&[StaticCommandMatch {
+            match_type: "text",
+            name: "文件搜索",
+            description: "在本地文件中搜索当前文本",
+            regexp: None,
+            min: Some(1),
+            max: None,
+        }]),
     }],
 };
 

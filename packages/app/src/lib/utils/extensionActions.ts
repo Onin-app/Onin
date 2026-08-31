@@ -77,7 +77,11 @@ export const EXTENSION_ACTION_MAP: Record<string, ExtensionAction> = {
   // ── 文件搜索 ──────────────────────────────────────────────────────────────
   "file_search:search": {
     type: "navigate",
-    route: () => "/extensions/filesearch",
+    route: (ctx) =>
+      ctx.effectiveText
+        ? `/extensions/filesearch?q=${encode(ctx.effectiveText)}`
+        : "/extensions/filesearch",
+    queryOnlyWhenMatched: true,
   },
 
   // ── AI ────────────────────────────────────────────────────────────────────

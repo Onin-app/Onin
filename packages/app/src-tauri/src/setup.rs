@@ -29,9 +29,8 @@ pub fn on_app_setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     // 3. 加载并初始化 AI 配置
     load_ai_config(app);
 
-    // 4. 启动平台特定服务 (仅 Windows)
-    #[cfg(target_os = "windows")]
-    plugin_api::clipboard::start_clipboard_monitor(app.handle().clone());
+    // 4. 初始化剪贴板辅助服务（全平台自动清空检查任务与时间戳管理）
+    plugin_api::clipboard::init_clipboard_service(app.handle());
 
     // Initialize Clipboard Extension (Native)
     crate::extensions::clipboard::init(app.handle());

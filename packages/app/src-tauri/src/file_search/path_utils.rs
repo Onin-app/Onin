@@ -90,12 +90,16 @@ pub(super) fn validate_search_result_path(app: &AppHandle, path: &str) -> Result
 }
 
 pub(super) fn platform_file_from_path(path: &Path) -> Option<PlatformFile> {
-    let metadata = fs::metadata(path).ok()?;
-    platform_file_from_path_with_kind_and_modified_time(
-        path,
-        metadata.is_dir(),
-        modified_time_from_metadata(&metadata),
-    )
+    let path_str = path.to_string_lossy();
+    let trimmed_str = path_str.trim_end_matches(['\\', '/']);
+    let clean_path = Path::new(trimmed_str);
+    let metadata = fs::metadata(clean_path).ok();
+    let is_dir = metadata
+        .as_ref()
+        .map(|m| m.is_dir())
+        .unwrap_or_else(|| clean_path.is_dir());
+    let modified_time = metadata.as_ref().and_then(modified_time_from_metadata);
+    platform_file_from_path_with_kind_and_modified_time(clean_path, is_dir, modified_time)
 }
 
 pub(super) fn platform_file_from_path_with_kind_and_modified_time(
@@ -103,19 +107,31 @@ pub(super) fn platform_file_from_path_with_kind_and_modified_time(
     is_dir: bool,
     modified_time: Option<u64>,
 ) -> Option<PlatformFile> {
-    let name = path.file_name()?.to_string_lossy().to_string();
+    let path_str = path.to_string_lossy();
+    let trimmed_str = path_str.trim_end_matches(['\\', '/']);
+    let path = Path::new(trimmed_str);
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| trimmed_str.to_string());
+    if name.is_empty() {
+        return None;
+    }
     let parent = path
         .parent()
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_default();
-    let extension = path
-        .extension()
-        .map(|ext| format!(".{}", ext.to_string_lossy().to_lowercase()))
-        .unwrap_or_default();
+    let extension = if is_dir {
+        String::new()
+    } else {
+        path.extension()
+            .map(|ext| format!(".{}", ext.to_string_lossy().to_lowercase()))
+            .unwrap_or_default()
+    };
 
     Some(PlatformFile {
         name,
-        path: path.to_string_lossy().to_string(),
+        path: trimmed_str.to_string(),
         parent,
         extension,
         is_dir,
@@ -201,6 +217,10 @@ pub(super) fn should_ignore_path(path: &Path, options: &FileSearchOptions) -> bo
             return true;
         }
 
+        if name.starts_with("$recycle.bin") || name.starts_with("$") {
+            return true;
+        }
+
         matches!(
             name.as_str(),
             ".git"
@@ -213,11 +233,20 @@ pub(super) fn should_ignore_path(path: &Path, options: &FileSearchOptions) -> bo
                 | "caches"
                 | "temp"
                 | "tmp"
+                | "$recycle.bin"
+                | "recycle.bin"
+                | "system volume information"
+                | "__pycache__"
         )
     })
 }
 
 fn is_platform_cache_dir(path: &Path) -> bool {
     let normalized = path.to_string_lossy().replace('\\', "/").to_lowercase();
-    normalized.contains("/appdata/local/temp") || normalized.contains("/library/caches")
+    normalized.contains("/appdata/local/temp")
+        || normalized.contains("/appdata/roaming/microsoft/windows/recent")
+        || normalized.contains("/library/caches")
+        || normalized.contains("/$recycle.bin")
+        || normalized.contains("/system volume information")
+        || normalized.contains("/program files/windowsapps")
 }

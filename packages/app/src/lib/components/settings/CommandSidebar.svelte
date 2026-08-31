@@ -5,7 +5,7 @@
    * 指令设置侧边栏组件
    * 显示内置指令分类和插件指令列表
    */
-  import { Button } from "bits-ui";
+  import { Button } from "$lib/components/ui/button";
   import {
     Command as CommandIcon,
     RocketLaunch,
@@ -26,13 +26,11 @@
     Internal: Compass,
   };
 
-  // 分类接口
   interface Category {
     id: string;
     name: string;
   }
 
-  // Props 接口
   interface Props {
     categories: Category[];
     activeCategory: Category | null;
@@ -52,29 +50,29 @@
   }: Props = $props();
 </script>
 
-<div
-  class="flex w-36 shrink-0 flex-col gap-4 border-r border-neutral-100 pr-4 dark:border-neutral-800"
->
+<div class="border-border/40 flex w-36 shrink-0 flex-col gap-4 border-r pr-4">
   <!-- 内置指令分类 -->
   <div class="flex flex-col gap-1">
     <h3
-      class="px-2 py-1 text-[10px] font-semibold tracking-wider text-neutral-400 uppercase dark:text-neutral-500"
+      class="text-muted-foreground px-2 py-1 text-[10px] font-semibold tracking-wider uppercase select-none"
     >
       内置指令
     </h3>
     <div class="flex flex-col gap-0.5">
       {#each categories as category}
-        <Button.Root
-          class="flex w-full items-center justify-start gap-2 rounded-md px-2 py-1 text-sm font-medium transition-colors {activeCategory?.id ===
-          category.id
-            ? 'bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-white'
-            : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-neutral-200'}"
+        {@const isActive = activeCategory?.id === category.id}
+        <Button
+          variant={isActive ? "secondary" : "ghost"}
+          size="sm"
+          class="h-8.5 w-full cursor-pointer justify-start gap-2 rounded-xl px-2.5 text-xs font-medium transition-[transform,background-color,color,box-shadow] duration-140 ease-[cubic-bezier(0.23,1,0.32,1)] outline-none active:scale-[0.97] {isActive
+            ? 'bg-card text-foreground border-border/50 border shadow-2xs'
+            : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
           onclick={() => onSelectCategory(category.id)}
         >
           {@const Icon = iconMap[category.id] || CommandIcon}
-          <Icon size={15} />
-          {category.name}
-        </Button.Root>
+          <Icon size={14} class="shrink-0" />
+          <span class="truncate">{category.name}</span>
+        </Button>
       {/each}
     </div>
   </div>
@@ -83,22 +81,24 @@
   {#if pluginNames.length > 0}
     <div class="flex flex-col gap-1">
       <h3
-        class="px-2 py-1 text-[10px] font-semibold tracking-wider text-neutral-400 uppercase dark:text-neutral-500"
+        class="text-muted-foreground px-2 py-1 text-[10px] font-semibold tracking-wider uppercase select-none"
       >
         插件指令
       </h3>
       <div class="flex flex-col gap-0.5">
         {#each pluginNames as pluginName}
-          <Button.Root
-            class="flex w-full items-center justify-start gap-2 truncate rounded-md px-2 py-1 text-left text-sm font-medium transition-colors {selectedPlugin ===
-            pluginName
-              ? 'bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-white'
-              : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-neutral-200'}"
+          {@const isActive = selectedPlugin === pluginName}
+          <Button
+            variant={isActive ? "secondary" : "ghost"}
+            size="sm"
+            class="h-8.5 w-full cursor-pointer justify-start gap-2 rounded-xl px-2.5 text-xs font-medium transition-[transform,background-color,color,box-shadow] duration-140 ease-[cubic-bezier(0.23,1,0.32,1)] outline-none active:scale-[0.97] {isActive
+              ? 'bg-card text-foreground border-border/50 border shadow-2xs'
+              : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
             onclick={() => onSelectPlugin(pluginName)}
           >
-            <PuzzlePiece size={15} class="shrink-0" />
+            <PuzzlePiece size={14} class="shrink-0" />
             <span class="truncate">{pluginName}</span>
-          </Button.Root>
+          </Button>
         {/each}
       </div>
     </div>

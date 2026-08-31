@@ -11,7 +11,7 @@
   import { CheckCircle, Storefront } from "phosphor-svelte";
   import { goto } from "$app/navigation";
   import { escapeHandler } from "$lib/stores/escapeHandler";
-  import AppScrollArea from "$lib/components/AppScrollArea.svelte";
+  import { ScrollArea } from "$lib/components/ui/scroll-area";
 
   // Composable
   import {
@@ -101,7 +101,7 @@
 
 <div class="h-[100vh] w-full bg-transparent p-1">
   <main
-    class="flex h-full w-full flex-col overflow-hidden rounded-xl bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100"
+    class="border-border/70 bg-background/95 text-foreground relative flex h-full w-full flex-col overflow-hidden rounded-2xl border shadow-2xl ring-1 ring-white/10 backdrop-blur-2xl dark:ring-white/5"
     data-tauri-drag-region
   >
     {#if currentSettingsPlugin && currentSettingsPlugin.settings}
@@ -125,32 +125,32 @@
       <div class="flex-1 overflow-hidden px-4 py-3">
         <Tabs.Root bind:value={activeTab} class="flex h-full flex-col">
           <Tabs.List
-            class="mb-3 inline-flex items-center gap-1 border-b border-neutral-200 dark:border-neutral-700"
+            class="bg-muted/50 border-border/40 mb-3 inline-flex w-fit items-center gap-1 rounded-xl border p-1"
           >
             <Tabs.Trigger
               value="installed"
-              class="inline-flex items-center justify-center border-b-2 border-transparent px-3 py-2 text-sm font-medium text-neutral-600 transition-colors hover:text-neutral-900 data-[state=active]:border-neutral-900 data-[state=active]:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 dark:data-[state=active]:border-neutral-100 dark:data-[state=active]:text-neutral-100"
+              class="text-muted-foreground hover:text-foreground data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:border-border/50 inline-flex cursor-pointer items-center justify-center rounded-lg px-3 py-1.5 text-xs font-medium transition-[transform,background-color,color,box-shadow] duration-140 ease-[cubic-bezier(0.23,1,0.32,1)] outline-none active:scale-[0.97] data-[state=active]:border data-[state=active]:shadow-2xs"
             >
-              <CheckCircle class="mr-1.5 h-4 w-4" />
+              <CheckCircle class="mr-1.5 h-3.5 w-3.5" />
               已安装
             </Tabs.Trigger>
             <Tabs.Trigger
               value="market"
-              class="inline-flex items-center justify-center border-b-2 border-transparent px-3 py-2 text-sm font-medium text-neutral-600 transition-colors hover:text-neutral-900 data-[state=active]:border-neutral-900 data-[state=active]:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 dark:data-[state=active]:border-neutral-100 dark:data-[state=active]:text-neutral-100"
+              class="text-muted-foreground hover:text-foreground data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:border-border/50 inline-flex cursor-pointer items-center justify-center rounded-lg px-3 py-1.5 text-xs font-medium transition-[transform,background-color,color,box-shadow] duration-140 ease-[cubic-bezier(0.23,1,0.32,1)] outline-none active:scale-[0.97] data-[state=active]:border data-[state=active]:shadow-2xs"
             >
-              <Storefront class="mr-1.5 h-4 w-4" />
+              <Storefront class="mr-1.5 h-3.5 w-3.5" />
               插件市场
             </Tabs.Trigger>
           </Tabs.List>
 
           <Tabs.Content value="installed" class="flex-1 overflow-hidden">
-            <AppScrollArea
+            <ScrollArea
               class="h-full w-full"
               viewportClass="h-full w-full overflow-x-hidden pr-2"
             >
               {#if pluginList.filteredPlugins.length > 0}
                 <div
-                  class="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3"
+                  class="grid grid-cols-1 gap-2.5 pb-4 md:grid-cols-2 xl:grid-cols-3"
                 >
                   {#each pluginList.filteredPlugins as plugin (plugin.dir_name || plugin.id)}
                     <PluginCard
@@ -168,13 +168,13 @@
               {:else}
                 <EmptyPluginState />
               {/if}
-            </AppScrollArea>
+            </ScrollArea>
           </Tabs.Content>
 
           <Tabs.Content value="market" class="flex-1 overflow-hidden">
             {#await import("$lib/components/marketplace/MarketplaceView.svelte")}
               <div class="flex h-full items-center justify-center">
-                <div class="text-neutral-500">加载中...</div>
+                <div class="text-muted-foreground text-xs">加载市场中...</div>
               </div>
             {:then { default: MarketplaceView }}
               <MarketplaceView
@@ -183,11 +183,15 @@
               />
             {:catch error}
               <div
-                class="flex h-full flex-col items-center justify-center text-neutral-500"
+                class="text-muted-foreground flex h-full flex-col items-center justify-center"
               >
-                <Storefront class="mb-4 h-12 w-12 opacity-50" />
-                <p class="text-lg">插件市场加载失败</p>
-                <p class="mt-2 text-sm">{error.message}</p>
+                <Storefront class="mb-3 h-10 w-10 opacity-40" />
+                <p class="text-foreground text-sm font-medium">
+                  插件市场加载失败
+                </p>
+                <p class="text-muted-foreground mt-1 text-xs">
+                  {error.message}
+                </p>
               </div>
             {/await}
           </Tabs.Content>

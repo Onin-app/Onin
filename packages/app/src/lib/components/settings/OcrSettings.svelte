@@ -2,8 +2,12 @@
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { toast } from "svelte-sonner";
-  import { Select } from "bits-ui";
-  import { Check, CaretUpDown } from "phosphor-svelte";
+  import {
+    Select,
+    SelectTrigger,
+    SelectContent,
+    SelectItem,
+  } from "$lib/components/ui/select";
   import type { AppConfig } from "$lib/type";
 
   // 定义 AI 相关接口
@@ -63,88 +67,56 @@
     return provider.models.some(supportsImage);
   }
 
-  // 派生状态：全局激活的提供商和模型信息
-  let globalProviderName = $derived.by(() => {
-    if (!aiConfig.active_provider_id) return "未激活";
-    const provider = aiConfig.providers.find(
-      (p) => p.id === aiConfig.active_provider_id,
-    );
-    return provider ? provider.display_name || provider.name : "未激活";
+  // 派生状态：可用的 Provider 列表
+  let providerOptions = $derived.by(() => {
+    const options = [
+      {
+        value: "default",
+        label: "跟随全局默认 AI 提供商",
+      },
+    ];
+
+    // 过滤出具备多模态能力或未拉取模型的提供商
+    const supportedProviders = aiConfig.providers.filter(providerSupportsImage);
+
+    supportedProviders.forEach((provider) => {
+      options.push({
+        value: provider.id,
+        label: provider.display_name || provider.name,
+      });
+    });
+
+    return options;
   });
 
-  let globalModelName = $derived.by(() => {
-    if (!aiConfig.active_provider_id) return "未启用";
-    const provider = aiConfig.providers.find(
-      (p) => p.id === aiConfig.active_provider_id,
-    );
-    if (!provider) return "未启用";
-    const defaultModelId = provider.default_model;
-    if (!defaultModelId) return "未配置模型";
-    const modelInfo = provider.models?.find((m) => m.id === defaultModelId);
-    return modelInfo?.name || defaultModelId;
-  });
-
-  interface GlobalModelStatus {
-    configured: boolean;
-    modelName: string;
-    supportsImage: boolean;
-  }
-
-  let globalModelStatus = $derived.by<GlobalModelStatus>(() => {
-    if (!aiConfig.active_provider_id) {
-      return { configured: false, modelName: "", supportsImage: false };
-    }
-    const provider = aiConfig.providers.find(
-      (p) => p.id === aiConfig.active_provider_id,
-    );
-    if (!provider) {
-      return { configured: false, modelName: "", supportsImage: false };
-    }
-    const defaultModelId = provider.default_model;
-    if (!defaultModelId) {
-      return { configured: false, modelName: "", supportsImage: false };
-    }
-    const modelInfo = provider.models?.find((m) => m.id === defaultModelId);
-    const isVl = modelInfo
-      ? supportsImage(modelInfo)
-      : supportsImage({ id: defaultModelId, name: defaultModelId });
-    return {
-      configured: true,
-      modelName: modelInfo?.name || defaultModelId,
-      supportsImage: isVl,
-    };
-  });
-
-  // 派生状态：AI 提供商可选项
-  let providerOptions = $derived([
-    { value: "default", label: `跟随全局配置 (${globalProviderName})` },
-    ...aiConfig.providers.filter(providerSupportsImage).map((p) => ({
-      value: p.id,
-      label: p.display_name || p.name,
-    })),
-  ]);
-
-  // 派生状态：当前选中的提供商的默认模型名称
+  // 派生状态：获取当前生效的 Provider 的默认模型名称
   let activeProviderDefaultModelName = $derived.by(() => {
-    const providerId = config?.ocr_provider_id;
-    if (!providerId) return "未指定";
-    const provider = aiConfig.providers.find((p) => p.id === providerId);
-    if (!provider) return "未指定";
-    const defaultModelId = provider.default_model;
-    if (!defaultModelId) return "未配置模型";
-    const modelInfo = provider.models?.find((m) => m.id === defaultModelId);
-    return modelInfo?.name || defaultModelId;
+    const targetProviderId =
+      config?.ocr_provider_id || aiConfig.active_provider_id;
+    const provider = aiConfig.providers.find((p) => p.id === targetProviderId);
+    if (!provider) return "无默认模型";
+
+    if (provider.default_model) {
+      const found = provider.models?.find(
+        (m) => m.id === provider.default_model,
+      );
+      return found?.name || provider.default_model;
+    }
+    return "无默认模型";
   });
 
-  // 派生状态：AI 模型可选项
+  // 派生状态：可供选择的模型列表
   let modelOptions = $derived.by(() => {
     const options = [];
+
+    // 1. 如果没有指定提供商，即“跟随全局默认”
     if (!config?.ocr_provider_id) {
       options.push({
         value: "default",
-        label: `跟随全局激活的默认模型 (${globalModelName})`,
+        label: `跟随所选提供商默认 (${activeProviderDefaultModelName})`,
       });
     } else {
+      // 2. 如果指定了特定提供商
       options.push({
         value: "default",
         label: `默认模型 (${activeProviderDefaultModelName})`,
@@ -245,218 +217,115 @@
 </script>
 
 {#if loading}
-  <div class="py-3 text-sm text-neutral-500 dark:text-neutral-400">
-    正在加载文字识别设置...
-  </div>
+  <div class="text-muted-foreground py-3 text-sm">正在加载文字识别设置...</div>
 {:else if config}
   <div class="flex flex-col gap-5">
     <!-- 默认引擎设置 -->
-    <section class="border-t border-neutral-100 pt-4 dark:border-neutral-800">
+    <section class="border-border/50 border-t pt-4">
       <div class="flex flex-col gap-1.5">
-        <h4 class="text-sm font-semibold text-neutral-950 dark:text-neutral-50">
-          默认识别引擎
-        </h4>
-        <p class="text-xs text-neutral-500 dark:text-neutral-400">
+        <h4 class="text-foreground text-sm font-semibold">默认识别引擎</h4>
+        <p class="text-muted-foreground text-xs">
           设置每次打开文字识别页面时，首选激活的 OCR 识别模式。
         </p>
 
-        <Select.Root
+        <Select
           type="single"
           value={config.ocr_default_engine || "local"}
           onValueChange={handleEngineChange}
         >
-          <Select.Trigger
-            class="mt-2 inline-flex h-10 w-full items-center justify-between rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 transition-colors focus:border-neutral-400 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-100 dark:focus:border-neutral-600"
-          >
+          <SelectTrigger class="mt-2 h-10 w-full">
             <span class="truncate">
               {engineOptions.find(
                 (o) => o.value === (config?.ocr_default_engine || "local"),
               )?.label}
             </span>
-            <CaretUpDown class="ml-auto size-4 shrink-0 text-neutral-400" />
-          </Select.Trigger>
-          <Select.Portal>
-            <Select.Content
-              class="z-50 max-h-60 w-[var(--bits-select-anchor-width)] min-w-[var(--bits-select-anchor-width)] rounded-lg border border-neutral-200 bg-white px-1 py-1.5 shadow-lg outline-hidden select-none data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1 dark:border-neutral-800 dark:bg-neutral-950"
-              sideOffset={4}
-            >
-              <Select.Viewport class="p-0.5">
-                {#each engineOptions as option (option.value)}
-                  <Select.Item
-                    class="flex h-9 w-full cursor-pointer items-center rounded-md py-2 pr-2 pl-3 text-sm text-neutral-800 outline-hidden hover:bg-neutral-50 data-disabled:opacity-50 data-highlighted:bg-neutral-50 dark:text-neutral-200 dark:hover:bg-neutral-900 dark:data-highlighted:bg-neutral-900"
-                    value={option.value}
-                    label={option.label}
-                  >
-                    {#snippet children({ selected })}
-                      <span class="truncate">{option.label}</span>
-                      {#if selected}
-                        <Check
-                          class="ml-auto size-4 shrink-0 text-neutral-600 dark:text-neutral-400"
-                        />
-                      {/if}
-                    {/snippet}
-                  </Select.Item>
-                {/each}
-              </Select.Viewport>
-            </Select.Content>
-          </Select.Portal>
-        </Select.Root>
+          </SelectTrigger>
+          <SelectContent class="w-[var(--bits-select-anchor-width)]">
+            {#each engineOptions as option (option.value)}
+              <SelectItem value={option.value} label={option.label}>
+                <span class="truncate">{option.label}</span>
+              </SelectItem>
+            {/each}
+          </SelectContent>
+        </Select>
       </div>
     </section>
 
-    <!-- AI 提供商设置 -->
-    <section class="border-t border-neutral-100 pt-4 dark:border-neutral-800">
-      <div class="flex flex-col gap-1.5">
-        <h4 class="text-sm font-semibold text-neutral-950 dark:text-neutral-50">
-          AI 识别服务提供商
-        </h4>
-        <p class="text-xs text-neutral-500 dark:text-neutral-400">
-          指定用于 AI 识别的服务提供商。选择跟随全局时，自动同步主 AI
-          设置页面中的模型。
-        </p>
-
-        <Select.Root
-          type="single"
-          value={config.ocr_provider_id || "default"}
-          onValueChange={handleProviderChange}
-        >
-          <Select.Trigger
-            class="mt-2 inline-flex h-10 w-full items-center justify-between rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 transition-colors focus:border-neutral-400 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-100 dark:focus:border-neutral-600"
-          >
-            <span class="truncate">
-              {providerOptions.find(
-                (o) => o.value === (config?.ocr_provider_id || "default"),
-              )?.label}
-            </span>
-            <CaretUpDown class="ml-auto size-4 shrink-0 text-neutral-400" />
-          </Select.Trigger>
-          <Select.Portal>
-            <Select.Content
-              class="z-50 max-h-60 w-[var(--bits-select-anchor-width)] min-w-[var(--bits-select-anchor-width)] rounded-lg border border-neutral-200 bg-white px-1 py-1.5 shadow-lg outline-hidden select-none data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1 dark:border-neutral-800 dark:bg-neutral-950"
-              sideOffset={4}
-            >
-              <Select.Viewport class="p-0.5">
-                {#each providerOptions as option (option.value)}
-                  <Select.Item
-                    class="flex h-9 w-full cursor-pointer items-center rounded-md py-2 pr-2 pl-3 text-sm text-neutral-800 outline-hidden hover:bg-neutral-50 data-disabled:opacity-50 data-highlighted:bg-neutral-50 dark:text-neutral-200 dark:hover:bg-neutral-900 dark:data-highlighted:bg-neutral-900"
-                    value={option.value}
-                    label={option.label}
-                  >
-                    {#snippet children({ selected })}
-                      <span class="truncate">{option.label}</span>
-                      {#if selected}
-                        <Check
-                          class="ml-auto size-4 shrink-0 text-neutral-600 dark:text-neutral-400"
-                        />
-                      {/if}
-                    {/snippet}
-                  </Select.Item>
-                {/each}
-              </Select.Viewport>
-            </Select.Content>
-          </Select.Portal>
-        </Select.Root>
-
-        {#if !config.ocr_provider_id}
-          <div
-            class="mt-2.5 flex items-start gap-2 rounded-lg border px-3 py-2 text-xs
-            {globalModelStatus.configured
-              ? globalModelStatus.supportsImage
-                ? 'border-emerald-200 bg-emerald-50/30 text-emerald-800 dark:border-emerald-800/30 dark:bg-emerald-950/10 dark:text-emerald-300'
-                : 'border-amber-200 bg-amber-50/30 text-amber-800 dark:border-amber-800/30 dark:bg-amber-950/10 dark:text-amber-300'
-              : 'border-amber-200 bg-amber-50/30 text-amber-800 dark:border-amber-800/30 dark:bg-amber-950/10 dark:text-amber-300'}"
-          >
-            {#if globalModelStatus.configured && globalModelStatus.supportsImage}
-              <span
-                class="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400"
-                >✓</span
-              >
-            {:else}
-              <span class="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400"
-                >⚠️</span
-              >
-            {/if}
-            <div>
-              {#if !globalModelStatus.configured}
-                <span class="font-semibold">全局未激活 AI 模型：</span
-                >当前全局未配置或激活默认 AI 渠道，AI OCR
-                识别可能无法工作。建议前往“设置 -
-                模型”中激活，或者在此处手动指定支持多模态的独立模型。
-              {:else if !globalModelStatus.supportsImage}
-                <span class="font-semibold">全局模型可能不支持多模态：</span
-                >当前全局默认模型
-                <code
-                  class="rounded-sm bg-amber-100/50 px-1 py-0.5 font-mono text-[10px] dark:bg-neutral-800"
-                  >{globalModelStatus.modelName}</code
-                > 未检测到图片识别能力。AI OCR 识别可能无法正常工作，建议在此手动绑定独立的多模态通道。
-              {:else}
-                <span class="font-semibold">全局模型兼容：</span
-                >当前全局默认模型
-                <code
-                  class="rounded-sm bg-emerald-100/50 px-1 py-0.5 font-mono text-[10px] dark:bg-neutral-800"
-                  >{globalModelStatus.modelName}</code
-                > 支持图片多模态输入，已完美直接跟随使用。
-              {/if}
-            </div>
+    <!-- AI 识别专属配置 -->
+    {#if (config.ocr_default_engine || "local") === "ai"}
+      <section class="border-border/50 border-t pt-4">
+        <div class="flex flex-col gap-4">
+          <div>
+            <h4 class="text-foreground text-sm font-semibold">
+              AI 视觉模型设置
+            </h4>
+            <p class="text-muted-foreground mt-1 text-xs">
+              指定 OCR 识别所使用的视觉大模型服务。支持按需定制专属 Provider
+              与模型。
+            </p>
           </div>
-        {/if}
-      </div>
-    </section>
 
-    <!-- AI 模型设置 -->
-    <section class="border-t border-neutral-100 pt-4 dark:border-neutral-800">
-      <div class="flex flex-col gap-1.5">
-        <h4 class="text-sm font-semibold text-neutral-950 dark:text-neutral-50">
-          AI 识别模型
-        </h4>
-        <p class="text-xs text-neutral-500 dark:text-neutral-400">
-          选择具体执行图片识别的 AI 模型。推荐带有相机图标或标有 “多模态”
-          的模型。
-        </p>
-
-        <Select.Root
-          type="single"
-          value={config.ocr_model_id || "default"}
-          onValueChange={handleModelChange}
-          disabled={!config.ocr_provider_id}
-        >
-          <Select.Trigger
-            class="mt-2 inline-flex h-10 w-full items-center justify-between rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 transition-colors focus:border-neutral-400 disabled:cursor-not-allowed disabled:bg-neutral-50 disabled:text-neutral-400 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-100 dark:focus:border-neutral-600 dark:disabled:bg-neutral-900 dark:disabled:text-neutral-500"
-          >
-            <span class="truncate">
-              {modelOptions.find(
-                (o) => o.value === (config?.ocr_model_id || "default"),
-              )?.label}
-            </span>
-            <CaretUpDown class="ml-auto size-4 shrink-0 text-neutral-400" />
-          </Select.Trigger>
-          <Select.Portal>
-            <Select.Content
-              class="z-50 max-h-60 w-[var(--bits-select-anchor-width)] min-w-[var(--bits-select-anchor-width)] rounded-lg border border-neutral-200 bg-white px-1 py-1.5 shadow-lg outline-hidden select-none data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1 dark:border-neutral-800 dark:bg-neutral-950"
-              sideOffset={4}
+          <!-- Provider 选择 -->
+          <div class="flex flex-col gap-1.5">
+            <div class="text-foreground text-xs font-medium">
+              AI 提供商 (Provider)
+            </div>
+            <Select
+              type="single"
+              value={config.ocr_provider_id || "default"}
+              onValueChange={handleProviderChange}
             >
-              <Select.Viewport class="p-0.5">
-                {#each modelOptions as option (option.value)}
-                  <Select.Item
-                    class="flex h-9 w-full cursor-pointer items-center rounded-md py-2 pr-2 pl-3 text-sm text-neutral-800 outline-hidden hover:bg-neutral-50 data-disabled:opacity-50 data-highlighted:bg-neutral-50 dark:text-neutral-200 dark:hover:bg-neutral-900 dark:data-highlighted:bg-neutral-900"
-                    value={option.value}
-                    label={option.label}
-                  >
-                    {#snippet children({ selected })}
-                      <span class="truncate">{option.label}</span>
-                      {#if selected}
-                        <Check
-                          class="ml-auto size-4 shrink-0 text-neutral-600 dark:text-neutral-400"
-                        />
-                      {/if}
-                    {/snippet}
-                  </Select.Item>
+              <SelectTrigger class="h-10 w-full">
+                <span class="truncate">
+                  {providerOptions.find(
+                    (p) => p.value === (config?.ocr_provider_id || "default"),
+                  )?.label}
+                </span>
+              </SelectTrigger>
+              <SelectContent class="w-[var(--bits-select-anchor-width)]">
+                {#each providerOptions as provider (provider.value)}
+                  <SelectItem value={provider.value} label={provider.label}>
+                    <span class="truncate">{provider.label}</span>
+                  </SelectItem>
                 {/each}
-              </Select.Viewport>
-            </Select.Content>
-          </Select.Portal>
-        </Select.Root>
-      </div>
-    </section>
+              </SelectContent>
+            </Select>
+            <p class="text-muted-foreground text-[11px]">
+              如需添加新的 AI 提供商，请前往「AI 设置」页面配置。
+            </p>
+          </div>
+
+          <!-- 模型选择 -->
+          <div class="flex flex-col gap-1.5">
+            <div class="text-foreground text-xs font-medium">
+              指定识别模型 (Model)
+            </div>
+            <Select
+              type="single"
+              value={config.ocr_model_id || "default"}
+              onValueChange={handleModelChange}
+            >
+              <SelectTrigger class="h-10 w-full">
+                <span class="truncate">
+                  {modelOptions.find(
+                    (m) => m.value === (config?.ocr_model_id || "default"),
+                  )?.label || "跟随默认"}
+                </span>
+              </SelectTrigger>
+              <SelectContent class="w-[var(--bits-select-anchor-width)]">
+                {#each modelOptions as model (model.value)}
+                  <SelectItem value={model.value} label={model.label}>
+                    <span class="truncate">{model.label}</span>
+                  </SelectItem>
+                {/each}
+              </SelectContent>
+            </Select>
+            <p class="text-muted-foreground text-[11px]">
+              仅多模态（Vision / VL）模型支持图片 OCR 文本提取与排版分析。
+            </p>
+          </div>
+        </div>
+      </section>
+    {/if}
   </div>
 {/if}

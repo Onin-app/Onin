@@ -10,8 +10,16 @@
     Download,
     GithubLogo,
   } from "phosphor-svelte";
-  import { Button, Dialog } from "bits-ui";
-  import AppScrollArea from "$lib/components/AppScrollArea.svelte";
+  import { Button } from "$lib/components/ui/button";
+  import { Input } from "$lib/components/ui/input";
+  import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+  } from "$lib/components/ui/dialog";
+  import { ScrollArea } from "$lib/components/ui/scroll-area";
   import PluginCard from "./PluginCard.svelte";
   import { fetchPlugins } from "$lib/api/marketplace";
   import type { MarketplacePlugin } from "$lib/types/marketplace";
@@ -64,16 +72,15 @@
   async function loadInstalledPlugins() {
     try {
       const installed = await invoke<PluginManifest[]>("get_loaded_plugins");
-      // 只有来源明确为“marketplace”的插件才在市场显示为“已安装”
-      // 排除本地导入(@local)或其他非市场来源的版本
-      // 同时考虑 id 和 dir_name，因为市场 ID 可能对应后端的 dir_name
       const versions = new Map<string, string>();
-      installed
-        .filter((p) => p.install_source === "marketplace")
-        .forEach((p) => {
+      for (const p of installed) {
+        if (p.install_source === "marketplace") {
           if (p.id) versions.set(p.id, p.version);
-          if (p.dir_name) versions.set(p.dir_name, p.version);
-        });
+          if (p.dir_name && p.dir_name !== p.id) {
+            versions.set(p.dir_name, p.version);
+          }
+        }
+      }
       installedVersions = versions;
     } catch (e) {
       console.error("Failed to load installed plugins:", e);
@@ -83,70 +90,46 @@
   async function loadPlugins() {
     loading = true;
     error = null;
-
     try {
-      const response = await fetchPlugins({
+      const result = await fetchPlugins({
         page,
         limit,
-        category: selectedCategory === "all" ? undefined : selectedCategory,
         keyword: searchQuery || undefined,
+        category: selectedCategory === "all" ? undefined : selectedCategory,
       });
-
-      // 去重：防止插件在多个分类中出现导致 Svelte Key 重复
-      const uniquePlugins: MarketplacePlugin[] = [];
-      const seenIds = new Set<string>();
-
-      for (const p of response.data) {
-        if (p.id && !seenIds.has(p.id)) {
-          seenIds.add(p.id);
-          uniquePlugins.push(p);
-        }
-      }
-
-      plugins = uniquePlugins;
-      total = response.meta.total;
-
-      // 同时加载已安装插件列表
+      plugins = result.data;
+      total = result.meta.total;
       await loadInstalledPlugins();
-    } catch (e) {
-      console.error("Failed to load marketplace plugins:", e);
-      error = e instanceof Error ? e.message : "加载失败";
-
-      // 如果 API 不可用，显示提示
-      if (error.includes("fetch")) {
-        error = "插件市场服务暂时不可用，请稍后再试";
-      }
+    } catch (e: any) {
+      error = e.message || "加载插件失败";
+      console.error("Failed to load plugins:", e);
     } finally {
       loading = false;
     }
   }
 
+  let searchTimeout: number | null = null;
+  $effect(() => {
+    searchQuery;
+    selectedCategory;
+
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+
+    searchTimeout = setTimeout(() => {
+      page = 1;
+      loadPlugins();
+    }, 300) as unknown as number;
+  });
+
   let selectedPlugin = $state<MarketplacePlugin | null>(null);
-  let loadingDetail = $state(false);
   let detailDialogOpen = $state(false);
+  let loadingDetail = $state(false);
 
   async function handlePluginClick(plugin: MarketplacePlugin) {
-    // 总是获取插件详情以获取完整信息（包括 releaseNotes）
-    loadingDetail = true;
-    selectedPlugin = plugin; // 先显示基本信息
+    selectedPlugin = plugin;
     detailDialogOpen = true;
-
-    try {
-      const { fetchPluginDetail } = await import("$lib/api/marketplace");
-      const detail = await fetchPluginDetail(plugin.id);
-      selectedPlugin = detail; // 更新为完整详情
-    } catch (e) {
-      console.error("Failed to load plugin detail:", e);
-      // 即使获取详情失败，也显示基本信息
-      await invoke("show_notification", {
-        options: {
-          title: "提示",
-          body: `无法获取完整插件详情，显示基本信息`,
-        },
-      });
-    } finally {
-      loadingDetail = false;
-    }
   }
 
   function handleDetailDialogOpenChange(open: boolean) {
@@ -156,52 +139,27 @@
     }
   }
 
-  // 事件监听清理函数
-  let unlistenFns: UnlistenFn[] = [];
-
+  let unlistenPluginChanged: UnlistenFn | null = null;
   onMount(async () => {
     loadPlugins();
 
-    // 监听插件卸载事件，刷新已安装列表
-    const unlistenUninstalled = await listen<string>(
-      "plugin-uninstalled",
-      async () => {
-        await loadInstalledPlugins();
-      },
-    );
-    unlistenFns.push(unlistenUninstalled);
-
-    // 监听插件安装事件，刷新已安装列表
-    const unlistenInstalled = await listen<string>(
-      "plugin-installed",
-      async () => {
-        await loadInstalledPlugins();
-      },
-    );
-    unlistenFns.push(unlistenInstalled);
+    unlistenPluginChanged = await listen("plugin-changed", () => {
+      loadInstalledPlugins();
+    });
   });
 
   onDestroy(() => {
-    // 清理事件监听
-    unlistenFns.forEach((fn) => fn());
-  });
-
-  // 搜索和筛选变化时重新加载
-  $effect(() => {
-    if (searchQuery !== undefined || selectedCategory !== undefined) {
-      page = 1;
-      loadPlugins();
+    if (unlistenPluginChanged) {
+      unlistenPluginChanged();
     }
   });
 
-  // 当进入市场页时，强制刷新一次本地已安装列表，确保安装状态/按钮显示正确 (P2 修复)
   $effect(() => {
     if (active) {
       loadInstalledPlugins();
     }
   });
 
-  // 监听外部刷新触发
   $effect(() => {
     if (refreshTrigger > 0 && active) {
       loadPlugins();
@@ -217,20 +175,20 @@
     <!-- 搜索框 -->
     <div class="relative flex-1">
       <MagnifyingGlass
-        class="absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-neutral-400"
+        class="text-muted-foreground/60 absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2"
       />
-      <input
+      <Input
         type="text"
         bind:value={searchQuery}
         placeholder="搜索插件..."
-        class="h-9 w-full rounded border border-neutral-300 bg-white py-1.5 pr-3 pl-9 text-sm text-neutral-900 focus:border-neutral-500 focus:outline-none dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-100 dark:focus:border-neutral-400"
+        class="h-8.5 w-full rounded-xl pl-8 text-xs font-normal transition-[border-color,box-shadow] duration-140"
       />
     </div>
 
     <!-- 分类筛选 -->
     <select
       bind:value={selectedCategory}
-      class="h-9 rounded border border-neutral-300 bg-white px-3 text-sm text-neutral-900 focus:border-neutral-500 focus:outline-none dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-100"
+      class="border-border/60 bg-background text-foreground focus:border-primary focus:ring-primary/20 h-8.5 cursor-pointer rounded-xl border px-3 text-xs shadow-2xs transition-[border-color,box-shadow] duration-140 outline-none focus:ring-2"
     >
       {#each categories as category}
         <option value={category.value}>{category.label}</option>
@@ -239,41 +197,42 @@
   </div>
 
   <!-- 插件列表 -->
-  <AppScrollArea class="flex-1" viewportClass="h-full w-full overflow-x-hidden">
-    <div class="pr-2">
+  <ScrollArea class="flex-1" viewportClass="h-full w-full overflow-x-hidden">
+    <div class="pr-2 pb-4">
       {#if loading}
         <div
-          class="flex h-full min-h-64 items-center justify-center text-neutral-500"
+          class="text-muted-foreground flex h-full min-h-64 items-center justify-center"
         >
           <div class="text-center">
-            <div class="mb-2 text-lg">加载中...</div>
-            <div class="text-sm">正在获取插件列表</div>
+            <div class="text-foreground/80 mb-1 text-sm font-medium">
+              加载中...
+            </div>
+            <div class="text-muted-foreground/60 text-xs">正在获取插件列表</div>
           </div>
         </div>
       {:else if error}
         <div
-          class="flex h-full min-h-64 flex-col items-center justify-center text-neutral-500"
+          class="text-muted-foreground flex h-full min-h-64 flex-col items-center justify-center"
         >
-          <Package class="mb-4 h-12 w-12 opacity-50" />
-          <p class="text-lg">加载失败</p>
-          <p class="mt-2 text-sm">{error}</p>
-          <Button.Root
-            class="mt-4 inline-flex h-8 items-center justify-center rounded bg-neutral-900 px-3 text-sm font-medium text-white hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200"
-            onclick={loadPlugins}
+          <Package class="mb-3 h-10 w-10 opacity-40" />
+          <p class="text-foreground text-sm font-medium">加载失败</p>
+          <p class="text-muted-foreground mt-1 text-xs">{error}</p>
+          <Button
+            size="sm"
+            class="mt-3 rounded-xl text-xs transition-transform active:scale-95"
+            onclick={loadPlugins}>重试</Button
           >
-            重试
-          </Button.Root>
         </div>
       {:else if plugins.length === 0}
         <div
-          class="flex h-full min-h-64 flex-col items-center justify-center text-neutral-500"
+          class="text-muted-foreground flex h-full min-h-64 flex-col items-center justify-center"
         >
-          <Package class="mb-4 h-12 w-12 opacity-50" />
-          <p class="text-lg">没有找到插件</p>
-          <p class="mt-2 text-sm">尝试调整搜索条件</p>
+          <Package class="mb-3 h-10 w-10 opacity-40" />
+          <p class="text-foreground text-sm font-medium">没有找到插件</p>
+          <p class="text-muted-foreground/60 mt-1 text-xs">尝试调整搜索条件</p>
         </div>
       {:else}
-        <div class="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+        <div class="grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-3">
           {#each plugins as plugin (plugin.id)}
             {@const installedVersion = installedVersions.get(plugin.id)}
             {@const isInstalled = !!installedVersion}
@@ -289,8 +248,10 @@
 
         {#if totalPages > 1}
           <div class="mt-4 flex items-center justify-center gap-2 pb-1">
-            <Button.Root
-              class="h-8 rounded border border-neutral-300 bg-white px-3 text-sm hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-600 dark:bg-neutral-900 dark:hover:bg-neutral-800"
+            <Button
+              variant="outline"
+              size="sm"
+              class="h-7.5 rounded-xl px-2.5 text-xs shadow-2xs transition-transform duration-120 active:scale-95"
               disabled={page === 1}
               onclick={() => {
                 page--;
@@ -298,14 +259,16 @@
               }}
             >
               上一页
-            </Button.Root>
+            </Button>
 
-            <span class="text-sm text-neutral-600 dark:text-neutral-400">
+            <span class="text-muted-foreground font-mono text-xs">
               {page} / {totalPages}
             </span>
 
-            <Button.Root
-              class="h-8 rounded border border-neutral-300 bg-white px-3 text-sm hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-600 dark:bg-neutral-900 dark:hover:bg-neutral-800"
+            <Button
+              variant="outline"
+              size="sm"
+              class="h-7.5 rounded-xl px-2.5 text-xs shadow-2xs transition-transform duration-120 active:scale-95"
               disabled={page === totalPages}
               onclick={() => {
                 page++;
@@ -313,199 +276,172 @@
               }}
             >
               下一页
-            </Button.Root>
+            </Button>
           </div>
         {/if}
       {/if}
     </div>
-  </AppScrollArea>
+  </ScrollArea>
 </div>
 
 <!-- 插件详情弹窗 -->
 {#if selectedPlugin}
-  <Dialog.Root
-    open={detailDialogOpen}
-    onOpenChange={handleDetailDialogOpenChange}
-  >
-    <Dialog.Portal>
-      <Dialog.Overlay
-        class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50"
-      />
-      <Dialog.Content
-        class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] fixed top-[50%] left-[50%] z-50 h-[80vh] w-full max-w-2xl translate-x-[-50%] translate-y-[-50%] overflow-hidden rounded-lg bg-white p-6 shadow-xl dark:bg-neutral-900"
-      >
-        <div use:setupImageFallback class="contents">
-          <Dialog.Close
-            class="absolute top-4 right-4 rounded p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-            aria-label="关闭"
-          >
-            <svg
-              class="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </Dialog.Close>
-
-          <AppScrollArea
-            class="h-full w-full"
-            viewportClass="h-full w-full overflow-x-hidden pr-2"
-          >
-            {#if loadingDetail}
-              <div class="flex h-64 items-center justify-center">
-                <div class="text-neutral-500">加载中...</div>
-              </div>
-            {:else}
-              <!-- 插件头部 -->
-              <div class="mb-6 flex items-start gap-4">
-                <div
-                  class="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-neutral-100 to-neutral-200 dark:from-neutral-800 dark:to-neutral-700"
-                >
-                  {#if selectedPlugin.icon}
-                    <img
-                      src={selectedPlugin.icon}
-                      alt={selectedPlugin.name}
-                      class="h-16 w-16 rounded object-contain"
-                    />
-                  {:else}
-                    <div class="text-4xl">🧩</div>
-                  {/if}
-                </div>
-
-                <div class="flex-1">
-                  <h2 class="mb-2 text-2xl font-bold">{selectedPlugin.name}</h2>
-                  <p class="mb-2 text-neutral-600 dark:text-neutral-400">
-                    {selectedPlugin.description}
-                  </p>
-                  <div class="flex items-center gap-4 text-sm text-neutral-500">
-                    <span>作者: {selectedPlugin.author}</span>
-                    <span>分类: {selectedPlugin.category}</span>
-                    {#if isValidPluginVersion(selectedPlugin.version)}
-                      <span
-                        >版本: {formatPluginVersion(
-                          selectedPlugin.version,
-                        )}</span
-                      >
-                    {/if}
-                  </div>
-                </div>
-              </div>
-
-              <!-- 统计信息 -->
+  <Dialog open={detailDialogOpen} onOpenChange={handleDetailDialogOpenChange}>
+    <DialogContent class="flex h-[80vh] max-w-2xl flex-col p-6">
+      <div use:setupImageFallback class="flex-1 overflow-hidden">
+        <ScrollArea
+          class="h-full w-full"
+          viewportClass="h-full w-full overflow-x-hidden pr-2"
+        >
+          {#if loadingDetail}
+            <div class="flex h-64 items-center justify-center">
+              <div class="text-muted-foreground text-sm">加载中...</div>
+            </div>
+          {:else}
+            <!-- 插件头部 -->
+            <div class="mb-6 flex items-start gap-4">
               <div
-                class="mb-6 flex justify-around rounded-lg bg-neutral-50 p-4 dark:bg-neutral-800"
+                class="bg-muted flex h-16 w-16 shrink-0 items-center justify-center rounded-lg"
               >
-                <div class="flex items-center gap-3">
-                  <Star class="h-8 w-8 text-yellow-500" weight="fill" />
-                  <div>
-                    <div class="text-xl font-semibold">
-                      {selectedPlugin.stars}
-                    </div>
-                    <div class="text-xs text-neutral-500">Stars</div>
-                  </div>
-                </div>
-                <div class="flex items-center gap-3">
-                  <Download class="h-8 w-8 text-blue-500" weight="fill" />
-                  <div>
-                    <div class="text-xl font-semibold">
-                      {selectedPlugin.downloads}
-                    </div>
-                    <div class="text-xs text-neutral-500">Downloads</div>
-                  </div>
-                </div>
-                {#if selectedPlugin.size}
-                  <div class="flex items-center gap-3">
-                    <Package class="h-8 w-8 text-green-500" weight="fill" />
-                    <div>
-                      <div class="text-xl font-semibold">
-                        {(selectedPlugin.size / 1024 / 1024).toFixed(2)} MB
-                      </div>
-                      <div class="text-xs text-neutral-500">Size</div>
-                    </div>
-                  </div>
+                {#if selectedPlugin.icon}
+                  <img
+                    src={selectedPlugin.icon}
+                    alt={selectedPlugin.name}
+                    class="h-12 w-12 rounded object-contain"
+                  />
+                {:else}
+                  <div class="text-3xl">🧩</div>
                 {/if}
               </div>
 
-              <!-- README -->
-              {#if selectedPlugin.readme}
-                <div class="mb-6">
-                  <h3 class="mb-3 text-lg font-semibold">插件说明</h3>
-                  <!-- svelte-ignore a11y_click_events_have_key_events -->
-                  <!-- svelte-ignore a11y_no_static_element_interactions -->
-                  <div
-                    class="prose prose-sm dark:prose-invert max-w-none rounded-lg bg-neutral-50 p-4 dark:bg-neutral-800"
-                    onclick={handleMarkdownClick}
-                  >
-                    {@html renderMarkdown(
-                      selectedPlugin.readme,
-                      selectedPlugin.repository,
-                    )}
-                  </div>
-                </div>
-              {/if}
-
-              <!-- 更新说明 -->
-              {#if selectedPlugin.releaseNotes}
-                <div class="mb-6">
-                  <h3 class="mb-3 text-lg font-semibold">更新说明</h3>
-                  <!-- svelte-ignore a11y_click_events_have_key_events -->
-                  <!-- svelte-ignore a11y_no_static_element_interactions -->
-                  <div
-                    class="prose prose-sm dark:prose-invert max-w-none rounded-lg bg-neutral-50 p-4 dark:bg-neutral-800"
-                    onclick={handleMarkdownClick}
-                  >
-                    {@html renderMarkdown(
-                      selectedPlugin.releaseNotes,
-                      selectedPlugin.repository,
-                    )}
-                  </div>
-                </div>
-              {/if}
-
-              <!-- 关键词 -->
-              {#if selectedPlugin.keywords && selectedPlugin.keywords.length > 0}
-                <div class="mb-6">
-                  <h3 class="mb-2 font-semibold">标签</h3>
-                  <div class="flex flex-wrap gap-2">
-                    {#each selectedPlugin.keywords as keyword}
-                      <span
-                        class="rounded bg-neutral-100 px-2 py-1 text-xs dark:bg-neutral-800"
-                      >
-                        {keyword}
-                      </span>
-                    {/each}
-                  </div>
-                </div>
-              {/if}
-
-              <!-- 底部操作 -->
-              <div
-                class="border-t border-neutral-200 pt-4 dark:border-neutral-700"
-              >
-                <a
-                  href={selectedPlugin.repository}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="flex items-center gap-2 text-sm text-blue-600 hover:underline dark:text-blue-400"
-                  onclick={(e) =>
-                    selectedPlugin?.repository &&
-                    openExternalLink(selectedPlugin.repository, e)}
+              <div class="flex-1">
+                <h2 class="text-foreground mb-1 text-xl font-bold">
+                  {selectedPlugin.name}
+                </h2>
+                <p class="text-muted-foreground mb-2 text-xs">
+                  {selectedPlugin.description}
+                </p>
+                <div
+                  class="text-muted-foreground flex flex-wrap items-center gap-3 text-xs"
                 >
-                  <GithubLogo class="h-4 w-4" />
-                  查看源码
-                </a>
+                  <span>作者: {selectedPlugin.author}</span>
+                  <span>分类: {selectedPlugin.category}</span>
+                  {#if isValidPluginVersion(selectedPlugin.version)}
+                    <span
+                      >版本: {formatPluginVersion(selectedPlugin.version)}</span
+                    >
+                  {/if}
+                </div>
+              </div>
+            </div>
+
+            <!-- 统计信息 -->
+            <div class="bg-muted/50 mb-6 flex justify-around rounded-xl p-3">
+              <div class="flex items-center gap-3">
+                <Star class="h-6 w-6 text-yellow-500" weight="fill" />
+                <div>
+                  <div class="text-foreground text-base font-semibold">
+                    {selectedPlugin.stars}
+                  </div>
+                  <div class="text-muted-foreground text-[10px]">Stars</div>
+                </div>
+              </div>
+              <div class="flex items-center gap-3">
+                <Download class="h-6 w-6 text-blue-500" weight="fill" />
+                <div>
+                  <div class="text-foreground text-base font-semibold">
+                    {selectedPlugin.downloads}
+                  </div>
+                  <div class="text-muted-foreground text-[10px]">Downloads</div>
+                </div>
+              </div>
+              {#if selectedPlugin.size}
+                <div class="flex items-center gap-3">
+                  <Package class="h-6 w-6 text-emerald-500" weight="fill" />
+                  <div>
+                    <div class="text-foreground text-base font-semibold">
+                      {(selectedPlugin.size / 1024 / 1024).toFixed(2)} MB
+                    </div>
+                    <div class="text-muted-foreground text-[10px]">Size</div>
+                  </div>
+                </div>
+              {/if}
+            </div>
+
+            <!-- README -->
+            {#if selectedPlugin.readme}
+              <div class="mb-6">
+                <h3 class="text-foreground mb-2 text-sm font-semibold">
+                  插件说明
+                </h3>
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <div
+                  class="prose prose-sm dark:prose-invert bg-muted/40 max-w-none rounded-xl p-4"
+                  onclick={handleMarkdownClick}
+                >
+                  {@html renderMarkdown(
+                    selectedPlugin.readme,
+                    selectedPlugin.repository,
+                  )}
+                </div>
               </div>
             {/if}
-          </AppScrollArea>
-        </div>
-      </Dialog.Content>
-    </Dialog.Portal>
-  </Dialog.Root>
+
+            <!-- 更新说明 -->
+            {#if selectedPlugin.releaseNotes}
+              <div class="mb-6">
+                <h3 class="text-foreground mb-2 text-sm font-semibold">
+                  更新说明
+                </h3>
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <div
+                  class="prose prose-sm dark:prose-invert bg-muted/40 max-w-none rounded-xl p-4"
+                  onclick={handleMarkdownClick}
+                >
+                  {@html renderMarkdown(
+                    selectedPlugin.releaseNotes,
+                    selectedPlugin.repository,
+                  )}
+                </div>
+              </div>
+            {/if}
+
+            <!-- 关键词 -->
+            {#if selectedPlugin.keywords && selectedPlugin.keywords.length > 0}
+              <div class="mb-6">
+                <h3 class="text-foreground mb-2 text-xs font-semibold">标签</h3>
+                <div class="flex flex-wrap gap-1.5">
+                  {#each selectedPlugin.keywords as keyword}
+                    <span
+                      class="bg-muted text-muted-foreground rounded-md px-2 py-0.5 text-xs"
+                    >
+                      {keyword}
+                    </span>
+                  {/each}
+                </div>
+              </div>
+            {/if}
+
+            <!-- 底部操作 -->
+            <div class="border-t pt-4">
+              <a
+                href={selectedPlugin.repository}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-primary flex items-center gap-2 text-xs hover:underline"
+                onclick={(e) =>
+                  selectedPlugin?.repository &&
+                  openExternalLink(selectedPlugin.repository, e)}
+              >
+                <GithubLogo class="h-4 w-4" />
+                查看源码
+              </a>
+            </div>
+          {/if}
+        </ScrollArea>
+      </div>
+    </DialogContent>
+  </Dialog>
 {/if}

@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { Button } from "bits-ui";
+  import { Button } from "$lib/components/ui/button";
   import { invoke } from "@tauri-apps/api/core";
   import { platform } from "@tauri-apps/plugin-os";
+  import { X, Keyboard } from "phosphor-svelte";
 
   let {
     value = $bindable(""),
@@ -9,16 +10,18 @@
     disabled = false,
     showPresets = false,
   } = $props();
-  let previousShortcut = "";
-  let isFocused = $state(false);
 
-  // 立即初始化平台信息，不要等到 onMount
+  let isFocused = $state(false);
+  let previousShortcut = "";
+  let activeModifiers = $state<string[]>([]);
+  let inputElement = $state<HTMLInputElement | null>(null);
+
+  // 初始化平台信息
   let currentPlatform = "";
   try {
     if (typeof window !== "undefined" && (window as any).__TAURI__) {
       currentPlatform = platform();
     } else {
-      // 在浏览器环境中，使用 navigator 来检测平台
       const userAgent = navigator.userAgent.toLowerCase();
       if (userAgent.includes("mac")) {
         currentPlatform = "macos";
@@ -30,208 +33,352 @@
     }
   } catch (error) {
     console.error("Error detecting platform:", error);
-    // 使用 navigator.platform 作为后备方案
-    const navPlatform = navigator.platform.toLowerCase();
+    const navPlatform = navigator.platform?.toLowerCase() || "";
     if (navPlatform.includes("mac")) {
       currentPlatform = "macos";
     } else if (navPlatform.includes("win")) {
       currentPlatform = "windows";
     } else {
-      // Linux 或其他类 Unix 系统
       currentPlatform = "linux";
     }
   }
 
-  // 根据平台获取预设快捷键选项
+  const isMac = currentPlatform === "macos";
+
+  // 根据平台获取预设快捷键
   const getPresetShortcuts = (platformName: string) => {
-    const isMac = platformName === "macos";
+    const isMacPlatform = platformName === "macos";
     return [
       {
-        label: isMac ? "⌥+Space" : "Alt+Space",
+        label: isMacPlatform ? "⌥ Space" : "Alt+Space",
         value: "Alt+Space",
       },
       {
-        label: isMac ? "⌘+Space" : "Ctrl+Space",
+        label: isMacPlatform ? "⌘ Space" : "Ctrl+Space",
         value: "CommandOrControl+Space",
       },
     ];
   };
 
-  // 将快捷键转换为用户友好的显示格式（输入框用文字）
-  const formatShortcutForDisplay = (shortcut: string) => {
-    if (!shortcut) return "";
-
-    const isMac = currentPlatform === "macos";
-    const parts = shortcut.split("+");
-
-    const displayParts = parts.map((part) => {
-      const trimmedPart = part.trim();
-      const lowerPart = trimmedPart.toLowerCase();
-      switch (lowerPart) {
-        case "commandorcontrol":
-          return isMac ? "Command" : "Ctrl";
-        case "ctrl":
-        case "control":
-          return "Control";
-        case "alt":
-        case "option":
-          return isMac ? "Option" : "Alt";
-        case "shift":
-          return "Shift";
-        case "super":
-        case "cmd":
-        case "command":
-          return "Command";
-        case "win":
-          return "Win";
-        case "space":
-          return "Space";
-        default:
-          // 保持首字母大写
-          return (
-            trimmedPart.charAt(0).toUpperCase() +
-            trimmedPart.slice(1).toLowerCase()
-          );
-      }
-    });
-
-    return displayParts.join("+");
-  };
-
-  let presetShortcuts = $state<{ label: string; value: string }[]>(
+  const presetShortcuts = $state<{ label: string; value: string }[]>(
     getPresetShortcuts(currentPlatform),
   );
 
-  const handleKeydown = (e: KeyboardEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  // 解析快捷键并转换为键帽对象列表
+  interface KeyItem {
+    raw: string;
+    display: string;
+    isModifier: boolean;
+  }
 
-    const parts: string[] = [];
-    const isMac = currentPlatform === "macos";
+  const parseShortcutToKeys = (shortcutStr: string): KeyItem[] => {
+    if (!shortcutStr) return [];
+    const parts = shortcutStr.split("+");
 
-    // 处理修饰键的逻辑：
-    // 1. 在 macOS 上，Cmd 键映射为 CommandOrControl
-    // 2. 在其他平台上，Ctrl 键映射为 CommandOrControl
-    // 3. 如果同时按下了其他修饰键（如 macOS 上的 Ctrl），也要记录
+    return parts.map((part) => {
+      const trimmed = part.trim();
+      const lower = trimmed.toLowerCase();
 
-    // 主修饰键（跨平台）
-    if ((e.metaKey && isMac) || (e.ctrlKey && !isMac)) {
-      parts.push("CommandOrControl");
-    }
+      switch (lower) {
+        case "commandorcontrol":
+          return {
+            raw: trimmed,
+            display: isMac ? "⌘" : "Ctrl",
+            isModifier: true,
+          };
+        case "ctrl":
+        case "control":
+          return {
+            raw: trimmed,
+            display: isMac ? "⌃" : "Ctrl",
+            isModifier: true,
+          };
+        case "alt":
+        case "option":
+          return {
+            raw: trimmed,
+            display: isMac ? "⌥" : "Alt",
+            isModifier: true,
+          };
+        case "shift":
+          return {
+            raw: trimmed,
+            display: isMac ? "⇧" : "Shift",
+            isModifier: true,
+          };
+        case "super":
+        case "meta":
+        case "win":
+        case "cmd":
+        case "command":
+          return {
+            raw: trimmed,
+            display: isMac ? "⌘" : "Win",
+            isModifier: true,
+          };
+        case "space":
+          return {
+            raw: trimmed,
+            display: "Space",
+            isModifier: false,
+          };
+        default:
+          return {
+            raw: trimmed,
+            display: trimmed.length === 1 ? trimmed.toUpperCase() : trimmed,
+            isModifier: false,
+          };
+      }
+    });
+  };
 
-    // 额外的修饰键
-    // 在 macOS 上，如果按下了 Ctrl，单独记录（即使同时按下了 Cmd）
-    if (e.ctrlKey && isMac) {
-      parts.push("Control");
-    }
-    // 在非 macOS 上，如果按下了 Meta/Super 键，单独记录（即使同时按下了 Ctrl）
-    if (e.metaKey && !isMac) {
-      parts.push("Super");
-    }
+  let currentKeyItems = $derived(parseShortcutToKeys(value));
 
-    if (e.altKey) parts.push("Alt");
-    if (e.shiftKey) parts.push("Shift");
+  function handleKeyDown(event: KeyboardEvent) {
+    if (disabled || !isFocused) return;
 
-    const key = e.key;
+    event.preventDefault();
+    event.stopPropagation();
 
-    if (["Control", "Alt", "Shift", "Meta"].includes(key)) {
-      value = parts.join("+");
+    // 处理取消/清除操作 (ESC / Backspace)
+    if (event.key === "Escape") {
+      value = previousShortcut;
+      isFocused = false;
+      inputElement?.blur();
       return;
     }
 
-    let finalKey = key;
-    if (key === " ") {
-      finalKey = "Space";
-    } else if (key.length === 1 && /[a-zA-Z]/.test(key)) {
-      finalKey = key.toUpperCase();
+    if (
+      (event.key === "Backspace" || event.key === "Delete") &&
+      !event.ctrlKey &&
+      !event.altKey &&
+      !event.shiftKey &&
+      !event.metaKey
+    ) {
+      value = "";
+      isFocused = false;
+      inputElement?.blur();
+      onSave();
+      return;
     }
 
-    parts.push(finalKey);
-    value = parts.join("+");
-  };
+    // 收集修饰键
+    const modifiers: string[] = [];
+    if (event.ctrlKey || event.metaKey) {
+      modifiers.push("CommandOrControl");
+    }
+    if (event.altKey) {
+      modifiers.push("Alt");
+    }
+    if (event.shiftKey) {
+      modifiers.push("Shift");
+    }
 
-  const handleFocus = () => {
+    activeModifiers = modifiers;
+
+    // 检查是否仅按下了修饰键
+    const modifierKeys = ["Control", "Alt", "Shift", "Meta", "OS", "Super"];
+    if (modifierKeys.includes(event.key)) {
+      return;
+    }
+
+    // 处理常规按键
+    let mainKey = event.key;
+    if (mainKey === " ") {
+      mainKey = "Space";
+    } else if (mainKey.length === 1) {
+      mainKey = mainKey.toUpperCase();
+    }
+
+    // 组合快捷键字符串
+    const newShortcut =
+      modifiers.length > 0 ? `${modifiers.join("+")}+${mainKey}` : mainKey;
+
+    value = newShortcut;
+    isFocused = false;
+    activeModifiers = [];
+    inputElement?.blur();
+    onSave();
+  }
+
+  function handleKeyUp(event: KeyboardEvent) {
+    if (!isFocused) return;
+
+    const modifiers: string[] = [];
+    if (event.ctrlKey || event.metaKey) {
+      modifiers.push("CommandOrControl");
+    }
+    if (event.altKey) {
+      modifiers.push("Alt");
+    }
+    if (event.shiftKey) {
+      modifiers.push("Shift");
+    }
+
+    activeModifiers = modifiers;
+  }
+
+  function handleFocus() {
+    if (disabled) return;
     isFocused = true;
     previousShortcut = value;
-    // 通知后端：正在录制快捷键，Windows 的 Alt+Space 钩子需放行按键
-    invoke("set_shortcut_recording", { active: true }).catch(() => {});
-  };
+    activeModifiers = [];
+  }
 
-  const handleBlur = () => {
+  function handleBlur() {
+    if (!isFocused) return;
     isFocused = false;
-    invoke("set_shortcut_recording", { active: false }).catch(() => {});
-    const modifiers = [
-      "commandorcontrol",
-      "control",
-      "alt",
-      "shift",
-      "super",
-      "command",
-      "cmd",
-    ];
-    const parts = value.split("+");
-    const lastPart = parts[parts.length - 1];
-
-    if (
-      !value ||
-      (parts.length > 0 && modifiers.includes(lastPart.toLowerCase()))
-    ) {
+    activeModifiers = [];
+    if (!value && previousShortcut) {
       value = previousShortcut;
     }
-    if (value !== previousShortcut) {
-      onSave();
-    }
-  };
+  }
 
-  const setPresetShortcut = (shortcut: string) => {
-    value = shortcut;
+  function handleClear(e: MouseEvent) {
+    e.stopPropagation();
+    value = "";
     onSave();
-  };
+  }
+
+  function handleCancel(e: MouseEvent) {
+    e.stopPropagation();
+    value = previousShortcut;
+    isFocused = false;
+    activeModifiers = [];
+    inputElement?.blur();
+  }
+
+  function setPresetShortcut(presetValue: string) {
+    if (disabled) return;
+    value = presetValue;
+    onSave();
+  }
 </script>
 
-<div class="flex flex-col gap-2">
-  <div class="relative w-full">
+<div class="flex flex-col gap-1.5">
+  <!-- 输入触发容器 -->
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="group bg-background relative flex h-9 min-w-[170px] cursor-pointer items-center justify-between gap-2 rounded-xl border px-3 transition-[border-color,box-shadow,background-color] duration-140 ease-[cubic-bezier(0.23,1,0.32,1)]
+      {isFocused
+      ? 'border-primary ring-primary/20 shadow-xs ring-2'
+      : 'border-input hover:border-border hover:bg-accent/30'}
+      {disabled ? 'cursor-not-allowed opacity-50' : ''}"
+    onclick={() => {
+      if (!disabled) {
+        inputElement?.focus();
+      }
+    }}
+  >
+    <!-- 隐藏但捕获焦点的真实 input -->
     <input
+      bind:this={inputElement}
       type="text"
-      readonly
-      data-shortcut-recorder
-      value={formatShortcutForDisplay(value)}
-      onkeydown={handleKeydown}
+      class="sr-only"
       onfocus={handleFocus}
       onblur={handleBlur}
-      placeholder={isFocused ? "请按下组合键..." : "点击设置"}
-      class="h-8 w-full rounded-md border bg-transparent px-2 text-sm font-medium transition-all placeholder:text-xs placeholder:text-neutral-400 focus:outline-none {isFocused
-        ? 'border-neutral-800 ring-4 ring-neutral-900/5 placeholder:text-neutral-500 dark:border-neutral-200 dark:ring-neutral-100/10'
-        : 'border-neutral-200 hover:border-neutral-300 dark:border-neutral-800 dark:hover:border-neutral-700'} text-neutral-900 dark:text-neutral-100 dark:placeholder:text-neutral-600"
+      onkeydown={handleKeyDown}
+      onkeyup={handleKeyUp}
       {disabled}
+      tabindex={disabled ? -1 : 0}
+      aria-label="快捷键输入"
     />
-    {#if isFocused}
-      <div
-        class="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2"
-      >
-        <span class="flex h-1.5 w-1.5">
-          <span
-            class="absolute inline-flex h-full w-full animate-ping rounded-full bg-neutral-400 opacity-75 dark:bg-neutral-500"
-          ></span>
-          <span
-            class="relative inline-flex h-1.5 w-1.5 rounded-full bg-neutral-900 dark:bg-neutral-100"
-          ></span>
-        </span>
-      </div>
-    {/if}
+
+    <!-- 键帽/状态显示区域 -->
+    <div class="flex flex-1 flex-wrap items-center gap-1 overflow-hidden">
+      {#if isFocused}
+        <!-- 录入状态 -->
+        {#if activeModifiers.length > 0}
+          <!-- 正在按下修饰键 -->
+          {#each activeModifiers as mod}
+            <kbd
+              class="border-primary/40 bg-primary/10 text-primary shadow-kbd inline-flex h-5.5 min-w-[24px] items-center justify-center rounded-md border px-1.5 font-mono text-[11px] font-semibold select-none"
+            >
+              {parseShortcutToKeys(mod)[0]?.display || mod}
+            </kbd>
+          {/each}
+          <span class="text-muted-foreground/60 text-[10px] font-bold">+</span>
+          <kbd
+            class="border-primary/60 bg-primary/10 text-primary inline-flex h-5.5 min-w-[28px] animate-pulse items-center justify-center rounded-md border border-dashed px-1.5 font-mono text-[10px] font-medium select-none"
+          >
+            主键
+          </kbd>
+        {:else}
+          <!-- 等待录入提示 -->
+          <div
+            class="text-primary flex items-center gap-1.5 text-xs font-medium"
+          >
+            <span class="relative flex h-2 w-2">
+              <span
+                class="bg-primary absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
+              ></span>
+              <span class="bg-primary relative inline-flex h-2 w-2 rounded-full"
+              ></span>
+            </span>
+            <span>按下快捷键组合...</span>
+          </div>
+        {/if}
+      {:else if currentKeyItems.length > 0}
+        <!-- 常态展示：已设置快捷键键帽 -->
+        {#each currentKeyItems as item, i}
+          {#if i > 0}
+            <span class="text-muted-foreground/50 text-[10px] font-bold">+</span
+            >
+          {/if}
+          <kbd
+            class="border-border/80 bg-muted/80 text-foreground shadow-kbd inline-flex h-5.5 min-w-[24px] items-center justify-center rounded-md border px-1.5 font-mono text-[11px] font-medium select-none"
+          >
+            {item.display}
+          </kbd>
+        {/each}
+      {:else}
+        <!-- 未设置快捷键的空状态 -->
+        <div class="text-muted-foreground/70 flex items-center gap-1.5 text-xs">
+          <Keyboard class="h-3.5 w-3.5" />
+          <span>点击录入快捷键</span>
+        </div>
+      {/if}
+    </div>
+
+    <!-- 右侧操作 -->
+    <div class="flex shrink-0 items-center gap-1">
+      {#if isFocused}
+        <Button
+          variant="ghost"
+          size="sm"
+          class="h-6 px-1.5 text-[11px] transition-transform duration-120 active:scale-95"
+          onclick={handleCancel}
+        >
+          取消
+        </Button>
+      {:else if value && !disabled}
+        <Button
+          variant="ghost"
+          size="icon"
+          class="text-muted-foreground/60 hover:text-foreground hover:bg-muted/80 h-5 w-5 opacity-0 transition-all duration-120 group-hover:opacity-100 active:scale-90"
+          onclick={handleClear}
+          title="清除快捷键"
+        >
+          <X class="h-3 w-3" />
+        </Button>
+      {/if}
+    </div>
   </div>
+
+  <!-- 预设快捷键按钮组 -->
   {#if showPresets}
-    <div class="flex gap-2">
+    <div class="flex items-center gap-1.5 pt-0.5">
       {#each presetShortcuts as preset}
-        <Button.Root
-          class="rounded-input bg-dark text-background shadow-mini hover:bg-dark/95 inline-flex
-	                items-center justify-center px-2
-	                text-[12px]  active:scale-[0.98] active:transition-all"
+        <Button
+          variant="outline"
+          size="sm"
+          class="h-6 rounded-lg px-2 text-[11px] shadow-2xs transition-[transform,background-color] duration-120 active:scale-95"
           onclick={() => setPresetShortcut(preset.value)}
           {disabled}
         >
           {preset.label}
-        </Button.Root>
+        </Button>
       {/each}
     </div>
   {/if}

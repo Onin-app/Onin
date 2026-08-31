@@ -6,7 +6,7 @@
   import { goto } from "$app/navigation";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
-  import AppScrollArea from "$lib/components/AppScrollArea.svelte";
+  import { ScrollArea } from "$lib/components/ui/scroll-area";
   import ExtensionHeader from "$lib/components/ExtensionHeader.svelte";
   import FilePreview from "$lib/components/FilePreview.svelte";
 
@@ -141,20 +141,18 @@
     onKeyDown={handleKeyDown}
   />
 
-  <div class="flex flex-1 overflow-hidden">
+  <div class="flex flex-1 gap-2 overflow-hidden pt-2">
     <!-- Left List Pane -->
-    <div
-      class="flex w-1/3 flex-col border-r border-neutral-200 dark:border-neutral-700"
-    >
-      <AppScrollArea class="h-full w-full" viewportClass="h-full w-full p-2">
+    <div class="border-border/40 flex w-1/3 flex-col border-r pr-2">
+      <ScrollArea class="h-full w-full" viewportClass="h-full w-full pr-1">
         {#if filteredItems.length === 0}
           <div
-            class="flex h-full items-center justify-center text-sm text-neutral-500"
+            class="text-muted-foreground flex h-full items-center justify-center text-xs"
           >
             {#if searchQuery}
-              No matches
+              无匹配记录
             {:else}
-              Empty
+              暂无历史记录
             {/if}
           </div>
         {:else}
@@ -162,10 +160,10 @@
             {#each filteredItems as item, index (item.id)}
               <button
                 id="item-{index}"
-                class="group flex w-full flex-row items-center gap-3 rounded-md border border-transparent px-3 py-2 text-left font-sans text-sm transition-colors
+                class="group flex w-full cursor-pointer flex-row items-center gap-3 rounded-xl border px-3 py-2 text-left font-sans text-xs transition-[transform,background-color,border-color] duration-120 active:scale-[0.985]
                     {selectedIndex === index
-                  ? 'bg-neutral-200 dark:bg-neutral-700/50'
-                  : 'hover:bg-neutral-200/50 dark:hover:bg-neutral-800'}"
+                  ? 'border-border/60 bg-accent text-accent-foreground shadow-2xs'
+                  : 'text-foreground/80 hover:bg-muted/60 border-transparent'}"
                 onclick={() => (selectedIndex = index)}
                 ondblclick={() => handleItemSelect(item)}
               >
@@ -174,7 +172,7 @@
                   <img
                     src={item.thumbnail}
                     alt="Thumbnail"
-                    class="h-10 w-10 flex-shrink-0 rounded border border-neutral-200 bg-neutral-100 object-cover dark:border-neutral-700 dark:bg-neutral-800"
+                    class="border-border/40 bg-muted h-9 w-9 flex-shrink-0 rounded-lg border object-cover shadow-2xs"
                   />
                 {/if}
 
@@ -182,18 +180,18 @@
                 <div class="flex min-w-0 flex-1 flex-col justify-center">
                   {#if item.item_type === "File"}
                     <div
-                      class="w-full truncate leading-tight font-medium text-neutral-900 dark:text-neutral-100"
+                      class="text-foreground w-full truncate leading-tight font-medium"
                       title={item.text}
                     >
                       {getDisplayName(item)}
                     </div>
                   {:else if item.item_type === "Image"}
-                    <span class="text-xs text-neutral-500 italic"
-                      >Image Bitmap</span
+                    <span class="text-muted-foreground/70 text-xs italic"
+                      >图片数据</span
                     >
                   {:else}
                     <div
-                      class="line-clamp-2 w-full leading-tight break-all text-neutral-600 dark:text-neutral-300"
+                      class="text-foreground/85 line-clamp-2 w-full leading-relaxed break-all"
                     >
                       {item.text}
                     </div>
@@ -202,14 +200,16 @@
 
                 <!-- Right: Metadata -->
                 <div
-                  class="flex flex-shrink-0 flex-col items-end gap-0.5 self-start pt-1"
+                  class="flex flex-shrink-0 flex-col items-end gap-0.5 self-start pt-0.5"
                 >
                   <span
-                    class="text-[9px] font-semibold tracking-wider text-neutral-400/70 uppercase"
+                    class="text-muted-foreground/50 text-[9px] font-semibold tracking-wider uppercase"
                   >
                     {item.item_type}
                   </span>
-                  <span class="text-[10px] text-neutral-400 tabular-nums">
+                  <span
+                    class="text-muted-foreground/50 font-mono text-[10px] tabular-nums"
+                  >
                     {formatTime(item.timestamp)}
                   </span>
                 </div>
@@ -217,27 +217,24 @@
             {/each}
           </div>
         {/if}
-      </AppScrollArea>
+      </ScrollArea>
     </div>
 
     <!-- Right Preview Pane -->
     <div
-      class="flex w-2/3 flex-col overflow-hidden bg-white dark:bg-neutral-900"
+      class="bg-card border-border/50 flex w-2/3 flex-col overflow-hidden rounded-2xl border shadow-2xs"
     >
       {#if filteredItems[selectedIndex]}
         {@const selectedItem = filteredItems[selectedIndex]}
         <div class="flex h-full flex-col">
           <!-- Preview Header -->
           <div
-            class="flex flex-shrink-0 items-center justify-between border-b border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-900/50"
+            class="border-border/40 bg-muted/30 flex flex-shrink-0 items-center justify-between border-b px-4 py-2.5"
           >
             <div class="flex items-center gap-2">
-              <span
-                class="text-sm font-medium text-neutral-900 dark:text-neutral-100"
-                >Preview</span
-              >
-              <span class="text-xs text-neutral-400">|</span>
-              <span class="text-xs text-neutral-500"
+              <span class="text-foreground text-xs font-medium">预览</span>
+              <span class="text-muted-foreground/40 text-xs">•</span>
+              <span class="text-muted-foreground text-xs"
                 >{selectedItem.item_type}</span
               >
             </div>
@@ -246,10 +243,10 @@
           <!-- Fixed File Path Info (if applicable) -->
           {#if selectedItem.item_type === "File"}
             <div
-              class="flex-shrink-0 border-b border-neutral-100 bg-neutral-50/50 p-2 px-4 text-xs dark:border-neutral-800 dark:bg-neutral-900/30"
+              class="border-border/40 bg-muted/20 flex-shrink-0 border-b p-2 px-4 text-xs"
             >
               <div
-                class="cursor-text font-mono break-all text-neutral-500 select-text"
+                class="text-muted-foreground/80 cursor-text font-mono text-xs break-all select-text"
               >
                 {selectedItem.text}
               </div>
@@ -258,14 +255,11 @@
 
           <!-- Preview Content -->
           <div class="relative flex-1 overflow-hidden">
-            <AppScrollArea
-              class="h-full w-full"
-              viewportClass="h-full w-full p-6"
-            >
+            <ScrollArea class="h-full w-full" viewportClass="h-full w-full p-4">
               {#if selectedItem.item_type === "Image" && selectedItem.thumbnail}
                 <FilePreview
                   imageSrc={selectedItem.thumbnail}
-                  fileName="Clipboard Image"
+                  fileName="剪贴板图片"
                 />
               {:else if selectedItem.item_type === "File"}
                 <FilePreview
@@ -276,28 +270,27 @@
               {:else}
                 <!-- Text Content -->
                 <div
-                  class="cursor-text font-mono text-sm leading-relaxed break-words whitespace-pre-wrap text-neutral-800 select-text dark:text-neutral-200"
+                  class="text-foreground/90 cursor-text font-mono text-xs leading-relaxed break-words whitespace-pre-wrap select-text"
                 >
                   {selectedItem.text}
                 </div>
               {/if}
-            </AppScrollArea>
+            </ScrollArea>
           </div>
 
           <!-- Footer Info -->
           <div
-            class="flex items-center justify-between border-t border-neutral-200 bg-neutral-50 px-4 py-2 text-[10px] text-neutral-400 dark:border-neutral-800 dark:bg-neutral-900/50"
+            class="border-border/40 bg-muted/20 text-muted-foreground/60 flex items-center justify-between border-t px-4 py-2 text-[10px]"
           >
             <span class="font-mono">{selectedItem.id}</span>
-            <span>{selectedItem.text.length} chars</span>
+            <span class="font-mono">{selectedItem.text.length} 字符</span>
           </div>
         </div>
       {:else}
         <div
-          class="flex h-full flex-col items-center justify-center gap-2 text-neutral-400"
+          class="text-muted-foreground flex h-full flex-col items-center justify-center gap-2 text-xs"
         >
-          <div class="i-lucide-clipboard text-4xl opacity-20"></div>
-          <span>Select an item to view details</span>
+          <span>选择一项查看详情</span>
         </div>
       {/if}
     </div>

@@ -157,6 +157,9 @@ impl ClipboardMonitor {
 
 impl ClipboardHandler for ClipboardMonitor {
     fn on_clipboard_change(&mut self) {
+        // 更新全局剪贴板时间戳
+        crate::plugin_api::clipboard::update_clipboard_timestamp();
+
         // 检查是否应该跳过这次监听
         if self.history.should_skip() {
             return;

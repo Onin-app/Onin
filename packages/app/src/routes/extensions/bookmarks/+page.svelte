@@ -8,7 +8,7 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import { invoke } from "@tauri-apps/api/core";
-  import AppScrollArea from "$lib/components/AppScrollArea.svelte";
+  import { ScrollArea } from "$lib/components/ui/scroll-area";
   import ExtensionHeader from "$lib/components/ExtensionHeader.svelte";
   import PhosphorIcon from "$lib/components/PhosphorIcon.svelte";
   import { toast } from "svelte-sonner";
@@ -393,7 +393,7 @@
         </div>
       </div>
     {:else}
-      <AppScrollArea class="h-full w-full" viewportClass="h-full w-full p-2">
+      <ScrollArea class="h-full w-full" viewportClass="h-full w-full p-2">
         <div class="flex flex-col gap-1.5">
           {#each filteredBookmarks as item, index (item.url + index)}
             <button
@@ -515,7 +515,7 @@
             </button>
           {/each}
         </div>
-      </AppScrollArea>
+      </ScrollArea>
     {/if}
   </div>
 </div>

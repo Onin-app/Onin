@@ -151,13 +151,13 @@ pub(super) fn search_platform_files(
     }
 
     let options = file_search_options(app);
-    // 拉大候选池，避免 Everything 按字母序返回时把相关结果切掉
+    // 扩大候选池容量，确保精准项与丰富候选能够充分参与二次打分排序
     let requested_end = offset.saturating_add(limit);
     let candidate_limit = requested_end
-        .saturating_mul(6)
-        .max(200)
+        .saturating_mul(10)
+        .max(500)
         .min(MAX_CANDIDATE_LIMIT);
-    let mut files = platform_search(&terms.text_query(), candidate_limit, &options)?;
+    let mut files = platform_search(&terms, candidate_limit, &options)?;
     let candidate_limit_reached = files.len() >= candidate_limit;
     files = filter_files(files, &terms, &options);
     files.sort_by(|a, b| compare_files(a, b, &terms, &options));
@@ -210,8 +210,8 @@ fn is_cjk_search_character(character: char) -> bool {
     )
 }
 
-#[derive(Default)]
-struct ParsedTerms {
+#[derive(Default, Clone)]
+pub(crate) struct ParsedTerms {
     text: Vec<String>,
     extension: Option<String>,
     kind: Option<SearchKind>,
@@ -235,7 +235,7 @@ impl ParsedTerms {
     }
 }
 
-fn parse_terms(query: &str) -> ParsedTerms {
+pub(crate) fn parse_terms(query: &str) -> ParsedTerms {
     let mut terms = ParsedTerms::default();
 
     for token in split_query_tokens(query) {
@@ -362,8 +362,8 @@ fn compare_files(
     score_b
         .cmp(&score_a)
         .then_with(|| b.is_dir.cmp(&a.is_dir))
-        .then_with(|| b.modified_time.cmp(&a.modified_time))
         .then_with(|| path_depth(&a.path).cmp(&path_depth(&b.path)))
+        .then_with(|| b.modified_time.cmp(&a.modified_time))
         .then_with(|| a.name.len().cmp(&b.name.len()))
         .then_with(|| a.name.cmp(&b.name))
 }
@@ -393,8 +393,18 @@ fn score_file_with_options(
         .file_stem()
         .map(|stem| stem.to_string_lossy().to_lowercase())
         .unwrap_or_default();
-    // 目录基础分略高：搜索 src/config 等词时优先展示目录本身
-    let mut score = if file.is_dir { 15 } else { 0 };
+
+    // 目录精准匹配加分：精准同名文件夹（如搜索 test 时的 test 目录）给予绝对优先权重
+    let is_exact_match = terms.text.len() == 1 && (name == terms.text[0] || stem == terms.text[0]);
+    let mut score = if file.is_dir {
+        if is_exact_match {
+            40
+        } else {
+            15
+        }
+    } else {
+        0
+    };
     let demote_path_matches = terms.is_single_cjk_text_query();
 
     for text in &terms.text {
@@ -414,6 +424,16 @@ fn match_text_score(
     text: &str,
     demote_path_matches: bool,
 ) -> Option<i32> {
+    let normalized_path = path.replace('/', "\\").to_lowercase();
+    let normalized_text = text.replace('/', "\\").to_lowercase();
+    if normalized_path == normalized_text {
+        return Some(280);
+    }
+    if normalized_path.ends_with(&normalized_text) || normalized_path.starts_with(&normalized_text)
+    {
+        return Some(250);
+    }
+
     if name == text {
         return Some(260);
     }
@@ -575,31 +595,31 @@ fn launchable_item_from_file(file: PlatformFile) -> LaunchableItem {
 }
 
 fn platform_search(
-    query: &str,
+    terms: &ParsedTerms,
     limit: usize,
     options: &FileSearchOptions,
 ) -> Result<Vec<PlatformFile>, String> {
-    if query.trim().is_empty() {
+    if terms.text.is_empty() {
         return Ok(Vec::new());
     }
 
     #[cfg(target_os = "windows")]
     {
-        search_windows(query, limit, options)
+        search_windows(terms, limit, options)
     }
     #[cfg(target_os = "macos")]
     {
         let _ = options;
-        search_macos(query, limit)
+        search_macos(terms, limit)
     }
     #[cfg(target_os = "linux")]
     {
         let _ = options;
-        search_linux(query, limit)
+        search_linux(terms, limit)
     }
     #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
     {
-        let _ = (query, limit);
+        let _ = (terms, limit);
         Err("当前平台没有可用的系统文件搜索后端".to_string())
     }
 }
@@ -646,31 +666,31 @@ struct WindowsSearchRow {
 }
 
 #[cfg(target_os = "windows")]
-fn search_windows(
-    query: &str,
+pub(crate) fn search_windows(
+    terms: &ParsedTerms,
     limit: usize,
     options: &FileSearchOptions,
 ) -> Result<Vec<PlatformFile>, String> {
-    match search_everything_ipc(query, limit, options) {
+    match search_everything_ipc(terms, limit, options) {
         Ok(files) => return Ok(files),
         Err(error) => {
             tracing::warn!(backend = "Everything", %error, "file search backend failed");
         }
     }
 
-    match search_everything_cli(query, limit, options) {
+    match search_everything_cli(terms, limit, options) {
         Ok(files) => return Ok(files),
         Err(error) => {
             tracing::warn!(backend = "Everything CLI", %error, "file search backend failed");
         }
     }
 
-    search_windows_search(query, limit)
+    search_windows_search(&terms.text_query(), limit)
 }
 
 #[cfg(target_os = "windows")]
 fn search_everything_ipc(
-    query: &str,
+    terms: &ParsedTerms,
     limit: usize,
     options: &FileSearchOptions,
 ) -> Result<Vec<PlatformFile>, String> {
@@ -682,14 +702,22 @@ fn search_everything_ipc(
         | RequestFlags::Attributes
         | RequestFlags::DateModified;
     let mut files = Vec::new();
+    let mut seen = HashSet::new();
 
-    for search_query in everything_queries(query, options) {
+    let (tier0_queries, tier1_queries, tier2_queries) = everything_tiered_queries(terms, options);
+
+    // 第 0 阶段：同名精准匹配绝对优先（exact:test | exact:test.*），确保目标目录/文件 100% 优先入库
+    for search_query in tier0_queries {
+        if files.len() >= limit {
+            break;
+        }
+
         let list = everything
             .query_wait(&search_query)
             .request_flags(request_flags)
-            .sort(Sort::NameAscending)
+            .sort(Sort::DateModifiedDescending)
             .max_results(limit as u32)
-            .timeout(std::time::Duration::from_millis(700))
+            .timeout(std::time::Duration::from_millis(500))
             .call()
             .map_err(|error| error.to_string())?;
 
@@ -700,12 +728,17 @@ fn search_everything_ipc(
             let Some(parent) = item.get_string(RequestFlags::Path) else {
                 continue;
             };
+            let path = PathBuf::from(parent).join(name);
             let is_dir = item
                 .get_u32(RequestFlags::Attributes)
                 .map(|attributes| attributes & 0x10 != 0)
-                .unwrap_or(false);
+                .unwrap_or_else(|| path.is_dir());
 
-            let path = PathBuf::from(parent).join(name);
+            let key = normalize_path_key(&path.to_string_lossy());
+            if !seen.insert(key) {
+                continue;
+            }
+
             let modified_time = item
                 .get_time(RequestFlags::DateModified)
                 .and_then(|filetime| {
@@ -724,11 +757,121 @@ fn search_everything_ipc(
         }
     }
 
+    // 第 1 阶段：前缀匹配（wfn:query*）
+    if files.len() < limit {
+        for search_query in tier1_queries {
+            if files.len() >= limit {
+                break;
+            }
+
+            let list = everything
+                .query_wait(&search_query)
+                .request_flags(request_flags)
+                .sort(Sort::DateModifiedDescending)
+                .max_results(limit as u32)
+                .timeout(std::time::Duration::from_millis(500))
+                .call()
+                .map_err(|error| error.to_string())?;
+
+            for item in list.iter() {
+                let Some(name) = item.get_string(RequestFlags::FileName) else {
+                    continue;
+                };
+                let Some(parent) = item.get_string(RequestFlags::Path) else {
+                    continue;
+                };
+                let path = PathBuf::from(parent).join(name);
+                let is_dir = item
+                    .get_u32(RequestFlags::Attributes)
+                    .map(|attributes| attributes & 0x10 != 0)
+                    .unwrap_or_else(|| path.is_dir());
+
+                let key = normalize_path_key(&path.to_string_lossy());
+                if !seen.insert(key) {
+                    continue;
+                }
+
+                let modified_time =
+                    item.get_time(RequestFlags::DateModified)
+                        .and_then(|filetime| {
+                            filetime_to_unix_millis(filetime.dwHighDateTime, filetime.dwLowDateTime)
+                        });
+
+                if let Some(file) = platform_file_from_path_with_kind_and_modified_time(
+                    &path,
+                    is_dir,
+                    modified_time,
+                ) {
+                    files.push(file);
+                }
+
+                if files.len() >= limit {
+                    return Ok(files);
+                }
+            }
+        }
+    }
+
+    // 第 2 阶段：常规子串模糊匹配补充候选池
+    if files.len() < limit {
+        for search_query in tier2_queries {
+            if files.len() >= limit {
+                break;
+            }
+
+            let list = everything
+                .query_wait(&search_query)
+                .request_flags(request_flags)
+                .sort(Sort::DateModifiedDescending)
+                .max_results(limit as u32)
+                .timeout(std::time::Duration::from_millis(500))
+                .call()
+                .map_err(|error| error.to_string())?;
+
+            for item in list.iter() {
+                let Some(name) = item.get_string(RequestFlags::FileName) else {
+                    continue;
+                };
+                let Some(parent) = item.get_string(RequestFlags::Path) else {
+                    continue;
+                };
+                let path = PathBuf::from(parent).join(name);
+                let is_dir = item
+                    .get_u32(RequestFlags::Attributes)
+                    .map(|attributes| attributes & 0x10 != 0)
+                    .unwrap_or_else(|| path.is_dir());
+
+                let key = normalize_path_key(&path.to_string_lossy());
+                if !seen.insert(key) {
+                    continue;
+                }
+
+                let modified_time =
+                    item.get_time(RequestFlags::DateModified)
+                        .and_then(|filetime| {
+                            filetime_to_unix_millis(filetime.dwHighDateTime, filetime.dwLowDateTime)
+                        });
+
+                if let Some(file) = platform_file_from_path_with_kind_and_modified_time(
+                    &path,
+                    is_dir,
+                    modified_time,
+                ) {
+                    files.push(file);
+                }
+
+                if files.len() >= limit {
+                    return Ok(files);
+                }
+            }
+        }
+    }
+
     Ok(files)
 }
 
 #[cfg(target_os = "windows")]
-fn everything_client_or_start() -> Result<everything_ipc::wm::EverythingClient, String> {
+pub(crate) fn everything_client_or_start() -> Result<everything_ipc::wm::EverythingClient, String> {
     use everything_ipc::wm::EverythingClient;
 
     if let Ok(client) = EverythingClient::new() {
@@ -808,7 +951,7 @@ fn disable_everything_update_notification(path: &Path) -> Result<(), String> {
 }
 
 #[cfg(target_os = "windows")]
-fn find_everything_exe_path() -> Option<PathBuf> {
+pub(crate) fn find_everything_exe_path() -> Option<PathBuf> {
     find_everything_exe_path_from_registry().or_else(|| {
         [
             r"C:\Program Files\Everything\Everything.exe",
@@ -917,12 +1060,23 @@ fn everything_exe_from_registry_value(value: &str) -> Option<PathBuf> {
 
 #[cfg(target_os = "windows")]
 fn search_everything_cli(
-    query: &str,
+    terms: &ParsedTerms,
     limit: usize,
     options: &FileSearchOptions,
 ) -> Result<Vec<PlatformFile>, String> {
     let mut files = Vec::new();
-    for search_query in everything_queries(query, options) {
+    let mut seen = HashSet::new();
+    let (tier0_queries, tier1_queries, tier2_queries) = everything_tiered_queries(terms, options);
+
+    for search_query in tier0_queries
+        .into_iter()
+        .chain(tier1_queries.into_iter())
+        .chain(tier2_queries.into_iter())
+    {
+        if files.len() >= limit {
+            break;
+        }
+
         let mut command = Command::new("es.exe");
         command.args(["-n", &limit.to_string(), &search_query]);
         let output =
@@ -937,6 +1091,11 @@ fn search_everything_cli(
 
         for line in String::from_utf8_lossy(&output.stdout).lines() {
             let path = PathBuf::from(line.trim());
+            let key = normalize_path_key(&path.to_string_lossy());
+            if !seen.insert(key) {
+                continue;
+            }
+
             if let Some(file) = platform_file_from_path(&path) {
                 files.push(file);
             }
@@ -1058,8 +1217,64 @@ fn install_everything_with_winget() -> Result<(), String> {
 }
 
 #[cfg(target_os = "windows")]
-fn everything_queries(query: &str, options: &FileSearchOptions) -> Vec<String> {
-    let query = query.trim();
+fn everything_tiered_queries(
+    terms: &ParsedTerms,
+    options: &FileSearchOptions,
+) -> (Vec<String>, Vec<String>, Vec<String>) {
+    let mut prefix_parts = Vec::new();
+    let mut broad_parts = Vec::new();
+
+    if let Some(kind) = terms.kind {
+        match kind {
+            SearchKind::File => {
+                prefix_parts.push("file:".to_string());
+                broad_parts.push("file:".to_string());
+            }
+            SearchKind::Folder => {
+                prefix_parts.push("folder:".to_string());
+                broad_parts.push("folder:".to_string());
+            }
+        }
+    }
+
+    if let Some(ref ext) = terms.extension {
+        let ext_clean = ext.trim_start_matches('.');
+        if !ext_clean.is_empty() {
+            prefix_parts.push(format!("ext:{}", ext_clean));
+            broad_parts.push(format!("ext:{}", ext_clean));
+        }
+    }
+
+    if terms.text.is_empty() {
+        return (Vec::new(), Vec::new(), Vec::new());
+    }
+
+    let first_word = &terms.text[0];
+    // Tier 0: 同名完全精准匹配（wfn:test | wfn:test.*）
+    let mut exact_text_parts = prefix_parts.clone();
+    if terms.text.len() == 1 {
+        exact_text_parts.push(format!("wfn:{} | wfn:{}.*", first_word, first_word));
+    } else {
+        exact_text_parts.push(format!("(wfn:{} | wfn:{}.*)", first_word, first_word));
+        exact_text_parts.extend(terms.text[1..].iter().cloned());
+    }
+    let tier0_query = exact_text_parts.join(" ");
+
+    // Tier 1: 前缀匹配（wfn:test*）
+    let mut prefix_text_parts = prefix_parts.clone();
+    if terms.text.len() == 1 {
+        prefix_text_parts.push(format!("wfn:{}*", first_word));
+    } else {
+        prefix_text_parts.push(format!("wfn:{}*", first_word));
+        prefix_text_parts.extend(terms.text[1..].iter().cloned());
+    }
+    let tier1_query = prefix_text_parts.join(" ");
+
+    // Tier 2: 常规模糊匹配
+    let mut broad_text_parts = broad_parts;
+    broad_text_parts.extend(terms.text.iter().cloned());
+    let tier2_query = broad_text_parts.join(" ");
+
     let roots = options
         .roots
         .iter()
@@ -1067,20 +1282,46 @@ fn everything_queries(query: &str, options: &FileSearchOptions) -> Vec<String> {
         .collect::<Vec<_>>();
 
     if roots.is_empty() {
-        return vec![query.to_string()];
+        return (vec![tier0_query], vec![tier1_query], vec![tier2_query]);
     }
 
-    roots
-        .into_iter()
+    let tier0 = roots
+        .iter()
         .map(|root| {
-            let root = everything_path_scope(root);
-            if root.is_empty() {
-                query.to_string()
+            let scope = everything_path_scope(root);
+            if scope.is_empty() {
+                tier0_query.clone()
             } else {
-                format!("{} {}", root, query)
+                format!("{} {}", scope, tier0_query)
             }
         })
-        .collect()
+        .collect();
+
+    let tier1 = roots
+        .iter()
+        .map(|root| {
+            let scope = everything_path_scope(root);
+            if scope.is_empty() {
+                tier1_query.clone()
+            } else {
+                format!("{} {}", scope, tier1_query)
+            }
+        })
+        .collect();
+
+    let tier2 = roots
+        .into_iter()
+        .map(|root| {
+            let scope = everything_path_scope(root);
+            if scope.is_empty() {
+                tier2_query.clone()
+            } else {
+                format!("{} {}", scope, tier2_query)
+            }
+        })
+        .collect();
+
+    (tier0, tier1, tier2)
 }
 
 #[cfg(target_os = "windows")]
@@ -1145,8 +1386,9 @@ fn windows_powershell_path() -> PathBuf {
 }
 
 #[cfg(target_os = "macos")]
-fn search_macos(query: &str, limit: usize) -> Result<Vec<PlatformFile>, String> {
-    let query = format!("kMDItemFSName == '*{}*'cd", query.replace('\'', "\\'"));
+fn search_macos(terms: &ParsedTerms, limit: usize) -> Result<Vec<PlatformFile>, String> {
+    let query_str = terms.text_query();
+    let query = format!("kMDItemFSName == '*{}*'cd", query_str.replace('\'', "\\'"));
     let mut command = Command::new("mdfind");
     command.args(["-0", &query]);
     let output = run_command_with_timeout(&mut command, "Spotlight 查询", Duration::from_secs(3))?;
@@ -1173,11 +1415,10 @@ fn command_exists(name: &str) -> bool {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .output()
-        .is_ok()
 }
 
 #[cfg(target_os = "linux")]
-fn search_linux(query: &str, limit: usize) -> Result<Vec<PlatformFile>, String> {
+fn search_linux(terms: &ParsedTerms, limit: usize) -> Result<Vec<PlatformFile>, String> {
     let command = if command_exists("plocate") {
         "plocate"
     } else if command_exists("locate") {
@@ -1187,7 +1428,8 @@ fn search_linux(query: &str, limit: usize) -> Result<Vec<PlatformFile>, String> 
     };
 
     let mut search_command = Command::new(command);
-    search_command.args(["-0", "-i", "-l", &limit.to_string(), query]);
+    let query_str = terms.text_query();
+    search_command.args(["-0", "-i", "-l", &limit.to_string(), &query_str]);
     let output = run_command_with_timeout(
         &mut search_command,
         &format!("{} 查询", command),
@@ -1384,6 +1626,42 @@ mod scoring_tests {
         assert!(is_search_query_long_enough("あ"));
         assert!(is_search_query_long_enough("ア"));
         assert!(is_search_query_long_enough("한"));
+    }
+
+    #[test]
+    fn exact_name_ranks_above_underscore_wrapped_name() {
+        let terms = terms("test");
+        let options = options(Vec::new());
+        let mut exact_folder = file(r"F:\byper\test", "test", r"F:\byper");
+        exact_folder.is_dir = true;
+        let mut underscore_tests = file(
+            r"D:\byp\repositories\tauri\onin\packages\app\src\lib\stores\__tests__",
+            "__tests__",
+            r"D:\byp\repositories\tauri\onin\packages\app\src\lib\stores",
+        );
+        underscore_tests.is_dir = true;
+
+        assert!(
+            score_file_with_options(&exact_folder, &terms, &options)
+                > score_file_with_options(&underscore_tests, &terms, &options)
+        );
+        assert_eq!(
+            compare_files(&exact_folder, &underscore_tests, &terms, &options),
+            Ordering::Less
+        );
+    }
+
+    #[test]
+    fn exact_path_query_ranks_highest() {
+        let terms = terms(r"F:\byper\test");
+        let options = options(Vec::new());
+        let exact_path = file(r"F:\byper\test", "test", r"F:\byper");
+        let other_path = file(r"D:\test\app", "app", r"D:\test");
+
+        assert!(
+            score_file_with_options(&exact_path, &terms, &options)
+                > score_file_with_options(&other_path, &terms, &options)
+        );
     }
 
     #[test]

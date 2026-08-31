@@ -364,7 +364,7 @@ jobs:
   # 这样当 GitHub 不可达时，应用会回退到 OSS 完成检查更新与下载安装。
   publish-oss-manifest:
     needs: [release, build-tauri]
-    if: needs.release.outputs.released == 'true' && needs.build-tauri.result == 'success'
+    if: needs.release.outputs.released == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Download GitHub updater manifest
@@ -373,7 +373,7 @@ jobs:
           TAG: ${{ needs.release.outputs.tag }}
         run: |
           mkdir -p dist-latest
-          curl -fsSL "https://github.com/Onin-app/Onin/releases/download/${TAG}/latest.json" -o dist-latest/latest.json
+          curl -fsSL --retry 3 --retry-delay 5 "https://github.com/Onin-app/Onin/releases/download/${TAG}/latest.json" -o dist-latest/latest.json
 
       - name: Rewrite asset URLs to Aliyun OSS
         shell: bash

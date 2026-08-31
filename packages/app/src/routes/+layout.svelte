@@ -37,6 +37,7 @@
     trackEvent,
     accumulateCommandStat,
   } from "$lib/tracking";
+  import { windowOpacity, setWindowOpacity } from "$lib/stores/opacity";
 
   // Setup plugin console listener to forward plugin console output to webview devtools
   setupPluginConsoleListener();
@@ -268,10 +269,13 @@
 
     let autoUpdateIntervalId: ReturnType<typeof setInterval> | null = null;
 
-    // 加载配置判定是否执行自动检查更新
-    const setupAutoCheckUpdate = async () => {
+    // 加载配置判定是否执行自动检查更新及同步窗口透明度
+    const setupAppConfig = async () => {
       try {
         const config = await invoke<AppConfig>("get_app_config");
+        if (config.window_opacity !== undefined) {
+          setWindowOpacity(config.window_opacity);
+        }
         if (config.auto_check_update ?? true) {
           // 启动后延迟 2 秒，避免阻塞窗口首屏密集渲染
           setTimeout(() => {
@@ -284,11 +288,11 @@
           }, 43200000);
         }
       } catch (err) {
-        console.error("加载自动检查更新配置失败:", err);
+        console.error("加载应用配置失败:", err);
       }
     };
 
-    setupAutoCheckUpdate();
+    setupAppConfig();
 
     // The returned cleanup function will only run if the entire layout is destroyed.
     return () => {
@@ -320,9 +324,25 @@
   });
 
   let { children } = $props();
+
+  const isOverlayRoute = $derived(
+    page.route.id?.includes("color-picker-overlay") ||
+      page.route.id?.includes("screen-recorder") ||
+      page.route.id?.includes("screenshot-selection") ||
+      page.route.id?.includes("toast-overlay"),
+  );
 </script>
 
-{@render children()}
+{#if isOverlayRoute}
+  {@render children()}
+{:else}
+  <div
+    class="h-full w-full"
+    style="opacity: var(--window-opacity, 1); transition: opacity 0.15s ease-out;"
+  >
+    {@render children()}
+  </div>
+{/if}
 
 <WindowResizer />
 <Toaster richColors position="top-center" />

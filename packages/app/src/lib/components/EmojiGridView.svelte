@@ -6,7 +6,7 @@
    * 支持键盘导航和点击选择
    */
   import { onMount } from "svelte";
-  import AppScrollArea from "$lib/components/AppScrollArea.svelte";
+  import { ScrollArea } from "$lib/components/ui/scroll-area";
   import type {
     EmojiGridData,
     EmojiItem,
@@ -254,24 +254,20 @@
 </script>
 
 <div class="h-full w-full" role="grid" tabindex="0" onkeydown={handleKeyDown}>
-  <AppScrollArea
-    class="h-full w-full rounded-[10px] border"
+  <ScrollArea
+    class="border-border/40 bg-card/40 h-full w-full rounded-2xl border shadow-2xs"
     viewportClass="h-full w-full overflow-x-hidden"
-    verticalScrollbarClass="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-2 touch-none rounded-full border-l border-l-transparent p-px transition-all duration-200 select-none hover:w-3"
-    thumbClass="flex-1 rounded-full bg-neutral-300 dark:bg-neutral-600"
   >
-    <div class="space-y-5 p-3">
+    <div class="space-y-6 p-4">
       {#each data.groups as group, groupIndex}
         <div>
           <!-- 分类标题 -->
           <div class="mb-3 flex items-center gap-2">
-            <span
-              class="text-sm font-medium text-neutral-600 dark:text-neutral-400"
-            >
+            <span class="text-foreground text-xs font-semibold tracking-tight">
               {group.name}
             </span>
             <span
-              class="rounded-full bg-neutral-200 px-2 py-0.5 text-xs text-neutral-500 dark:bg-neutral-700 dark:text-neutral-400"
+              class="bg-muted text-muted-foreground rounded-full px-2 py-0.5 font-mono text-[10px]"
             >
               {group.emojis.length}
             </span>
@@ -287,10 +283,10 @@
               {@const flatIndex = getFlatIndex(groupIndex, emojiIndex)}
               <button
                 bind:this={buttonRefs[flatIndex]}
-                class="flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg text-2xl transition-all duration-150
+                class="flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl text-2xl transition-[transform,background-color,box-shadow] duration-120 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-90
                     {flatSelectedIndex === flatIndex
-                  ? 'scale-110 bg-blue-500/20 ring-2 ring-blue-500'
-                  : 'hover:scale-105 hover:bg-neutral-200 dark:hover:bg-neutral-700'}"
+                  ? 'bg-primary/15 ring-primary/60 scale-110 shadow-xs ring-2'
+                  : 'hover:bg-muted/80 hover:scale-105'}"
                 onclick={() => handleClick(emoji, flatIndex)}
                 title={emoji.name}
               >
@@ -301,5 +297,5 @@
         </div>
       {/each}
     </div>
-  </AppScrollArea>
+  </ScrollArea>
 </div>
