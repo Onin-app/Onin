@@ -137,4 +137,5 @@ export interface AppConfig {
   ocr_default_engine?: string;
   ocr_provider_id?: string | null;
   ocr_model_id?: string | null;
+  window_opacity?: number;
 }

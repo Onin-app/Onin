@@ -13,6 +13,7 @@
   import { toast } from "svelte-sonner";
 
   import { theme, toggleTheme } from "$lib/utils/theme";
+  import { windowOpacity, setWindowOpacity } from "$lib/stores/opacity";
   import { Theme, type SortMode, type AppConfig } from "$lib/type";
   import {
     detachWindowShortcut,
@@ -36,6 +37,7 @@
   ];
 
   let currentTheme = $state<Theme>(Theme.DARK);
+  let windowOpacityVal = $state<number>(100);
   let autostartEnabled = $state<boolean>(false);
   let trayIconEnabled = $state<boolean>(false);
   let autoCheckUpdate = $state<boolean>(true);
@@ -98,6 +100,11 @@
     }
   };
 
+  const handleOpacityChange = (value: number) => {
+    windowOpacityVal = value;
+    setWindowOpacity(value);
+  };
+
   const updateConfig = async () => {
     try {
       await invoke("update_app_config", {
@@ -109,6 +116,7 @@
           marketplace_api_url: marketplaceApiUrl || undefined,
           disabled_extension_ids: disabledExtensionIds,
           auto_check_update: autoCheckUpdate,
+          window_opacity: windowOpacityVal,
         },
       });
       toast.success("配置已保存");
@@ -158,8 +166,12 @@
     }
   };
 
-  const unsubscribe = theme.subscribe((value) => {
+  const unsubscribeTheme = theme.subscribe((value) => {
     currentTheme = value;
+  });
+
+  const unsubscribeOpacity = windowOpacity.subscribe((value) => {
+    windowOpacityVal = value;
   });
 
   onMount(async () => {
@@ -193,6 +205,10 @@
       marketplaceApiUrl = config.marketplace_api_url || "";
       disabledExtensionIds = config.disabled_extension_ids || [];
       autoCheckUpdate = config.auto_check_update ?? true;
+      if (config.window_opacity !== undefined) {
+        windowOpacityVal = config.window_opacity;
+        setWindowOpacity(config.window_opacity);
+      }
     } catch (e) {
       console.error("Failed to get app config:", e);
       toast.error("加载应用配置失败，请重启应用");
@@ -205,7 +221,10 @@
     }
   });
 
-  onDestroy(unsubscribe);
+  onDestroy(() => {
+    unsubscribeTheme();
+    unsubscribeOpacity();
+  });
 </script>
 
 <ScrollArea class="h-full w-full" viewportClass="h-full w-full">
@@ -232,6 +251,26 @@
                 {/each}
               </TabsList>
             </Tabs>
+          {/snippet}
+        </SetItem>
+        <SetItem title="窗口透明度" description="调节主窗口及界面的不透明度">
+          {#snippet content()}
+            <div class="flex w-48 items-center gap-3">
+              <Slider
+                type="single"
+                value={windowOpacityVal}
+                min={30}
+                max={100}
+                step={1}
+                onValueChange={(v) => handleOpacityChange(v as number)}
+                onValueCommit={updateConfig}
+              />
+              <span
+                class="text-muted-foreground w-12 shrink-0 text-right text-xs"
+              >
+                {windowOpacityVal}%
+              </span>
+            </div>
           {/snippet}
         </SetItem>
       </Card>
