@@ -2,7 +2,10 @@
   import { onMount, onDestroy } from "svelte";
   import { get } from "svelte/store";
   import { invoke, convertFileSrc } from "@tauri-apps/api/core";
-  import { Button } from "bits-ui";
+  import { Button } from "$lib/components/ui/button";
+  import { Badge } from "$lib/components/ui/badge";
+  import { Card } from "$lib/components/ui/card";
+  import { ScrollArea } from "$lib/components/ui/scroll-area";
   import { toast } from "svelte-sonner";
   import {
     Database,
@@ -15,7 +18,6 @@
     ArrowClockwise,
     CaretRight,
   } from "phosphor-svelte";
-  import AppScrollArea from "$lib/components/AppScrollArea.svelte";
   import { Theme } from "$lib/type";
   import { getTheme, theme } from "$lib/utils/theme";
 
@@ -480,21 +482,21 @@
       </span>
     </div>
     <div class="flex gap-2">
-      <Button.Root
+      <Button
         class="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 text-xs font-medium text-neutral-900 shadow-xs transition-colors hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200 dark:hover:bg-neutral-800"
         onclick={loadDataInfo}
         disabled={loadingList}
       >
         <ArrowClockwise size={14} class={loadingList ? "animate-spin" : ""} />
         刷新
-      </Button.Root>
-      <Button.Root
+      </Button>
+      <Button
         class="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-neutral-900 px-3 text-xs font-medium text-white shadow-xs transition-colors hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-950 dark:hover:bg-neutral-200"
         onclick={handleOpenDataDir}
       >
         <FolderOpen size={14} />
         打开文件夹
-      </Button.Root>
+      </Button>
     </div>
   </div>
 
@@ -504,7 +506,7 @@
     <div
       class="flex w-60 flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900"
     >
-      <AppScrollArea
+      <ScrollArea
         class="h-full w-full"
         viewportClass="h-full w-full p-3 flex flex-col gap-4"
       >
@@ -708,7 +710,7 @@
             </div>
           {/if}
         {/if}
-      </AppScrollArea>
+      </ScrollArea>
     </div>
 
     <!-- 右侧内容区域 -->
@@ -739,20 +741,20 @@
           </div>
           <div class="flex items-center gap-2">
             {#if selectedFile.is_json}
-              <Button.Root
+              <Button
                 class="inline-flex h-7 items-center justify-center gap-1 rounded-md border border-neutral-200 bg-white px-2.5 text-[11px] font-medium text-neutral-700 shadow-xs transition-colors hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-300 dark:hover:bg-neutral-800"
                 onclick={handleCopyContent}
                 disabled={loadingContent || !selectedFileContent}
               >
                 <Copy size={12} />
                 复制
-              </Button.Root>
+              </Button>
             {/if}
           </div>
         </div>
 
         <!-- 详情内容区 -->
-        <AppScrollArea
+        <ScrollArea
           class="min-h-0 w-full flex-1"
           viewportClass="h-full w-full p-4 bg-neutral-50/50 dark:bg-neutral-950/30 flex flex-col"
         >
@@ -793,13 +795,13 @@
                 MB)。为了避免解析大文件导致应用卡死，我们限制了其直接预览。
               </p>
               <div class="mt-2 flex gap-2">
-                <Button.Root
+                <Button
                   class="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 text-xs font-medium text-neutral-900 shadow-xs transition-colors hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200 dark:hover:bg-neutral-800"
                   onclick={handleOpenDataDir}
                 >
                   <FolderOpen size={14} />
                   在系统资源管理器中打开目录
-                </Button.Root>
+                </Button>
               </div>
             </div>
           {:else if !selectedFileDisplay}
@@ -830,7 +832,7 @@
               {/if}
             </div>
           {/if}
-        </AppScrollArea>
+        </ScrollArea>
       {/if}
     </div>
   </div>

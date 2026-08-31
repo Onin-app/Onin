@@ -6,7 +6,7 @@
   import { open } from "@tauri-apps/plugin-dialog";
   import { VideoCamera, Trash, Play, Spinner } from "phosphor-svelte";
   import { Switch, Tabs } from "bits-ui";
-  import AppScrollArea from "$lib/components/AppScrollArea.svelte";
+  import { ScrollArea } from "$lib/components/ui/scroll-area";
   import ExtensionHeader from "$lib/components/ExtensionHeader.svelte";
   import { goto } from "$app/navigation";
 
@@ -454,7 +454,7 @@
                       选择录像屏幕
                     </span>
                     <!-- 显示器列表滚动区 -->
-                    <AppScrollArea
+                    <ScrollArea
                       class="min-h-0 flex-1 pr-1"
                       viewportClass="h-full w-full"
                     >
@@ -519,7 +519,7 @@
                           </div>
                         {/each}
                       </div>
-                    </AppScrollArea>
+                    </ScrollArea>
                   {:else}
                     <!-- 窗口录制来源选择 -->
                     <div class="flex shrink-0 items-center justify-between">
@@ -541,7 +541,7 @@
                       </button>
                     </div>
 
-                    <AppScrollArea
+                    <ScrollArea
                       class="min-h-0 flex-1 pr-1"
                       viewportClass="h-full w-full"
                     >
@@ -598,7 +598,7 @@
                           {/each}
                         </div>
                       {/if}
-                    </AppScrollArea>
+                    </ScrollArea>
                   {/if}
                 </div>
               </div>
@@ -608,7 +608,7 @@
                 class="flex w-[280px] shrink-0 flex-col justify-between border-l border-neutral-200/50 pl-5 dark:border-neutral-800/40"
               >
                 <!-- 配置列表 -->
-                <AppScrollArea
+                <ScrollArea
                   class="min-h-0 flex-1 pr-0.5"
                   viewportClass="h-full w-full"
                 >
@@ -1012,7 +1012,7 @@
                       </div>
                     </div>
                   </div>
-                </AppScrollArea>
+                </ScrollArea>
 
                 <!-- 5. 启动录制按钮 -->
                 <button
@@ -1057,7 +1057,7 @@
               </div>
             {:else}
               <!-- 统一自定义滚动条，限制高度为 flex-1 min-h-0 w-full 以启用内部滚动 -->
-              <AppScrollArea
+              <ScrollArea
                 class="min-h-0 w-full flex-1 pr-1"
                 viewportClass="h-full w-full"
               >
@@ -1108,7 +1108,7 @@
                     </div>
                   {/each}
                 </div>
-              </AppScrollArea>
+              </ScrollArea>
             {/if}
           </div>
         </Tabs.Content>

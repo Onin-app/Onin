@@ -3,13 +3,14 @@
    * SearchInput Component
    *
    * 搜索输入区域组件
-   * 包含文本/文件附件展示和输入框
+   * 遵循无缝融合设计：无突兀外边框，直接与主启动器面板融为一体
    */
   import autoAnimate from "@formkit/auto-animate";
   import type { Action } from "svelte/action";
   import { CaretRight, CaretLeft } from "phosphor-svelte";
   import FileAttachment from "./FileAttachment.svelte";
   import TextAttachment from "./TextAttachment.svelte";
+  import { Button } from "$lib/components/ui/button";
 
   interface Props {
     value: string;
@@ -45,7 +46,6 @@
     onBackspace,
   }: Props = $props();
 
-  // AutoAnimate action for file attachments
   const animate: Action<HTMLElement> = (node) => {
     autoAnimate(node, {
       duration: 200,
@@ -53,15 +53,12 @@
     });
   };
 
-  // Input element reference
   let inputElement: HTMLInputElement;
 
-  // 暴露 focus 方法
   export function focus() {
     inputElement?.focus();
   }
 
-  // 暴露 select 方法
   export function select() {
     inputElement?.select();
   }
@@ -77,7 +74,7 @@
 <div
   class="flex w-full {showAllFiles
     ? 'flex-col gap-2'
-    : 'flex-row items-center gap-2'} rounded-lg border border-neutral-300 bg-white px-2 py-2 dark:border-neutral-600 dark:bg-neutral-800"
+    : 'flex-row items-center gap-2'} bg-transparent px-1 py-1"
   ondrop={onDrop}
   ondragover={onDragOver}
   role="region"
@@ -94,33 +91,31 @@
   {:else if attachedFiles.length > 0}
     <div use:animate class="flex flex-wrap items-center gap-1.5">
       {#if showAllFiles}
-        <!-- 展开模式：显示所有文件 -->
         {#each attachedFiles as file, index (file.name + index)}
           <FileAttachment {file} onRemove={() => onRemoveFile(index)} />
         {/each}
       {:else}
-        <!-- 折叠模式：只显示第一个文件 -->
         <FileAttachment
           file={attachedFiles[0]}
           onRemove={() => onRemoveFile(0)}
         />
       {/if}
       {#if attachedFiles.length > 1}
-        <button
-          class="inline-flex h-[34px] items-center gap-1 rounded-md border px-2 text-sm font-medium transition-colors {showAllFiles
-            ? 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-600 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50'
-            : 'border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100 dark:border-orange-600 dark:bg-orange-900/30 dark:text-orange-300 dark:hover:bg-orange-900/50'}"
+        <Button
+          variant="outline"
+          size="sm"
+          class="h-7 gap-1 px-2 text-xs"
           onclick={onToggleShowAllFiles}
           aria-label={showAllFiles ? "收起文件" : "展开所有文件"}
         >
           {#if showAllFiles}
-            <CaretLeft class="size-4" weight="bold" />
+            <CaretLeft class="size-3.5" weight="bold" />
             <span>收起</span>
           {:else}
             <span>+{attachedFiles.length - 1}</span>
-            <CaretRight class="size-4" weight="bold" />
+            <CaretRight class="size-3.5" weight="bold" />
           {/if}
-        </button>
+        </Button>
       {/if}
     </div>
   {/if}
@@ -129,7 +124,7 @@
     bind:this={inputElement}
     class="{showAllFiles
       ? 'w-full'
-      : 'min-w-0 flex-1'} h-[34px] bg-transparent text-2xl focus:ring-0 focus:outline-none active:ring-0 active:outline-none"
+      : 'min-w-0 flex-1'} text-foreground placeholder:text-muted-foreground/60 h-10 border-none bg-transparent text-xl font-normal outline-none focus:ring-0 focus:outline-none active:outline-none"
     type="text"
     {placeholder}
     bind:value

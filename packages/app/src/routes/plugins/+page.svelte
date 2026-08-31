@@ -11,7 +11,7 @@
   import { CheckCircle, Storefront } from "phosphor-svelte";
   import { goto } from "$app/navigation";
   import { escapeHandler } from "$lib/stores/escapeHandler";
-  import AppScrollArea from "$lib/components/AppScrollArea.svelte";
+  import { ScrollArea } from "$lib/components/ui/scroll-area";
 
   // Composable
   import {
@@ -144,7 +144,7 @@
           </Tabs.List>
 
           <Tabs.Content value="installed" class="flex-1 overflow-hidden">
-            <AppScrollArea
+            <ScrollArea
               class="h-full w-full"
               viewportClass="h-full w-full overflow-x-hidden pr-2"
             >
@@ -168,7 +168,7 @@
               {:else}
                 <EmptyPluginState />
               {/if}
-            </AppScrollArea>
+            </ScrollArea>
           </Tabs.Content>
 
           <Tabs.Content value="market" class="flex-1 overflow-hidden">

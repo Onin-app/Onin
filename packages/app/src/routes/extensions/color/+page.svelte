@@ -7,7 +7,7 @@
   import { toast } from "svelte-sonner";
   import ColorPicker, { ChromeVariant } from "svelte-awesome-color-picker";
   import { Copy, ClipboardText, Eyedropper } from "phosphor-svelte";
-  import AppScrollArea from "$lib/components/AppScrollArea.svelte";
+  import { ScrollArea } from "$lib/components/ui/scroll-area";
   import ExtensionHeader from "$lib/components/ExtensionHeader.svelte";
 
   interface ColorConversion {
@@ -302,7 +302,7 @@
     onKeyDown={handleKeyDown}
   />
 
-  <AppScrollArea
+  <ScrollArea
     class="h-0 min-h-0 flex-1 overflow-hidden"
     viewportClass="h-full max-h-full w-full overflow-y-auto overflow-x-hidden"
   >
@@ -400,7 +400,7 @@
         <div class="empty">无法识别颜色</div>
       {/if}
     </main>
-  </AppScrollArea>
+  </ScrollArea>
 </div>
 
 <style>

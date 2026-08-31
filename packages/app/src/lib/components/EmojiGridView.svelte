@@ -6,7 +6,7 @@
    * 支持键盘导航和点击选择
    */
   import { onMount } from "svelte";
-  import AppScrollArea from "$lib/components/AppScrollArea.svelte";
+  import { ScrollArea } from "$lib/components/ui/scroll-area";
   import type {
     EmojiGridData,
     EmojiItem,
@@ -254,7 +254,7 @@
 </script>
 
 <div class="h-full w-full" role="grid" tabindex="0" onkeydown={handleKeyDown}>
-  <AppScrollArea
+  <ScrollArea
     class="h-full w-full rounded-[10px] border"
     viewportClass="h-full w-full overflow-x-hidden"
     verticalScrollbarClass="bg-muted hover:bg-dark-10 data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0 flex w-2 touch-none rounded-full border-l border-l-transparent p-px transition-all duration-200 select-none hover:w-3"
@@ -301,5 +301,5 @@
         </div>
       {/each}
     </div>
-  </AppScrollArea>
+  </ScrollArea>
 </div>

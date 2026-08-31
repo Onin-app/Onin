@@ -1,8 +1,8 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { Button } from "bits-ui";
+  import { Button } from "$lib/components/ui/button";
+  import { ScrollArea } from "$lib/components/ui/scroll-area";
   import { ArrowLeft } from "phosphor-svelte";
-  import AppScrollArea from "$lib/components/AppScrollArea.svelte";
   import SettingField from "./SettingField.svelte";
   import type {
     PluginSettingsSchema,
@@ -66,12 +66,10 @@
   // 自动保存设置（带防抖）
   let saveTimeout: number | null = null;
   async function autoSaveSettings(key: string, value: any) {
-    // 清除之前的定时器
     if (saveTimeout !== null) {
       clearTimeout(saveTimeout);
     }
 
-    // 设置新的定时器（500ms 防抖）
     saveTimeout = setTimeout(async () => {
       try {
         saveError = null;
@@ -86,55 +84,52 @@
     }, 500) as unknown as number;
   }
 
-  // 初始化加载
   $effect(() => {
     loadSettings();
   });
 </script>
 
-<div class="flex h-full flex-col bg-neutral-50 dark:bg-neutral-900">
+<div class="bg-background flex h-full flex-col">
   <!-- Header -->
-  <div
-    class="flex items-center gap-2 border-b border-neutral-200 bg-white px-4 py-3 dark:border-neutral-700 dark:bg-neutral-800"
-  >
-    <Button.Root
-      class="rounded p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+  <div class="bg-card flex items-center gap-2 border-b px-4 py-3">
+    <Button
+      variant="ghost"
+      size="icon"
+      class="h-8 w-8"
       onclick={onback}
       aria-label="返回"
     >
-      <ArrowLeft class="h-5 w-5" />
-    </Button.Root>
-    <h2 class="text-lg font-semibold">{pluginName} - 设置</h2>
+      <ArrowLeft class="h-4 w-4" />
+    </Button>
+    <h2 class="text-foreground text-base font-semibold">{pluginName} - 设置</h2>
   </div>
 
   <!-- Content -->
-  <AppScrollArea class="flex-1" viewportClass="h-full w-full overflow-x-hidden">
+  <ScrollArea class="flex-1" viewportClass="h-full w-full overflow-x-hidden">
     <div class="p-6 pr-8">
       {#if loading}
         <div class="flex items-center justify-center py-12">
-          <div class="text-neutral-500">加载中...</div>
+          <div class="text-muted-foreground text-sm">加载中...</div>
         </div>
       {:else if loadError}
         <div class="mx-auto max-w-2xl">
           <div
-            class="rounded-lg border border-red-200 bg-red-50 p-4 text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200"
+            class="border-destructive/20 bg-destructive/10 text-destructive rounded-xl border p-4"
           >
-            <p class="font-semibold">加载失败</p>
-            <p class="mt-1 text-sm">{loadError}</p>
+            <p class="text-sm font-semibold">加载失败</p>
+            <p class="mt-1 text-xs">{loadError}</p>
           </div>
         </div>
       {:else}
         <div class="mx-auto max-w-2xl">
           {#if saveError}
             <div
-              class="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200"
+              class="border-destructive/20 bg-destructive/10 text-destructive mb-4 rounded-xl border p-3 text-xs"
             >
               {saveError}
             </div>
           {/if}
-          <div
-            class="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-800"
-          >
+          <div class="bg-card rounded-xl border p-4">
             {#each schema.fields as field (field.key)}
               <SettingField
                 {field}
@@ -149,5 +144,5 @@
         </div>
       {/if}
     </div>
-  </AppScrollArea>
+  </ScrollArea>
 </div>

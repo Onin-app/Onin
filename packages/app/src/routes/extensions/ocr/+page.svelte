@@ -15,7 +15,7 @@
     TextIndent,
   } from "phosphor-svelte";
   import { Tabs, Button } from "bits-ui";
-  import AppScrollArea from "$lib/components/AppScrollArea.svelte";
+  import { ScrollArea } from "$lib/components/ui/scroll-area";
   import ExtensionHeader from "$lib/components/ExtensionHeader.svelte";
   import type { AppConfig } from "$lib/type";
 
@@ -866,10 +866,7 @@
             class="flex h-full min-h-0 w-full flex-1 flex-col focus:outline-none"
           >
             <div class="h-full min-h-0 w-full flex-1">
-              <AppScrollArea
-                class="h-full w-full"
-                viewportClass="h-full w-full"
-              >
+              <ScrollArea class="h-full w-full" viewportClass="h-full w-full">
                 <div class="flex flex-col gap-2 p-4">
                   {#if filteredLines.length === 0}
                     <div
@@ -915,7 +912,7 @@
                     {/each}
                   {/if}
                 </div>
-              </AppScrollArea>
+              </ScrollArea>
             </div>
           </Tabs.Content>
         </div>

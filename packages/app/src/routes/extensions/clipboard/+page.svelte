@@ -6,7 +6,7 @@
   import { goto } from "$app/navigation";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
-  import AppScrollArea from "$lib/components/AppScrollArea.svelte";
+  import { ScrollArea } from "$lib/components/ui/scroll-area";
   import ExtensionHeader from "$lib/components/ExtensionHeader.svelte";
   import FilePreview from "$lib/components/FilePreview.svelte";
 
@@ -146,7 +146,7 @@
     <div
       class="flex w-1/3 flex-col border-r border-neutral-200 dark:border-neutral-700"
     >
-      <AppScrollArea class="h-full w-full" viewportClass="h-full w-full p-2">
+      <ScrollArea class="h-full w-full" viewportClass="h-full w-full p-2">
         {#if filteredItems.length === 0}
           <div
             class="flex h-full items-center justify-center text-sm text-neutral-500"
@@ -217,7 +217,7 @@
             {/each}
           </div>
         {/if}
-      </AppScrollArea>
+      </ScrollArea>
     </div>
 
     <!-- Right Preview Pane -->
@@ -258,10 +258,7 @@
 
           <!-- Preview Content -->
           <div class="relative flex-1 overflow-hidden">
-            <AppScrollArea
-              class="h-full w-full"
-              viewportClass="h-full w-full p-6"
-            >
+            <ScrollArea class="h-full w-full" viewportClass="h-full w-full p-6">
               {#if selectedItem.item_type === "Image" && selectedItem.thumbnail}
                 <FilePreview
                   imageSrc={selectedItem.thumbnail}
@@ -281,7 +278,7 @@
                   {selectedItem.text}
                 </div>
               {/if}
-            </AppScrollArea>
+            </ScrollArea>
           </div>
 
           <!-- Footer Info -->

@@ -11,14 +11,14 @@
 </script>
 
 <div
-  class="flex min-h-[44px] items-center justify-between gap-4 border-b border-neutral-100 py-2.5 last:border-0 dark:border-neutral-800"
+  class="border-border/40 flex min-h-[44px] items-center justify-between gap-4 border-b py-2.5 last:border-0"
 >
-  <div class="flex flex-col gap-1">
-    <span class="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+  <div class="flex flex-col gap-0.5">
+    <span class="text-foreground text-sm font-medium">
       {title}
     </span>
     {#if description}
-      <span class="text-xs text-neutral-500 dark:text-neutral-400">
+      <span class="text-muted-foreground text-xs">
         {description}
       </span>
     {/if}

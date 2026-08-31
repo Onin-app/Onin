@@ -2,8 +2,11 @@
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { openUrl } from "@tauri-apps/plugin-opener";
-  import { Button, Combobox } from "bits-ui";
-  import AppScrollArea from "$lib/components/AppScrollArea.svelte";
+  import { Button } from "$lib/components/ui/button";
+  import { Badge } from "$lib/components/ui/badge";
+  import { Card } from "$lib/components/ui/card";
+  import { ScrollArea } from "$lib/components/ui/scroll-area";
+  import { Combobox } from "bits-ui";
   import { toast } from "svelte-sonner";
   import {
     Check,
@@ -780,7 +783,7 @@
   }
 </script>
 
-<AppScrollArea class="h-full w-full" viewportClass="h-full w-full">
+<ScrollArea class="h-full w-full" viewportClass="h-full w-full">
   <main class="h-full w-full pr-2 pb-8">
     <!-- Tab 导航 -->
     <div
@@ -819,13 +822,13 @@
             </p>
           </div>
           <div class="flex gap-2">
-            <Button.Root
+            <Button
               class="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 text-xs font-medium text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
               disabled={isSyncingRegistry}
               onclick={() => syncProvidersRegistry(true)}
             >
               {isSyncingRegistry ? "正在同步..." : "同步模型列表"}
-            </Button.Root>
+            </Button>
           </div>
         </div>
       {/if}
@@ -956,13 +959,13 @@
                   >
                     {rp.name}
                   </span>
-                  <Button.Root
+                  <Button
                     class="inline-flex h-7 shrink-0 items-center justify-center gap-0.5 rounded-lg border border-neutral-200 bg-white px-2.5 text-[11px] font-semibold text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
                     onclick={() => connectRegistryProvider(rp)}
                   >
                     <Plus class="h-3 w-3" />
                     连接
-                  </Button.Root>
+                  </Button>
                 </div>
               {/each}
             </div>
@@ -985,13 +988,13 @@
                   >
                     {rp.name}
                   </span>
-                  <Button.Root
+                  <Button
                     class="shadow-3xs inline-flex h-6 shrink-0 items-center justify-center gap-0.5 rounded-md border border-neutral-200 bg-white px-2 text-[10px] font-semibold text-neutral-600 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700"
                     onclick={() => connectRegistryProvider(rp)}
                   >
                     <Plus class="h-2.5 w-2.5" />
                     连接
-                  </Button.Root>
+                  </Button>
                 </div>
               {/each}
 
@@ -1004,13 +1007,13 @@
                 >
                   自定义直连服务
                 </span>
-                <Button.Root
+                <Button
                   class="shadow-3xs inline-flex h-6 shrink-0 items-center justify-center gap-0.5 rounded-md border border-neutral-200 bg-white px-2 text-[10px] font-semibold text-neutral-600 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700"
                   onclick={startAdd}
                 >
                   <Plus class="h-2.5 w-2.5" />
                   连接
-                </Button.Root>
+                </Button>
               </div>
             </div>
           </div>
@@ -1400,30 +1403,30 @@
                 <!-- Left: Test connection -->
                 <div>
                   {#if editForm.provider_type}
-                    <Button.Root
+                    <Button
                       class="inline-flex h-9 items-center justify-center rounded-lg border border-neutral-200 bg-white px-4 text-xs font-semibold text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
                       onclick={testConnection}
                     >
                       测试连接
-                    </Button.Root>
+                    </Button>
                   {/if}
                 </div>
 
                 <!-- Right: Cancel and Save -->
                 <div class="flex gap-2">
-                  <Button.Root
+                  <Button
                     class="inline-flex h-9 items-center justify-center rounded-lg border border-neutral-200 bg-white px-4 text-xs font-semibold text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
                     onclick={cancelEdit}
                   >
                     取消
-                  </Button.Root>
-                  <Button.Root
+                  </Button>
+                  <Button
                     class="inline-flex h-9 items-center justify-center rounded-lg bg-neutral-900 px-4 text-xs font-bold text-neutral-50 shadow-sm transition-colors hover:bg-neutral-900/90 focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:outline-hidden dark:bg-neutral-50 dark:text-neutral-900 dark:hover:bg-neutral-50/90"
                     onclick={save}
                     disabled={!editForm.provider_type}
                   >
                     保存
-                  </Button.Root>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -1432,7 +1435,7 @@
       </div>
     {/if}
   </main>
-</AppScrollArea>
+</ScrollArea>
 
 <!-- Delete Confirmation Dialog -->
 <ConfirmDialog

@@ -2,8 +2,14 @@
   import { invoke } from "@tauri-apps/api/core";
   import { openExternalLink } from "$lib/utils/link";
   import { Star, Download, Package, GithubLogo } from "phosphor-svelte";
-  import { Dialog } from "bits-ui";
-  import AppScrollArea from "$lib/components/AppScrollArea.svelte";
+  import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+  } from "$lib/components/ui/dialog";
+  import { ScrollArea } from "$lib/components/ui/scroll-area";
   import {
     formatPluginVersion,
     isValidPluginVersion,
@@ -24,7 +30,6 @@
     auto_detach?: boolean;
     terminate_on_bg?: boolean;
     run_at_startup?: boolean;
-    // 市场插件可能有的额外字段
     stars?: number;
     downloads?: number;
     repository?: string;
@@ -62,7 +67,6 @@
       return undefined;
     }
 
-    // 如果是完整 URL（marketplace 插件），直接返回
     if (
       plugin.icon.startsWith("http://") ||
       plugin.icon.startsWith("https://")
@@ -70,7 +74,6 @@
       return plugin.icon;
     }
 
-    // 如果是相对路径（本地插件），通过插件服务器访问
     try {
       const port = await invoke<number>("get_plugin_server_port");
       return `http://127.0.0.1:${port}/plugin/${plugin.dir_name}/${plugin.icon}`;
@@ -86,19 +89,16 @@
     error = null;
 
     try {
-      // 先从本地获取基本信息
       const result = await invoke<PluginDetail>("get_plugin_detail", {
         pluginId,
       });
       detail = result;
 
-      // 如果是市场插件，从接口获取完整详情
       if (result.install_source === "marketplace") {
         try {
           const { fetchPluginDetail } = await import("$lib/api/marketplace");
           const marketDetail = await fetchPluginDetail(result.id);
 
-          // 合并数据：优先使用市场数据
           detail = {
             ...result,
             readme: marketDetail.readme || result.readme,
@@ -114,7 +114,6 @@
             "Failed to load market detail, using local data:",
             marketError,
           );
-          // 如果市场接口失败，继续使用本地数据
         }
       }
     } catch (e) {
@@ -125,7 +124,6 @@
     }
   }
 
-  // 当 open 或 pluginId 变化时加载详情
   $effect(() => {
     if (open && pluginId) {
       loadDetail();
@@ -133,172 +131,152 @@
   });
 </script>
 
-<Dialog.Root {open} {onOpenChange}>
-  <Dialog.Portal>
-    <Dialog.Overlay
-      class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50"
-    />
-    <Dialog.Content
-      class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] fixed top-[50%] left-[50%] z-50 h-[80vh] w-full max-w-2xl translate-x-[-50%] translate-y-[-50%] overflow-hidden rounded-lg bg-white p-6 shadow-xl dark:bg-neutral-900"
-    >
-      <div use:setupImageFallback class="contents">
-        <Dialog.Close
-          class="absolute top-4 right-4 rounded p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-          aria-label="关闭"
-        >
-          <svg
-            class="h-5 w-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </Dialog.Close>
+<Dialog {open} {onOpenChange}>
+  <DialogContent class="flex h-[80vh] max-w-2xl flex-col p-6">
+    <div use:setupImageFallback class="flex-1 overflow-hidden">
+      <ScrollArea
+        class="h-full w-full"
+        viewportClass="h-full w-full overflow-x-hidden pr-2"
+      >
+        {#if loading}
+          <div class="flex h-64 items-center justify-center">
+            <div class="text-muted-foreground text-sm">加载中...</div>
+          </div>
+        {:else if error}
+          <div class="flex h-64 flex-col items-center justify-center">
+            <p class="text-destructive text-base font-medium">加载失败</p>
+            <p class="text-muted-foreground mt-1 text-xs">{error}</p>
+          </div>
+        {:else if detail}
+          <!-- 插件头部 -->
+          <div class="mb-6 flex items-start gap-4">
+            <div
+              class="bg-muted flex h-16 w-16 shrink-0 items-center justify-center rounded-lg"
+            >
+              {#await getPluginIconUrl(detail)}
+                <div class="text-2xl">🧩</div>
+              {:then iconUrl}
+                {#if iconUrl}
+                  <img
+                    src={iconUrl}
+                    alt={detail.name}
+                    class="h-12 w-12 rounded object-contain"
+                  />
+                {:else}
+                  <div class="text-2xl">🧩</div>
+                {/if}
+              {:catch}
+                <div class="text-2xl">🧩</div>
+              {/await}
+            </div>
 
-        <AppScrollArea
-          class="h-full w-full"
-          viewportClass="h-full w-full overflow-x-hidden pr-2"
-        >
-          {#if loading}
-            <div class="flex h-64 items-center justify-center">
-              <div class="text-neutral-500">加载中...</div>
-            </div>
-          {:else if error}
-            <div class="flex h-64 flex-col items-center justify-center">
-              <p class="text-lg text-red-500">加载失败</p>
-              <p class="mt-2 text-sm text-neutral-500">{error}</p>
-            </div>
-          {:else if detail}
-            <!-- 插件头部 -->
-            <div class="mb-6 flex items-start gap-4">
+            <div class="flex-1">
+              <h2 class="text-foreground mb-1 text-xl font-bold">
+                {detail.name}
+              </h2>
+              <p class="text-muted-foreground mb-2 text-xs">
+                {detail.description}
+              </p>
               <div
-                class="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-neutral-100 to-neutral-200 dark:from-neutral-800 dark:to-neutral-700"
+                class="text-muted-foreground flex flex-wrap items-center gap-3 text-xs"
               >
-                {#await getPluginIconUrl(detail)}
-                  <div class="text-4xl">🧩</div>
-                {:then iconUrl}
-                  {#if iconUrl}
-                    <img
-                      src={iconUrl}
-                      alt={detail.name}
-                      class="h-16 w-16 rounded object-contain"
-                    />
-                  {:else}
-                    <div class="text-4xl">🧩</div>
-                  {/if}
-                {:catch}
-                  <div class="text-4xl">🧩</div>
-                {/await}
-              </div>
-
-              <div class="flex-1">
-                <div class="mb-2 flex items-center gap-2">
-                  <h2 class="text-2xl font-bold">{detail.name}</h2>
-                  {#if detail.install_source === "local"}
-                    <span
-                      class="rounded bg-orange-500 px-2 py-0.5 text-xs font-medium text-white"
-                    >
-                      本地
-                    </span>
-                  {:else}
-                    <span
-                      class="rounded bg-blue-500 px-2 py-0.5 text-xs font-medium text-white"
-                    >
-                      市场
-                    </span>
-                  {/if}
-                </div>
-                <p class="mb-2 text-neutral-600 dark:text-neutral-400">
-                  {detail.description}
-                </p>
-                <div class="flex items-center gap-4 text-sm text-neutral-500">
-                  {#if detail.author}
-                    <span>作者: {detail.author}</span>
-                  {/if}
-                  {#if isValidPluginVersion(detail.version)}
-                    <span>版本: {formatPluginVersion(detail.version)}</span>
-                  {/if}
-                  <span>ID: {detail.id}</span>
-                </div>
+                {#if detail.author}
+                  <span>作者: {detail.author}</span>
+                {/if}
+                {#if isValidPluginVersion(detail.version)}
+                  <span>版本: {formatPluginVersion(detail.version)}</span>
+                {/if}
+                <span
+                  >来源: {detail.install_source === "local"
+                    ? "本地导入"
+                    : "插件市场"}</span
+                >
               </div>
             </div>
+          </div>
 
-            <!-- 统计信息（仅市场插件） -->
-            {#if detail.install_source === "marketplace" && (detail.stars || detail.downloads)}
-              <div
-                class="mb-6 flex justify-around rounded-lg bg-neutral-50 p-4 dark:bg-neutral-800"
-              >
-                {#if detail.stars}
-                  <div class="flex items-center gap-3">
-                    <Star class="h-8 w-8 text-yellow-500" weight="fill" />
-                    <div>
-                      <div class="text-xl font-semibold">{detail.stars}</div>
-                      <div class="text-xs text-neutral-500">Stars</div>
+          <!-- 市场插件统计信息 -->
+          {#if detail.install_source === "marketplace" && (detail.stars !== undefined || detail.downloads !== undefined)}
+            <div class="bg-muted/50 mb-6 flex justify-around rounded-xl p-3">
+              {#if detail.stars !== undefined}
+                <div class="flex items-center gap-3">
+                  <Star class="h-6 w-6 text-yellow-500" weight="fill" />
+                  <div>
+                    <div class="text-foreground text-base font-semibold">
+                      {detail.stars}
+                    </div>
+                    <div class="text-muted-foreground text-[10px]">Stars</div>
+                  </div>
+                </div>
+              {/if}
+              {#if detail.downloads !== undefined}
+                <div class="flex items-center gap-3">
+                  <Download class="h-6 w-6 text-blue-500" weight="fill" />
+                  <div>
+                    <div class="text-foreground text-base font-semibold">
+                      {detail.downloads}
+                    </div>
+                    <div class="text-muted-foreground text-[10px]">
+                      Downloads
                     </div>
                   </div>
-                {/if}
-                {#if detail.downloads}
-                  <div class="flex items-center gap-3">
-                    <Download class="h-8 w-8 text-blue-500" weight="fill" />
-                    <div>
-                      <div class="text-xl font-semibold">
-                        {detail.downloads}
-                      </div>
-                      <div class="text-xs text-neutral-500">Downloads</div>
-                    </div>
-                  </div>
-                {/if}
-              </div>
-            {/if}
-
-            <!-- README -->
-            {#if detail.readme}
-              <div class="mb-6">
-                <h3 class="mb-3 text-lg font-semibold">插件说明</h3>
-                <!-- svelte-ignore a11y_click_events_have_key_events -->
-                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                <div
-                  class="prose prose-sm dark:prose-invert max-w-none rounded-lg bg-neutral-50 p-4 dark:bg-neutral-800"
-                  onclick={handleMarkdownClick}
-                >
-                  {@html renderMarkdown(detail.readme, detail.repository)}
                 </div>
-              </div>
-            {:else}
-              <div class="mb-6 text-center text-neutral-500">
-                <Package class="mx-auto mb-2 h-12 w-12 opacity-50" />
-                <p>该插件没有提供说明文档</p>
-              </div>
-            {/if}
-
-            <!-- GitHub 链接（如果有） -->
-            {#if detail.repository}
-              <div
-                class="border-t border-neutral-200 pt-4 dark:border-neutral-700"
-              >
-                <a
-                  href={detail.repository}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="flex items-center gap-2 text-sm text-blue-600 hover:underline dark:text-blue-400"
-                  onclick={(e) =>
-                    detail?.repository &&
-                    openExternalLink(detail.repository, e)}
-                >
-                  <GithubLogo class="h-4 w-4" />
-                  查看源码
-                </a>
-              </div>
-            {/if}
+              {/if}
+            </div>
           {/if}
-        </AppScrollArea>
-      </div>
-    </Dialog.Content>
-  </Dialog.Portal>
-</Dialog.Root>
+
+          <!-- 配置信息 -->
+          <div class="bg-muted/20 mb-6 rounded-xl border p-4 text-xs">
+            <h3 class="text-foreground mb-2 text-sm font-semibold">运行配置</h3>
+            <div class="text-muted-foreground grid grid-cols-2 gap-2">
+              <div>
+                自动分离窗口: {detail.auto_detach ? "是" : "否"}
+              </div>
+              <div>
+                后台运行保留: {detail.terminate_on_bg === false ? "是" : "否"}
+              </div>
+              <div>
+                开机启动: {detail.run_at_startup ? "是" : "否"}
+              </div>
+              <div>状态: {detail.enabled ? "已启用" : "已禁用"}</div>
+            </div>
+          </div>
+
+          <!-- README -->
+          {#if detail.readme}
+            <div class="mb-6">
+              <h3 class="text-foreground mb-2 text-sm font-semibold">
+                插件说明
+              </h3>
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <div
+                class="prose prose-sm dark:prose-invert bg-muted/40 max-w-none rounded-xl p-4"
+                onclick={handleMarkdownClick}
+              >
+                {@html renderMarkdown(detail.readme, detail.repository)}
+              </div>
+            </div>
+          {/if}
+
+          <!-- 底部操作 -->
+          {#if detail.repository}
+            <div class="border-t pt-4">
+              <a
+                href={detail.repository}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-primary flex items-center gap-2 text-xs hover:underline"
+                onclick={(e) =>
+                  detail?.repository && openExternalLink(detail.repository, e)}
+              >
+                <GithubLogo class="h-4 w-4" />
+                查看源码
+              </a>
+            </div>
+          {/if}
+        {/if}
+      </ScrollArea>
+    </div>
+  </DialogContent>
+</Dialog>

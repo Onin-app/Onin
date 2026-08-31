@@ -14,7 +14,13 @@
   import { get } from "svelte/store";
   import autoAnimate from "@formkit/auto-animate";
   import type { Action } from "svelte/action";
-  import AppScrollArea from "$lib/components/AppScrollArea.svelte";
+  import { ScrollArea } from "$lib/components/ui/scroll-area";
+  import {
+    Tooltip,
+    TooltipTrigger,
+    TooltipContent,
+    TooltipProvider,
+  } from "$lib/components/ui/tooltip";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -50,7 +56,6 @@
   import PluginInlineView from "$lib/components/PluginInlineView.svelte";
   import ExtensionResultItem from "$lib/components/ExtensionResultItem.svelte";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
-  import { Tooltip } from "bits-ui";
 
   import "../index.css";
 
@@ -672,7 +677,7 @@
   role="presentation"
 >
   <main
-    class="h-full w-full overflow-hidden rounded-xl bg-neutral-100 p-3 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100"
+    class="border-border/60 bg-background/95 text-foreground flex h-full w-full flex-col overflow-hidden rounded-2xl border p-3 shadow-2xl backdrop-blur-xl"
     data-tauri-drag-region
   >
     <div
@@ -682,64 +687,62 @@
       onkeydown={handleNavigationKeyDown}
     >
       <!-- Header: Logo + Search Input + Plugin Menu -->
-      <div class="flex items-center gap-2 pb-2">
-        <Tooltip.Provider delayDuration={1000}>
-          <Tooltip.Root>
-            <Tooltip.Trigger
+      <div class="border-border/40 flex items-center gap-2 border-b pb-2">
+        <TooltipProvider delayDuration={1000}>
+          <Tooltip>
+            <TooltipTrigger
               class="relative flex-shrink-0 cursor-pointer transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-108 hover:rotate-6 active:scale-95"
               onclick={handleToSettings}
               aria-label="打开设置"
             >
               <img
                 src="/logo.png"
-                class="h-10 w-10 filter transition-all duration-300 hover:drop-shadow-[0_0_8px_rgba(99,102,241,0.55)] dark:hover:drop-shadow-[0_0_10px_rgba(165,180,252,0.6)]"
+                class="h-9 w-9 filter transition-all duration-300 hover:drop-shadow-[0_0_8px_rgba(99,102,241,0.55)] dark:hover:drop-shadow-[0_0_10px_rgba(165,180,252,0.6)]"
                 alt="Onin logo"
               />
               {#if $hasNewVersion}
                 <!-- 精致微章：呼吸灯紫色小红点，表示有新版本 -->
-                <span class="absolute -top-0.5 -right-0.5 flex h-3 w-3">
+                <span class="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
                   <span
                     class="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-400 opacity-75"
                   ></span>
                   <span
-                    class="relative inline-flex h-3 w-3 rounded-full bg-violet-500"
+                    class="relative inline-flex h-2.5 w-2.5 rounded-full bg-violet-500"
                   ></span>
                 </span>
               {/if}
-            </Tooltip.Trigger>
-            <Tooltip.Content
-              side="right"
-              sideOffset={8}
-              class="text-xxs data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 z-50 rounded-md border border-neutral-800 bg-neutral-900 px-2.5 py-1 font-semibold whitespace-nowrap text-neutral-200 shadow-md duration-150 select-none dark:border-neutral-200 dark:bg-white dark:text-neutral-800"
-            >
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={8}>
               {#if $hasNewVersion && $latestVersion}
                 发现新版本 v{$latestVersion} (当前 v{$appVersion})！点击查看更新
               {:else}
                 打开设置 (Settings)
               {/if}
-            </Tooltip.Content>
-          </Tooltip.Root>
-        </Tooltip.Provider>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
 
-        <SearchInput
-          bind:this={searchInputRef}
-          bind:value={inputValue}
-          attachedText={clipboard.state.attachedText}
-          attachedFiles={clipboard.state.attachedFiles}
-          showAllFiles={clipboard.state.showAllFiles}
-          onInput={handleInput}
-          onPaste={handlePaste}
-          onDrop={handleDrop}
-          onDragOver={clipboard.handleDragOver}
-          onRemoveFile={handleRemoveFile}
-          onRemoveText={() => {
-            clipboard.clearAttachments();
-            updateMatchedCommands();
-          }}
-          onEditText={handleEditText}
-          onToggleShowAllFiles={clipboard.toggleShowAllFiles}
-          onBackspace={handleBackspace}
-        />
+        <div class="min-w-0 flex-1">
+          <SearchInput
+            bind:this={searchInputRef}
+            bind:value={inputValue}
+            attachedText={clipboard.state.attachedText}
+            attachedFiles={clipboard.state.attachedFiles}
+            showAllFiles={clipboard.state.showAllFiles}
+            onInput={handleInput}
+            onPaste={handlePaste}
+            onDrop={handleDrop}
+            onDragOver={clipboard.handleDragOver}
+            onRemoveFile={handleRemoveFile}
+            onRemoveText={() => {
+              clipboard.clearAttachments();
+              updateMatchedCommands();
+            }}
+            onEditText={handleEditText}
+            onToggleShowAllFiles={clipboard.toggleShowAllFiles}
+            onBackspace={handleBackspace}
+          />
+        </div>
 
         <div class="flex-shrink-0">
           {#if plugin.state.showPluginInline}
@@ -763,7 +766,7 @@
       </div>
 
       <!-- Content Area -->
-      <div class="relative flex-1 overflow-hidden">
+      <div class="relative flex-1 overflow-hidden pt-1.5">
         <RefreshProgressBar isRefreshing={appListManager.state.isRefreshing} />
 
         {#if plugin.state.showPluginInline}
@@ -779,11 +782,11 @@
           />
         {:else}
           <!-- App List -->
-          <AppScrollArea
-            class="h-full w-full rounded-[10px] border px-2 py-2"
-            viewportClass="h-full w-full overflow-x-hidden"
+          <ScrollArea
+            class="h-full w-full"
+            viewportClass="h-full w-full overflow-x-hidden pr-1"
           >
-            <div class="app-list overflow-hidden">
+            <div class="app-list flex flex-col gap-0.5 overflow-hidden">
               {#each displayList as app, index ((app.action || "") + app.path + app.name + index)}
                 {#if app.path.startsWith("extension:")}
                   <!-- Extension 预览项（如计算器结果） -->
@@ -806,7 +809,7 @@
                 {/if}
               {/each}
             </div>
-          </AppScrollArea>
+          </ScrollArea>
         {/if}
       </div>
     </div>

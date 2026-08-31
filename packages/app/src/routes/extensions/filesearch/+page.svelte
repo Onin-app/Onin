@@ -5,7 +5,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { platform } from "@tauri-apps/plugin-os";
   import { toast } from "svelte-sonner";
-  import AppScrollArea from "$lib/components/AppScrollArea.svelte";
+  import { ScrollArea } from "$lib/components/ui/scroll-area";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import ExtensionHeader from "$lib/components/ExtensionHeader.svelte";
   import FilePreview from "$lib/components/FilePreview.svelte";
@@ -595,10 +595,7 @@
   {:else}
     <div id="file-search-split-shell" class="flex flex-1 overflow-hidden">
       <div class="flex min-w-0 flex-col" style={`width: ${listPaneWidth}%`}>
-        <AppScrollArea
-          class="h-full w-full"
-          viewportClass="h-full w-full p-1.5"
-        >
+        <ScrollArea class="h-full w-full" viewportClass="h-full w-full p-1.5">
           <div class="flex flex-col gap-1">
             {#each results as item, index (item.path)}
               <button
@@ -661,7 +658,7 @@
               </div>
             {/if}
           </div>
-        </AppScrollArea>
+        </ScrollArea>
       </div>
 
       <button
@@ -700,7 +697,7 @@
         </div>
 
         <div class="relative flex-1 overflow-hidden">
-          <AppScrollArea class="h-full w-full" viewportClass="h-full w-full">
+          <ScrollArea class="h-full w-full" viewportClass="h-full w-full">
             {#if selectedItem.item_type === "File"}
               <FilePreview
                 path={selectedItem.path}
@@ -777,7 +774,7 @@
                 </div>
               </div>
             {/if}
-          </AppScrollArea>
+          </ScrollArea>
         </div>
       </div>
     </div>
