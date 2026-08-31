@@ -22,12 +22,12 @@
     bind:value
     {placeholder}
     {...restProps}
-    class="border border-neutral-200 bg-white text-sm placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:focus:border-neutral-100 {className} pr-10 pl-3"
+    class="border border-neutral-200 bg-white text-sm transition-[border-color,box-shadow] duration-120 ease-out placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:focus:border-neutral-100 {className} pr-10 pl-3"
   />
   <button
     type="button"
     onclick={() => (showPassword = !showPassword)}
-    class="absolute right-3 flex cursor-pointer items-center justify-center text-neutral-400 hover:text-neutral-600 focus:outline-hidden dark:hover:text-neutral-200"
+    class="absolute right-3 flex cursor-pointer items-center justify-center text-neutral-400 transition-[transform,color] duration-100 select-none hover:text-neutral-600 focus:outline-hidden active:scale-90 dark:hover:text-neutral-200"
     aria-label={showPassword ? "隐藏密码" : "显示密码"}
   >
     {#if showPassword}

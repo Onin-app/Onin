@@ -217,14 +217,18 @@
 </script>
 
 {#if loading}
-  <div class="text-muted-foreground py-3 text-sm">正在加载文字识别设置...</div>
+  <div class="text-muted-foreground py-6 text-center text-xs">
+    正在加载文字识别设置...
+  </div>
 {:else if config}
-  <div class="flex flex-col gap-5">
+  <div class="flex flex-col gap-6">
     <!-- 默认引擎设置 -->
     <section class="border-border/50 border-t pt-4">
       <div class="flex flex-col gap-1.5">
-        <h4 class="text-foreground text-sm font-semibold">默认识别引擎</h4>
-        <p class="text-muted-foreground text-xs">
+        <h4 class="text-foreground text-sm font-semibold tracking-tight">
+          默认识别引擎
+        </h4>
+        <p class="text-muted-foreground/75 text-xs leading-normal">
           设置每次打开文字识别页面时，首选激活的 OCR 识别模式。
         </p>
 
@@ -233,16 +237,24 @@
           value={config.ocr_default_engine || "local"}
           onValueChange={handleEngineChange}
         >
-          <SelectTrigger class="mt-2 h-10 w-full">
+          <SelectTrigger
+            class="border-input bg-background text-foreground focus:ring-ring mt-2 h-10 w-full cursor-pointer rounded-xl border text-xs transition-[border-color,box-shadow,transform] duration-120 ease-out focus:ring-1 focus:outline-none active:scale-[0.99]"
+          >
             <span class="truncate">
               {engineOptions.find(
                 (o) => o.value === (config?.ocr_default_engine || "local"),
               )?.label}
             </span>
           </SelectTrigger>
-          <SelectContent class="w-[var(--bits-select-anchor-width)]">
+          <SelectContent
+            class="bg-popover text-popover-foreground border-border/60 z-50 w-[var(--bits-select-anchor-width)] rounded-xl border shadow-xl"
+          >
             {#each engineOptions as option (option.value)}
-              <SelectItem value={option.value} label={option.label}>
+              <SelectItem
+                value={option.value}
+                label={option.label}
+                class="text-popover-foreground data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground cursor-pointer rounded-lg px-2.5 py-1.5 text-xs font-medium outline-none"
+              >
                 <span class="truncate">{option.label}</span>
               </SelectItem>
             {/each}
@@ -256,10 +268,10 @@
       <section class="border-border/50 border-t pt-4">
         <div class="flex flex-col gap-4">
           <div>
-            <h4 class="text-foreground text-sm font-semibold">
+            <h4 class="text-foreground text-sm font-semibold tracking-tight">
               AI 视觉模型设置
             </h4>
-            <p class="text-muted-foreground mt-1 text-xs">
+            <p class="text-muted-foreground/75 mt-0.5 text-xs leading-normal">
               指定 OCR 识别所使用的视觉大模型服务。支持按需定制专属 Provider
               与模型。
             </p>
@@ -275,22 +287,30 @@
               value={config.ocr_provider_id || "default"}
               onValueChange={handleProviderChange}
             >
-              <SelectTrigger class="h-10 w-full">
+              <SelectTrigger
+                class="border-input bg-background text-foreground focus:ring-ring h-10 w-full cursor-pointer rounded-xl border text-xs transition-[border-color,box-shadow,transform] duration-120 ease-out focus:ring-1 focus:outline-none active:scale-[0.99]"
+              >
                 <span class="truncate">
                   {providerOptions.find(
                     (p) => p.value === (config?.ocr_provider_id || "default"),
                   )?.label}
                 </span>
               </SelectTrigger>
-              <SelectContent class="w-[var(--bits-select-anchor-width)]">
+              <SelectContent
+                class="bg-popover text-popover-foreground border-border/60 z-50 w-[var(--bits-select-anchor-width)] rounded-xl border shadow-xl"
+              >
                 {#each providerOptions as provider (provider.value)}
-                  <SelectItem value={provider.value} label={provider.label}>
+                  <SelectItem
+                    value={provider.value}
+                    label={provider.label}
+                    class="text-popover-foreground data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground cursor-pointer rounded-lg px-2.5 py-1.5 text-xs font-medium outline-none"
+                  >
                     <span class="truncate">{provider.label}</span>
                   </SelectItem>
                 {/each}
               </SelectContent>
             </Select>
-            <p class="text-muted-foreground text-[11px]">
+            <p class="text-muted-foreground/75 text-[11px]">
               如需添加新的 AI 提供商，请前往「AI 设置」页面配置。
             </p>
           </div>
@@ -305,22 +325,30 @@
               value={config.ocr_model_id || "default"}
               onValueChange={handleModelChange}
             >
-              <SelectTrigger class="h-10 w-full">
+              <SelectTrigger
+                class="border-input bg-background text-foreground focus:ring-ring h-10 w-full cursor-pointer rounded-xl border text-xs transition-[border-color,box-shadow,transform] duration-120 ease-out focus:ring-1 focus:outline-none active:scale-[0.99]"
+              >
                 <span class="truncate">
                   {modelOptions.find(
                     (m) => m.value === (config?.ocr_model_id || "default"),
                   )?.label || "跟随默认"}
                 </span>
               </SelectTrigger>
-              <SelectContent class="w-[var(--bits-select-anchor-width)]">
+              <SelectContent
+                class="bg-popover text-popover-foreground border-border/60 z-50 w-[var(--bits-select-anchor-width)] rounded-xl border shadow-xl"
+              >
                 {#each modelOptions as model (model.value)}
-                  <SelectItem value={model.value} label={model.label}>
+                  <SelectItem
+                    value={model.value}
+                    label={model.label}
+                    class="text-popover-foreground data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground cursor-pointer rounded-lg px-2.5 py-1.5 text-xs font-medium outline-none"
+                  >
                     <span class="truncate">{model.label}</span>
                   </SelectItem>
                 {/each}
               </SelectContent>
             </Select>
-            <p class="text-muted-foreground text-[11px]">
+            <p class="text-muted-foreground/75 text-[11px]">
               仅多模态（Vision / VL）模型支持图片 OCR 文本提取与排版分析。
             </p>
           </div>

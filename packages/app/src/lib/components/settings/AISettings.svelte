@@ -786,16 +786,14 @@
 <ScrollArea class="h-full w-full" viewportClass="h-full w-full">
   <main class="h-full w-full pr-2 pb-8">
     <!-- Tab 导航 -->
-    <div
-      class="mb-6 flex gap-1 border-b border-neutral-200 dark:border-neutral-800"
-    >
-      {#each tabs as tab}
+    <div class="border-border/50 mb-6 flex gap-1.5 border-b pb-2">
+      {#each tabs as tab (tab.id)}
         {@const TabIcon = tab.icon}
+        {@const isActive = activeTab === tab.id}
         <button
-          class="flex items-center gap-2 border-b-2 px-3 pb-2.5 text-sm font-medium transition-colors
-              {activeTab === tab.id
-            ? 'border-neutral-900 text-neutral-900 dark:border-neutral-100 dark:text-neutral-100'
-            : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200'}"
+          class="flex cursor-pointer items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-medium transition-[background-color,color,transform,box-shadow] duration-140 ease-[cubic-bezier(0.23,1,0.32,1)] outline-none active:scale-95 {isActive
+            ? 'bg-card text-foreground border-border/60 border font-semibold shadow-2xs'
+            : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'}"
           onclick={() => (activeTab = tab.id)}
         >
           <TabIcon size={15} />
@@ -813,20 +811,26 @@
         <div class="mb-6 flex items-center justify-between px-1">
           <div>
             <h2
-              class="mb-1 text-sm font-semibold text-neutral-900 dark:text-neutral-100"
+              class="text-foreground mb-1 text-sm font-semibold tracking-tight"
             >
               提供商
             </h2>
-            <p class="text-xs text-neutral-500 dark:text-neutral-400">
+            <p class="text-muted-foreground/75 text-xs">
               管理你的 AI 提供商与服务
             </p>
           </div>
           <div class="flex gap-2">
             <Button
-              class="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 text-xs font-medium text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+              variant="outline"
+              size="sm"
+              class="h-8 cursor-pointer gap-1.5 rounded-xl text-xs font-medium transition-[transform,background-color] duration-140 active:scale-95"
               disabled={isSyncingRegistry}
               onclick={() => syncProvidersRegistry(true)}
             >
+              <Sparkle
+                size={13}
+                class={isSyncingRegistry ? "animate-spin" : ""}
+              />
               {isSyncingRegistry ? "正在同步..." : "同步模型列表"}
             </Button>
           </div>
@@ -839,50 +843,48 @@
           <!-- 已连接的提供商分区 -->
           <div>
             <h3
-              class="mb-3 text-xs font-semibold tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
+              class="text-muted-foreground mb-3 text-xs font-semibold tracking-wider uppercase"
             >
               已连接的提供商
             </h3>
 
             {#if config.providers.length === 0}
               <div
-                class="rounded-xl border border-dashed border-neutral-200 bg-neutral-50/50 px-6 py-8 text-center dark:border-neutral-800 dark:bg-neutral-900/20"
+                class="border-border/60 bg-muted/20 rounded-2xl border border-dashed px-6 py-8 text-center"
               >
-                <p class="text-xs text-neutral-400 dark:text-neutral-500">
-                  暂无已连接的提供商
-                </p>
+                <p class="text-muted-foreground text-xs">暂无已连接的提供商</p>
               </div>
             {:else}
               <div
-                class="divide-y divide-neutral-100 overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-xs dark:divide-neutral-800/60 dark:border-neutral-800 dark:bg-neutral-900"
+                class="divide-border/40 border-border/60 bg-card divide-y overflow-hidden rounded-2xl border shadow-2xs"
               >
                 {#each config.providers as provider, index (provider.id)}
                   {@const defaultModelInfo = getModelInfo(provider)}
                   <div
-                    class="group relative flex items-center transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800/30"
+                    class="group hover:bg-muted/40 relative flex items-center transition-colors"
                   >
                     <button
                       type="button"
-                      class="flex min-w-0 flex-1 cursor-pointer items-center justify-between px-4 py-3 text-left focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-neutral-400 dark:focus-visible:outline-neutral-500"
+                      class="flex min-w-0 flex-1 cursor-pointer items-center justify-between px-4 py-3.5 text-left outline-none"
                       aria-pressed={config.active_provider_id === provider.id}
                       onclick={() => setActive(provider.id)}
                     >
                       <!-- Left indicator & Info -->
-                      <div class="flex min-w-0 items-center gap-2.5">
+                      <div class="flex min-w-0 items-center gap-3">
                         <!-- Active dot indicator -->
                         <div class="flex w-4 items-center justify-center">
                           {#if config.active_provider_id === provider.id}
                             <span class="relative flex h-2 w-2">
                               <span
-                                class="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"
+                                class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"
                               ></span>
                               <span
-                                class="relative inline-flex h-2 w-2 rounded-full bg-green-500"
+                                class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"
                               ></span>
                             </span>
                           {:else}
                             <span
-                              class="h-2 w-2 rounded-full bg-neutral-200 transition-colors group-hover:bg-neutral-300 dark:bg-neutral-700 dark:group-hover:bg-neutral-600"
+                              class="bg-muted-foreground/30 group-hover:bg-muted-foreground/50 h-2 w-2 rounded-full transition-colors"
                             ></span>
                           {/if}
                         </div>
@@ -891,12 +893,12 @@
                         <div class="min-w-0">
                           <div class="flex items-center gap-2">
                             <span
-                              class="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100"
+                              class="text-foreground truncate text-sm font-semibold tracking-tight"
                             >
                               {provider.display_name || provider.name}
                             </span>
                             <span
-                              class="rounded border border-solid border-neutral-200/50 bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:border-neutral-700/50 dark:bg-neutral-800 dark:text-neutral-400"
+                              class="border-border/50 bg-muted text-muted-foreground rounded-md border px-1.5 py-0.5 text-[10px] font-medium"
                             >
                               {provider.api_key ? "API 密钥" : "免密钥"}
                             </span>
@@ -908,7 +910,7 @@
                       <div class="hidden items-center gap-2 sm:flex">
                         {#if provider.default_model}
                           <code
-                            class="rounded-md border border-neutral-200/60 bg-neutral-50 px-2 py-0.5 font-mono text-[11px] text-neutral-700 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-300"
+                            class="border-border/50 bg-muted/60 text-muted-foreground rounded-md border px-2 py-0.5 font-mono text-[11px]"
                           >
                             {provider.default_model}
                           </code>
@@ -920,17 +922,15 @@
                     <div class="flex items-center gap-3 pr-4">
                       <button
                         type="button"
-                        class="text-xs text-neutral-500 transition-colors hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200"
+                        class="text-muted-foreground hover:text-foreground cursor-pointer text-xs font-medium transition-[color,transform] duration-120 active:scale-95"
                         onclick={() => startEdit(index)}
                       >
                         编辑
                       </button>
-                      <span class="text-neutral-300 dark:text-neutral-800"
-                        >|</span
-                      >
+                      <span class="text-border">|</span>
                       <button
                         type="button"
-                        class="text-xs text-red-500 transition-colors hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
+                        class="text-destructive/80 hover:text-destructive cursor-pointer text-xs font-medium transition-[color,transform] duration-120 active:scale-95"
                         onclick={() => deleteProvider(index)}
                       >
                         断开连接
@@ -945,22 +945,24 @@
           <!-- 热门提供商分区 -->
           <div class="space-y-2.5">
             <h3
-              class="text-xs font-semibold tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
+              class="text-muted-foreground text-xs font-semibold tracking-wider uppercase"
             >
               热门提供商
             </h3>
             <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3">
               {#each popularProviders as rp (rp.id)}
                 <div
-                  class="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-2.5 shadow-xs transition-all hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700"
+                  class="border-border/60 bg-card hover:border-border flex items-center justify-between rounded-xl border p-2.5 shadow-2xs transition-[border-color,box-shadow,transform] duration-140 hover:-translate-y-0.5"
                 >
                   <span
-                    class="truncate pr-1 text-xs font-medium text-neutral-900 dark:text-neutral-100"
+                    class="text-foreground truncate pr-1 text-xs font-medium"
                   >
                     {rp.name}
                   </span>
                   <Button
-                    class="inline-flex h-7 shrink-0 items-center justify-center gap-0.5 rounded-lg border border-neutral-200 bg-white px-2.5 text-[11px] font-semibold text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+                    variant="outline"
+                    size="sm"
+                    class="h-7 shrink-0 cursor-pointer gap-0.5 rounded-lg px-2.5 text-[11px] font-medium transition-[transform,background-color] duration-120 active:scale-90"
                     onclick={() => connectRegistryProvider(rp)}
                   >
                     <Plus class="h-3 w-3" />
@@ -974,22 +976,24 @@
           <!-- 其他提供商分区 -->
           <div class="space-y-2.5 pt-2">
             <h3
-              class="text-xs font-semibold tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
+              class="text-muted-foreground text-xs font-semibold tracking-wider uppercase"
             >
               其他可用提供商
             </h3>
             <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
               {#each otherProviders as rp (rp.id)}
                 <div
-                  class="flex items-center justify-between rounded-lg border border-neutral-200 bg-white p-2 shadow-2xs transition-all hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700"
+                  class="border-border/60 bg-card hover:border-border flex items-center justify-between rounded-xl border p-2 shadow-2xs transition-[border-color,box-shadow,transform] duration-140 hover:-translate-y-0.5"
                 >
                   <span
-                    class="truncate pr-1 text-xs font-medium text-neutral-800 dark:text-neutral-200"
+                    class="text-foreground truncate pr-1 text-xs font-medium"
                   >
                     {rp.name}
                   </span>
                   <Button
-                    class="shadow-3xs inline-flex h-6 shrink-0 items-center justify-center gap-0.5 rounded-md border border-neutral-200 bg-white px-2 text-[10px] font-semibold text-neutral-600 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700"
+                    variant="outline"
+                    size="sm"
+                    class="h-6 shrink-0 cursor-pointer gap-0.5 rounded-md px-2 text-[10px] font-medium transition-[transform,background-color] duration-120 active:scale-90"
                     onclick={() => connectRegistryProvider(rp)}
                   >
                     <Plus class="h-2.5 w-2.5" />
@@ -1000,15 +1004,15 @@
 
               <!-- 手动连接自定义大模型 -->
               <div
-                class="flex items-center justify-between rounded-lg border border-dashed border-neutral-200 bg-transparent p-2 transition-all hover:border-neutral-300 dark:border-neutral-800 dark:hover:border-neutral-700"
+                class="border-border/60 hover:border-border flex items-center justify-between rounded-xl border border-dashed bg-transparent p-2 transition-[border-color,box-shadow,transform] duration-140 hover:-translate-y-0.5"
               >
-                <span
-                  class="truncate pr-1 text-xs font-medium text-neutral-800 dark:text-neutral-200"
-                >
+                <span class="text-foreground truncate pr-1 text-xs font-medium">
                   自定义直连服务
                 </span>
                 <Button
-                  class="shadow-3xs inline-flex h-6 shrink-0 items-center justify-center gap-0.5 rounded-md border border-neutral-200 bg-white px-2 text-[10px] font-semibold text-neutral-600 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700"
+                  variant="outline"
+                  size="sm"
+                  class="h-6 shrink-0 cursor-pointer gap-0.5 rounded-md px-2 text-[10px] font-medium transition-[transform,background-color] duration-120 active:scale-90"
                   onclick={startAdd}
                 >
                   <Plus class="h-2.5 w-2.5" />
@@ -1020,20 +1024,22 @@
         {:else}
           <!-- Edit Form -->
           <div
-            class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-xs transition-all dark:border-neutral-800 dark:bg-neutral-900"
+            class="border-border/60 bg-card overflow-hidden rounded-2xl border shadow-2xs transition-[border-color,box-shadow] duration-140 ease-out"
           >
             <!-- Header with name -->
             <div
-              class="relative flex items-center justify-between border-b border-neutral-200/60 bg-neutral-50/50 px-4 py-3.5 dark:border-neutral-800/60 dark:bg-neutral-800/30"
+              class="border-border/50 bg-muted/20 relative flex items-center justify-between border-b px-5 py-4"
             >
               <div class="flex items-center gap-2.5">
                 <div>
                   <h3
-                    class="text-sm font-semibold text-neutral-900 dark:text-neutral-100"
+                    class="text-foreground text-sm font-semibold tracking-tight"
                   >
                     {editingIndex === -1 ? "连接新提供商" : "编辑提供商配置"}
                   </h3>
-                  <p class="text-xs text-neutral-500 dark:text-neutral-400">
+                  <p
+                    class="text-muted-foreground/75 mt-0.5 text-xs leading-normal"
+                  >
                     {editForm.provider_type
                       ? `正在配置 ${selectedRemoteProvider?.name || editForm.provider_type}`
                       : "选择一个大模型提供商开始连接"}
@@ -1045,7 +1051,7 @@
               {#if editingIndex === -1 && editForm.provider_type}
                 <button
                   type="button"
-                  class="text-xs text-neutral-500 transition-colors hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
+                  class="text-muted-foreground hover:text-foreground cursor-pointer text-xs font-medium transition-colors"
                   onclick={() => {
                     editForm.provider_type = "";
                     editForm.base_url = "";
@@ -1059,12 +1065,12 @@
               {/if}
             </div>
 
-            <div class="space-y-4 p-4">
+            <div class="space-y-4 p-5">
               <!-- 1. 如果尚未选择提供商类型 (仅在新建且 provider_type 为空时显示) -->
               {#if !editForm.provider_type}
                 <div>
                   <span
-                    class="mb-1.5 block text-xs font-semibold tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
+                    class="text-muted-foreground mb-1.5 block text-xs font-semibold tracking-wider uppercase"
                   >
                     服务提供商
                   </span>
@@ -1089,11 +1095,11 @@
                         id="provider-type"
                         oninput={(e) =>
                           (providerSearch = e.currentTarget.value)}
-                        class="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm font-medium text-neutral-900 placeholder:text-neutral-500 focus:ring-2 focus:ring-neutral-950 focus:ring-offset-2 focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-offset-neutral-950 dark:placeholder:text-neutral-400 dark:focus:ring-neutral-300"
+                        class="border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring h-10 w-full rounded-xl border px-3 text-sm font-medium transition-[border-color,box-shadow] duration-120 ease-out focus:ring-1 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                         placeholder="选择提供商"
                       />
                       <Combobox.Trigger
-                        class="absolute top-1/2 right-3 -translate-y-1/2 text-neutral-400"
+                        class="text-muted-foreground absolute top-1/2 right-3 -translate-y-1/2"
                       >
                         <CaretUpDown class="h-4 w-4" />
                       </Combobox.Trigger>
@@ -1101,43 +1107,43 @@
 
                     <Combobox.Portal>
                       <Combobox.Content
-                        class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 max-h-64 w-[var(--bits-combobox-anchor-width)] overflow-hidden rounded-md border border-neutral-200 bg-white shadow-md dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-50"
+                        class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:data-[state=open]:slide-in-from-top-2 data-[side=bottom]:data-[state=closed]:slide-out-to-top-2 data-[side=top]:data-[state=open]:slide-in-from-bottom-2 data-[side=top]:data-[state=closed]:slide-out-to-bottom-2 bg-popover text-popover-foreground border-border/60 z-50 max-h-64 w-[var(--bits-combobox-anchor-width)] origin-[var(--bits-floating-transform-origin,center)] overflow-hidden rounded-xl border shadow-xl duration-140 ease-[cubic-bezier(0.23,1,0.32,1)]"
                       >
                         <Combobox.ScrollUpButton
-                          class="flex w-full items-center justify-center py-1 text-neutral-400"
+                          class="text-muted-foreground flex w-full items-center justify-center py-1"
                         >
                           <CaretDoubleUp class="h-3 w-3" />
                         </Combobox.ScrollUpButton>
                         <Combobox.Viewport class="p-1">
                           {#each filteredProviderOptions as option (option.value)}
                             <Combobox.Item
-                              class="flex cursor-pointer items-center rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-[highlighted]:bg-neutral-100 dark:data-[highlighted]:bg-neutral-800"
+                              class="text-popover-foreground data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground flex cursor-pointer items-center rounded-lg px-2.5 py-1.5 text-sm outline-none select-none"
                               value={option.value}
                               label={option.label}
                             >
                               {#snippet children({ selected })}
                                 <span class="flex-1">{option.label}</span>
                                 {#if selected}
-                                  <Check class="h-4 w-4" />
+                                  <Check class="text-primary h-4 w-4" />
                                 {/if}
                               {/snippet}
                             </Combobox.Item>
                           {:else}
                             {#if isRegistryLoading}
                               <div
-                                class="px-2 py-3 text-center text-sm text-neutral-400"
+                                class="text-muted-foreground px-2 py-3 text-center text-sm"
                               >
                                 正在加载模型列表...
                               </div>
                             {:else if providersRegistry.length === 0}
                               <div
-                                class="px-2 py-3 text-center text-sm text-neutral-400"
+                                class="text-muted-foreground px-2 py-3 text-center text-sm"
                               >
                                 暂无模型数据，请点击上方的「同步模型列表」按钮获取
                               </div>
                             {:else}
                               <div
-                                class="px-2 py-3 text-center text-sm text-neutral-400"
+                                class="text-muted-foreground px-2 py-3 text-center text-sm"
                               >
                                 未找到匹配项
                               </div>
@@ -1145,7 +1151,7 @@
                           {/each}
                         </Combobox.Viewport>
                         <Combobox.ScrollDownButton
-                          class="flex w-full items-center justify-center py-1 text-neutral-400"
+                          class="text-muted-foreground flex w-full items-center justify-center py-1"
                         >
                           <CaretDoubleDown class="h-3 w-3" />
                         </Combobox.ScrollDownButton>
@@ -1161,7 +1167,7 @@
                   <div>
                     <label
                       for="provider-name-input"
-                      class="mb-1.5 block text-xs font-semibold tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
+                      class="text-muted-foreground mb-1.5 block text-xs font-semibold tracking-wider uppercase"
                     >
                       配置名称 (必填)
                     </label>
@@ -1170,14 +1176,14 @@
                       type="text"
                       bind:value={editForm.name}
                       placeholder="如「DeepSeek」、「OpenAI」"
-                      class="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:focus:border-neutral-100"
+                      class="border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring h-10 w-full rounded-xl border px-3 text-sm transition-[border-color,box-shadow] duration-120 ease-out focus:ring-1 focus:outline-none"
                     />
                   </div>
 
                   <div>
                     <label
                       for="display-name-input"
-                      class="mb-1.5 block text-xs font-semibold tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
+                      class="text-muted-foreground mb-1.5 block text-xs font-semibold tracking-wider uppercase"
                     >
                       配置别名 (可选)
                     </label>
@@ -1186,7 +1192,7 @@
                       type="text"
                       bind:value={editForm.display_name}
                       placeholder="区分多个账号, 如「工作账号」"
-                      class="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:focus:border-neutral-100"
+                      class="border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring h-10 w-full rounded-xl border px-3 text-sm transition-[border-color,box-shadow] duration-120 ease-out focus:ring-1 focus:outline-none"
                     />
                   </div>
                 </div>
@@ -1195,7 +1201,7 @@
                 <div>
                   <label
                     for="api-key-input"
-                    class="mb-1.5 block text-xs font-semibold tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
+                    class="text-muted-foreground mb-1.5 block text-xs font-semibold tracking-wider uppercase"
                   >
                     API 密钥 (API Key)
                   </label>
@@ -1205,16 +1211,14 @@
                     placeholder={editForm.provider_type === "ollama"
                       ? "Ollama 本地服务通常免密钥"
                       : "输入您的 API Key / 密钥"}
-                    class="h-10 w-full rounded-lg bg-white dark:bg-neutral-800"
+                    class="bg-background h-10 w-full rounded-xl"
                   />
                   {#if selectedRemoteProvider?.apiKeyUrl}
-                    <p
-                      class="mt-1.5 text-xs text-neutral-500 dark:text-neutral-400"
-                    >
+                    <p class="text-muted-foreground mt-1.5 text-xs">
                       需要申请 API 密钥?
                       <button
                         type="button"
-                        class="text-blue-600 hover:underline dark:text-blue-400"
+                        class="text-primary cursor-pointer font-medium hover:underline"
                         onclick={() => {
                           if (selectedRemoteProvider?.apiKeyUrl) {
                             openUrl(selectedRemoteProvider.apiKeyUrl);
@@ -1231,7 +1235,7 @@
                 <div>
                   <label
                     for="api-url-input"
-                    class="mb-1.5 block text-xs font-semibold tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
+                    class="text-muted-foreground mb-1.5 block text-xs font-semibold tracking-wider uppercase"
                   >
                     API 地址 (Base URL)
                   </label>
@@ -1241,7 +1245,7 @@
                       type="text"
                       value={editForm.base_url}
                       disabled
-                      class="h-10 w-full cursor-not-allowed rounded-lg border border-neutral-200 bg-neutral-50 px-3 text-sm text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800/50 dark:text-neutral-400"
+                      class="border-input bg-muted/50 text-muted-foreground h-10 w-full cursor-not-allowed rounded-xl border px-3 text-sm"
                     />
                   {:else}
                     <input
@@ -1249,7 +1253,7 @@
                       type="text"
                       bind:value={editForm.base_url}
                       placeholder="https://..."
-                      class="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:focus:border-neutral-100"
+                      class="border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring h-10 w-full rounded-xl border px-3 text-sm transition-[border-color,box-shadow] duration-120 ease-out focus:ring-1 focus:outline-none"
                     />
                   {/if}
                 </div>
@@ -1259,13 +1263,13 @@
                   <div class="mb-1.5 flex items-center justify-between">
                     <label
                       for="default-model-input"
-                      class="text-xs font-semibold tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
+                      class="text-muted-foreground text-xs font-semibold tracking-wider uppercase"
                     >
                       默认模型
                     </label>
                     <button
                       type="button"
-                      class="text-xs font-semibold text-blue-600 hover:underline disabled:opacity-50 dark:text-blue-400"
+                      class="text-primary cursor-pointer text-xs font-medium hover:underline disabled:opacity-50"
                       disabled={isSyncingDirect}
                       onclick={syncDirectModels}
                     >
@@ -1301,11 +1305,11 @@
                               editForm.default_model = e.currentTarget.value;
                             }
                           }}
-                          class="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm font-medium text-neutral-900 placeholder:text-neutral-500 focus:ring-2 focus:ring-neutral-950 focus:ring-offset-2 focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-offset-neutral-950 dark:placeholder:text-neutral-400 dark:focus:ring-neutral-300"
+                          class="border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring h-10 w-full rounded-xl border px-3 text-sm font-medium transition-[border-color,box-shadow] duration-120 ease-out focus:ring-1 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                           placeholder="选择或输入模型"
                         />
                         <Combobox.Trigger
-                          class="absolute top-1/2 right-3 -translate-y-1/2 text-neutral-400"
+                          class="text-muted-foreground absolute top-1/2 right-3 -translate-y-1/2"
                         >
                           <CaretUpDown class="h-4 w-4" />
                         </Combobox.Trigger>
@@ -1313,17 +1317,17 @@
 
                       <Combobox.Portal>
                         <Combobox.Content
-                          class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 max-h-64 w-[var(--bits-combobox-anchor-width)] overflow-hidden rounded-md border border-neutral-200 bg-white shadow-md dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-50"
+                          class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:data-[state=open]:slide-in-from-top-2 data-[side=bottom]:data-[state=closed]:slide-out-to-top-2 data-[side=top]:data-[state=open]:slide-in-from-bottom-2 data-[side=top]:data-[state=closed]:slide-out-to-bottom-2 bg-popover text-popover-foreground border-border/60 z-50 max-h-64 w-[var(--bits-combobox-anchor-width)] origin-[var(--bits-floating-transform-origin,center)] overflow-hidden rounded-xl border shadow-xl duration-140 ease-[cubic-bezier(0.23,1,0.32,1)]"
                         >
                           <Combobox.ScrollUpButton
-                            class="flex w-full items-center justify-center py-1 text-neutral-400"
+                            class="text-muted-foreground flex w-full items-center justify-center py-1"
                           >
                             <CaretDoubleUp class="h-3 w-3" />
                           </Combobox.ScrollUpButton>
                           <Combobox.Viewport class="p-1">
                             {#each filteredModelOptions as option (option.value)}
                               <Combobox.Item
-                                class="flex cursor-pointer items-center rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-[highlighted]:bg-neutral-100 dark:data-[highlighted]:bg-neutral-800"
+                                class="text-popover-foreground data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground flex cursor-pointer items-center rounded-lg px-2.5 py-1.5 text-sm outline-none select-none"
                                 value={option.value}
                                 label={option.label}
                               >
@@ -1337,7 +1341,7 @@
                                     >
                                       {#if option.model.context_window}
                                         <span
-                                          class="rounded bg-neutral-100 px-1 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
+                                          class="bg-muted text-muted-foreground rounded px-1 py-0.5 text-[10px] font-medium"
                                         >
                                           {Math.round(
                                             option.model.context_window / 1024,
@@ -1346,39 +1350,41 @@
                                       {/if}
                                       {#if option.model.reasoning}
                                         <span
-                                          class="rounded bg-purple-100 px-1 py-0.5 text-[10px] font-medium text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
+                                          class="rounded bg-purple-500/10 px-1 py-0.5 text-[10px] font-medium text-purple-600 dark:text-purple-400"
                                           title="思考链推理">思考</span
                                         >
                                       {/if}
                                       {#if option.model.tool_call}
                                         <span
-                                          class="rounded bg-blue-100 px-1 py-0.5 text-[10px] font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                                          class="rounded bg-blue-500/10 px-1 py-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-400"
                                           title="工具/函数调用">工具</span
                                         >
                                       {/if}
                                       {#if option.model.attachment}
                                         <span
-                                          class="rounded bg-green-100 px-1 py-0.5 text-[10px] font-medium text-green-600 dark:bg-green-900/30 dark:text-green-400"
+                                          class="rounded bg-emerald-500/10 px-1 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400"
                                           title="图片/文件上传">附件</span
                                         >
                                       {/if}
                                     </div>
                                   </div>
                                   {#if selected}
-                                    <Check class="h-4 w-4 shrink-0" />
+                                    <Check
+                                      class="text-primary h-4 w-4 shrink-0"
+                                    />
                                   {/if}
                                 {/snippet}
                               </Combobox.Item>
                             {:else}
                               <div
-                                class="px-2 py-3 text-center text-sm text-neutral-400"
+                                class="text-muted-foreground px-2 py-3 text-center text-sm"
                               >
                                 未找到匹配项
                               </div>
                             {/each}
                           </Combobox.Viewport>
                           <Combobox.ScrollDownButton
-                            class="flex w-full items-center justify-center py-1 text-neutral-400"
+                            class="text-muted-foreground flex w-full items-center justify-center py-1"
                           >
                             <CaretDoubleDown class="h-3 w-3" />
                           </Combobox.ScrollDownButton>
@@ -1388,7 +1394,7 @@
                   {:else}
                     <input
                       id="default-model-input"
-                      class="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:focus:border-neutral-100"
+                      class="border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring h-10 w-full rounded-xl border px-3 text-sm transition-[border-color,box-shadow] duration-120 ease-out focus:ring-1 focus:outline-none"
                       bind:value={editForm.default_model}
                       placeholder="例如 gpt-4o"
                     />
@@ -1398,13 +1404,15 @@
 
               <!-- Actions -->
               <div
-                class="mt-6 flex items-center justify-between gap-2 border-t border-neutral-100 pt-3 dark:border-neutral-800/80"
+                class="border-border/50 mt-6 flex items-center justify-between gap-2 border-t pt-3"
               >
                 <!-- Left: Test connection -->
                 <div>
                   {#if editForm.provider_type}
                     <Button
-                      class="inline-flex h-9 items-center justify-center rounded-lg border border-neutral-200 bg-white px-4 text-xs font-semibold text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+                      variant="outline"
+                      size="sm"
+                      class="h-9 cursor-pointer rounded-xl px-4 text-xs font-semibold transition-[transform,background-color] duration-120 active:scale-95"
                       onclick={testConnection}
                     >
                       测试连接
@@ -1415,13 +1423,17 @@
                 <!-- Right: Cancel and Save -->
                 <div class="flex gap-2">
                   <Button
-                    class="inline-flex h-9 items-center justify-center rounded-lg border border-neutral-200 bg-white px-4 text-xs font-semibold text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+                    variant="outline"
+                    size="sm"
+                    class="h-9 cursor-pointer rounded-xl px-4 text-xs font-semibold transition-[transform,background-color] duration-120 active:scale-95"
                     onclick={cancelEdit}
                   >
                     取消
                   </Button>
                   <Button
-                    class="inline-flex h-9 items-center justify-center rounded-lg bg-neutral-900 px-4 text-xs font-bold text-neutral-50 shadow-sm transition-colors hover:bg-neutral-900/90 focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:outline-hidden dark:bg-neutral-50 dark:text-neutral-900 dark:hover:bg-neutral-50/90"
+                    variant="default"
+                    size="sm"
+                    class="h-9 cursor-pointer rounded-xl px-4 text-xs font-semibold transition-[transform,background-color] duration-120 active:scale-95"
                     onclick={save}
                     disabled={!editForm.provider_type}
                   >

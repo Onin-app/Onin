@@ -137,13 +137,11 @@
           class="flex flex-col gap-2 text-xs font-medium"
         >
           {#each field.options as option}
-            <div
-              class="text-foreground group flex items-center transition-all select-none"
-            >
+            <div class="text-foreground group flex items-center select-none">
               <RadioGroup.Item
                 id={option.value}
                 value={option.value}
-                class="border-input bg-background hover:border-foreground data-[state=checked]:border-primary size-4 shrink-0 cursor-pointer rounded-full border transition-all data-[state=checked]:border-[5px]"
+                class="border-input bg-background hover:border-foreground data-[state=checked]:border-primary size-4 shrink-0 cursor-pointer rounded-full border transition-[border-color,border-width,transform] duration-140 ease-out active:scale-90 data-[state=checked]:border-[5px]"
               />
               <Label.Root
                 for={option.value}

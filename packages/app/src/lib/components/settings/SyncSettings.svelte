@@ -179,7 +179,7 @@
       >
         数据同步
       </h2>
-      <Card class="px-4 py-1">
+      <Card class="border-border/60 bg-card rounded-2xl px-4 py-0.5 shadow-2xs">
         <SetItem
           title="启用 WebDAV 数据同步"
           description="将您的本地数据打包上传至 WebDAV 云盘，实现跨设备多端配置同步"
@@ -199,7 +199,9 @@
         >
           服务器配置
         </h2>
-        <Card class="px-4 py-1">
+        <Card
+          class="border-border/60 bg-card rounded-2xl px-4 py-0.5 shadow-2xs"
+        >
           <!-- 地址 -->
           <SetItem
             title="WebDAV 服务器地址"
@@ -211,7 +213,7 @@
                 bind:value={baseUrl}
                 onchange={updateConfig}
                 placeholder="https://..."
-                class="h-8 w-80 text-sm"
+                class="border-input bg-background h-8 w-80 rounded-xl text-xs"
               />
             {/snippet}
           </SetItem>
@@ -224,7 +226,7 @@
                 bind:value={username}
                 onchange={updateConfig}
                 placeholder="用户名/邮箱"
-                class="h-8 w-64 text-sm"
+                class="border-input bg-background h-8 w-64 rounded-xl text-xs"
               />
             {/snippet}
           </SetItem>
@@ -239,7 +241,7 @@
                 bind:value={password}
                 onchange={updateConfig}
                 placeholder="应用授权密钥"
-                class="h-8 w-64 bg-transparent"
+                class="bg-background h-8 w-64 rounded-xl"
               />
             {/snippet}
           </SetItem>
@@ -255,7 +257,7 @@
                 bind:value={folderName}
                 onchange={updateConfig}
                 placeholder="onin"
-                class="h-8 w-64 text-sm"
+                class="border-input bg-background h-8 w-64 rounded-xl text-xs"
               />
             {/snippet}
           </SetItem>
@@ -266,13 +268,13 @@
               <div class="flex items-center gap-3">
                 {#if testSuccess === true}
                   <span
-                    class="flex items-center gap-1 text-xs text-green-600 dark:text-green-400"
+                    class="flex items-center gap-1.5 text-xs font-medium text-emerald-500"
                   >
                     <CheckCircle class="h-4 w-4" /> 连接成功
                   </span>
                 {:else if testSuccess === false}
                   <span
-                    class="text-destructive flex items-center gap-1 text-xs"
+                    class="text-destructive flex items-center gap-1.5 text-xs font-medium"
                   >
                     <XCircle class="h-4 w-4" /> 连接失败
                   </span>
@@ -280,6 +282,7 @@
                 <Button
                   variant="outline"
                   size="sm"
+                  class="h-8 cursor-pointer rounded-xl px-3 text-xs font-medium transition-[transform,background-color] duration-120 active:scale-95"
                   onclick={testConnection}
                   disabled={testingConnection}
                 >
@@ -302,7 +305,9 @@
         >
           自动同步策略
         </h2>
-        <Card class="px-4 py-1">
+        <Card
+          class="border-border/60 bg-card rounded-2xl px-4 py-0.5 shadow-2xs"
+        >
           <SetItem
             title="开机启动时自动下载同步"
             description="应用启动时将自动检测云端更新并拉取同步最新配置"
@@ -336,7 +341,9 @@
         >
           数据手动同步
         </h2>
-        <Card class="px-4 py-1">
+        <Card
+          class="border-border/60 bg-card rounded-2xl px-4 py-0.5 shadow-2xs"
+        >
           <!-- 上次同步状态显示 -->
           <SetItem title="云端备份状态">
             {#snippet content()}
@@ -346,7 +353,7 @@
                     <span
                       class="text-muted-foreground flex items-center justify-end gap-1"
                     >
-                      <Spinner class="h-3 w-3 animate-spin" /> 检测云端数据...
+                      <Spinner class="h-3.5 w-3.5 animate-spin" /> 检测云端数据...
                     </span>
                   {:else if cloudBackupInfo}
                     <div class="text-muted-foreground">
@@ -360,7 +367,7 @@
                       >
                     </div>
                   {:else}
-                    <span class="text-muted-foreground"
+                    <span class="text-muted-foreground/75"
                       >云端未检测到备份文件</span
                     >
                   {/if}
@@ -368,7 +375,7 @@
                 <Button
                   variant="outline"
                   size="icon"
-                  class="h-8 w-8"
+                  class="h-8 w-8 cursor-pointer rounded-xl transition-[transform,background-color] duration-120 active:scale-90"
                   onclick={checkCloudBackup}
                   disabled={checkingBackup}
                   title="刷新云端备份状态"
@@ -392,6 +399,7 @@
                 <Button
                   variant="default"
                   size="sm"
+                  class="h-8 cursor-pointer gap-1.5 rounded-xl px-3 text-xs font-semibold transition-[transform,background-color] duration-120 active:scale-95"
                   onclick={() => executeSync("backup")}
                   disabled={syncing}
                 >
@@ -406,6 +414,7 @@
                 <Button
                   variant="outline"
                   size="sm"
+                  class="h-8 cursor-pointer gap-1.5 rounded-xl px-3 text-xs font-semibold transition-[transform,background-color] duration-120 active:scale-95"
                   onclick={() => executeSync("restore")}
                   disabled={syncing}
                 >

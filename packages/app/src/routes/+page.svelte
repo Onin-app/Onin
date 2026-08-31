@@ -677,7 +677,7 @@
   role="presentation"
 >
   <main
-    class="border-border/70 bg-background/95 text-foreground flex h-full w-full flex-col overflow-hidden rounded-2xl border p-3.5 shadow-2xl ring-1 ring-white/10 backdrop-blur-2xl dark:ring-white/5"
+    class="border-border/70 bg-background text-foreground flex h-full w-full flex-col overflow-hidden rounded-2xl border p-3.5 shadow-2xl ring-1 ring-white/10 dark:ring-white/5"
     data-tauri-drag-region
   >
     <div

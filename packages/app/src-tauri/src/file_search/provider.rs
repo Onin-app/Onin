@@ -1415,6 +1415,7 @@ fn command_exists(name: &str) -> bool {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .output()
+        .is_ok()
 }
 
 #[cfg(target_os = "linux")]

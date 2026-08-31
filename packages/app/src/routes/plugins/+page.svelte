@@ -101,7 +101,7 @@
 
 <div class="h-[100vh] w-full bg-transparent p-1">
   <main
-    class="border-border/70 bg-background/95 text-foreground relative flex h-full w-full flex-col overflow-hidden rounded-2xl border shadow-2xl ring-1 ring-white/10 backdrop-blur-2xl dark:ring-white/5"
+    class="border-border/70 bg-background text-foreground relative flex h-full w-full flex-col overflow-hidden rounded-2xl border shadow-2xl ring-1 ring-white/10 dark:ring-white/5"
     data-tauri-drag-region
   >
     {#if currentSettingsPlugin && currentSettingsPlugin.settings}
