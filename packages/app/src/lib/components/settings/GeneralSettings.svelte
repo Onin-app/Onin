@@ -236,7 +236,7 @@
       >
         主题设置
       </h2>
-      <Card class="px-4 py-1">
+      <Card class="border-border/60 bg-card rounded-2xl px-4 py-0.5 shadow-2xs">
         <SetItem title="主题">
           {#snippet content()}
             <Tabs
@@ -283,7 +283,7 @@
       >
         系统设置
       </h2>
-      <Card class="px-4 py-1">
+      <Card class="border-border/60 bg-card rounded-2xl px-4 py-0.5 shadow-2xs">
         <SetItem title="开机自启">
           {#snippet content()}
             <Switch
@@ -339,7 +339,7 @@
       >
         剪贴板设置
       </h2>
-      <Card class="px-4 py-1">
+      <Card class="border-border/60 bg-card rounded-2xl px-4 py-0.5 shadow-2xs">
         <SetItem
           title="自动粘贴时间限制（秒）"
           description="复制内容后在此时间内自动粘贴"
@@ -400,7 +400,7 @@
       >
         指令排序
       </h2>
-      <Card class="px-4 py-1">
+      <Card class="border-border/60 bg-card rounded-2xl px-4 py-0.5 shadow-2xs">
         <SetItem
           title="启用使用频率追踪"
           description="根据使用习惯优化指令排序"
@@ -449,7 +449,7 @@
       >
         插件市场
       </h2>
-      <Card class="px-4 py-1">
+      <Card class="border-border/60 bg-card rounded-2xl px-4 py-0.5 shadow-2xs">
         <SetItem title="API 地址">
           {#snippet content()}
             <Input
@@ -471,7 +471,7 @@
       >
         数据存储
       </h2>
-      <Card class="px-4 py-1">
+      <Card class="border-border/60 bg-card rounded-2xl px-4 py-0.5 shadow-2xs">
         <SetItem title="应用数据">
           {#snippet content()}
             <Button
@@ -493,7 +493,7 @@
       >
         关于
       </h2>
-      <Card class="px-4 py-1">
+      <Card class="border-border/60 bg-card rounded-2xl px-4 py-0.5 shadow-2xs">
         <SetItem title="当前版本">
           {#snippet content()}
             <div class="flex items-center gap-3">

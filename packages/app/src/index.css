@@ -49,14 +49,26 @@
   /* black */
   --contrast: hsl(0 0% 0%);
 
+  /* Emil Kowalski Motion Tokens (animations.dev standard) */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --duration-press: 140ms;
+  --duration-hover: 120ms;
+  --duration-modal: 180ms;
+
   /* Shadows */
   --shadow-mini: 0px 1px 0px 1px rgba(0, 0, 0, 0.04);
   --shadow-mini-inset: 0px 1px 0px 0px rgba(0, 0, 0, 0.04) inset;
   --shadow-popover: 0px 7px 12px 3px hsla(var(--dark-10));
-  --shadow-kbd: 0px 2px 0px 0px rgba(0, 0, 0, 0.07);
+  --shadow-kbd:
+    0px 1.5px 0px 1px rgba(0, 0, 0, 0.08), 0px 0.5px 0px 0px rgba(0, 0, 0, 0.06);
   --shadow-btn: 0px 1px 0px 1px rgba(0, 0, 0, 0.03);
   --shadow-card: 0px 2px 0px 1px rgba(0, 0, 0, 0.04);
   --shadow-date-field-focus: 0px 0px 0px 3px rgba(24, 24, 27, 0.17);
+  --shadow-active-item:
+    0 2px 8px -2px rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
 }
 
 .dark {
@@ -99,10 +111,15 @@
   --shadow-mini: 0px 1px 0px 1px rgba(0, 0, 0, 0.3);
   --shadow-mini-inset: 0px 1px 0px 0px rgba(0, 0, 0, 0.5) inset;
   --shadow-popover: 0px 7px 12px 3px hsla(0deg 0% 0% / 30%);
-  --shadow-kbd: 0px 2px 0px 0px rgba(255, 255, 255, 0.07);
+  --shadow-kbd:
+    0px 1.5px 0px 1px rgba(255, 255, 255, 0.08),
+    0px 0.5px 0px 0px rgba(255, 255, 255, 0.04);
   --shadow-btn: 0px 1px 0px 1px rgba(0, 0, 0, 0.2);
   --shadow-card: 0px 2px 0px 1px rgba(0, 0, 0, 0.4);
   --shadow-date-field-focus: 0px 0px 0px 3px rgba(244, 244, 245, 0.1);
+  --shadow-active-item:
+    0 2px 10px -2px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
 }
 
 @theme inline {
@@ -150,6 +167,12 @@
   --shadow-btn: var(--shadow-btn);
   --shadow-card: var(--shadow-card);
   --shadow-date-field-focus: var(--shadow-date-field-focus);
+  --shadow-active-item: var(--shadow-active-item);
+
+  --ease-out: var(--ease-out);
+  --ease-in-out: var(--ease-in-out);
+  --ease-drawer: var(--ease-drawer);
+  --ease-spring: var(--ease-spring);
 }
 
 * {
@@ -165,4 +188,28 @@ body {
   overflow: hidden;
   user-select: none;
   background: transparent;
+}
+
+/* Emil Kowalski Craft Utilities */
+.interactive-item {
+  transition:
+    transform var(--duration-press) var(--ease-out),
+    background-color var(--duration-hover) ease,
+    opacity var(--duration-hover) ease;
+  will-change: transform;
+}
+
+.interactive-item:active {
+  transform: scale(0.985);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

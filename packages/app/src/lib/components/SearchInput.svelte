@@ -48,8 +48,8 @@
 
   const animate: Action<HTMLElement> = (node) => {
     autoAnimate(node, {
-      duration: 200,
-      easing: "ease-in-out",
+      duration: 150,
+      easing: "cubic-bezier(0.23, 1, 0.32, 1)",
     });
   };
 
@@ -104,7 +104,7 @@
         <Button
           variant="outline"
           size="sm"
-          class="h-7 gap-1 px-2 text-xs"
+          class="h-7 gap-1 px-2 text-xs shadow-2xs transition-[transform,background-color] duration-120 active:scale-95"
           onclick={onToggleShowAllFiles}
           aria-label={showAllFiles ? "收起文件" : "展开所有文件"}
         >
@@ -124,7 +124,7 @@
     bind:this={inputElement}
     class="{showAllFiles
       ? 'w-full'
-      : 'min-w-0 flex-1'} text-foreground placeholder:text-muted-foreground/60 h-10 border-none bg-transparent text-xl font-normal outline-none focus:ring-0 focus:outline-none active:outline-none"
+      : 'min-w-0 flex-1'} text-foreground placeholder:text-muted-foreground/50 h-10 border-none bg-transparent text-xl font-normal tracking-tight outline-none focus:ring-0 focus:outline-none active:outline-none"
     type="text"
     {placeholder}
     bind:value

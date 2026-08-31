@@ -74,9 +74,9 @@
 {#if isTranslator}
   {@render children()}
 {:else}
-  <div class="h-[100vh] w-full bg-transparent p-0">
+  <div class="h-[100vh] w-full bg-transparent p-1">
     <main
-      class="h-full w-full overflow-hidden rounded-xl bg-neutral-100 p-3 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100"
+      class="border-border/70 bg-background/95 text-foreground relative flex h-full w-full flex-col overflow-hidden rounded-2xl border p-3 shadow-2xl ring-1 ring-white/10 backdrop-blur-2xl dark:ring-white/5"
       data-tauri-drag-region
     >
       {@render children()}

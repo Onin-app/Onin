@@ -32,34 +32,36 @@
 </script>
 
 <div
-  class="flex items-center justify-between border-b px-4 py-3"
+  class="border-border/40 flex items-center justify-between border-b px-4 py-3"
   data-tauri-drag-region
 >
   <div class="flex items-center gap-2">
     <Button
       variant="ghost"
       size="icon"
-      class="h-8 w-8"
+      class="h-8 w-8 cursor-pointer rounded-xl transition-[transform,background-color] duration-120 active:scale-95"
       onclick={onBack}
       aria-label="返回设置"
     >
       <ArrowLeft class="h-4 w-4" />
     </Button>
-    <h2 class="text-foreground text-base font-semibold">插件管理</h2>
+    <h2 class="text-foreground text-base font-semibold tracking-tight">
+      插件管理
+    </h2>
   </div>
 
   <div class="flex items-center gap-2">
     <!-- 搜索框 -->
     <div class="relative">
       <MagnifyingGlass
-        class="text-muted-foreground absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2"
+        class="text-muted-foreground/60 absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2"
       />
       <Input
         type="text"
         bind:value={searchQuery}
         oninput={(e) => onSearchChange(e.currentTarget.value)}
         placeholder="搜索插件..."
-        class="h-8 w-56 pl-9 text-xs"
+        class="h-8 w-56 rounded-xl pl-8 text-xs font-normal transition-[border-color,box-shadow] duration-140"
       />
     </div>
 
@@ -67,7 +69,7 @@
     <Button
       variant="outline"
       size="sm"
-      class="h-8 gap-1.5 text-xs"
+      class="h-8 gap-1.5 rounded-xl text-xs shadow-2xs transition-[transform,background-color] duration-120 active:scale-95"
       onclick={onRefresh}
     >
       <ArrowClockwise class="h-3.5 w-3.5" />
@@ -75,7 +77,11 @@
     </Button>
 
     <!-- 手动导入插件按钮 -->
-    <Button size="sm" class="h-8 gap-1.5 text-xs" onclick={onImport}>
+    <Button
+      size="sm"
+      class="h-8 gap-1.5 rounded-xl text-xs shadow-2xs transition-[transform,background-color] duration-120 active:scale-95"
+      onclick={onImport}
+    >
       <Plus class="h-3.5 w-3.5" />
       导入插件
     </Button>

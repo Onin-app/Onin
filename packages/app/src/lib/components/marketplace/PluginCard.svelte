@@ -107,7 +107,7 @@
 </script>
 
 <div
-  class="group flex cursor-pointer flex-col rounded-lg border border-neutral-200 bg-white p-3 text-left transition-all hover:border-neutral-300 hover:shadow-sm dark:border-neutral-700 dark:bg-neutral-900 dark:hover:border-neutral-600"
+  class="group border-border/60 bg-card hover:border-border flex cursor-pointer flex-col rounded-2xl border p-3.5 text-left shadow-2xs transition-[border-color,box-shadow,transform] duration-140 ease-[cubic-bezier(0.23,1,0.32,1)] hover:shadow-xs active:scale-[0.99]"
   {onclick}
   role="button"
   tabindex="0"
@@ -122,13 +122,13 @@
   <div class="mb-2 flex items-start gap-3">
     <!-- 图标 -->
     <div
-      class="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-neutral-100 to-neutral-200 dark:from-neutral-800 dark:to-neutral-700"
+      class="bg-muted/60 border-border/50 flex h-13 w-13 shrink-0 items-center justify-center rounded-xl border shadow-xs"
     >
       {#if plugin.icon && !imageError}
         <img
           src={plugin.icon}
           alt={plugin.name}
-          class="h-12 w-12 rounded object-contain"
+          class="h-9 w-9 rounded-md object-contain"
           onerror={handleImageError}
           crossorigin="anonymous"
         />
@@ -138,15 +138,18 @@
     </div>
 
     <!-- 右侧信息 -->
-    <div class="flex min-w-0 flex-1 flex-col gap-1">
+    <div class="flex min-w-0 flex-1 flex-col gap-0.5">
       <!-- 标题、版本和 GitHub 链接 -->
       <div class="flex items-start justify-between gap-2">
         <div class="flex min-w-0 items-baseline gap-2">
-          <h3 class="truncate text-base leading-tight font-semibold">
+          <h3
+            class="text-foreground truncate text-sm leading-tight font-semibold tracking-tight"
+          >
             {plugin.name}
           </h3>
           {#if isValidPluginVersion(plugin.version)}
-            <span class="shrink-0 text-xs text-neutral-400"
+            <span
+              class="text-muted-foreground/60 shrink-0 font-mono text-[11px]"
               >{formatPluginVersion(plugin.version)}</span
             >
           {/if}
@@ -155,55 +158,56 @@
           href={plugin.repository}
           target="_blank"
           rel="noopener noreferrer"
-          class="shrink-0 rounded p-1 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+          class="text-muted-foreground hover:text-foreground hover:bg-muted shrink-0 rounded-lg p-1 opacity-0 transition-all duration-120 group-hover:opacity-100"
           onclick={(e) => {
             e.stopPropagation();
             plugin.repository && openExternalLink(plugin.repository, e);
           }}
           aria-label="查看 GitHub"
         >
-          <GithubLogo class="h-4 w-4" />
+          <GithubLogo class="h-3.5 w-3.5" />
         </a>
       </div>
 
       <!-- 描述 -->
-      <p class="line-clamp-1 text-sm text-neutral-500 dark:text-neutral-400">
+      <p class="text-muted-foreground/75 line-clamp-1 text-xs leading-normal">
         {plugin.description}
       </p>
 
       <!-- 作者和 ID -->
       <div
-        class="flex items-center justify-between gap-2 text-xs text-neutral-400"
+        class="text-muted-foreground/60 flex items-center justify-between gap-2 text-xs"
       >
-        <span class="truncate">{plugin.author}</span>
-        <span class="shrink-0 text-neutral-300 dark:text-neutral-600"
-          >ID: {plugin.id}</span
-        >
+        <span class="truncate text-[11.5px]">{plugin.author}</span>
+        <span class="shrink-0 font-mono text-[10px]">ID: {plugin.id}</span>
       </div>
     </div>
   </div>
 
   <!-- 底部：统计、分类和安装按钮 -->
   <div
-    class="flex items-center justify-between border-t border-neutral-200 pt-2 dark:border-neutral-700"
+    class="border-border/40 flex items-center justify-between border-t pt-2.5"
   >
     <!-- 左侧：统计或分类 -->
     {#if showStats}
       <!-- 统计信息（市场列表） -->
-      <div class="flex items-center gap-3 text-xs text-neutral-500">
+      <div class="text-muted-foreground/70 flex items-center gap-3 text-xs">
         <div class="flex items-center gap-1">
-          <Star class="h-3.5 w-3.5" />
-          <span>{formatNumber(plugin.stars)}</span>
+          <Star class="h-3.5 w-3.5 text-amber-500/80" />
+          <span class="font-mono text-[11px]">{formatNumber(plugin.stars)}</span
+          >
         </div>
         <div class="flex items-center gap-1">
-          <Download class="h-3.5 w-3.5" />
-          <span>{formatNumber(plugin.downloads)}</span>
+          <Download class="h-3.5 w-3.5 text-blue-500/80" />
+          <span class="font-mono text-[11px]"
+            >{formatNumber(plugin.downloads)}</span
+          >
         </div>
       </div>
     {:else}
       <!-- 分类标签（已安装列表） -->
       <span
-        class="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400"
+        class="bg-muted/70 text-muted-foreground rounded-md px-1.5 py-0.5 text-[10px] font-medium"
       >
         {plugin.category}
       </span>
@@ -214,7 +218,7 @@
       <!-- 分类标签（仅在市场列表显示） -->
       {#if showStats}
         <span
-          class="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400"
+          class="bg-muted/70 text-muted-foreground rounded-md px-1.5 py-0.5 text-[10px] font-medium"
         >
           {plugin.category}
         </span>
@@ -223,7 +227,7 @@
       <!-- 安装按钮 -->
       {#if plugin.id}
         <button
-          class="flex items-center gap-1 rounded bg-blue-500 px-3 py-1 text-xs text-white transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+          class="bg-primary text-primary-foreground hover:bg-primary/90 flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium shadow-2xs transition-[transform,background-color] duration-120 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
           onclick={handleInstall}
           disabled={installing || (isInstalled && !hasUpdate)}
           class:opacity-50={isInstalled && !hasUpdate}

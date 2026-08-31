@@ -83,25 +83,25 @@
 <div class="flex items-center gap-2 pb-2" role="banner">
   <!-- Back Button -->
   <button
-    class="flex h-10 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-lg text-neutral-600 transition-colors hover:bg-neutral-200 dark:text-neutral-400 dark:hover:bg-neutral-700"
+    class="text-muted-foreground hover:text-foreground hover:bg-muted/80 flex h-9 w-9 flex-shrink-0 cursor-pointer items-center justify-center rounded-xl transition-[transform,background-color] duration-120 active:scale-95"
     onclick={onBack}
     aria-label="返回"
   >
-    <ArrowLeft class="size-5" weight="bold" />
+    <ArrowLeft class="size-4.5" weight="bold" />
   </button>
 
   <!-- Search Input or Title -->
   {#if showSearch}
     <div
-      class="flex w-full flex-row items-center gap-2 rounded-lg border border-neutral-300 bg-white px-2 py-2 transition-all duration-200 dark:border-neutral-600 dark:bg-neutral-800 {disabled
-        ? 'cursor-not-allowed bg-neutral-50 opacity-65 dark:bg-neutral-900/50'
+      class="border-border/60 bg-background/80 focus-within:border-primary/60 focus-within:ring-primary/20 flex w-full flex-row items-center gap-2 rounded-xl border px-3 py-1.5 shadow-2xs transition-[border-color,box-shadow] duration-140 focus-within:ring-2 {disabled
+        ? 'bg-muted/40 cursor-not-allowed opacity-65'
         : ''}"
     >
       <input
         bind:this={inputElement}
         id="extension-search-input"
-        class="h-[34px] min-w-0 flex-1 bg-transparent text-2xl focus:ring-0 focus:outline-none active:ring-0 active:outline-none {disabled
-          ? 'cursor-not-allowed text-neutral-400 dark:text-neutral-500'
+        class="text-foreground placeholder:text-muted-foreground/50 h-[30px] min-w-0 flex-1 bg-transparent text-xl font-medium tracking-tight focus:outline-none {disabled
+          ? 'text-muted-foreground cursor-not-allowed'
           : ''}"
         type="text"
         {disabled}
@@ -114,7 +114,7 @@
   {:else}
     <div class="flex-1 pl-1.5">
       <h2
-        class="text-sm font-semibold tracking-wide text-neutral-800 uppercase dark:text-neutral-100"
+        class="text-foreground text-sm font-semibold tracking-tight uppercase"
       >
         {title || "扩展"}
       </h2>
@@ -122,20 +122,20 @@
   {/if}
 
   <!-- Right Slot & Settings Button -->
-  <div class="flex flex-shrink-0 items-center gap-2">
+  <div class="flex flex-shrink-0 items-center gap-1.5">
     {#if right}
       {@render right()}
     {/if}
     {#if extensionId}
       {#if right}
-        <span class="h-4 w-[1px] bg-neutral-200 dark:bg-neutral-800"></span>
+        <span class="border-border/40 h-4 w-[1px] border-r"></span>
       {/if}
       <button
-        class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-neutral-600 transition-all hover:bg-neutral-200 active:scale-95 dark:text-neutral-400 dark:hover:bg-neutral-700"
+        class="text-muted-foreground hover:text-foreground hover:bg-muted/80 flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl transition-[transform,background-color] duration-120 active:scale-95"
         onclick={() => (settingsOpen = true)}
         aria-label="扩展设置"
       >
-        <Gear class="size-5" />
+        <Gear class="size-4.5" />
       </button>
     {/if}
   </div>

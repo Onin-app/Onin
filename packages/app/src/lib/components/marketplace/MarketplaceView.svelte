@@ -175,20 +175,20 @@
     <!-- 搜索框 -->
     <div class="relative flex-1">
       <MagnifyingGlass
-        class="text-muted-foreground absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2"
+        class="text-muted-foreground/60 absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2"
       />
       <Input
         type="text"
         bind:value={searchQuery}
         placeholder="搜索插件..."
-        class="h-9 w-full pl-9 text-sm"
+        class="h-8.5 w-full rounded-xl pl-8 text-xs font-normal transition-[border-color,box-shadow] duration-140"
       />
     </div>
 
     <!-- 分类筛选 -->
     <select
       bind:value={selectedCategory}
-      class="border-input bg-background text-foreground focus:ring-ring h-9 rounded-md border px-3 text-sm focus:ring-1 focus:outline-none"
+      class="border-border/60 bg-background text-foreground focus:border-primary focus:ring-primary/20 h-8.5 cursor-pointer rounded-xl border px-3 text-xs shadow-2xs transition-[border-color,box-shadow] duration-140 outline-none focus:ring-2"
     >
       {#each categories as category}
         <option value={category.value}>{category.label}</option>
@@ -198,35 +198,41 @@
 
   <!-- 插件列表 -->
   <ScrollArea class="flex-1" viewportClass="h-full w-full overflow-x-hidden">
-    <div class="pr-2">
+    <div class="pr-2 pb-4">
       {#if loading}
         <div
           class="text-muted-foreground flex h-full min-h-64 items-center justify-center"
         >
           <div class="text-center">
-            <div class="mb-2 text-base font-medium">加载中...</div>
-            <div class="text-xs">正在获取插件列表</div>
+            <div class="text-foreground/80 mb-1 text-sm font-medium">
+              加载中...
+            </div>
+            <div class="text-muted-foreground/60 text-xs">正在获取插件列表</div>
           </div>
         </div>
       {:else if error}
         <div
           class="text-muted-foreground flex h-full min-h-64 flex-col items-center justify-center"
         >
-          <Package class="mb-4 h-12 w-12 opacity-50" />
-          <p class="text-base font-medium">加载失败</p>
-          <p class="mt-1 text-xs">{error}</p>
-          <Button size="sm" class="mt-4" onclick={loadPlugins}>重试</Button>
+          <Package class="mb-3 h-10 w-10 opacity-40" />
+          <p class="text-foreground text-sm font-medium">加载失败</p>
+          <p class="text-muted-foreground mt-1 text-xs">{error}</p>
+          <Button
+            size="sm"
+            class="mt-3 rounded-xl text-xs transition-transform active:scale-95"
+            onclick={loadPlugins}>重试</Button
+          >
         </div>
       {:else if plugins.length === 0}
         <div
           class="text-muted-foreground flex h-full min-h-64 flex-col items-center justify-center"
         >
-          <Package class="mb-4 h-12 w-12 opacity-50" />
-          <p class="text-base font-medium">没有找到插件</p>
-          <p class="mt-1 text-xs">尝试调整搜索条件</p>
+          <Package class="mb-3 h-10 w-10 opacity-40" />
+          <p class="text-foreground text-sm font-medium">没有找到插件</p>
+          <p class="text-muted-foreground/60 mt-1 text-xs">尝试调整搜索条件</p>
         </div>
       {:else}
-        <div class="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+        <div class="grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-3">
           {#each plugins as plugin (plugin.id)}
             {@const installedVersion = installedVersions.get(plugin.id)}
             {@const isInstalled = !!installedVersion}
@@ -245,6 +251,7 @@
             <Button
               variant="outline"
               size="sm"
+              class="h-7.5 rounded-xl px-2.5 text-xs shadow-2xs transition-transform duration-120 active:scale-95"
               disabled={page === 1}
               onclick={() => {
                 page--;
@@ -254,13 +261,14 @@
               上一页
             </Button>
 
-            <span class="text-muted-foreground text-xs">
+            <span class="text-muted-foreground font-mono text-xs">
               {page} / {totalPages}
             </span>
 
             <Button
               variant="outline"
               size="sm"
+              class="h-7.5 rounded-xl px-2.5 text-xs shadow-2xs transition-transform duration-120 active:scale-95"
               disabled={page === totalPages}
               onclick={() => {
                 page++;

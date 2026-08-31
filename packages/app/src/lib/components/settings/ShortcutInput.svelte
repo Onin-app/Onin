@@ -260,10 +260,10 @@
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
-    class="group bg-background relative flex h-9 min-w-[160px] cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 transition-all
+    class="group bg-background relative flex h-9 min-w-[170px] cursor-pointer items-center justify-between gap-2 rounded-xl border px-3 transition-[border-color,box-shadow,background-color] duration-140 ease-[cubic-bezier(0.23,1,0.32,1)]
       {isFocused
-      ? 'border-primary ring-ring/20 ring-2'
-      : 'border-input hover:border-border hover:bg-accent/40'}
+      ? 'border-primary ring-primary/20 shadow-xs ring-2'
+      : 'border-input hover:border-border hover:bg-accent/30'}
       {disabled ? 'cursor-not-allowed opacity-50' : ''}"
     onclick={() => {
       if (!disabled) {
@@ -293,14 +293,14 @@
           <!-- 正在按下修饰键 -->
           {#each activeModifiers as mod}
             <kbd
-              class="border-primary/40 bg-primary/10 text-primary inline-flex h-5 min-w-[22px] items-center justify-center rounded border px-1.5 font-mono text-[11px] font-semibold select-none"
+              class="border-primary/40 bg-primary/10 text-primary shadow-kbd inline-flex h-5.5 min-w-[24px] items-center justify-center rounded-md border px-1.5 font-mono text-[11px] font-semibold select-none"
             >
               {parseShortcutToKeys(mod)[0]?.display || mod}
             </kbd>
           {/each}
-          <span class="text-muted-foreground text-[10px] font-bold">+</span>
+          <span class="text-muted-foreground/60 text-[10px] font-bold">+</span>
           <kbd
-            class="border-primary/60 bg-primary/10 text-primary inline-flex h-5 min-w-[24px] animate-pulse items-center justify-center rounded border border-dashed px-1.5 font-mono text-[10px] font-medium select-none"
+            class="border-primary/60 bg-primary/10 text-primary inline-flex h-5.5 min-w-[28px] animate-pulse items-center justify-center rounded-md border border-dashed px-1.5 font-mono text-[10px] font-medium select-none"
           >
             主键
           </kbd>
@@ -323,18 +323,18 @@
         <!-- 常态展示：已设置快捷键键帽 -->
         {#each currentKeyItems as item, i}
           {#if i > 0}
-            <span class="text-muted-foreground/60 text-[10px] font-bold">+</span
+            <span class="text-muted-foreground/50 text-[10px] font-bold">+</span
             >
           {/if}
           <kbd
-            class="border-border bg-muted text-foreground inline-flex h-5.5 min-w-[22px] items-center justify-center rounded border px-1.5 font-mono text-[11px] font-semibold shadow-xs"
+            class="border-border/80 bg-muted/80 text-foreground shadow-kbd inline-flex h-5.5 min-w-[24px] items-center justify-center rounded-md border px-1.5 font-mono text-[11px] font-medium select-none"
           >
             {item.display}
           </kbd>
         {/each}
       {:else}
         <!-- 未设置快捷键的空状态 -->
-        <div class="text-muted-foreground flex items-center gap-1.5 text-xs">
+        <div class="text-muted-foreground/70 flex items-center gap-1.5 text-xs">
           <Keyboard class="h-3.5 w-3.5" />
           <span>点击录入快捷键</span>
         </div>
@@ -347,7 +347,7 @@
         <Button
           variant="ghost"
           size="sm"
-          class="h-6 px-1.5 text-[11px]"
+          class="h-6 px-1.5 text-[11px] transition-transform duration-120 active:scale-95"
           onclick={handleCancel}
         >
           取消
@@ -356,7 +356,7 @@
         <Button
           variant="ghost"
           size="icon"
-          class="text-muted-foreground h-5 w-5 opacity-0 transition-opacity group-hover:opacity-100"
+          class="text-muted-foreground/60 hover:text-foreground hover:bg-muted/80 h-5 w-5 opacity-0 transition-all duration-120 group-hover:opacity-100 active:scale-90"
           onclick={handleClear}
           title="清除快捷键"
         >
@@ -373,7 +373,7 @@
         <Button
           variant="outline"
           size="sm"
-          class="h-6 px-2 text-[11px]"
+          class="h-6 rounded-lg px-2 text-[11px] shadow-2xs transition-[transform,background-color] duration-120 active:scale-95"
           onclick={() => setPresetShortcut(preset.value)}
           {disabled}
         >

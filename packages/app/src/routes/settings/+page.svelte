@@ -154,25 +154,25 @@
 
 <div class="h-screen w-full bg-transparent p-1">
   <main
-    class="relative flex h-full w-full overflow-hidden rounded-xl bg-neutral-50 text-neutral-900 selection:bg-neutral-200 dark:bg-neutral-900 dark:text-neutral-100 dark:selection:bg-neutral-700"
+    class="border-border/70 bg-background/95 text-foreground relative flex h-full w-full overflow-hidden rounded-2xl border shadow-2xl ring-1 ring-white/10 backdrop-blur-2xl dark:ring-white/5"
     data-tauri-drag-region
   >
     <TooltipProvider delayDuration={150}>
       <aside
-        class="flex flex-col border-r border-neutral-200 bg-neutral-100/50 pt-4 pb-3 transition-all duration-200 ease-in-out dark:border-neutral-800 dark:bg-neutral-900/50 {isCollapsed
+        class="border-border/50 bg-muted/30 flex flex-col border-r pt-4 pb-3 transition-[width,padding] duration-180 ease-[cubic-bezier(0.32,0.72,0,1)] {isCollapsed
           ? 'w-16 px-2'
           : 'w-52 p-3'}"
         data-tauri-drag-region
       >
         <div
-          class="mb-4 flex items-center {isCollapsed
+          class="mb-3 flex items-center {isCollapsed
             ? 'justify-center'
             : 'justify-between px-2'} h-8"
           data-tauri-drag-region
         >
           {#if !isCollapsed}
             <span
-              class="text-sm font-semibold text-neutral-500 select-none"
+              class="text-muted-foreground text-xs font-semibold tracking-wider uppercase select-none"
               data-tauri-drag-region
             >
               设置
@@ -180,7 +180,7 @@
           {/if}
           <Tooltip>
             <TooltipTrigger
-              class="flex h-7 w-7 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-200/60 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+              class="text-muted-foreground hover:bg-muted/80 hover:text-foreground flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg transition-[transform,background-color,color] duration-140 ease-[cubic-bezier(0.23,1,0.32,1)] outline-none active:scale-95"
               onclick={toggleCollapse}
               aria-label={isCollapsed ? "展开侧边栏" : "折叠侧边栏"}
             >
@@ -198,15 +198,15 @@
         <nav
           class="flex flex-1 flex-col gap-1 overflow-x-hidden overflow-y-auto"
         >
-          {#each settings as setting}
+          {#each settings as setting (setting.id)}
             {@const Icon = setting.icon}
+            {@const isActive = activeSetting.id === setting.id}
             {#if isCollapsed}
               <Tooltip>
                 <TooltipTrigger
-                  class="flex h-9 w-full items-center justify-center rounded-lg transition-colors {activeSetting.id ===
-                  setting.id
-                    ? 'bg-white text-neutral-900 shadow-sm dark:bg-neutral-800 dark:text-white'
-                    : 'text-neutral-600 hover:bg-neutral-200/50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white'}"
+                  class="flex h-9 w-full cursor-pointer items-center justify-center rounded-xl transition-[transform,background-color,color,box-shadow] duration-140 ease-[cubic-bezier(0.23,1,0.32,1)] outline-none active:scale-[0.96] {isActive
+                    ? 'bg-card text-foreground border-border/50 border shadow-xs'
+                    : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
                   onclick={() => handleClickSetting(setting)}
                   aria-label={setting.name}
                 >
@@ -218,10 +218,9 @@
               </Tooltip>
             {:else}
               <Button.Root
-                class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors {activeSetting.id ===
-                setting.id
-                  ? 'bg-white text-neutral-900 shadow-sm dark:bg-neutral-800 dark:text-white'
-                  : 'text-neutral-600 hover:bg-neutral-200/50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white'}"
+                class="flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-[transform,background-color,color,box-shadow] duration-140 ease-[cubic-bezier(0.23,1,0.32,1)] outline-none active:scale-[0.97] {isActive
+                  ? 'bg-card text-foreground border-border/50 border shadow-xs'
+                  : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
                 onclick={() => handleClickSetting(setting)}
               >
                 <Icon size={18} class="shrink-0" />
@@ -231,13 +230,11 @@
           {/each}
         </nav>
 
-        <div
-          class="mt-auto border-t border-neutral-200 pt-3 dark:border-neutral-800"
-        >
+        <div class="border-border/40 mt-auto border-t pt-3">
           {#if isCollapsed}
             <Tooltip>
               <TooltipTrigger
-                class="flex h-9 w-full items-center justify-center rounded-lg text-neutral-600 transition-colors hover:bg-neutral-200/50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white"
+                class="text-muted-foreground hover:bg-muted/60 hover:text-foreground flex h-9 w-full cursor-pointer items-center justify-center rounded-xl transition-[transform,background-color,color] duration-140 ease-[cubic-bezier(0.23,1,0.32,1)] outline-none active:scale-[0.96]"
                 onclick={() => goto("/plugins")}
                 aria-label="插件管理"
               >
@@ -249,7 +246,7 @@
             </Tooltip>
           {:else}
             <Button.Root
-              class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-200/50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white"
+              class="text-muted-foreground hover:bg-muted/60 hover:text-foreground flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-[transform,background-color,color] duration-140 ease-[cubic-bezier(0.23,1,0.32,1)] outline-none active:scale-[0.97]"
               onclick={() => goto("/plugins")}
             >
               <PlugsConnected size={18} class="shrink-0" />
@@ -261,12 +258,31 @@
     </TooltipProvider>
 
     <div
-      class="flex-1 overflow-hidden bg-white p-6 dark:bg-neutral-950"
+      class="bg-background flex-1 overflow-hidden p-6"
       data-tauri-drag-region
     >
       <div class="mx-auto flex h-full max-w-3xl flex-col">
-        <ActiveComponent />
+        {#key activeSetting.id}
+          <div
+            class="h-full w-full animate-[tab-enter_140ms_cubic-bezier(0.23,1,0.32,1)_forwards]"
+          >
+            <ActiveComponent />
+          </div>
+        {/key}
       </div>
     </div>
   </main>
 </div>
+
+<style>
+  @keyframes tab-enter {
+    from {
+      opacity: 0;
+      transform: translateY(3px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+</style>

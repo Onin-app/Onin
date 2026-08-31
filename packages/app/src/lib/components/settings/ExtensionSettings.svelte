@@ -101,33 +101,43 @@
     </header>
 
     {#if loading}
-      <Card class="text-muted-foreground p-6 text-sm">正在加载扩展...</Card>
+      <Card
+        class="border-border/60 text-muted-foreground rounded-2xl p-6 text-sm"
+        >正在加载扩展...</Card
+      >
     {:else if extensions.length === 0}
-      <Card class="text-muted-foreground p-6 text-sm">暂无可管理的扩展</Card>
+      <Card
+        class="border-border/60 text-muted-foreground rounded-2xl p-6 text-sm"
+        >暂无可管理的扩展</Card
+      >
     {:else}
       <section class="flex flex-col gap-3">
         {#each extensions as extension (extension.id)}
-          <Card class="p-4 transition-colors">
+          <Card
+            class="border-border/60 bg-card hover:border-border rounded-2xl p-4 shadow-2xs transition-[border-color,box-shadow] duration-140 ease-[cubic-bezier(0.23,1,0.32,1)]"
+          >
             <div class="flex items-start gap-4">
               <div
-                class="bg-muted text-foreground flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
+                class="bg-muted/60 text-foreground border-border/50 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border shadow-xs"
               >
-                <PhosphorIcon icon={extension.icon} class="h-6 w-6" />
+                <PhosphorIcon icon={extension.icon} class="h-5.5 w-5.5" />
               </div>
 
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-2">
-                  <h3 class="text-foreground truncate text-sm font-semibold">
+                  <h3
+                    class="text-foreground truncate text-sm font-semibold tracking-tight"
+                  >
                     {extension.name}
                   </h3>
                   <Badge
                     variant={extension.enabled ? "secondary" : "outline"}
-                    class="px-1.5 py-0 text-[10px] font-normal"
+                    class="rounded-md px-1.5 py-0 text-[10px] font-normal"
                   >
                     {extension.enabled ? "启用中" : "已禁用"}
                   </Badge>
                 </div>
-                <p class="text-muted-foreground mt-1 text-xs">
+                <p class="text-muted-foreground/75 mt-1 text-xs leading-normal">
                   {extension.description}
                 </p>
               </div>
@@ -137,7 +147,7 @@
                   <Button
                     variant="ghost"
                     size="icon"
-                    class="text-muted-foreground hover:text-foreground h-8 w-8"
+                    class="text-muted-foreground hover:text-foreground h-8 w-8 cursor-pointer rounded-lg transition-transform duration-120 active:scale-90"
                     onclick={() =>
                       openExtensionSettings(extension.id, extension.name)}
                     title="设置"
@@ -156,19 +166,22 @@
               </div>
             </div>
 
-            <div class="border-border/50 mt-4 border-t pt-3">
-              <div class="text-muted-foreground mb-2 text-xs font-medium">
+            <div class="border-border/40 mt-4 border-t pt-3">
+              <div
+                class="text-muted-foreground/70 mb-2 text-[11px] font-medium tracking-wider uppercase"
+              >
                 指令
               </div>
-              <div class="flex flex-wrap gap-2">
+              <div class="flex flex-wrap gap-1.5">
                 {#each extension.commands as command (command.code)}
                   <span
-                    class="bg-muted text-foreground inline-flex max-w-full items-center gap-1.5 rounded-md px-2 py-1 text-xs"
+                    class="bg-muted/60 text-foreground border-border/40 inline-flex max-w-full items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs shadow-2xs"
                   >
                     <PhosphorIcon icon={command.icon} class="h-3.5 w-3.5" />
                     <span class="truncate">{command.name}</span>
                     {#if command.has_matches}
-                      <span class="text-muted-foreground text-[10px]">匹配</span
+                      <span class="text-muted-foreground/60 text-[10px]"
+                        >匹配</span
                       >
                     {/if}
                   </span>

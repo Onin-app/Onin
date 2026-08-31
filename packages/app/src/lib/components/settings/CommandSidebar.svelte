@@ -50,25 +50,28 @@
   }: Props = $props();
 </script>
 
-<div class="flex w-36 shrink-0 flex-col gap-4 border-r pr-4">
+<div class="border-border/40 flex w-36 shrink-0 flex-col gap-4 border-r pr-4">
   <!-- 内置指令分类 -->
   <div class="flex flex-col gap-1">
     <h3
-      class="text-muted-foreground px-2 py-1 text-[10px] font-semibold tracking-wider uppercase"
+      class="text-muted-foreground px-2 py-1 text-[10px] font-semibold tracking-wider uppercase select-none"
     >
       内置指令
     </h3>
     <div class="flex flex-col gap-0.5">
       {#each categories as category}
+        {@const isActive = activeCategory?.id === category.id}
         <Button
-          variant={activeCategory?.id === category.id ? "secondary" : "ghost"}
+          variant={isActive ? "secondary" : "ghost"}
           size="sm"
-          class="h-8 w-full justify-start gap-2 px-2 text-xs font-medium"
+          class="h-8.5 w-full cursor-pointer justify-start gap-2 rounded-xl px-2.5 text-xs font-medium transition-[transform,background-color,color,box-shadow] duration-140 ease-[cubic-bezier(0.23,1,0.32,1)] outline-none active:scale-[0.97] {isActive
+            ? 'bg-card text-foreground border-border/50 border shadow-2xs'
+            : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
           onclick={() => onSelectCategory(category.id)}
         >
           {@const Icon = iconMap[category.id] || CommandIcon}
-          <Icon size={14} />
-          {category.name}
+          <Icon size={14} class="shrink-0" />
+          <span class="truncate">{category.name}</span>
         </Button>
       {/each}
     </div>
@@ -78,16 +81,19 @@
   {#if pluginNames.length > 0}
     <div class="flex flex-col gap-1">
       <h3
-        class="text-muted-foreground px-2 py-1 text-[10px] font-semibold tracking-wider uppercase"
+        class="text-muted-foreground px-2 py-1 text-[10px] font-semibold tracking-wider uppercase select-none"
       >
         插件指令
       </h3>
       <div class="flex flex-col gap-0.5">
         {#each pluginNames as pluginName}
+          {@const isActive = selectedPlugin === pluginName}
           <Button
-            variant={selectedPlugin === pluginName ? "secondary" : "ghost"}
+            variant={isActive ? "secondary" : "ghost"}
             size="sm"
-            class="h-8 w-full justify-start gap-2 truncate px-2 text-xs font-medium"
+            class="h-8.5 w-full cursor-pointer justify-start gap-2 rounded-xl px-2.5 text-xs font-medium transition-[transform,background-color,color,box-shadow] duration-140 ease-[cubic-bezier(0.23,1,0.32,1)] outline-none active:scale-[0.97] {isActive
+              ? 'bg-card text-foreground border-border/50 border shadow-2xs'
+              : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
             onclick={() => onSelectPlugin(pluginName)}
           >
             <PuzzlePiece size={14} class="shrink-0" />

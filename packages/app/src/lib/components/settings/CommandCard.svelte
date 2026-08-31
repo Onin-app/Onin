@@ -38,31 +38,31 @@
 </script>
 
 <Card
-  class="group/card hover:border-border flex flex-col gap-2 p-3 transition-all"
+  class="border-border/60 bg-card hover:border-border flex flex-col gap-2.5 rounded-2xl p-3.5 shadow-2xs transition-[border-color,box-shadow] duration-140 ease-[cubic-bezier(0.23,1,0.32,1)]"
 >
   <!-- 标题 -->
   <div class="flex items-center justify-between">
-    <h4 class="text-foreground text-sm font-semibold">
+    <h4 class="text-foreground text-sm font-semibold tracking-tight">
       {command.title}
     </h4>
   </div>
 
   <!-- 描述信息 -->
   {#if command.description}
-    <p class="text-muted-foreground text-xs">
+    <p class="text-muted-foreground/75 text-xs leading-normal">
       {command.description}
     </p>
   {/if}
 
   <!-- 匹配规则显示区域（function 模式下隐藏） -->
   {#if mode !== "function" && command.matches && command.matches.length > 0}
-    <div class="flex flex-col gap-1.5">
+    <div class="flex flex-col gap-1.5 pt-0.5">
       {#each command.matches as match}
         <div class="flex flex-wrap items-center gap-1.5 text-xs">
           <!-- 匹配类型标签 -->
           <Badge
             variant="secondary"
-            class="gap-1 px-2 py-0.5 text-[11px] font-medium"
+            class="border-border/40 gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium shadow-2xs"
           >
             {#if match.type === "text"}
               <svg
@@ -141,20 +141,20 @@
           <!-- 匹配规则详情 -->
           {#if match.regexp}
             <span
-              class="bg-muted text-muted-foreground rounded px-1.5 py-0.5 font-mono"
+              class="bg-muted/70 text-muted-foreground border-border/40 rounded-md border px-1.5 py-0.5 font-mono text-[11px]"
             >
               /{match.regexp}/
             </span>
           {/if}
 
           {#if match.extensions && match.extensions.length > 0}
-            <span class="text-muted-foreground">
+            <span class="text-muted-foreground text-xs">
               扩展名: {match.extensions.join(", ")}
             </span>
           {/if}
 
           {#if match.min != null || match.max != null}
-            <span class="text-muted-foreground">
+            <span class="text-muted-foreground text-xs">
               {#if match.type === "text"}
                 {#if match.min != null && match.max != null}
                   {match.min}-{match.max} 字符
@@ -175,7 +175,7 @@
 
           <!-- 匹配名称和描述 -->
           {#if match.description}
-            <span class="text-muted-foreground/70">
+            <span class="text-muted-foreground/60 text-xs">
               ({match.description})
             </span>
           {/if}
@@ -186,20 +186,22 @@
 
   <!-- 关键词列表（match 模式下隐藏） -->
   {#if mode !== "match"}
-    <div class="flex flex-wrap gap-1.5">
+    <div class="flex flex-wrap gap-1.5 pt-0.5">
       {#each command.keywords as keyword}
         <div
-          class="group/chip bg-muted/50 text-foreground relative inline-flex items-center rounded-md border px-2 py-0.5 text-sm font-medium transition-colors
-        {keyword.disabled ? 'line-through opacity-50' : 'hover:bg-muted'}"
+          class="group/chip bg-muted/60 text-foreground border-border/60 relative inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium shadow-2xs transition-[transform,background-color,border-color] duration-140 ease-[cubic-bezier(0.23,1,0.32,1)]
+        {keyword.disabled
+            ? 'line-through opacity-50'
+            : 'hover:bg-muted hover:border-border'}"
         >
           <!-- 关键词下拉菜单 -->
           <DropdownMenu>
             <DropdownMenuTrigger
-              class="cursor-pointer text-xs outline-none select-none"
+              class="cursor-pointer font-mono text-xs outline-none select-none"
             >
               {keyword.name}
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" class="w-32">
+            <DropdownMenuContent align="start" class="w-32 rounded-xl">
               <DropdownMenuItem onclick={() => onExecute(command.name)}>
                 执行指令
               </DropdownMenuItem>
@@ -214,7 +216,7 @@
           <!-- 删除按钮（仅非默认关键词显示） -->
           {#if !keyword.is_default}
             <button
-              class="text-muted-foreground hover:bg-destructive/10 hover:text-destructive -mr-0.5 ml-1 cursor-pointer rounded-full p-0.5 opacity-0 transition-all group-hover/chip:opacity-100"
+              class="text-muted-foreground hover:bg-destructive/15 hover:text-destructive -mr-0.5 ml-1 cursor-pointer rounded-md p-0.5 opacity-0 transition-[transform,opacity,color,background-color] duration-120 group-hover/chip:opacity-100 active:scale-90"
               aria-label="删除关键词"
               onclick={(e) => {
                 e.stopPropagation();
@@ -232,7 +234,7 @@
         <input
           type="text"
           placeholder="+ 添加"
-          class="border-input text-muted-foreground placeholder:text-muted-foreground/60 focus:border-ring focus:bg-background focus:text-foreground h-[26px] w-16 rounded-md border border-dashed bg-transparent px-2 text-xs transition-all focus:w-24 focus:border-solid focus:outline-none"
+          class="border-input text-muted-foreground placeholder:text-muted-foreground/60 focus:border-ring focus:bg-background focus:text-foreground h-[26px] w-16 rounded-lg border border-dashed bg-transparent px-2 font-mono text-xs transition-[width,border-color,background-color] duration-140 ease-[cubic-bezier(0.23,1,0.32,1)] focus:w-24 focus:border-solid focus:outline-none"
           onkeydown={(e) => {
             if (e.key === "Enter") {
               onAddKeyword(command.name, e.currentTarget.value);

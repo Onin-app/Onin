@@ -677,7 +677,7 @@
   role="presentation"
 >
   <main
-    class="border-border/60 bg-background text-foreground flex h-full w-full flex-col overflow-hidden rounded-2xl border p-3 shadow-2xl backdrop-blur-xl"
+    class="border-border/70 bg-background/95 text-foreground flex h-full w-full flex-col overflow-hidden rounded-2xl border p-3.5 shadow-2xl ring-1 ring-white/10 backdrop-blur-2xl dark:ring-white/5"
     data-tauri-drag-region
   >
     <div
@@ -687,17 +687,17 @@
       onkeydown={handleNavigationKeyDown}
     >
       <!-- Header: Logo + Search Input + Plugin Menu -->
-      <div class="border-border/40 flex items-center gap-2 border-b pb-2">
-        <TooltipProvider delayDuration={1000}>
+      <div class="border-border/40 flex items-center gap-2.5 border-b pb-2.5">
+        <TooltipProvider delayDuration={400}>
           <Tooltip>
             <TooltipTrigger
-              class="relative flex-shrink-0 cursor-pointer transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-108 hover:rotate-6 active:scale-95"
+              class="relative flex-shrink-0 cursor-pointer transition-transform duration-160 ease-[cubic-bezier(0.23,1,0.32,1)] outline-none hover:scale-105 active:scale-95"
               onclick={handleToSettings}
               aria-label="打开设置"
             >
               <img
                 src="/logo.png"
-                class="h-9 w-9 filter transition-all duration-300 hover:drop-shadow-[0_0_8px_rgba(99,102,241,0.55)] dark:hover:drop-shadow-[0_0_10px_rgba(165,180,252,0.6)]"
+                class="h-9 w-9 filter transition-[filter,transform] duration-160 hover:drop-shadow-[0_0_8px_rgba(99,102,241,0.55)] dark:hover:drop-shadow-[0_0_10px_rgba(165,180,252,0.6)]"
                 alt="Onin logo"
               />
               {#if $hasNewVersion}
@@ -707,7 +707,7 @@
                     class="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-400 opacity-75"
                   ></span>
                   <span
-                    class="relative inline-flex h-2.5 w-2.5 rounded-full bg-violet-500"
+                    class="relative inline-flex h-2.5 w-2.5 rounded-full bg-violet-500 shadow-xs"
                   ></span>
                 </span>
               {/if}
@@ -766,7 +766,7 @@
       </div>
 
       <!-- Content Area -->
-      <div class="relative flex-1 overflow-hidden pt-1.5">
+      <div class="relative flex-1 overflow-hidden pt-2">
         <RefreshProgressBar isRefreshing={appListManager.state.isRefreshing} />
 
         {#if plugin.state.showPluginInline}
@@ -780,13 +780,51 @@
               // No-op for now, logic potentially moved to component or manager
             }}
           />
+        {:else if displayList.length === 0}
+          <!-- Empty State -->
+          <div
+            class="flex h-full flex-col items-center justify-center py-10 text-center select-none"
+          >
+            <div
+              class="bg-muted/40 border-border/50 text-muted-foreground/50 mb-3 flex h-11 w-11 items-center justify-center rounded-2xl border shadow-2xs"
+            >
+              <svg
+                class="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.5"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+            </div>
+            <p class="text-foreground/85 text-xs font-medium tracking-tight">
+              未找到匹配的结果
+            </p>
+            <p
+              class="text-muted-foreground/60 mt-1 max-w-xs text-[11px] leading-normal"
+            >
+              {#if inputValue}
+                换个关键词搜索，或按 <kbd
+                  class="border-border bg-muted text-foreground/80 shadow-kbd rounded border px-1 py-0.5 font-mono text-[9px]"
+                  >Esc</kbd
+                > 清空
+              {:else}
+                请输入应用名、拼音缩写或粘贴内容
+              {/if}
+            </p>
+          </div>
         {:else}
           <!-- App List -->
           <ScrollArea
             class="h-full w-full"
-            viewportClass="h-full w-full overflow-x-hidden pr-1"
+            viewportClass="h-full w-full overflow-x-hidden pr-1.5"
           >
-            <div class="app-list flex flex-col gap-0.5 overflow-hidden">
+            <div class="app-list flex flex-col gap-1 overflow-hidden py-1">
               {#each displayList as app, index ((app.action || "") + app.path + app.name + index)}
                 {#if app.path.startsWith("extension:")}
                   <!-- Extension 预览项（如计算器结果） -->
@@ -812,6 +850,58 @@
           </ScrollArea>
         {/if}
       </div>
+
+      <!-- Footer: Raycast-style Action Hints -->
+      {#if !plugin.state.showPluginInline}
+        {@const currentSelectedItem =
+          displayList[appListManager.state.selectedIndex]}
+        <footer
+          class="border-border/40 mt-1 flex items-center justify-between border-t pt-2 pb-0.5 text-xs select-none"
+        >
+          <!-- 左侧：当前选中项信息 -->
+          <div
+            class="text-muted-foreground/60 flex min-w-0 items-center gap-1.5 text-[11px]"
+          >
+            {#if currentSelectedItem}
+              <span
+                class="text-foreground/75 max-w-[160px] truncate font-medium"
+                >{currentSelectedItem.name}</span
+              >
+              <span class="text-muted-foreground/30">•</span>
+              <span class="text-muted-foreground/50"
+                >{currentSelectedItem.source_display ||
+                  (currentSelectedItem.source === "Internal"
+                    ? "内置"
+                    : currentSelectedItem.source)}</span
+              >
+            {:else}
+              <span class="text-muted-foreground/50">Onin Launcher</span>
+            {/if}
+          </div>
+
+          <!-- 右侧：快捷键实体键帽提示 -->
+          <div class="flex shrink-0 items-center gap-2.5">
+            <div
+              class="text-muted-foreground/60 flex items-center gap-1 text-[11px]"
+            >
+              <kbd
+                class="border-border/80 bg-muted text-foreground/80 shadow-kbd inline-flex h-4.5 min-w-[18px] items-center justify-center rounded border px-1 font-mono text-[10px] font-semibold"
+                >↵</kbd
+              >
+              <span class="text-[10.5px]">打开</span>
+            </div>
+            <div
+              class="text-muted-foreground/60 flex items-center gap-1 text-[11px]"
+            >
+              <kbd
+                class="border-border/80 bg-muted text-foreground/80 shadow-kbd inline-flex h-4.5 min-w-[18px] items-center justify-center rounded border px-1 font-mono text-[10px] font-semibold"
+                >Esc</kbd
+              >
+              <span class="text-[10.5px]">关闭</span>
+            </div>
+          </div>
+        </footer>
+      {/if}
     </div>
   </main>
 </div>

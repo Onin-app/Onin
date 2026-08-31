@@ -54,7 +54,7 @@
 
 <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
 <Card
-  class="group hover:border-border flex cursor-pointer flex-col p-3 transition-all hover:shadow-sm"
+  class="group border-border/60 bg-card hover:border-border flex cursor-pointer flex-col rounded-2xl p-3.5 shadow-2xs transition-[border-color,box-shadow,transform] duration-140 ease-[cubic-bezier(0.23,1,0.32,1)] hover:shadow-xs active:scale-[0.99]"
   onclick={() => onViewDetail(plugin.id)}
   role="button"
   tabindex={0}
@@ -69,20 +69,20 @@
   <div class="mb-2 flex items-start gap-3">
     <!-- 左侧图标 -->
     <button
-      class="bg-muted text-muted-foreground relative flex h-14 w-14 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-transform hover:scale-105"
+      class="bg-muted/60 text-muted-foreground border-border/50 relative flex h-13 w-13 shrink-0 cursor-pointer items-center justify-center rounded-xl border shadow-xs transition-transform duration-140 hover:scale-105 active:scale-95"
       onclick={(e: MouseEvent) => {
         e.stopPropagation();
         onExecute(plugin.id);
       }}
     >
       {#await getPluginIconUrl(plugin)}
-        <PuzzlePiece class="h-7 w-7 animate-pulse" />
+        <PuzzlePiece class="h-6 w-6 animate-pulse" />
       {:then iconUrl}
         {#if iconUrl && !imageErrors.has(plugin.id)}
           <img
             src={iconUrl}
             alt={plugin.name}
-            class="h-10 w-10 rounded object-contain"
+            class="h-9 w-9 rounded-md object-contain"
             onerror={() => {
               console.error(
                 "Failed to load icon:",
@@ -94,16 +94,16 @@
             }}
           />
         {:else}
-          <PuzzlePiece class="h-7 w-7" />
+          <PuzzlePiece class="h-6 w-6" />
         {/if}
       {:catch}
-        <PuzzlePiece class="h-7 w-7" />
+        <PuzzlePiece class="h-6 w-6" />
       {/await}
 
       <!-- 来源标识 -->
       {#if plugin.install_source === "local"}
         <Badge
-          class="absolute -top-1 -right-1 px-1 py-0 text-[9px] font-medium"
+          class="absolute -top-1 -right-1 rounded-md px-1 py-0 text-[9px] font-medium shadow-xs"
         >
           本地
         </Badge>
@@ -115,12 +115,13 @@
       <div class="mb-1 flex items-start justify-between gap-2">
         <div class="flex min-w-0 items-baseline gap-2">
           <h3
-            class="text-foreground truncate text-sm leading-tight font-semibold"
+            class="text-foreground truncate text-sm leading-tight font-semibold tracking-tight"
           >
             {plugin.name}
           </h3>
           {#if isValidPluginVersion(plugin.version)}
-            <span class="text-muted-foreground shrink-0 text-xs"
+            <span
+              class="text-muted-foreground/60 shrink-0 font-mono text-[11px]"
               >{formatPluginVersion(plugin.version)}</span
             >
           {/if}
@@ -128,7 +129,7 @@
         <Button
           variant="ghost"
           size="icon"
-          class="h-6 w-6 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+          class="text-muted-foreground hover:text-foreground h-6 w-6 shrink-0 opacity-0 transition-opacity duration-120 group-hover:opacity-100"
           onclick={(e: MouseEvent) => {
             e.stopPropagation();
           }}
@@ -137,7 +138,7 @@
           <GithubLogo class="h-3.5 w-3.5" />
         </Button>
       </div>
-      <p class="text-muted-foreground line-clamp-1 text-xs">
+      <p class="text-muted-foreground/75 line-clamp-1 text-xs leading-normal">
         {plugin.description}
       </p>
     </div>
@@ -145,16 +146,18 @@
 
   <!-- 作者和 ID -->
   <div
-    class="text-muted-foreground/70 mb-2 flex items-center justify-between gap-2 text-xs"
+    class="text-muted-foreground/60 mb-2.5 flex items-center justify-between gap-2 text-xs"
   >
     {#if plugin.author}
-      <span class="truncate">{plugin.author}</span>
+      <span class="truncate text-[11.5px]">{plugin.author}</span>
     {/if}
     <span class="shrink-0 font-mono text-[10px]">ID: {plugin.id}</span>
   </div>
 
   <!-- 底部：操作按钮 -->
-  <div class="border-border/50 flex items-center justify-between border-t pt-2">
+  <div
+    class="border-border/40 flex items-center justify-between border-t pt-2.5"
+  >
     <div></div>
 
     <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -176,14 +179,14 @@
         <Button
           variant="ghost"
           size="icon"
-          class="text-muted-foreground hover:text-foreground h-7 w-7"
+          class="text-muted-foreground hover:text-foreground h-7 w-7 rounded-lg transition-transform duration-120 active:scale-90"
           onclick={(e: MouseEvent) => {
             e.stopPropagation();
             onSettings(plugin);
           }}
           aria-label="插件设置"
         >
-          <Gear class="h-4 w-4" />
+          <Gear class="h-3.5 w-3.5" />
         </Button>
       {/if}
 
@@ -193,27 +196,31 @@
           <Button
             variant="ghost"
             size="icon"
-            class="text-muted-foreground hover:text-destructive h-7 w-7"
+            class="text-muted-foreground hover:text-destructive h-7 w-7 rounded-lg transition-transform duration-120 active:scale-90"
             aria-label="卸载插件"
           >
-            <Trash class="h-4 w-4" />
+            <Trash class="h-3.5 w-3.5" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent class="w-64">
+        <PopoverContent class="w-64 rounded-2xl p-4 shadow-xl">
           <div class="mb-3 flex items-center gap-2 text-sm font-medium">
             <WarningCircle size={18} class="text-destructive shrink-0" />
             <span>确认卸载插件 {plugin.name}？</span>
           </div>
           <div class="flex justify-end gap-2">
             <PopoverClose>
-              <Button variant="outline" size="sm" class="h-7 text-xs">
+              <Button
+                variant="outline"
+                size="sm"
+                class="h-7 rounded-lg text-xs"
+              >
                 取消
               </Button>
             </PopoverClose>
             <Button
               variant="destructive"
               size="sm"
-              class="h-7 text-xs"
+              class="h-7 rounded-lg text-xs"
               onclick={(e: MouseEvent) => {
                 e.stopPropagation();
                 onUninstall(plugin.id);
