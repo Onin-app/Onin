@@ -624,7 +624,7 @@
                         class="flex rounded-lg border border-neutral-200/40 bg-neutral-100 p-0.5 dark:border-neutral-800/40 dark:bg-neutral-950/40"
                       >
                         <button
-                          class="flex-1 rounded-md py-1 text-center text-[10px] font-semibold transition-all {recordTargetType ===
+                          class="flex-1 cursor-pointer rounded-md py-1 text-center text-[10px] font-semibold transition-[background-color,color,box-shadow,transform] duration-120 ease-out active:scale-95 {recordTargetType ===
                           'screen'
                             ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
                             : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
@@ -633,7 +633,7 @@
                           屏幕录制
                         </button>
                         <button
-                          class="flex-1 rounded-md py-1 text-center text-[10px] font-semibold transition-all {recordTargetType ===
+                          class="flex-1 cursor-pointer rounded-md py-1 text-center text-[10px] font-semibold transition-[background-color,color,box-shadow,transform] duration-120 ease-out active:scale-95 {recordTargetType ===
                           'window'
                             ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
                             : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"
@@ -645,7 +645,7 @@
                           窗口录制
                         </button>
                         <button
-                          class="flex-1 rounded-md py-1 text-center text-[10px] font-semibold transition-all {recordTargetType ===
+                          class="flex-1 cursor-pointer rounded-md py-1 text-center text-[10px] font-semibold transition-[background-color,color,box-shadow,transform] duration-120 ease-out active:scale-95 {recordTargetType ===
                           'area'
                             ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-800 dark:text-white'
                             : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}"

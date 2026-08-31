@@ -45,7 +45,7 @@
       {#each thumbs as thumb}
         <SliderPrimitive.Thumb
           index={thumb}
-          class="border-primary/50 bg-background focus-visible:ring-ring block h-4 w-4 rounded-full border shadow transition-colors focus-visible:ring-1 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
+          class="border-primary/50 bg-background focus-visible:ring-ring block h-4 w-4 cursor-grab rounded-full border shadow transition-[transform,colors,box-shadow] duration-100 ease-out hover:scale-110 focus-visible:ring-1 focus-visible:outline-none active:scale-120 active:cursor-grabbing disabled:pointer-events-none disabled:opacity-50"
         />
       {/each}
     {/snippet}
@@ -70,7 +70,7 @@
       {#each thumbs as thumb}
         <SliderPrimitive.Thumb
           index={thumb}
-          class="border-primary/50 bg-background focus-visible:ring-ring block h-4 w-4 rounded-full border shadow transition-colors focus-visible:ring-1 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
+          class="border-primary/50 bg-background focus-visible:ring-ring block h-4 w-4 cursor-grab rounded-full border shadow transition-[transform,colors,box-shadow] duration-100 ease-out hover:scale-110 focus-visible:ring-1 focus-visible:outline-none active:scale-120 active:cursor-grabbing disabled:pointer-events-none disabled:opacity-50"
         />
       {/each}
     {/snippet}

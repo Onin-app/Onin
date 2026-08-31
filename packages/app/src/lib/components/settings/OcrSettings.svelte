@@ -238,7 +238,7 @@
           onValueChange={handleEngineChange}
         >
           <SelectTrigger
-            class="border-input bg-background text-foreground focus:ring-ring mt-2 h-10 w-full cursor-pointer rounded-xl border text-xs transition-all focus:ring-1 focus:outline-none"
+            class="border-input bg-background text-foreground focus:ring-ring mt-2 h-10 w-full cursor-pointer rounded-xl border text-xs transition-[border-color,box-shadow,transform] duration-120 ease-out focus:ring-1 focus:outline-none active:scale-[0.99]"
           >
             <span class="truncate">
               {engineOptions.find(
@@ -288,7 +288,7 @@
               onValueChange={handleProviderChange}
             >
               <SelectTrigger
-                class="border-input bg-background text-foreground focus:ring-ring h-10 w-full cursor-pointer rounded-xl border text-xs transition-all focus:ring-1 focus:outline-none"
+                class="border-input bg-background text-foreground focus:ring-ring h-10 w-full cursor-pointer rounded-xl border text-xs transition-[border-color,box-shadow,transform] duration-120 ease-out focus:ring-1 focus:outline-none active:scale-[0.99]"
               >
                 <span class="truncate">
                   {providerOptions.find(
@@ -326,7 +326,7 @@
               onValueChange={handleModelChange}
             >
               <SelectTrigger
-                class="border-input bg-background text-foreground focus:ring-ring h-10 w-full cursor-pointer rounded-xl border text-xs transition-all focus:ring-1 focus:outline-none"
+                class="border-input bg-background text-foreground focus:ring-ring h-10 w-full cursor-pointer rounded-xl border text-xs transition-[border-color,box-shadow,transform] duration-120 ease-out focus:ring-1 focus:outline-none active:scale-[0.99]"
               >
                 <span class="truncate">
                   {modelOptions.find(

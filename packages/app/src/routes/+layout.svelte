@@ -22,6 +22,8 @@
   import WindowResizer from "$lib/components/WindowResizer.svelte";
   import UpdateDialog from "$lib/components/UpdateDialog.svelte";
   import type { AppConfig } from "$lib/type";
+  import { Theme } from "$lib/type";
+  import { theme, getTheme } from "$lib/utils/theme";
   import {
     updateDialogOpen,
     appVersion,
@@ -345,7 +347,12 @@
 {/if}
 
 <WindowResizer />
-<Toaster richColors position="top-center" />
+<Toaster
+  richColors
+  position="top-center"
+  theme={getTheme($theme) === Theme.DARK ? "dark" : "light"}
+  expand={true}
+/>
 
 <UpdateDialog
   bind:open={$updateDialogOpen}

@@ -148,7 +148,7 @@
 
 <div class="flex items-center">
   <button
-    class="flex h-10 w-10 items-center justify-center rounded-lg text-neutral-500 transition-all hover:bg-neutral-200 hover:text-neutral-900 active:scale-95 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-100"
+    class="flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg text-neutral-500 transition-[transform,background-color,color] duration-120 ease-out select-none hover:bg-neutral-200 hover:text-neutral-900 active:scale-95 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-100"
     onclick={showNativeMenu}
     aria-label="插件菜单"
   >

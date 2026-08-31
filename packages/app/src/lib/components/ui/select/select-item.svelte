@@ -14,7 +14,7 @@
 <SelectPrimitive.Item
   bind:ref
   class={cn(
-    "data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground relative flex w-full cursor-pointer items-center rounded-sm py-1.5 pr-8 pl-2 text-sm outline-none select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+    "data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground relative flex w-full cursor-pointer items-center rounded-sm py-1.5 pr-8 pl-2 text-sm transition-[transform,background-color,color] duration-100 ease-out outline-none select-none active:scale-[0.98] data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
     className,
   )}
   {...restProps}

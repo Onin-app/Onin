@@ -13,7 +13,7 @@
 <DropdownMenuPrimitive.Item
   bind:ref
   class={cn(
-    "data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground relative flex cursor-pointer items-center rounded-sm px-2 py-1.5 text-xs transition-colors outline-none select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+    "data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground relative flex cursor-pointer items-center rounded-sm px-2 py-1.5 text-xs transition-[transform,background-color,color] duration-100 ease-out outline-none select-none active:scale-[0.98] data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
     className,
   )}
   {...restProps}

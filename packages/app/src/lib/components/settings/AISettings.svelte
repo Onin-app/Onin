@@ -1024,7 +1024,7 @@
         {:else}
           <!-- Edit Form -->
           <div
-            class="border-border/60 bg-card overflow-hidden rounded-2xl border shadow-2xs transition-all"
+            class="border-border/60 bg-card overflow-hidden rounded-2xl border shadow-2xs transition-[border-color,box-shadow] duration-140 ease-out"
           >
             <!-- Header with name -->
             <div
@@ -1095,7 +1095,7 @@
                         id="provider-type"
                         oninput={(e) =>
                           (providerSearch = e.currentTarget.value)}
-                        class="border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring h-10 w-full rounded-xl border px-3 text-sm font-medium transition-all focus:ring-1 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                        class="border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring h-10 w-full rounded-xl border px-3 text-sm font-medium transition-[border-color,box-shadow] duration-120 ease-out focus:ring-1 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                         placeholder="选择提供商"
                       />
                       <Combobox.Trigger
@@ -1107,7 +1107,7 @@
 
                     <Combobox.Portal>
                       <Combobox.Content
-                        class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 bg-popover text-popover-foreground border-border/60 z-50 max-h-64 w-[var(--bits-combobox-anchor-width)] overflow-hidden rounded-xl border shadow-xl"
+                        class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:data-[state=open]:slide-in-from-top-2 data-[side=bottom]:data-[state=closed]:slide-out-to-top-2 data-[side=top]:data-[state=open]:slide-in-from-bottom-2 data-[side=top]:data-[state=closed]:slide-out-to-bottom-2 bg-popover text-popover-foreground border-border/60 z-50 max-h-64 w-[var(--bits-combobox-anchor-width)] origin-[var(--bits-floating-transform-origin,center)] overflow-hidden rounded-xl border shadow-xl duration-140 ease-[cubic-bezier(0.23,1,0.32,1)]"
                       >
                         <Combobox.ScrollUpButton
                           class="text-muted-foreground flex w-full items-center justify-center py-1"
@@ -1176,7 +1176,7 @@
                       type="text"
                       bind:value={editForm.name}
                       placeholder="如「DeepSeek」、「OpenAI」"
-                      class="border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring h-10 w-full rounded-xl border px-3 text-sm transition-all focus:ring-1 focus:outline-none"
+                      class="border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring h-10 w-full rounded-xl border px-3 text-sm transition-[border-color,box-shadow] duration-120 ease-out focus:ring-1 focus:outline-none"
                     />
                   </div>
 
@@ -1192,7 +1192,7 @@
                       type="text"
                       bind:value={editForm.display_name}
                       placeholder="区分多个账号, 如「工作账号」"
-                      class="border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring h-10 w-full rounded-xl border px-3 text-sm transition-all focus:ring-1 focus:outline-none"
+                      class="border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring h-10 w-full rounded-xl border px-3 text-sm transition-[border-color,box-shadow] duration-120 ease-out focus:ring-1 focus:outline-none"
                     />
                   </div>
                 </div>
@@ -1253,7 +1253,7 @@
                       type="text"
                       bind:value={editForm.base_url}
                       placeholder="https://..."
-                      class="border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring h-10 w-full rounded-xl border px-3 text-sm transition-all focus:ring-1 focus:outline-none"
+                      class="border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring h-10 w-full rounded-xl border px-3 text-sm transition-[border-color,box-shadow] duration-120 ease-out focus:ring-1 focus:outline-none"
                     />
                   {/if}
                 </div>
@@ -1305,7 +1305,7 @@
                               editForm.default_model = e.currentTarget.value;
                             }
                           }}
-                          class="border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring h-10 w-full rounded-xl border px-3 text-sm font-medium transition-all focus:ring-1 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                          class="border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring h-10 w-full rounded-xl border px-3 text-sm font-medium transition-[border-color,box-shadow] duration-120 ease-out focus:ring-1 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                           placeholder="选择或输入模型"
                         />
                         <Combobox.Trigger
@@ -1317,7 +1317,7 @@
 
                       <Combobox.Portal>
                         <Combobox.Content
-                          class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 bg-popover text-popover-foreground border-border/60 z-50 max-h-64 w-[var(--bits-combobox-anchor-width)] overflow-hidden rounded-xl border shadow-xl"
+                          class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:data-[state=open]:slide-in-from-top-2 data-[side=bottom]:data-[state=closed]:slide-out-to-top-2 data-[side=top]:data-[state=open]:slide-in-from-bottom-2 data-[side=top]:data-[state=closed]:slide-out-to-bottom-2 bg-popover text-popover-foreground border-border/60 z-50 max-h-64 w-[var(--bits-combobox-anchor-width)] origin-[var(--bits-floating-transform-origin,center)] overflow-hidden rounded-xl border shadow-xl duration-140 ease-[cubic-bezier(0.23,1,0.32,1)]"
                         >
                           <Combobox.ScrollUpButton
                             class="text-muted-foreground flex w-full items-center justify-center py-1"
@@ -1394,7 +1394,7 @@
                   {:else}
                     <input
                       id="default-model-input"
-                      class="border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring h-10 w-full rounded-xl border px-3 text-sm transition-all focus:ring-1 focus:outline-none"
+                      class="border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring h-10 w-full rounded-xl border px-3 text-sm transition-[border-color,box-shadow] duration-120 ease-out focus:ring-1 focus:outline-none"
                       bind:value={editForm.default_model}
                       placeholder="例如 gpt-4o"
                     />
