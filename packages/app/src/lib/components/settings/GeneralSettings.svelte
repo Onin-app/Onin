@@ -232,7 +232,7 @@
     <!-- 主题设置 -->
     <section class="mb-6">
       <h2
-        class="text-muted-foreground mb-3 px-1 text-xs font-semibold tracking-wider uppercase"
+        class="text-foreground/80 mb-3 px-1 text-xs font-semibold tracking-wider uppercase"
       >
         主题设置
       </h2>
@@ -279,7 +279,7 @@
     <!-- 系统设置 -->
     <section class="mb-6">
       <h2
-        class="text-muted-foreground mb-3 px-1 text-xs font-semibold tracking-wider uppercase"
+        class="text-foreground/80 mb-3 px-1 text-xs font-semibold tracking-wider uppercase"
       >
         系统设置
       </h2>
@@ -335,7 +335,7 @@
     <!-- 剪贴板设置 -->
     <section class="mb-6">
       <h2
-        class="text-muted-foreground mb-3 px-1 text-xs font-semibold tracking-wider uppercase"
+        class="text-foreground/80 mb-3 px-1 text-xs font-semibold tracking-wider uppercase"
       >
         剪贴板设置
       </h2>
@@ -396,7 +396,7 @@
     <!-- 指令排序 -->
     <section class="mb-6">
       <h2
-        class="text-muted-foreground mb-3 px-1 text-xs font-semibold tracking-wider uppercase"
+        class="text-foreground/80 mb-3 px-1 text-xs font-semibold tracking-wider uppercase"
       >
         指令排序
       </h2>
@@ -450,7 +450,7 @@
     <!-- 插件市场 -->
     <section class="mb-6">
       <h2
-        class="text-muted-foreground mb-3 px-1 text-xs font-semibold tracking-wider uppercase"
+        class="text-foreground/80 mb-3 px-1 text-xs font-semibold tracking-wider uppercase"
       >
         插件市场
       </h2>
@@ -472,7 +472,7 @@
     <!-- 数据存储 -->
     <section class="mb-6">
       <h2
-        class="text-muted-foreground mb-3 px-1 text-xs font-semibold tracking-wider uppercase"
+        class="text-foreground/80 mb-3 px-1 text-xs font-semibold tracking-wider uppercase"
       >
         数据存储
       </h2>
@@ -495,7 +495,7 @@
     <!-- 关于 -->
     <section class="mb-6">
       <h2
-        class="text-muted-foreground mb-3 px-1 text-xs font-semibold tracking-wider uppercase"
+        class="text-foreground/80 mb-3 px-1 text-xs font-semibold tracking-wider uppercase"
       >
         关于
       </h2>

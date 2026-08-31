@@ -240,6 +240,20 @@ fn setup_desktop_features(app: &mut App) -> Result<(), Box<dyn std::error::Error
         eprintln!("[ERROR] Failed to set up window events: {}", e);
     }
 
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(window) = app.get_webview_window("main") {
+            if let Err(err) = window_vibrancy::apply_blur(&window, Some((0, 0, 0, 0))) {
+                eprintln!(
+                    "[window_manager] 无法为主窗口启用 Windows 背景模糊: {:?}",
+                    err
+                );
+            } else {
+                println!("[window_manager] 成功为主窗口启用了 Windows 背景模糊");
+            }
+        }
+    }
+
     #[cfg(target_os = "macos")]
     if let Err(e) = app
         .handle()
@@ -257,6 +271,12 @@ fn setup_desktop_features(app: &mut App) -> Result<(), Box<dyn std::error::Error
                 } else {
                     println!("[window_manager] 成功为主窗口启用了原生阴影");
                 }
+                let _ = window_vibrancy::apply_vibrancy(
+                    &window,
+                    window_vibrancy::NSVisualEffectMaterial::UnderWindowBackground,
+                    None,
+                    None,
+                );
             }
             None => {
                 eprintln!("[window_manager] 错误: 找不到主窗口 \"main\"，无法启用原生阴影");

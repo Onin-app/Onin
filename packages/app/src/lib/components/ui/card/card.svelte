@@ -11,7 +11,7 @@
 
 <div
   class={cn(
-    "bg-card text-card-foreground rounded-xl border shadow-xs",
+    "bg-card text-card-foreground rounded-xl border shadow-xs transition-colors duration-150",
     className,
   )}
   {...restProps}

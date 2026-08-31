@@ -4267,6 +4267,7 @@ dependencies = [
  "walkdir",
  "whoami",
  "widestring 0.5.1",
+ "window-vibrancy",
  "windows 0.57.0",
  "windows-capture",
  "winreg 0.55.0",

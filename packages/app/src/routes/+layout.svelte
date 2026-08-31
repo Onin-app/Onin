@@ -329,7 +329,8 @@
 
   const isOverlayRoute = $derived(
     page.route.id?.includes("color-picker-overlay") ||
-      page.route.id?.includes("screen-recorder") ||
+      page.route.id?.includes("screen-recorder-area") ||
+      page.route.id?.includes("screen-recorder-bar") ||
       page.route.id?.includes("screenshot-selection") ||
       page.route.id?.includes("toast-overlay"),
   );
@@ -338,10 +339,7 @@
 {#if isOverlayRoute}
   {@render children()}
 {:else}
-  <div
-    class="h-full w-full"
-    style="opacity: var(--window-opacity, 1); transition: opacity 0.15s ease-out;"
-  >
+  <div class="h-full w-full">
     {@render children()}
   </div>
 {/if}
