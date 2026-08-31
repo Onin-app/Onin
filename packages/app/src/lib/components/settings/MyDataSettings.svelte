@@ -465,25 +465,27 @@
 
 <div class="flex h-full w-full flex-col gap-4 overflow-hidden pr-2">
   <!-- 顶部路径卡片 -->
-  <div
-    class="flex items-center justify-between gap-4 rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
+  <Card
+    class="border-border/60 bg-card flex items-center justify-between gap-4 rounded-2xl p-4 shadow-2xs"
   >
-    <div class="flex flex-col gap-1 overflow-hidden">
+    <div class="flex min-w-0 flex-1 flex-col gap-1 overflow-hidden">
       <span
-        class="text-xs font-semibold text-neutral-400 uppercase dark:text-neutral-500"
+        class="text-muted-foreground text-xs font-semibold tracking-wider uppercase"
       >
         本地数据存储路径
       </span>
       <span
-        class="truncate font-mono text-xs text-neutral-600 dark:text-neutral-300"
+        class="text-foreground/90 truncate font-mono text-xs"
         title={dataDirPath}
       >
         {dataDirPath}
       </span>
     </div>
-    <div class="flex gap-2">
+    <div class="flex shrink-0 gap-2">
       <Button
-        class="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 text-xs font-medium text-neutral-900 shadow-xs transition-colors hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200 dark:hover:bg-neutral-800"
+        variant="outline"
+        size="sm"
+        class="h-8 cursor-pointer gap-1.5 rounded-xl text-xs font-medium transition-[transform,background-color] duration-120 active:scale-95"
         onclick={loadDataInfo}
         disabled={loadingList}
       >
@@ -491,20 +493,22 @@
         刷新
       </Button>
       <Button
-        class="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-neutral-900 px-3 text-xs font-medium text-white shadow-xs transition-colors hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-950 dark:hover:bg-neutral-200"
+        variant="default"
+        size="sm"
+        class="h-8 cursor-pointer gap-1.5 rounded-xl text-xs font-medium transition-[transform,background-color] duration-120 active:scale-95"
         onclick={handleOpenDataDir}
       >
         <FolderOpen size={14} />
         打开文件夹
       </Button>
     </div>
-  </div>
+  </Card>
 
   <!-- 双栏展示区 -->
   <div class="flex flex-1 gap-4 overflow-hidden">
     <!-- 左侧列表 -->
     <div
-      class="flex w-60 flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900"
+      class="border-border/60 bg-card flex w-60 flex-col overflow-hidden rounded-2xl border shadow-2xs"
     >
       <ScrollArea
         class="h-full w-full"
@@ -512,7 +516,7 @@
       >
         {#if loadingList}
           <div
-            class="flex flex-1 items-center justify-center py-8 text-xs text-neutral-400"
+            class="text-muted-foreground flex flex-1 items-center justify-center py-8 text-xs"
           >
             加载列表中...
           </div>
@@ -521,22 +525,22 @@
           {#if mainFiles.length > 0}
             <div class="flex flex-col gap-1">
               <div
-                class="flex items-center gap-1.5 px-2 py-1 text-[11px] font-semibold tracking-wider text-neutral-400 uppercase dark:text-neutral-500"
+                class="text-muted-foreground flex items-center gap-1.5 px-2 py-1 text-[11px] font-semibold tracking-wider uppercase"
               >
                 <Cpu size={12} />
                 核心配置
               </div>
-              {#each mainFiles as file}
+              {#each mainFiles as file (file.id)}
+                {@const isActive = selectedFile?.id === file.id}
                 <button
-                  class="flex w-full flex-col gap-1 rounded-lg px-2.5 py-1.5 text-left transition-colors {selectedFile?.id ===
-                  file.id
-                    ? 'bg-neutral-100 text-neutral-950 dark:bg-neutral-800 dark:text-white'
-                    : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white'}"
+                  class="flex w-full cursor-pointer flex-col gap-1 rounded-xl px-2.5 py-1.5 text-left transition-[transform,background-color,color] duration-120 active:scale-[0.98] {isActive
+                    ? 'bg-muted text-foreground border-border/50 border font-medium shadow-2xs'
+                    : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'}"
                   onclick={() => handleSelectFile(file)}
                 >
                   <span class="truncate text-xs font-medium">{file.name}</span>
                   <div
-                    class="flex w-full items-center justify-between text-[9px] text-neutral-400 dark:text-neutral-500"
+                    class="text-muted-foreground/75 flex w-full items-center justify-between text-[9px]"
                   >
                     <span
                       class="max-w-[110px] truncate font-mono"
@@ -556,23 +560,23 @@
           {#if groupedExtensions.length > 0}
             <div class="flex flex-col gap-1.5">
               <div
-                class="flex items-center gap-1.5 px-2 py-1 text-[11px] font-semibold tracking-wider text-neutral-400 uppercase dark:text-neutral-500"
+                class="text-muted-foreground flex items-center gap-1.5 px-2 py-1 text-[11px] font-semibold tracking-wider uppercase"
               >
                 <PuzzlePiece size={12} />
                 扩展数据
               </div>
-              {#each groupedExtensions as group}
+              {#each groupedExtensions as group (group.entityId)}
                 {@const isExpanded = !!expandedExtensions[group.entityId]}
                 {@const hasActiveFile = group.files.some(
                   (f) => selectedFile?.id === f.id,
                 )}
                 <div
-                  class="flex flex-col gap-0.5 overflow-hidden rounded-lg border border-neutral-100 bg-neutral-50/20 dark:border-neutral-800/40 dark:bg-neutral-950/10"
+                  class="border-border/40 bg-muted/20 flex flex-col gap-0.5 overflow-hidden rounded-xl border"
                 >
                   <button
-                    class="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-semibold transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800/40 {hasActiveFile
-                      ? 'bg-neutral-50/50 text-neutral-950 dark:bg-neutral-800/20 dark:text-white'
-                      : 'text-neutral-600 dark:text-neutral-400'}"
+                    class="hover:bg-muted/50 flex w-full cursor-pointer items-center justify-between px-3 py-2 text-left text-xs font-semibold transition-[background-color,color] duration-120 {hasActiveFile
+                      ? 'bg-muted/60 text-foreground'
+                      : 'text-muted-foreground'}"
                     onclick={() => toggleExtensionExpand(group.entityId)}
                   >
                     <div
@@ -581,14 +585,14 @@
                       <span class="truncate">{group.entityName}</span>
                       {#if group.entityId !== group.entityName}
                         <span
-                          class="truncate font-mono text-[9px] font-normal text-neutral-400 dark:text-neutral-500"
+                          class="text-muted-foreground/70 truncate font-mono text-[9px] font-normal"
                         >
                           ID: {group.entityId}
                         </span>
                       {/if}
                     </div>
                     <span
-                      class="text-neutral-400 transition-transform duration-200 dark:text-neutral-600 {isExpanded
+                      class="text-muted-foreground transition-transform duration-140 ease-[cubic-bezier(0.23,1,0.32,1)] {isExpanded
                         ? 'rotate-90'
                         : ''}"
                     >
@@ -597,21 +601,21 @@
                   </button>
                   {#if isExpanded}
                     <div
-                      class="flex flex-col gap-0.5 border-t border-neutral-100/50 py-1 pr-1 pl-3 dark:border-neutral-800/20"
+                      class="border-border/30 flex flex-col gap-0.5 border-t py-1 pr-1 pl-2"
                     >
-                      {#each group.files as file}
+                      {#each group.files as file (file.id)}
+                        {@const isActive = selectedFile?.id === file.id}
                         <button
-                          class="flex w-full flex-col gap-1 rounded-lg px-2.5 py-1.5 text-left transition-colors {selectedFile?.id ===
-                          file.id
-                            ? 'bg-neutral-100 text-neutral-950 dark:bg-neutral-800 dark:text-white'
-                            : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white'}"
+                          class="flex w-full cursor-pointer flex-col gap-1 rounded-lg px-2.5 py-1.5 text-left transition-[transform,background-color,color] duration-120 active:scale-[0.98] {isActive
+                            ? 'bg-muted text-foreground border-border/50 border font-medium shadow-2xs'
+                            : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'}"
                           onclick={() => handleSelectFile(file)}
                         >
                           <span class="truncate text-[11px] font-medium"
                             >{getFriendlyFileName(file)}</span
                           >
                           <div
-                            class="flex w-full items-center justify-between text-[9px] text-neutral-400 dark:text-neutral-500"
+                            class="text-muted-foreground/75 flex w-full items-center justify-between text-[9px]"
                           >
                             <span
                               class="max-w-[100px] truncate font-mono"
@@ -635,23 +639,23 @@
           {#if groupedPlugins.length > 0}
             <div class="flex flex-col gap-1.5">
               <div
-                class="flex items-center gap-1.5 px-2 py-1 text-[11px] font-semibold tracking-wider text-neutral-400 uppercase dark:text-neutral-500"
+                class="text-muted-foreground flex items-center gap-1.5 px-2 py-1 text-[11px] font-semibold tracking-wider uppercase"
               >
                 <Plugs size={12} />
                 插件数据
               </div>
-              {#each groupedPlugins as group}
+              {#each groupedPlugins as group (group.entityId)}
                 {@const isExpanded = !!expandedPlugins[group.entityId]}
                 {@const hasActiveFile = group.files.some(
                   (f) => selectedFile?.id === f.id,
                 )}
                 <div
-                  class="flex flex-col gap-0.5 overflow-hidden rounded-lg border border-neutral-100 bg-neutral-50/20 dark:border-neutral-800/40 dark:bg-neutral-950/10"
+                  class="border-border/40 bg-muted/20 flex flex-col gap-0.5 overflow-hidden rounded-xl border"
                 >
                   <button
-                    class="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-semibold transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800/40 {hasActiveFile
-                      ? 'bg-neutral-50/50 text-neutral-950 dark:bg-neutral-800/20 dark:text-white'
-                      : 'text-neutral-600 dark:text-neutral-400'}"
+                    class="hover:bg-muted/50 flex w-full cursor-pointer items-center justify-between px-3 py-2 text-left text-xs font-semibold transition-[background-color,color] duration-120 {hasActiveFile
+                      ? 'bg-muted/60 text-foreground'
+                      : 'text-muted-foreground'}"
                     onclick={() => togglePluginExpand(group.entityId)}
                   >
                     <div
@@ -660,14 +664,14 @@
                       <span class="truncate">{group.entityName}</span>
                       {#if group.entityId !== group.entityName}
                         <span
-                          class="truncate font-mono text-[9px] font-normal text-neutral-400 dark:text-neutral-500"
+                          class="text-muted-foreground/70 truncate font-mono text-[9px] font-normal"
                         >
                           ID: {group.entityId}
                         </span>
                       {/if}
                     </div>
                     <span
-                      class="text-neutral-400 transition-transform duration-200 dark:text-neutral-600 {isExpanded
+                      class="text-muted-foreground transition-transform duration-140 ease-[cubic-bezier(0.23,1,0.32,1)] {isExpanded
                         ? 'rotate-90'
                         : ''}"
                     >
@@ -676,21 +680,21 @@
                   </button>
                   {#if isExpanded}
                     <div
-                      class="flex flex-col gap-0.5 border-t border-neutral-100/50 py-1 pr-1 pl-3 dark:border-neutral-800/20"
+                      class="border-border/30 flex flex-col gap-0.5 border-t py-1 pr-1 pl-2"
                     >
-                      {#each group.files as file}
+                      {#each group.files as file (file.id)}
+                        {@const isActive = selectedFile?.id === file.id}
                         <button
-                          class="flex w-full flex-col gap-1 rounded-lg px-2.5 py-1.5 text-left transition-colors {selectedFile?.id ===
-                          file.id
-                            ? 'bg-neutral-100 text-neutral-950 dark:bg-neutral-800 dark:text-white'
-                            : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white'}"
+                          class="flex w-full cursor-pointer flex-col gap-1 rounded-lg px-2.5 py-1.5 text-left transition-[transform,background-color,color] duration-120 active:scale-[0.98] {isActive
+                            ? 'bg-muted text-foreground border-border/50 border font-medium shadow-2xs'
+                            : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'}"
                           onclick={() => handleSelectFile(file)}
                         >
                           <span class="truncate text-[11px] font-medium"
                             >{getFriendlyFileName(file)}</span
                           >
                           <div
-                            class="flex w-full items-center justify-between text-[9px] text-neutral-400 dark:text-neutral-500"
+                            class="text-muted-foreground/75 flex w-full items-center justify-between text-[9px]"
                           >
                             <span
                               class="max-w-[100px] truncate font-mono"
@@ -715,11 +719,11 @@
 
     <!-- 右侧内容区域 -->
     <div
-      class="flex flex-1 flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900"
+      class="border-border/60 bg-card flex flex-1 flex-col overflow-hidden rounded-2xl border shadow-2xs"
     >
       {#if !selectedFile}
         <div
-          class="flex flex-1 flex-col items-center justify-center gap-3 text-neutral-400 dark:text-neutral-600"
+          class="text-muted-foreground/75 flex flex-1 flex-col items-center justify-center gap-3"
         >
           <Database size={40} weight="light" />
           <span class="text-xs">请在左侧选择要预览的文件</span>
@@ -727,22 +731,26 @@
       {:else}
         <!-- 详情顶部面板 -->
         <div
-          class="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-800"
+          class="border-border/50 flex items-center justify-between border-b px-4 py-3"
         >
           <div class="flex flex-col gap-0.5 overflow-hidden">
             <span
-              class="truncate text-xs font-semibold text-neutral-800 dark:text-neutral-100"
+              class="text-foreground truncate text-xs font-semibold tracking-tight"
             >
               {getSelectedFileDisplayName(selectedFile)}
             </span>
-            <span class="truncate font-mono text-[10px] text-neutral-400">
+            <span
+              class="text-muted-foreground/70 truncate font-mono text-[10px]"
+            >
               相对路径: {selectedFile.rel_path}
             </span>
           </div>
           <div class="flex items-center gap-2">
             {#if selectedFile.is_json}
               <Button
-                class="inline-flex h-7 items-center justify-center gap-1 rounded-md border border-neutral-200 bg-white px-2.5 text-[11px] font-medium text-neutral-700 shadow-xs transition-colors hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                variant="outline"
+                size="sm"
+                class="h-7 cursor-pointer gap-1 rounded-lg px-2.5 text-[11px] font-medium transition-[transform,background-color] duration-120 active:scale-95"
                 onclick={handleCopyContent}
                 disabled={loadingContent || !selectedFileContent}
               >
@@ -756,11 +764,11 @@
         <!-- 详情内容区 -->
         <ScrollArea
           class="min-h-0 w-full flex-1"
-          viewportClass="h-full w-full p-4 bg-neutral-50/50 dark:bg-neutral-950/30 flex flex-col"
+          viewportClass="h-full w-full p-4 bg-muted/10 flex flex-col"
         >
           {#if loadingContent}
             <div
-              class="flex flex-1 items-center justify-center text-xs text-neutral-400"
+              class="text-muted-foreground flex flex-1 items-center justify-center text-xs"
             >
               读取数据内容中...
             </div>
@@ -769,34 +777,30 @@
               <img
                 src={imageUrl}
                 alt={getSelectedFileDisplayName(selectedFile)}
-                class="max-h-[380px] max-w-full rounded-lg border border-neutral-200 bg-white p-1.5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950"
+                class="border-border/60 bg-background max-h-[380px] max-w-full rounded-xl border p-1.5 shadow-sm"
               />
             </div>
           {:else if fileTooLarge}
             <div
-              class="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-neutral-500 dark:text-neutral-400"
+              class="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center"
             >
-              <FileCode
-                size={40}
-                class="text-neutral-400 dark:text-neutral-600"
-              />
-              <span
-                class="text-xs font-semibold text-neutral-800 dark:text-neutral-200"
-              >
+              <FileCode size={40} class="text-muted-foreground/60" />
+              <span class="text-foreground text-xs font-semibold">
                 文件过大，已禁用在应用内直接读取预览
               </span>
               <p
-                class="max-w-md text-[11px] leading-relaxed text-neutral-400 dark:text-neutral-500"
+                class="text-muted-foreground/80 max-w-md text-[11px] leading-relaxed"
               >
-                当前文件大小为 <strong
-                  class="text-neutral-600 dark:text-neutral-300"
+                当前文件大小为 <strong class="text-foreground"
                   >{formatSize(selectedFile?.size_bytes || 0)}</strong
                 >，已超过系统预览限制 (10
                 MB)。为了避免解析大文件导致应用卡死，我们限制了其直接预览。
               </p>
               <div class="mt-2 flex gap-2">
                 <Button
-                  class="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 text-xs font-medium text-neutral-900 shadow-xs transition-colors hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                  variant="outline"
+                  size="sm"
+                  class="h-8 cursor-pointer gap-1.5 rounded-xl text-xs font-medium transition-[transform,background-color] duration-120 active:scale-95"
                   onclick={handleOpenDataDir}
                 >
                   <FolderOpen size={14} />
@@ -806,7 +810,7 @@
             </div>
           {:else if !selectedFileDisplay}
             <div
-              class="flex flex-1 flex-col items-center justify-center gap-2 text-neutral-400 dark:text-neutral-600"
+              class="text-muted-foreground/75 flex flex-1 flex-col items-center justify-center gap-2"
             >
               <FileCode size={32} />
               <span class="text-xs">当前文件是二进制文件或无法直接预览</span>
@@ -816,10 +820,10 @@
             <div class="file-preview-code relative min-h-0 w-full">
               {#if isHighlighting}
                 <div
-                  class="absolute top-3 right-3 flex items-center gap-1.5 rounded-md bg-neutral-100/80 px-2 py-1 text-[10px] font-medium text-neutral-500 shadow-xs backdrop-blur-xs dark:bg-neutral-800/80 dark:text-neutral-400"
+                  class="bg-muted/80 text-muted-foreground border-border/40 absolute top-3 right-3 flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[10px] font-medium shadow-2xs backdrop-blur-xs"
                 >
                   <span
-                    class="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-500"
+                    class="bg-primary h-1.5 w-1.5 animate-pulse rounded-full"
                   ></span>
                   正在高亮...
                 </div>
@@ -828,7 +832,7 @@
                 {@html highlightedHtml}
               {:else}
                 <pre
-                  class="overflow-x-auto rounded-lg border border-neutral-200 bg-white p-3 font-mono text-xs break-all whitespace-pre-wrap text-neutral-800 shadow-xs select-text dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200">{selectedFileDisplay}</pre>
+                  class="border-border/60 bg-background text-foreground overflow-x-auto rounded-xl border p-3.5 font-mono text-xs break-all whitespace-pre-wrap shadow-2xs select-text">{selectedFileDisplay}</pre>
               {/if}
             </div>
           {/if}

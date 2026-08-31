@@ -1,15 +1,28 @@
 <script lang="ts">
   import { Lightning } from "phosphor-svelte";
+  import { Badge } from "$lib/components/ui/badge";
 </script>
 
 <div
-  class="flex h-full flex-col items-center justify-center gap-4 text-neutral-400 dark:text-neutral-600"
+  class="border-border/60 bg-card/40 flex h-72 flex-col items-center justify-center gap-3.5 rounded-2xl border border-dashed p-8 text-center shadow-2xs transition-[border-color,background-color] duration-140"
 >
-  <Lightning size={40} weight="thin" />
-  <div class="text-center">
-    <p class="text-sm font-medium text-neutral-500 dark:text-neutral-400">
-      Skills 配置
-    </p>
-    <p class="mt-1 text-xs text-neutral-400 dark:text-neutral-600">即将推出</p>
+  <div
+    class="border-border/50 bg-muted/60 text-muted-foreground flex h-14 w-14 items-center justify-center rounded-2xl border shadow-xs"
+  >
+    <Lightning size={28} weight="duotone" />
   </div>
+  <div class="space-y-1">
+    <h3 class="text-foreground text-sm font-semibold tracking-tight">
+      AI Agent Skills
+    </h3>
+    <p class="text-muted-foreground/75 max-w-sm text-xs leading-normal">
+      自定义 Agent 指令与技能集，让 AI 具备更专业强大的垂直场景执行能力。
+    </p>
+  </div>
+  <Badge
+    variant="secondary"
+    class="border-border/40 mt-1 rounded-md border px-2 py-0.5 text-[11px] font-medium"
+  >
+    即将推出
+  </Badge>
 </div>

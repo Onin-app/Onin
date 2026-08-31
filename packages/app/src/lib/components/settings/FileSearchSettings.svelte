@@ -230,21 +230,25 @@
 </script>
 
 {#if loading}
-  <div class="text-muted-foreground py-3 text-sm">正在加载文件搜索设置...</div>
+  <div class="text-muted-foreground py-6 text-center text-xs">
+    正在加载文件搜索设置...
+  </div>
 {:else if config}
-  <div class="flex flex-col gap-5">
+  <div class="flex flex-col gap-6">
     <section class="border-border/50 border-t pt-4">
       <div class="mb-3 flex items-center justify-between gap-4">
         <div>
-          <h4 class="text-foreground text-sm font-semibold">排除路径</h4>
-          <p class="text-muted-foreground mt-1 text-xs">
+          <h4 class="text-foreground text-sm font-semibold tracking-tight">
+            排除路径
+          </h4>
+          <p class="text-muted-foreground/75 mt-0.5 text-xs leading-normal">
             匹配这些路径的文件和目录不会出现在搜索结果中。
           </p>
         </div>
         <Button
           variant="outline"
           size="sm"
-          class="h-8 gap-1.5 text-xs"
+          class="h-8 cursor-pointer gap-1.5 rounded-xl text-xs font-medium transition-[transform,background-color] duration-120 active:scale-95"
           disabled={choosingDirectory}
           onclick={chooseDirectory}
         >
@@ -255,48 +259,50 @@
 
       <div class="mb-3 flex gap-2">
         <Input
-          placeholder="C:\Users\name\Downloads\tmp"
+          placeholder="例如 C:\Users\name\Downloads\tmp"
           bind:value={excludeInput}
           onkeydown={(event) => {
             if (event.key === "Enter") addExcludedPath(excludeInput);
           }}
-          class="h-9 text-sm"
+          class="border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring h-9 rounded-xl border text-xs transition-all focus:ring-1 focus:outline-none"
         />
         <Button
           disabled={!excludeInput.trim()}
           onclick={() => addExcludedPath(excludeInput)}
-          class="h-9 px-4"
+          class="h-9 cursor-pointer rounded-xl px-4 text-xs font-semibold transition-[transform,background-color] duration-120 active:scale-95"
         >
           添加
         </Button>
       </div>
 
-      <div class="flex flex-col gap-2">
+      <div class="flex flex-col gap-1.5">
         {#each excludedPaths as path (path)}
           <div
-            class="bg-muted/40 flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"
+            class="bg-muted/40 border-border/50 hover:border-border group flex items-center gap-2.5 rounded-xl border px-3 py-2 text-xs shadow-2xs transition-[border-color,background-color] duration-120"
           >
             <PhosphorIcon
               icon="prohibit"
-              class="text-muted-foreground h-4 w-4 shrink-0"
+              class="text-muted-foreground h-3.5 w-3.5 shrink-0"
             />
             <span
-              class="text-foreground min-w-0 flex-1 truncate font-mono text-xs"
+              class="text-foreground min-w-0 flex-1 truncate font-mono text-[11px]"
             >
               {path}
             </span>
             <Button
               variant="ghost"
               size="icon"
-              class="text-muted-foreground hover:text-destructive h-7 w-7"
+              class="text-muted-foreground hover:text-destructive h-6 w-6 cursor-pointer rounded-md opacity-0 transition-[opacity,transform] duration-120 group-hover:opacity-100 active:scale-90"
               title="移除"
               onclick={() => removeExcludedPath(path)}
             >
-              <PhosphorIcon icon="trash" class="h-4 w-4" />
+              <PhosphorIcon icon="trash" class="h-3.5 w-3.5" />
             </Button>
           </div>
         {:else}
-          <div class="text-sm text-muted-foreground">暂无额外排除路径</div>
+          <div class="text-muted-foreground/75 py-2 text-xs">
+            暂无额外排除路径
+          </div>
         {/each}
       </div>
     </section>
@@ -305,8 +311,10 @@
       class="border-border/50 flex items-center justify-between gap-4 border-t pt-4"
     >
       <div>
-        <h4 class="text-foreground text-sm font-semibold">隐藏文件</h4>
-        <p class="text-muted-foreground mt-1 text-xs">
+        <h4 class="text-foreground text-sm font-semibold tracking-tight">
+          隐藏文件
+        </h4>
+        <p class="text-muted-foreground/75 mt-0.5 text-xs leading-normal">
           开启后会显示以点号开头的文件和目录。
         </p>
       </div>
@@ -320,15 +328,17 @@
       <div>
         <div class="flex items-start justify-between gap-4">
           <div class="min-w-0">
-            <h4 class="text-foreground text-sm font-semibold">搜索后端</h4>
-            <p class="text-muted-foreground mt-1 text-xs">
+            <h4 class="text-foreground text-sm font-semibold tracking-tight">
+              搜索后端
+            </h4>
+            <p class="text-muted-foreground/75 mt-0.5 text-xs leading-normal">
               {backendDescription}
             </p>
           </div>
           {#if isWindows && status.everything_install_required}
             <Button
               size="sm"
-              class="h-8 shrink-0 gap-1.5 text-xs"
+              class="h-8 shrink-0 cursor-pointer gap-1.5 rounded-xl text-xs font-semibold transition-[transform,background-color] duration-120 active:scale-95"
               disabled={installingEverything}
               onclick={() => (installEverythingDialogOpen = true)}
             >
@@ -341,7 +351,7 @@
         <div class="mt-3 flex flex-wrap items-center gap-2">
           <Badge
             variant="secondary"
-            class="gap-1.5 px-2.5 py-1 text-xs font-normal"
+            class="border-border/40 gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-normal"
           >
             <span
               class="h-1.5 w-1.5 rounded-full {status.is_searching
@@ -359,7 +369,7 @@
           {#if isWindows}
             <Badge
               variant="outline"
-              class="gap-1.5 px-2.5 py-1 text-xs font-normal"
+              class="border-border/40 gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-normal"
             >
               <span
                 class="h-1.5 w-1.5 rounded-full {status.everything_installed
@@ -379,13 +389,15 @@
           {/if}
         </div>
         {#if isWindows && status.everything_install_required}
-          <p class="text-muted-foreground mt-2 text-xs">
+          <p class="text-muted-foreground/75 mt-2 text-xs">
             当前会继续使用 Windows Search。安装 Everything
             后可获得更快的全盘文件名搜索。
           </p>
         {/if}
         {#if status.last_error}
-          <p class="text-destructive mt-2 text-xs">{status.last_error}</p>
+          <p class="text-destructive mt-2 text-xs font-medium">
+            {status.last_error}
+          </p>
         {/if}
       </div>
     </section>

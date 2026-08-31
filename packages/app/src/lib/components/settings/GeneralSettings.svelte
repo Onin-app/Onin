@@ -419,13 +419,13 @@
                 bind:value={sortMode}
                 onchange={updateConfig}
                 disabled={!enableUsageTracking}
-                class="border-input bg-background h-8 rounded-md border px-2 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                class="border-input bg-background text-foreground focus:ring-ring h-8 cursor-pointer rounded-xl border px-2.5 py-1 text-xs font-medium transition-all focus:ring-1 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {#each sortModeOptions as option}
                   <option value={option.value}>{option.label}</option>
                 {/each}
               </select>
-              <span class="text-muted-foreground text-[10px]">
+              <span class="text-muted-foreground/75 text-[10px]">
                 {sortModeOptions.find((o) => o.value === sortMode)
                   ?.description || ""}
               </span>
@@ -434,7 +434,12 @@
         </SetItem>
         <SetItem title="使用记录">
           {#snippet content()}
-            <Button variant="outline" size="sm" onclick={handleClearUsageStats}>
+            <Button
+              variant="outline"
+              size="sm"
+              class="h-8 cursor-pointer rounded-xl px-3 text-xs font-medium transition-[transform,background-color] duration-120 active:scale-95"
+              onclick={handleClearUsageStats}
+            >
               清除使用记录
             </Button>
           {/snippet}
@@ -457,7 +462,7 @@
               bind:value={marketplaceApiUrl}
               onchange={updateConfig}
               placeholder="https://..."
-              class="h-8 w-64 text-sm"
+              class="border-input bg-background h-8 w-64 rounded-xl text-xs"
             />
           {/snippet}
         </SetItem>
@@ -477,6 +482,7 @@
             <Button
               variant="outline"
               size="sm"
+              class="h-8 cursor-pointer rounded-xl px-3 text-xs font-medium transition-[transform,background-color] duration-120 active:scale-95"
               onclick={() => invoke("open_app_data_dir")}
             >
               打开数据目录
@@ -497,7 +503,10 @@
         <SetItem title="当前版本">
           {#snippet content()}
             <div class="flex items-center gap-3">
-              <Badge variant="secondary" class="font-mono text-xs">
+              <Badge
+                variant="secondary"
+                class="border-border/40 font-mono text-xs"
+              >
                 v{appVersion}
               </Badge>
               {#if $hasNewVersion}
@@ -511,6 +520,7 @@
               <Button
                 variant={$hasNewVersion ? "default" : "outline"}
                 size="sm"
+                class="h-8 cursor-pointer rounded-xl px-3 text-xs font-medium transition-[transform,background-color] duration-120 active:scale-95"
                 onclick={() => checkUpdate(false)}
                 disabled={$checkingUpdate}
               >
