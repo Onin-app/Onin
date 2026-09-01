@@ -41,6 +41,7 @@
   import { focusInputTrigger, requestInputFocus } from "$lib/stores/focusInput";
   import { detachWindowShortcut } from "$lib/stores/shortcuts";
   import { hasNewVersion, latestVersion, appVersion } from "$lib/stores/update";
+  import { accumulateCommandStat } from "$lib/tracking";
 
   // Composables
   import { usePluginManager } from "$lib/composables/usePluginManager.svelte";
@@ -441,6 +442,14 @@
     if (app.source === "Extension") {
       const extensionInfo = parseExtensionAction(app.action);
       if (extensionInfo) {
+        if (app.action) {
+          invoke("record_command_usage", {
+            commandName: app.action,
+          }).catch((err) =>
+            console.error("Failed to record command usage:", err),
+          );
+        }
+        accumulateCommandStat(app.source);
         await handleExtensionAction(
           extensionInfo.extensionId,
           extensionInfo.commandCode,
@@ -517,6 +526,12 @@
   // 处理 Extension 预览项点击（如计算器结果）
   // preview 项的 path 格式为 "extension:id:code"，统一查表分发
   const handleExtensionClick = async (app: LaunchableItem) => {
+    if (app.action) {
+      invoke("record_command_usage", {
+        commandName: app.action,
+      }).catch((err) => console.error("Failed to record command usage:", err));
+    }
+    accumulateCommandStat(app.source);
     const parts = app.path.split(":");
     if (parts.length >= 2) {
       const extensionId = parts[1];
@@ -598,6 +613,8 @@
       "window_visibility",
       async (event) => {
         if (event.payload) {
+          await appListManager.fetchApps();
+
           if (!plugin.state.showPluginInline) {
             requestInputFocus();
           } else {
