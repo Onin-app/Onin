@@ -243,14 +243,7 @@ fn setup_desktop_features(app: &mut App) -> Result<(), Box<dyn std::error::Error
     #[cfg(target_os = "windows")]
     {
         if let Some(window) = app.get_webview_window("main") {
-            if let Err(err) = window_vibrancy::apply_blur(&window, Some((0, 0, 0, 0))) {
-                eprintln!(
-                    "[window_manager] 无法为主窗口启用 Windows 背景模糊: {:?}",
-                    err
-                );
-            } else {
-                println!("[window_manager] 成功为主窗口启用了 Windows 背景模糊");
-            }
+            window_manager::setup_windows_window_effects(&window);
         }
     }
 
