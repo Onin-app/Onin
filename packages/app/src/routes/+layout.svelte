@@ -168,6 +168,9 @@
           accumulateCommandStat("Hotkey");
 
           if (commandName === "extension:color:pick") {
+            invoke("record_command_usage", { commandName }).catch(
+              console.error,
+            );
             await startColorPickerFlow({
               closeOnSuccess: false,
               restoreMainWindow: false,
@@ -177,6 +180,9 @@
           }
 
           if (commandName === "extension:screenshot:capture") {
+            invoke("record_command_usage", { commandName }).catch(
+              console.error,
+            );
             await takeScreenshot();
             return;
           }
@@ -188,6 +194,9 @@
               const extensionId = parts[1];
               // Exclude translator which opens in a standalone window handled by backend
               if (extensionId !== "translator") {
+                invoke("record_command_usage", { commandName }).catch(
+                  console.error,
+                );
                 const routeName = extensionId.replace(/_/g, "");
                 goto(`/extensions/${routeName}`).then(() => {
                   invoke("show_main_window_cmd");

@@ -444,6 +444,59 @@ fn handle_window_blur(app_handle: &AppHandle, window: &tauri::WebviewWindow) {
     store_hide_task_handle(app_handle, handle);
 }
 
+#[cfg(target_os = "windows")]
+fn is_windows_11() -> bool {
+    use winreg::enums::HKEY_LOCAL_MACHINE;
+    use winreg::RegKey;
+
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    if let Ok(key) = hklm.open_subkey("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion") {
+        if let Ok(build_str) = key.get_value::<String, _>("CurrentBuildNumber") {
+            if let Ok(build) = build_str.parse::<u32>() {
+                return build >= 22000;
+            }
+        }
+    }
+    false
+}
+
+#[cfg(target_os = "windows")]
+pub fn setup_windows_window_effects(window: &tauri::WebviewWindow) {
+    let is_win11 = is_windows_11();
+
+    if is_win11 {
+        // Windows 11: 设置 DWM 原生大圆角属性
+        use windows::Win32::Foundation::HWND;
+        use windows::Win32::Graphics::Dwm::{
+            DwmSetWindowAttribute, DWMWA_WINDOW_CORNER_PREFERENCE,
+        };
+
+        if let Ok(hwnd) = window.hwnd() {
+            let hwnd_raw = HWND(hwnd.0 as _);
+            let preference = 2u32; // DWMWCP_ROUND
+            let _ = unsafe {
+                DwmSetWindowAttribute(
+                    hwnd_raw,
+                    DWMWA_WINDOW_CORNER_PREFERENCE,
+                    &preference as *const _ as *const _,
+                    std::mem::size_of::<u32>() as u32,
+                )
+            };
+        }
+
+        // 应用 Windows 11 原生 Mica 特效
+        if let Err(err) = window_vibrancy::apply_mica(window, Some(true)) {
+            eprintln!("[window_manager] 无法应用 Windows 11 Mica 效果: {:?}", err);
+        } else {
+            println!("[window_manager] 成功为主窗口应用了 Windows 11 Mica 效果");
+        }
+    } else {
+        // Windows 10: 保持原生透明通道，由前端 CSS 渲染抗锯齿圆角卡片。
+        // 规避 Win10 DWM 亚克力拖动掉帧及直角溢出缺陷，确保丝滑 120Hz 满帧与零锯齿圆角。
+        println!("[window_manager] Windows 10 环境：已启用纯净透明通道");
+    }
+}
+
 // ============================================================================
 // 主设置函数
 // ============================================================================
