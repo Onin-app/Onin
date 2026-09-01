@@ -159,14 +159,16 @@ pub fn run() {
 
                     let app_handle_clone = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
-                        match crate::sync::trigger_webdav_sync(
+                        let sync_fut = crate::sync::trigger_webdav_sync(
                             app_handle_clone.clone(),
                             "backup".to_string(),
-                        )
-                        .await
+                        );
+                        match tokio::time::timeout(std::time::Duration::from_secs(5), sync_fut)
+                            .await
                         {
-                            Ok(_) => println!("[sync] 退出自动备份成功！"),
-                            Err(e) => eprintln!("[sync] 退出自动备份失败: {}", e),
+                            Ok(Ok(_)) => println!("[sync] 退出自动备份成功！"),
+                            Ok(Err(e)) => eprintln!("[sync] 退出自动备份失败: {}", e),
+                            Err(_) => eprintln!("[sync] 退出自动备份超时！"),
                         }
                         SYNC_ON_EXIT_COMPLETED.store(true, Ordering::SeqCst);
                         app_handle_clone.exit(0);

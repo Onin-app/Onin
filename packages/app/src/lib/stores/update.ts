@@ -16,6 +16,7 @@ export const appVersion = writable("未知");
 // 下载与安装状态
 export const downloading = writable(false);
 export const installing = writable(false);
+export const isLongInstalling = writable(false);
 export const downloadPercent = writable(0);
 export const downloadedBytes = writable(0);
 export const totalBytes = writable<number | null>(null);
@@ -23,8 +24,29 @@ export const downloadError = writable("");
 
 // 缓存当前可用的更新对象
 let currentUpdate: Update | null = null;
+let installTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
 
 const CACHE_KEY_NOTIFIED = "onin_last_notified_version";
+
+/**
+ * 临时调整主窗口置顶状态，避免在 macOS 下更新时遮挡系统管理员密码输入弹窗
+ */
+async function setWindowAlwaysOnTop(val: boolean) {
+  try {
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    await getCurrentWindow().setAlwaysOnTop(val);
+  } catch (e) {
+    console.warn("更新流程设置窗口置顶失败:", e);
+  }
+}
+
+/**
+ * 打开浏览器手动下载最新版本
+ */
+export async function openManualDownload() {
+  const { openBrowserUrl } = await import("$lib/utils/link");
+  await openBrowserUrl("https://github.com/Onin-app/Onin/releases/latest");
+}
 
 // 极简的原生 DOMParser HTML 安全消毒函数，彻底防御 XSS 攻击
 function sanitizeHtml(html: string): string {
@@ -180,10 +202,14 @@ export async function startUpdate() {
 
   downloading.set(true);
   installing.set(false);
+  isLongInstalling.set(false);
   downloadError.set("");
   downloadPercent.set(0);
   downloadedBytes.set(0);
   totalBytes.set(null);
+
+  // 开始更新流程时，解除置顶，防止 macOS 系统管理员授权弹窗被无边框置顶窗口遮挡
+  await setWindowAlwaysOnTop(false);
 
   const currentVer = get(appVersion);
   const targetVer = get(latestVersion);
@@ -214,6 +240,13 @@ export async function startUpdate() {
           downloadPercent.set(100);
           downloading.set(false);
           installing.set(true); // 转为正在安装中
+          // 启动长时间未完成提示计时器（12秒）
+          if (installTimeoutTimer) clearTimeout(installTimeoutTimer);
+          installTimeoutTimer = setTimeout(() => {
+            if (get(installing)) {
+              isLongInstalling.set(true);
+            }
+          }, 12000);
           trackEvent("update_downloaded", {
             current_version: currentVer,
             latest_version: targetVer,
@@ -222,10 +255,22 @@ export async function startUpdate() {
       }
     });
 
+    if (installTimeoutTimer) {
+      clearTimeout(installTimeoutTimer);
+      installTimeoutTimer = null;
+    }
+
     // 下载安装完成，重启应用
     await relaunch();
   } catch (e) {
+    if (installTimeoutTimer) {
+      clearTimeout(installTimeoutTimer);
+      installTimeoutTimer = null;
+    }
     console.error("更新失败:", e);
+
+    // 失败时恢复置顶
+    await setWindowAlwaysOnTop(true);
 
     trackEvent("update_failed", {
       current_version: currentVer,
@@ -236,13 +281,22 @@ export async function startUpdate() {
     downloadError.set(String(e) || "下载更新失败，请重试");
     downloading.set(false);
     installing.set(false);
+    isLongInstalling.set(false);
   }
 }
 
 export function closeUpdateDialog() {
+  if (installTimeoutTimer) {
+    clearTimeout(installTimeoutTimer);
+    installTimeoutTimer = null;
+  }
   updateDialogOpen.set(false);
   downloadError.set(""); // 关闭弹窗时重置错误，防止下次残留
+  downloading.set(false);
   installing.set(false);
+  isLongInstalling.set(false);
+  // 恢复置顶
+  setWindowAlwaysOnTop(true);
 }
 
 // 初始化版本号

@@ -1,14 +1,23 @@
 <script lang="ts">
   import { openExternalLink } from "$lib/utils/link";
-  import { X, ArrowCircleUp, CloudArrowDown, Warning } from "phosphor-svelte";
+  import {
+    X,
+    ArrowCircleUp,
+    CloudArrowDown,
+    Warning,
+    ArrowSquareOut,
+  } from "phosphor-svelte";
   import {
     downloading,
     installing,
+    isLongInstalling,
     downloadPercent,
     downloadedBytes,
     totalBytes,
     downloadError,
     startUpdate,
+    openManualDownload,
+    closeUpdateDialog,
   } from "$lib/stores/update";
   import {
     Dialog,
@@ -62,8 +71,9 @@
   }
 
   function handleCancel() {
-    if ($installing) return;
+    if ($installing && !$isLongInstalling) return;
     open = false;
+    closeUpdateDialog();
     onClose();
   }
 </script>
@@ -150,25 +160,78 @@
               style="width: {$installing ? 100 : $downloadPercent}%"
             ></div>
           </div>
-          <p class="text-muted-foreground/70 text-center text-[10px]">
+
+          <div class="space-y-1 text-center">
+            <p class="text-muted-foreground/80 text-[11px]">
+              {#if $installing}
+                正在执行覆盖安装，完成后将自动重启。
+              {:else}
+                下载完成后系统将自动覆盖升级，在此期间请勿关闭应用。
+              {/if}
+            </p>
             {#if $installing}
-              正在执行安装，完成后应用将自动重启，在此期间请勿关闭应用。
-            {:else}
-              下载完成后系统将自动覆盖升级，在此期间请勿关闭应用。
+              <p class="text-muted-foreground/60 text-[10px]">
+                提示：若弹出 macOS 管理员授权弹窗，请输入密码以允许写入。
+              </p>
             {/if}
-          </p>
+          </div>
+
+          <!-- 长时间解包/安装兜底提示 -->
+          {#if $isLongInstalling}
+            <div
+              class="mt-2 flex flex-col gap-2 rounded-lg bg-amber-500/10 p-3 text-xs text-amber-600 dark:text-amber-400"
+            >
+              <div class="flex items-start gap-2">
+                <Warning size={16} class="mt-0.5 shrink-0" />
+                <span class="leading-relaxed">
+                  解包安装耗时较长。若系统权限受限或长时间未响应，可直接手动下载安装包覆盖。
+                </span>
+              </div>
+              <div class="flex justify-end gap-2 pt-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  class="h-7 text-xs"
+                  onclick={handleCancel}
+                >
+                  取消
+                </Button>
+                <Button
+                  size="sm"
+                  class="h-7 text-xs"
+                  onclick={openManualDownload}
+                >
+                  <ArrowSquareOut size={14} class="mr-1" />
+                  前往下载安装包
+                </Button>
+              </div>
+            </div>
+          {/if}
         </div>
       {/if}
 
       <!-- 错误提示 -->
       {#if $downloadError}
         <div
-          class="bg-destructive/10 text-destructive mt-3 flex items-start gap-2.5 rounded-lg p-3 text-xs"
+          class="bg-destructive/10 text-destructive mt-3 flex flex-col gap-2 rounded-lg p-3 text-xs"
         >
-          <Warning size={16} class="mt-0.5 shrink-0" />
-          <div class="flex-1">
-            <span class="font-semibold">升级失败:</span>
-            {$downloadError}
+          <div class="flex items-start gap-2.5">
+            <Warning size={16} class="mt-0.5 shrink-0" />
+            <div class="flex-1">
+              <span class="font-semibold">升级失败:</span>
+              {$downloadError}
+            </div>
+          </div>
+          <div class="flex justify-end pt-1">
+            <Button
+              variant="outline"
+              size="sm"
+              class="h-7 text-xs"
+              onclick={openManualDownload}
+            >
+              <ArrowSquareOut size={14} class="mr-1" />
+              手动下载最新版本
+            </Button>
           </div>
         </div>
       {/if}
