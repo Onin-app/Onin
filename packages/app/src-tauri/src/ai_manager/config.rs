@@ -18,4 +18,6 @@ pub struct ProviderConfig {
     pub default_model: Option<String>, // Default model for this provider
     #[serde(default)]
     pub models: Option<Vec<ModelInfo>>, // Cached models for this provider
+    #[serde(default)]
+    pub enabled_models: Option<Vec<String>>, // Enabled model IDs (if None, all models are enabled)
 }
