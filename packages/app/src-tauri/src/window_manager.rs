@@ -497,6 +497,72 @@ pub fn setup_windows_window_effects(window: &tauri::WebviewWindow) {
     }
 }
 
+#[cfg(target_os = "macos")]
+pub fn setup_macos_window_effects(window: &tauri::WebviewWindow) {
+    // 1. 启用系统原生窗口阴影，由 WindowServer 渲染高质量柔和边缘投射
+    if let Err(err) = window.set_shadow(true) {
+        eprintln!("[window_manager] 无法为主窗口启用原生阴影: {:?}", err);
+    } else {
+        println!("[window_manager] 成功为主窗口启用了原生阴影");
+    }
+
+    // 2. 清除可能残留的旧 Vibrancy
+    let _ = window_vibrancy::clear_vibrancy(window);
+
+    // 3. 应用 macOS 专属 HudWindow 原生磨砂毛玻璃材质
+    // - 选用 HudWindow（macOS Spotlight / HUD 浮窗原生毛玻璃特效，深邃通透）
+    // - 状态设为 Active，保证应用失焦时依然保持毛玻璃模糊质感，避免变灰
+    // - 半径传入 Some(16.0)，与前端卡片 rounded-2xl（16px）保持严格一致
+    if let Err(err) = window_vibrancy::apply_vibrancy(
+        window,
+        window_vibrancy::NSVisualEffectMaterial::HudWindow,
+        Some(window_vibrancy::NSVisualEffectState::Active),
+        Some(16.0),
+    ) {
+        eprintln!(
+            "[window_manager] 无法为主窗口应用 macOS 毛玻璃效果: {:?}",
+            err
+        );
+        return;
+    } else {
+        println!("[window_manager] 成功为主窗口应用了 macOS HudWindow 毛玻璃效果");
+    }
+
+    // 4. 对 NSVisualEffectView 及其 backing layer 执行 16px 圆角裁剪及清空底层背景
+    // 彻底根除无边框窗口下直角视觉溢出（白色三角直角）的缺陷
+    apply_macos_vibrancy_mask(window, 16.0);
+}
+
+#[cfg(target_os = "macos")]
+fn apply_macos_vibrancy_mask(window: &tauri::WebviewWindow, radius: f64) {
+    use objc2::msg_send;
+    use objc2_app_kit::NSWindow;
+    use objc2_foundation::NSInteger;
+
+    let Ok(ns_window_ptr) = window.ns_window() else {
+        return;
+    };
+
+    let ns_window: &NSWindow = unsafe { &*(ns_window_ptr as *const NSWindow) };
+
+    // 确保窗口自身透明
+    ns_window.setOpaque(false);
+
+    if let Some(content_view) = ns_window.contentView() {
+        const NS_VIEW_TAG_BLUR_VIEW: NSInteger = 91376254;
+        if let Some(blur_view) = content_view.viewWithTag(NS_VIEW_TAG_BLUR_VIEW) {
+            blur_view.setWantsLayer(true);
+            if let Some(layer) = blur_view.layer() {
+                unsafe {
+                    let () = msg_send![&*layer, setCornerRadius: radius];
+                    let () = msg_send![&*layer, setMasksToBounds: true];
+                }
+            }
+            println!("[window_manager] 成功为 macOS 毛玻璃视图设置了 16px 圆角裁剪");
+        }
+    }
+}
+
 // ============================================================================
 // 主设置函数
 // ============================================================================
