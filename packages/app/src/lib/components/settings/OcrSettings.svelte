@@ -30,6 +30,7 @@
     display_name?: string | null;
     default_model?: string | null;
     models?: ModelInfo[] | null;
+    enabled_models?: string[] | null;
   }
 
   interface AIConfig {
@@ -51,12 +52,20 @@
     },
   ];
 
-  // 派生状态：当前选中的 Provider 的模型列表
+  // 派生状态：当前选中的 Provider 的已启用模型列表
   let activeProviderModels = $derived.by(() => {
     const providerId = config?.ocr_provider_id;
     if (!providerId) return [];
     const provider = aiConfig.providers.find((p) => p.id === providerId);
-    return provider?.models || [];
+    if (!provider || !provider.models) return [];
+    if (
+      provider.enabled_models === null ||
+      provider.enabled_models === undefined
+    ) {
+      return provider.models;
+    }
+    const enabledSet = new Set(provider.enabled_models);
+    return provider.models.filter((m) => enabledSet.has(m.id));
   });
 
   // 判断提供商是否支持多模态识别（无本地模型缓存时保留以防误杀）
@@ -64,7 +73,14 @@
     if (!provider.models || provider.models.length === 0) {
       return true;
     }
-    return provider.models.some(supportsImage);
+    const enabledModels =
+      provider.enabled_models === null || provider.enabled_models === undefined
+        ? provider.models
+        : provider.models.filter((m) =>
+            provider.enabled_models!.includes(m.id),
+          );
+    if (enabledModels.length === 0) return true;
+    return enabledModels.some(supportsImage);
   }
 
   // 派生状态：可用的 Provider 列表

@@ -257,23 +257,10 @@ fn setup_desktop_features(app: &mut App) -> Result<(), Box<dyn std::error::Error
 
     #[cfg(target_os = "macos")]
     {
-        match app.get_webview_window("main") {
-            Some(window) => {
-                if let Err(err) = window.set_shadow(true) {
-                    eprintln!("[window_manager] 无法为主窗口启用原生阴影: {:?}", err);
-                } else {
-                    println!("[window_manager] 成功为主窗口启用了原生阴影");
-                }
-                let _ = window_vibrancy::apply_vibrancy(
-                    &window,
-                    window_vibrancy::NSVisualEffectMaterial::UnderWindowBackground,
-                    None,
-                    None,
-                );
-            }
-            None => {
-                eprintln!("[window_manager] 错误: 找不到主窗口 \"main\"，无法启用原生阴影");
-            }
+        if let Some(window) = app.get_webview_window("main") {
+            window_manager::setup_macos_window_effects(&window);
+        } else {
+            eprintln!("[window_manager] 错误: 找不到主窗口 \"main\"，无法应用 macOS 窗口特效");
         }
         window_manager::setup_activation_observer(&app.handle());
     }

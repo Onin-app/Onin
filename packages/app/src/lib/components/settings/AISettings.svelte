@@ -6,6 +6,11 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Card } from "$lib/components/ui/card";
   import { ScrollArea } from "$lib/components/ui/scroll-area";
+  import {
+    Popover,
+    PopoverTrigger,
+    PopoverContent,
+  } from "$lib/components/ui/popover";
   import { Combobox } from "bits-ui";
   import { toast } from "svelte-sonner";
   import {
@@ -13,10 +18,13 @@
     CaretUpDown,
     CaretDoubleUp,
     CaretDoubleDown,
+    CaretDown,
     Plus,
     Sparkle,
     Cpu,
     Lightning,
+    MagnifyingGlass,
+    Sliders,
   } from "phosphor-svelte";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import MCPSettings from "$lib/components/settings/MCPSettings.svelte";
@@ -45,6 +53,7 @@
     api_key: string | null;
     default_model: string | null;
     models?: ModelInfo[] | null;
+    enabled_models?: string[] | null;
   }
 
   interface ModelModalities {
@@ -110,6 +119,7 @@
     api_key: string | null;
     default_model: string | null;
     models: ModelInfo[] | null;
+    enabled_models: string[] | null;
   }>({
     id: "",
     provider_type: "",
@@ -119,15 +129,18 @@
     api_key: null,
     default_model: null,
     models: null,
+    enabled_models: null,
   });
 
   // Delete confirmation dialog state
   let deleteDialogOpen = $state(false);
   let pendingDeleteIndex = $state<number | null>(null);
 
-  // Search states for comboboxes
+  // Search states for comboboxes & popovers
   let providerSearch = $state("");
   let modelSearch = $state("");
+  let enabledModelsSearch = $state("");
+  let isModelsPopoverOpen = $state(false);
 
   // Syncing states
   let isSyncingDirect = $state(false);
@@ -230,23 +243,132 @@
   let isSyncingRegistry = $state(false);
   let isRegistryLoading = $state(true);
 
+  let isOtherProvidersOpen = $state(false);
+  let otherSearch = $state("");
+
   let availableProviders = $derived<RemoteProvider[]>(providersRegistry);
 
-  let popularProviders = $derived(
-    availableProviders.filter((p) => getProviderMeta(p.id).isPopular),
+  interface FeaturedProviderDef {
+    id: string;
+    matchIds: string[];
+    name: string;
+    fallbackBaseUrl: string;
+    fallbackApiKeyUrl: string;
+  }
+
+  const FEATURED_PROVIDERS: FeaturedProviderDef[] = [
+    // 国际主流
+    {
+      id: "openai",
+      matchIds: ["openai"],
+      name: "OpenAI",
+      fallbackBaseUrl: "https://api.openai.com/v1",
+      fallbackApiKeyUrl: "https://platform.openai.com/api_keys",
+    },
+    {
+      id: "anthropic",
+      matchIds: ["anthropic"],
+      name: "Anthropic",
+      fallbackBaseUrl: "https://api.anthropic.com/v1",
+      fallbackApiKeyUrl: "https://console.anthropic.com/settings/keys",
+    },
+    {
+      id: "google",
+      matchIds: ["google", "google-vertex"],
+      name: "Google (Gemini)",
+      fallbackBaseUrl:
+        "https://generativelanguage.googleapis.com/v1beta/openai",
+      fallbackApiKeyUrl: "https://aistudio.google.com/app/apikey",
+    },
+    {
+      id: "xai",
+      matchIds: ["xai", "x-ai"],
+      name: "xAI (Grok)",
+      fallbackBaseUrl: "https://api.x.ai/v1",
+      fallbackApiKeyUrl: "https://console.x.ai",
+    },
+    // 国内主流
+    {
+      id: "deepseek",
+      matchIds: ["deepseek"],
+      name: "DeepSeek",
+      fallbackBaseUrl: "https://api.deepseek.com",
+      fallbackApiKeyUrl: "https://platform.deepseek.com/api_keys",
+    },
+    {
+      id: "zhipuai",
+      matchIds: ["zhipuai", "zhipu", "zhipuai-coding-plan"],
+      name: "智谱 AI",
+      fallbackBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
+      fallbackApiKeyUrl: "https://open.bigmodel.cn/usercenter/apikeys",
+    },
+    {
+      id: "moonshotai",
+      matchIds: ["moonshotai", "moonshot", "moonshotai-cn", "kimi-for-coding"],
+      name: "月之暗面 (Kimi)",
+      fallbackBaseUrl: "https://api.moonshot.ai/v1",
+      fallbackApiKeyUrl: "https://platform.moonshot.cn/console/api-keys",
+    },
+    {
+      id: "minimax",
+      matchIds: [
+        "minimax",
+        "minimax-cn",
+        "minimax-coding-plan",
+        "minimax-cn-coding-plan",
+      ],
+      name: "MiniMax",
+      fallbackBaseUrl: "https://api.minimax.io/v1",
+      fallbackApiKeyUrl: "https://platform.minimax.io/",
+    },
+    {
+      id: "alibaba",
+      matchIds: [
+        "alibaba-cn",
+        "alibaba",
+        "qwen",
+        "alibaba-coding-plan-cn",
+        "alibaba-token-plan",
+      ],
+      name: "通义千问 (Qwen)",
+      fallbackBaseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      fallbackApiKeyUrl: "https://dashscope.console.aliyun.com/",
+    },
+  ];
+
+  let allFeaturedMatchedIds = $derived(
+    new Set(
+      FEATURED_PROVIDERS.flatMap((f) => [
+        f.id.toLowerCase(),
+        ...f.matchIds.map((m) => m.toLowerCase()),
+      ]),
+    ),
   );
 
   let otherProviders = $derived(
-    availableProviders.filter((p) => !getProviderMeta(p.id).isPopular),
+    availableProviders.filter(
+      (p) => !allFeaturedMatchedIds.has(p.id.toLowerCase()),
+    ),
+  );
+
+  let filteredOtherProviders = $derived(
+    otherSearch.trim() === ""
+      ? otherProviders
+      : otherProviders.filter(
+          (p) =>
+            p.name.toLowerCase().includes(otherSearch.toLowerCase()) ||
+            p.id.toLowerCase().includes(otherSearch.toLowerCase()),
+        ),
   );
 
   let selectedRemoteProvider = $derived(
     availableProviders.find((p) => p.id === editForm.provider_type),
   );
 
-  let providerOptions = $derived(
-    availableProviders.map((p) => ({ value: p.id, label: p.name })),
-  );
+  let providerOptions = $derived([
+    { value: "custom", label: "自定义直连 (OpenAI 兼容)" },
+    ...availableProviders.map((p) => ({ value: p.id, label: p.name })),
+  ]);
 
   let filteredProviderOptions = $derived(
     providerSearch === ""
@@ -262,32 +384,96 @@
     model: ModelInfo;
   }
 
-  let modelOptions = $derived.by(() => {
-    // 1. 如果该配置实例已经有单独拉取并保存的 models，优先使用它
+  // 当前配置下可用的全部模型（从本地缓存 models 或远程注册表获取）
+  let allAvailableModels = $derived.by<ModelInfo[]>(() => {
     if (editForm.models && editForm.models.length > 0) {
-      return editForm.models.map(
-        (m) =>
-          ({
-            value: m.id,
-            label: m.name,
-            model: m,
-          }) satisfies ModelOption,
-      );
+      return editForm.models;
     }
-
-    // 2. 如果选定了服务提供商
-    if (selectedRemoteProvider) {
-      return selectedRemoteProvider.models.map(
-        (m) =>
-          ({
-            value: m.id,
-            label: m.name,
-            model: m,
-          }) satisfies ModelOption,
-      );
+    if (selectedRemoteProvider && selectedRemoteProvider.models) {
+      return selectedRemoteProvider.models;
     }
-
     return [];
+  });
+
+  // 当前有效启用的模型 ID 数组（为 null 时默认全部启用）
+  let effectiveEnabledModelIds = $derived.by<string[]>(() => {
+    if (allAvailableModels.length === 0) return [];
+    if (
+      editForm.enabled_models === null ||
+      editForm.enabled_models === undefined
+    ) {
+      return allAvailableModels.map((m) => m.id);
+    }
+    return editForm.enabled_models;
+  });
+
+  // 当前有效启用的模型 ID 集合
+  let effectiveEnabledSet = $derived.by<Set<string>>(() => {
+    return new Set(effectiveEnabledModelIds);
+  });
+
+  // 多选下拉面板中过滤后的模型列表
+  let filteredAvailableModels = $derived.by<ModelInfo[]>(() => {
+    if (!enabledModelsSearch.trim()) return allAvailableModels;
+    const q = enabledModelsSearch.toLowerCase();
+    return allAvailableModels.filter(
+      (m) => m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q),
+    );
+  });
+
+  function toggleModelEnabled(modelId: string) {
+    const current = new Set(effectiveEnabledModelIds);
+    if (current.has(modelId)) {
+      current.delete(modelId);
+    } else {
+      current.add(modelId);
+    }
+    const newEnabled = Array.from(current);
+    editForm.enabled_models = newEnabled;
+
+    // 联动：如果当前默认模型被禁用了，且还有其他启用的模型，自动迁移到第一个启用的模型
+    if (editForm.default_model === modelId && !current.has(modelId)) {
+      editForm.default_model = newEnabled.length > 0 ? newEnabled[0] : null;
+    }
+  }
+
+  function enableAllModels() {
+    editForm.enabled_models = allAvailableModels.map((m) => m.id);
+    if (!editForm.default_model && allAvailableModels.length > 0) {
+      editForm.default_model = allAvailableModels[0].id;
+    }
+  }
+
+  function disableAllModels() {
+    editForm.enabled_models = [];
+    editForm.default_model = null;
+  }
+
+  function invertModelSelection() {
+    const current = new Set(effectiveEnabledModelIds);
+    const inverted = allAvailableModels
+      .map((m) => m.id)
+      .filter((id) => !current.has(id));
+    editForm.enabled_models = inverted;
+    if (editForm.default_model && !inverted.includes(editForm.default_model)) {
+      editForm.default_model = inverted.length > 0 ? inverted[0] : null;
+    }
+  }
+
+  // 默认模型下拉框的选项（仅列出已启用的模型）
+  let modelOptions = $derived.by(() => {
+    if (allAvailableModels.length === 0) return [];
+    const enabledSet = effectiveEnabledSet;
+    return allAvailableModels
+      .filter((m) => enabledSet.has(m.id))
+      .map(
+        (m) =>
+          ({
+            value: m.id,
+            label: m.name,
+            model: m,
+          }) satisfies ModelOption,
+      );
   });
 
   let filteredModelOptions = $derived(
@@ -297,6 +483,35 @@
           m.label.toLowerCase().includes(modelSearch.toLowerCase()),
         ),
   );
+
+  // 计算已连接提供商卡片的启用数量
+  function getProviderEnabledCount(provider: ProviderConfig): {
+    enabled: number;
+    total: number;
+  } {
+    let totalModels: ModelInfo[] = [];
+    if (provider.models && provider.models.length > 0) {
+      totalModels = provider.models;
+    } else {
+      const remote = providersRegistry.find(
+        (p) => p.id === provider.provider_type,
+      );
+      if (remote && remote.models) {
+        totalModels = remote.models;
+      }
+    }
+    const total = totalModels.length;
+    if (total === 0) return { enabled: 0, total: 0 };
+    if (
+      provider.enabled_models === null ||
+      provider.enabled_models === undefined
+    ) {
+      return { enabled: total, total };
+    }
+    const enabledSet = new Set(provider.enabled_models);
+    const enabled = totalModels.filter((m) => enabledSet.has(m.id)).length;
+    return { enabled, total };
+  }
 
   interface ValidationResult {
     valid: boolean;
@@ -308,6 +523,10 @@
   $effect(() => {
     const type = editForm.provider_type;
     if (type && editingIndex === -1) {
+      if (type === "custom") {
+        if (!editForm.name) editForm.name = "自定义提供商";
+        return;
+      }
       const remote = availableProviders.find((p) => p.id === type);
       if (remote) {
         editForm.base_url = remote.baseUrl;
@@ -427,7 +646,21 @@
       });
 
       if (fetched && fetched.length > 0) {
-        editForm.models = enrichModelsWithRegistry(fetched);
+        const enriched = enrichModelsWithRegistry(fetched);
+        editForm.models = enriched;
+
+        // 如果原本设置过 enabled_models，保留依然有效的新模型，否则设为全选新拉取到的模型
+        if (editForm.enabled_models && editForm.enabled_models.length > 0) {
+          const fetchedIds = new Set(enriched.map((m) => m.id));
+          const retained = editForm.enabled_models.filter((id) =>
+            fetchedIds.has(id),
+          );
+          editForm.enabled_models =
+            retained.length > 0 ? retained : enriched.map((m) => m.id);
+        } else {
+          editForm.enabled_models = enriched.map((m) => m.id);
+        }
+
         toast.success(`成功拉取并缓存了 ${fetched.length} 个模型`, {
           id: toastId,
         });
@@ -480,101 +713,77 @@
     return undefined;
   }
 
-  function startAdd() {
+  function getMatchedRemoteProvider(
+    featured: FeaturedProviderDef,
+  ): RemoteProvider | undefined {
+    return availableProviders.find(
+      (p) =>
+        featured.matchIds.some(
+          (mid) => p.id.toLowerCase() === mid.toLowerCase(),
+        ) || p.id.toLowerCase() === featured.id.toLowerCase(),
+    );
+  }
+
+  function isFeaturedConnected(featured: FeaturedProviderDef): boolean {
+    const allIds = [
+      featured.id.toLowerCase(),
+      ...featured.matchIds.map((m) => m.toLowerCase()),
+    ];
+    return config.providers.some((p) =>
+      allIds.includes(p.provider_type.toLowerCase()),
+    );
+  }
+
+  function connectFeaturedProvider(featured: FeaturedProviderDef) {
+    const remote = getMatchedRemoteProvider(featured);
     editingIndex = -1;
     providerSearch = "";
     modelSearch = "";
+    enabledModelsSearch = "";
+    isModelsPopoverOpen = false;
     editForm = {
       id: "",
-      provider_type: "",
-      name: "",
+      provider_type: remote?.id || featured.id,
+      name: featured.name.split(" ")[0],
+      display_name: null,
+      base_url: remote?.baseUrl || featured.fallbackBaseUrl,
+      api_key: null,
+      default_model:
+        remote?.models && remote.models.length > 0 ? remote.models[0].id : null,
+      models: null,
+      enabled_models: null,
+    };
+  }
+
+  function startCustomProvider() {
+    editingIndex = -1;
+    providerSearch = "";
+    modelSearch = "";
+    enabledModelsSearch = "";
+    isModelsPopoverOpen = false;
+    editForm = {
+      id: "",
+      provider_type: "custom",
+      name: "自定义提供商",
       display_name: null,
       base_url: "",
       api_key: null,
       default_model: null,
       models: null,
+      enabled_models: null,
     };
   }
 
-  interface ProviderMeta {
-    description: string;
-    isPopular: boolean;
-    recommendTag?: string;
-  }
-
-  const PROVIDER_METAS: Record<string, ProviderMeta> = {
-    deepseek: {
-      description: "高性价比国产大模型服务，提供极佳的推理与通用能力",
-      isPopular: true,
-      recommendTag: "推荐",
-    },
-    openai: {
-      description: "行业标杆，提供强大的 GPT 系列模型与多模态能力",
-      isPopular: true,
-      recommendTag: "推荐",
-    },
-    anthropic: {
-      description: "业界顶尖的 Claude 系列模型，适合复杂推理与长文本",
-      isPopular: true,
-      recommendTag: "推荐",
-    },
-    google: {
-      description: "Google Gemini 核心模型，多模态与长上下文优势明显",
-      isPopular: true,
-    },
-    ollama: {
-      description: "本地部署大模型服务的首选，完全免费，数据绝对安全隐私",
-      isPopular: true,
-    },
-    openrouter: {
-      description: "一站式 API 路由服务，可快速接入成百上千种前沿与开源模型",
-      isPopular: true,
-    },
-    groq: {
-      description: "超高速开源大模型推理引擎",
-      isPopular: true,
-    },
-    together: {
-      description: "大模型开源托管平台",
-      isPopular: true,
-    },
-    mistral: {
-      description: "欧洲主流的开源大模型先锋",
-      isPopular: true,
-    },
-    cohere: {
-      description: "企业级语言模型与重排服务",
-      isPopular: true,
-    },
-    siliconflow: {
-      description: "硅基流动高性能大模型服务平台",
-      isPopular: true,
-    },
-    zhipu: {
-      description: "智谱 AI 大模型开放平台",
-      isPopular: true,
-    },
-    moonshot: {
-      description: "月之暗面 (Kimi) 开放平台",
-      isPopular: true,
-    },
-  };
-
-  function getProviderMeta(id: string) {
-    const key = id.toLowerCase();
-    if (PROVIDER_METAS[key]) {
-      return PROVIDER_METAS[key];
-    }
-    return {
-      description: "通过标准 OpenAI 协议连接的其他 AI 大模型服务",
-      isPopular: false,
-    };
+  function startAdd() {
+    startCustomProvider();
   }
 
   function connectRegistryProvider(remote: RemoteProvider) {
     editingIndex = -1;
     providerSearch = "";
     modelSearch = "";
+    enabledModelsSearch = "";
+    isModelsPopoverOpen = false;
     editForm = {
       id: "",
       provider_type: remote.id,
@@ -585,16 +794,22 @@
       default_model:
         remote.models && remote.models.length > 0 ? remote.models[0].id : null,
       models: null,
+      enabled_models: null,
     };
   }
 
   function startEdit(index: number) {
     editingIndex = index;
     const provider = config.providers[index];
+    providerSearch = "";
+    modelSearch = "";
+    enabledModelsSearch = "";
+    isModelsPopoverOpen = false;
     editForm = {
       ...provider,
       display_name: provider.display_name ?? null,
       models: provider.models ?? null,
+      enabled_models: provider.enabled_models ?? null,
     };
   }
 
@@ -602,6 +817,8 @@
     editingIndex = null;
     providerSearch = "";
     modelSearch = "";
+    enabledModelsSearch = "";
+    isModelsPopoverOpen = false;
   }
 
   // Generate unique ID for provider instance
@@ -703,6 +920,7 @@
       api_key: editForm.api_key || null,
       default_model: editForm.default_model || null,
       models: editForm.models || null,
+      enabled_models: editForm.enabled_models || null,
     };
 
     if (editingIndex === -1) {
@@ -719,6 +937,8 @@
       editingIndex = null;
       providerSearch = "";
       modelSearch = "";
+      enabledModelsSearch = "";
+      isModelsPopoverOpen = false;
     } catch (e) {
       console.error(e);
       toast.error("保存模型配置失败");
@@ -860,6 +1080,7 @@
               >
                 {#each config.providers as provider, index (provider.id)}
                   {@const defaultModelInfo = getModelInfo(provider)}
+                  {@const enabledCount = getProviderEnabledCount(provider)}
                   <div
                     class="group hover:bg-muted/40 relative flex items-center transition-colors"
                   >
@@ -902,6 +1123,13 @@
                             >
                               {provider.api_key ? "API 密钥" : "免密钥"}
                             </span>
+                            {#if enabledCount.total > 0}
+                              <span
+                                class="border-border/50 bg-muted/60 text-muted-foreground rounded-md border px-1.5 py-0.5 text-[10px] font-medium"
+                              >
+                                {enabledCount.enabled} / {enabledCount.total} 模型已启用
+                              </span>
+                            {/if}
                           </div>
                         </div>
                       </div>
@@ -950,76 +1178,154 @@
               热门提供商
             </h3>
             <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3">
-              {#each popularProviders as rp (rp.id)}
+              <!-- 9 大精选热门提供商 -->
+              {#each FEATURED_PROVIDERS as fp (fp.id)}
+                {@const isConnected = isFeaturedConnected(fp)}
                 <div
                   class="border-border/60 bg-card hover:border-border flex items-center justify-between rounded-xl border p-2.5 shadow-2xs transition-[border-color,box-shadow,transform] duration-140 hover:-translate-y-0.5"
                 >
-                  <span
-                    class="text-foreground truncate pr-1 text-xs font-medium"
-                  >
-                    {rp.name}
-                  </span>
+                  <div class="flex min-w-0 items-center gap-2 pr-1">
+                    <span class="text-foreground truncate text-xs font-medium">
+                      {fp.name}
+                    </span>
+                    {#if isConnected}
+                      <span
+                        class="inline-flex shrink-0 items-center gap-1 text-[10px] font-medium text-emerald-500"
+                        title="已连接此提供商"
+                      >
+                        <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"
+                        ></span>
+                        已连接
+                      </span>
+                    {/if}
+                  </div>
                   <Button
                     variant="outline"
                     size="sm"
                     class="h-7 shrink-0 cursor-pointer gap-0.5 rounded-lg px-2.5 text-[11px] font-medium transition-[transform,background-color] duration-120 active:scale-90"
-                    onclick={() => connectRegistryProvider(rp)}
+                    onclick={() => connectFeaturedProvider(fp)}
                   >
                     <Plus class="h-3 w-3" />
                     连接
                   </Button>
                 </div>
               {/each}
-            </div>
-          </div>
 
-          <!-- 其他提供商分区 -->
-          <div class="space-y-2.5 pt-2">
-            <h3
-              class="text-muted-foreground text-xs font-semibold tracking-wider uppercase"
-            >
-              其他可用提供商
-            </h3>
-            <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-              {#each otherProviders as rp (rp.id)}
-                <div
-                  class="border-border/60 bg-card hover:border-border flex items-center justify-between rounded-xl border p-2 shadow-2xs transition-[border-color,box-shadow,transform] duration-140 hover:-translate-y-0.5"
-                >
-                  <span
-                    class="text-foreground truncate pr-1 text-xs font-medium"
-                  >
-                    {rp.name}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    class="h-6 shrink-0 cursor-pointer gap-0.5 rounded-md px-2 text-[10px] font-medium transition-[transform,background-color] duration-120 active:scale-90"
-                    onclick={() => connectRegistryProvider(rp)}
-                  >
-                    <Plus class="h-2.5 w-2.5" />
-                    连接
-                  </Button>
-                </div>
-              {/each}
-
-              <!-- 手动连接自定义大模型 -->
+              <!-- 自定义直连卡片 (横跨 3 列) -->
               <div
-                class="border-border/60 hover:border-border flex items-center justify-between rounded-xl border border-dashed bg-transparent p-2 transition-[border-color,box-shadow,transform] duration-140 hover:-translate-y-0.5"
+                class="border-border/60 bg-card hover:border-border col-span-1 flex items-center justify-between rounded-xl border border-dashed p-2.5 shadow-2xs transition-[border-color,box-shadow,transform] duration-140 hover:-translate-y-0.5 sm:col-span-2 md:col-span-3"
               >
-                <span class="text-foreground truncate pr-1 text-xs font-medium">
-                  自定义直连服务
-                </span>
+                <div class="flex min-w-0 items-center gap-2 pr-1">
+                  <Sliders class="text-primary h-3.5 w-3.5 shrink-0" />
+                  <span class="text-foreground text-xs font-medium">
+                    自定义提供商
+                  </span>
+                  <span
+                    class="text-muted-foreground hidden text-[11px] sm:inline"
+                  >
+                    (OpenAI 兼容协议 / 私有部署与第三方中转)
+                  </span>
+                </div>
                 <Button
                   variant="outline"
                   size="sm"
-                  class="h-6 shrink-0 cursor-pointer gap-0.5 rounded-md px-2 text-[10px] font-medium transition-[transform,background-color] duration-120 active:scale-90"
-                  onclick={startAdd}
+                  class="h-7 shrink-0 cursor-pointer gap-0.5 rounded-lg px-2.5 text-[11px] font-medium transition-[transform,background-color] duration-120 active:scale-90"
+                  onclick={startCustomProvider}
                 >
-                  <Plus class="h-2.5 w-2.5" />
+                  <Plus class="h-3 w-3" />
                   连接
                 </Button>
               </div>
             </div>
+          </div>
+
+          <!-- 其他可用提供商分区 (默认折叠) -->
+          <div
+            class="border-border/50 bg-muted/10 space-y-3 rounded-2xl border p-3.5"
+          >
+            <button
+              type="button"
+              class="group flex w-full cursor-pointer items-center justify-between text-left outline-none"
+              onclick={() => (isOtherProvidersOpen = !isOtherProvidersOpen)}
+            >
+              <div class="flex items-center gap-2">
+                <span
+                  class="text-muted-foreground text-xs font-semibold tracking-wider uppercase"
+                >
+                  其他可用提供商
+                </span>
+                <span
+                  class="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[10px] font-medium"
+                >
+                  {otherProviders.length}
+                </span>
+              </div>
+              <div
+                class="text-muted-foreground group-hover:text-foreground flex items-center gap-1 text-xs transition-colors"
+              >
+                <span>{isOtherProvidersOpen ? "收起列表" : "展开全部"}</span>
+                <CaretDown
+                  class="h-3.5 w-3.5 transition-transform duration-200 {isOtherProvidersOpen
+                    ? 'rotate-180'
+                    : ''}"
+                />
+              </div>
+            </button>
+
+            {#if isOtherProvidersOpen}
+              <div class="space-y-3 pt-1">
+                <!-- 搜索栏 -->
+                <div class="relative w-full">
+                  <MagnifyingGlass
+                    class="text-muted-foreground absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2"
+                  />
+                  <input
+                    type="text"
+                    bind:value={otherSearch}
+                    placeholder="搜索其他可用提供商..."
+                    class="border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring h-8 w-full rounded-lg border pr-3 pl-8 text-xs transition-[border-color,box-shadow] duration-120 ease-out focus:ring-1 focus:outline-none"
+                  />
+                </div>
+
+                <!-- 列表网格 (使用 ScrollArea 自定义滚动条) -->
+                {#if filteredOtherProviders.length === 0}
+                  <div class="text-muted-foreground py-6 text-center text-xs">
+                    未找到匹配的提供商
+                  </div>
+                {:else}
+                  <ScrollArea
+                    class="h-72 w-full"
+                    viewportClass="h-full w-full pr-3"
+                  >
+                    <div
+                      class="grid grid-cols-2 gap-2 pb-1 sm:grid-cols-3 md:grid-cols-4"
+                    >
+                      {#each filteredOtherProviders as rp (rp.id)}
+                        <div
+                          class="border-border/60 bg-card hover:border-border flex items-center justify-between rounded-xl border p-2 shadow-2xs transition-[border-color,box-shadow,transform] duration-140 hover:-translate-y-0.5"
+                        >
+                          <span
+                            class="text-foreground truncate pr-1 text-xs font-medium"
+                            title={rp.name}
+                          >
+                            {rp.name}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            class="h-6 shrink-0 cursor-pointer gap-0.5 rounded-md px-2 text-[10px] font-medium transition-[transform,background-color] duration-120 active:scale-90"
+                            onclick={() => connectRegistryProvider(rp)}
+                          >
+                            <Plus class="h-2.5 w-2.5" />
+                            连接
+                          </Button>
+                        </div>
+                      {/each}
+                    </div>
+                  </ScrollArea>
+                {/if}
+              </div>
+            {/if}
           </div>
         {:else}
           <!-- Edit Form -->
@@ -1041,7 +1347,9 @@
                     class="text-muted-foreground/75 mt-0.5 text-xs leading-normal"
                   >
                     {editForm.provider_type
-                      ? `正在配置 ${selectedRemoteProvider?.name || editForm.provider_type}`
+                      ? editForm.provider_type === "custom"
+                        ? "正在配置自定义直连服务 (OpenAI 兼容协议)"
+                        : `正在配置 ${selectedRemoteProvider?.name || editForm.provider_type}`
                       : "选择一个大模型提供商开始连接"}
                   </p>
                 </div>
@@ -1258,14 +1566,15 @@
                   {/if}
                 </div>
 
-                <!-- Model Selector -->
+                <!-- Model Enable Multi-Select / Filter -->
                 <div>
                   <div class="mb-1.5 flex items-center justify-between">
                     <label
-                      for="default-model-input"
+                      for="enabled-models-trigger"
                       class="text-muted-foreground text-xs font-semibold tracking-wider uppercase"
                     >
-                      默认模型
+                      启用模型 {#if allAvailableModels.length > 0}({effectiveEnabledModelIds.length}
+                        / {allAvailableModels.length}){/if}
                     </label>
                     <button
                       type="button"
@@ -1275,6 +1584,217 @@
                     >
                       {isSyncingDirect ? "正在拉取..." : "从 API 拉取最新模型"}
                     </button>
+                  </div>
+
+                  {#if allAvailableModels.length > 0}
+                    <Popover bind:open={isModelsPopoverOpen}>
+                      <PopoverTrigger
+                        id="enabled-models-trigger"
+                        class="border-input bg-background hover:bg-muted/30 focus:ring-ring flex h-10 w-full cursor-pointer items-center justify-between rounded-xl border px-3 text-left text-sm transition-[border-color,box-shadow,background-color] duration-120 focus:ring-1 focus:outline-none"
+                      >
+                        <div class="flex min-w-0 flex-1 items-center gap-2">
+                          <span
+                            class="rounded-md border px-2 py-0.5 text-xs font-medium {effectiveEnabledModelIds.length ===
+                            0
+                              ? 'border-destructive/40 bg-destructive/10 text-destructive'
+                              : effectiveEnabledModelIds.length ===
+                                  allAvailableModels.length
+                                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                : 'border-primary/30 bg-primary/10 text-primary'}"
+                          >
+                            {#if effectiveEnabledModelIds.length === 0}
+                              已全部禁用
+                            {:else if effectiveEnabledModelIds.length === allAvailableModels.length}
+                              已启用全部模型 ({allAvailableModels.length})
+                            {:else}
+                              已启用 {effectiveEnabledModelIds.length} / {allAvailableModels.length}
+                              个模型
+                            {/if}
+                          </span>
+                          <span
+                            class="text-muted-foreground hidden truncate text-xs sm:inline"
+                          >
+                            点击管理启用的模型列表
+                          </span>
+                        </div>
+                        <CaretDown
+                          class="text-muted-foreground h-4 w-4 shrink-0 transition-transform duration-200 {isModelsPopoverOpen
+                            ? 'rotate-180'
+                            : ''}"
+                        />
+                      </PopoverTrigger>
+
+                      <PopoverContent
+                        class="border-border/60 bg-popover text-popover-foreground w-[min(32rem,90vw)] rounded-2xl border p-0 shadow-xl"
+                        side="bottom"
+                        align="start"
+                        sideOffset={6}
+                      >
+                        <div class="space-y-2.5 p-3">
+                          <!-- Search Bar and Quick Actions -->
+                          <div class="flex items-center gap-2">
+                            <div class="relative flex-1">
+                              <MagnifyingGlass
+                                class="text-muted-foreground absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2"
+                              />
+                              <input
+                                type="text"
+                                bind:value={enabledModelsSearch}
+                                placeholder="搜索模型名称或 ID..."
+                                class="border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring h-8 w-full rounded-lg border pr-3 pl-8 text-xs focus:ring-1 focus:outline-none"
+                              />
+                            </div>
+                            <div class="flex shrink-0 items-center gap-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                class="h-8 rounded-lg px-2 text-[11px]"
+                                onclick={enableAllModels}
+                              >
+                                全选
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                class="h-8 rounded-lg px-2 text-[11px]"
+                                onclick={disableAllModels}
+                              >
+                                清空
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                class="h-8 rounded-lg px-2 text-[11px]"
+                                onclick={invertModelSelection}
+                              >
+                                反选
+                              </Button>
+                            </div>
+                          </div>
+
+                          <!-- Model List -->
+                          {#if filteredAvailableModels.length === 0}
+                            <div
+                              class="text-muted-foreground py-6 text-center text-xs"
+                            >
+                              未找到匹配的模型
+                            </div>
+                          {:else}
+                            <ScrollArea
+                              class="max-h-64 w-full"
+                              viewportClass="max-h-64 w-full pr-2"
+                            >
+                              <div class="space-y-1">
+                                {#each filteredAvailableModels as m (m.id)}
+                                  {@const isEnabled = effectiveEnabledSet.has(
+                                    m.id,
+                                  )}
+                                  {@const isDefault =
+                                    editForm.default_model === m.id}
+                                  <button
+                                    type="button"
+                                    class="hover:bg-muted/60 flex w-full cursor-pointer items-center justify-between rounded-xl px-2.5 py-2 text-left transition-colors {isEnabled
+                                      ? 'bg-muted/20'
+                                      : 'opacity-60'}"
+                                    onclick={() => toggleModelEnabled(m.id)}
+                                  >
+                                    <div
+                                      class="flex min-w-0 flex-1 items-center gap-2.5"
+                                    >
+                                      <!-- Checkbox box -->
+                                      <div
+                                        class="flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors {isEnabled
+                                          ? 'border-primary bg-primary text-primary-foreground'
+                                          : 'border-muted-foreground/40 bg-transparent'}"
+                                      >
+                                        {#if isEnabled}
+                                          <Check class="h-3 w-3 stroke-[3]" />
+                                        {/if}
+                                      </div>
+
+                                      <!-- Model Name and ID -->
+                                      <div class="min-w-0 flex-1">
+                                        <div class="flex items-center gap-1.5">
+                                          <span
+                                            class="text-foreground truncate text-xs font-medium"
+                                          >
+                                            {m.name}
+                                          </span>
+                                          {#if isDefault}
+                                            <span
+                                              class="bg-primary/10 py-0.2 text-primary rounded px-1 text-[9px] font-semibold"
+                                            >
+                                              默认
+                                            </span>
+                                          {/if}
+                                        </div>
+                                        <p
+                                          class="text-muted-foreground/80 truncate font-mono text-[10px]"
+                                        >
+                                          {m.id}
+                                        </p>
+                                      </div>
+                                    </div>
+
+                                    <!-- Badges -->
+                                    <div
+                                      class="flex shrink-0 items-center gap-1 pl-2"
+                                    >
+                                      {#if m.context_window}
+                                        <span
+                                          class="bg-muted text-muted-foreground rounded px-1 py-0.5 text-[9px] font-medium"
+                                        >
+                                          {Math.round(m.context_window / 1024)}k
+                                        </span>
+                                      {/if}
+                                      {#if m.reasoning}
+                                        <span
+                                          class="rounded bg-purple-500/10 px-1 py-0.5 text-[9px] font-medium text-purple-600 dark:text-purple-400"
+                                        >
+                                          思考
+                                        </span>
+                                      {/if}
+                                      {#if m.tool_call}
+                                        <span
+                                          class="rounded bg-blue-500/10 px-1 py-0.5 text-[9px] font-medium text-blue-600 dark:text-blue-400"
+                                        >
+                                          工具
+                                        </span>
+                                      {/if}
+                                      {#if m.attachment}
+                                        <span
+                                          class="rounded bg-emerald-500/10 px-1 py-0.5 text-[9px] font-medium text-emerald-600 dark:text-emerald-400"
+                                        >
+                                          附件
+                                        </span>
+                                      {/if}
+                                    </div>
+                                  </button>
+                                {/each}
+                              </div>
+                            </ScrollArea>
+                          {/if}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  {:else}
+                    <div
+                      class="text-muted-foreground/75 border-border/50 bg-muted/10 rounded-xl border border-dashed px-3 py-2 text-xs"
+                    >
+                      暂无缓存模型列表，可点击右上角「从 API 拉取最新模型」
+                    </div>
+                  {/if}
+                </div>
+
+                <!-- Default Model Selector -->
+                <div>
+                  <div class="mb-1.5 flex items-center justify-between">
+                    <label
+                      for="default-model-input"
+                      class="text-muted-foreground text-xs font-semibold tracking-wider uppercase"
+                    >
+                      默认模型
+                    </label>
                   </div>
                   {#if modelOptions.length > 0}
                     <Combobox.Root
@@ -1306,7 +1826,7 @@
                             }
                           }}
                           class="border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring h-10 w-full rounded-xl border px-3 text-sm font-medium transition-[border-color,box-shadow] duration-120 ease-out focus:ring-1 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                          placeholder="选择或输入模型"
+                          placeholder="选择或输入默认模型"
                         />
                         <Combobox.Trigger
                           class="text-muted-foreground absolute top-1/2 right-3 -translate-y-1/2"
@@ -1391,6 +1911,12 @@
                         </Combobox.Content>
                       </Combobox.Portal>
                     </Combobox.Root>
+                  {:else if allAvailableModels.length > 0 && effectiveEnabledModelIds.length === 0}
+                    <div
+                      class="text-destructive/90 border-destructive/30 bg-destructive/5 rounded-xl border px-3 py-2 text-xs"
+                    >
+                      所有模型均已禁用，请在上方「启用模型」中至少启用一个模型。
+                    </div>
                   {:else}
                     <input
                       id="default-model-input"
