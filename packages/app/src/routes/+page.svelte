@@ -10,10 +10,12 @@
    * - 协调组件之间的交互
    * - 处理页面级别的生命周期
    */
-  import { onDestroy, onMount } from "svelte";
+  import { onDestroy, onMount, tick } from "svelte";
   import { get } from "svelte/store";
   import autoAnimate from "@formkit/auto-animate";
   import type { Action } from "svelte/action";
+  import { fly, fade } from "svelte/transition";
+  import { cubicOut } from "svelte/easing";
   import { ScrollArea } from "$lib/components/ui/scroll-area";
   import {
     Tooltip,
@@ -23,12 +25,12 @@
   } from "$lib/components/ui/tooltip";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
-  import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
 
   // Stores
-  import { Theme, type LaunchableItem } from "$lib/type";
+  import { Theme, type LaunchableItem, type AppConfig } from "$lib/type";
   import { theme, getTheme } from "$lib/utils/theme";
   import { startColorPickerFlow } from "$lib/utils/colorPicker";
   import { takeScreenshot } from "$lib/utils/screenshot";
@@ -99,6 +101,29 @@
   let confirmDialogDescription = $state("");
   let pendingAction = $state<(() => void | Promise<void>) | null>(null);
 
+  // Window dimensions
+  const COMPACT_HEIGHT = 70;
+  const EXPANDED_HEIGHT = 600;
+  const DEFAULT_WIDTH = 960;
+
+  let isManualExpanded = $state<boolean>(false);
+  let lastAppliedHeight = $state<number>(EXPANDED_HEIGHT);
+
+  const isCompactMode = $derived(
+    appListManager.state.appConfig?.launcher_mode === "compact",
+  );
+  const hasContent = $derived(
+    Boolean(
+      inputValue.trim() ||
+        clipboard.state.attachedText ||
+        clipboard.state.attachedFiles.length > 0 ||
+        plugin.state.showPluginInline,
+    ),
+  );
+  const isExpanded = $derived(!isCompactMode || hasContent || isManualExpanded);
+
+  const searchPlaceholder = "搜索应用、指令、扩展...";
+
   // AutoAnimate action
   const animate: Action<HTMLElement> = (node) => {
     autoAnimate(node, {
@@ -153,6 +178,50 @@
     return [...result, ...uniqueApps];
   });
 
+  const isScrollable = $derived(!isCompactMode || displayList.length >= 8);
+
+  const getTargetHeight = (): number => {
+    if (!isCompactMode || plugin.state.showPluginInline) return EXPANDED_HEIGHT;
+    if (!isExpanded) return COMPACT_HEIGHT;
+    const count = displayList.length;
+    if (count === 0) return 220;
+    return Math.min(136 + count * 56, EXPANDED_HEIGHT);
+  };
+
+  const syncWindowSize = async (force: boolean = false) => {
+    const targetHeight = getTargetHeight();
+    if (!force && lastAppliedHeight === targetHeight) return;
+    lastAppliedHeight = targetHeight;
+    try {
+      await invoke("resize_main_window", { height: targetHeight });
+    } catch (e) {
+      console.error("Failed to resize window via invoke:", e);
+      try {
+        const currentWin = getCurrentWindow();
+        await currentWin.setSize(new LogicalSize(DEFAULT_WIDTH, targetHeight));
+      } catch (err) {
+        console.error("Failed to sync window size:", err);
+      }
+    }
+  };
+
+  $effect(() => {
+    const _ = displayList.length;
+    const __ = isExpanded;
+    const ___ = isCompactMode;
+    const ____ = plugin.state.showPluginInline;
+    syncWindowSize();
+  });
+
+  // 监听路由返回主页时，确保窗口尺寸与模式匹配
+  $effect(() => {
+    if (page.route.id === "/") {
+      if (isCompactMode && !hasContent && !isManualExpanded) {
+        syncWindowSize(true);
+      }
+    }
+  });
+
   // ===== Effects =====
   // 监听 focus 请求
   $effect(() => {
@@ -188,7 +257,9 @@
     inputValue = "";
     clipboard.clearAttachments();
     matchedCommands = [];
+    extensionPreviewItem = null;
     appListManager.resetToOriginList();
+    isManualExpanded = false;
 
     // 隐藏窗口前主动释放焦点，重置 activeElement 状态，防止混淆下次打开时的焦点判定
     if (typeof document !== "undefined" && document.activeElement) {
@@ -206,9 +277,25 @@
 
   const handleInput = async (value: string) => {
     inputValue = value;
+    if (!value) {
+      isManualExpanded = false;
+    }
     appListManager.handleInput(value);
     updateMatchedCommands();
     updateExtensionManagerPreviewDebounced();
+
+    if (isCompactMode) {
+      if (value.trim() && !isExpanded) {
+        syncWindowSize(true);
+      } else if (
+        !value.trim() &&
+        !isManualExpanded &&
+        !clipboard.state.attachedText &&
+        clipboard.state.attachedFiles.length === 0
+      ) {
+        syncWindowSize(false);
+      }
+    }
   };
 
   // 更新 Extension 预览（带防抖，适用于高频打字）
@@ -294,6 +381,7 @@
     extensionManager.clearPreview();
     matchedCommands = [];
     appListManager.resetToOriginList();
+    isManualExpanded = false;
   };
 
   const startColorPickCommand = async () => {
@@ -328,6 +416,7 @@
     extensionManager.clearPreview();
     matchedCommands = [];
     appListManager.resetToOriginList();
+    isManualExpanded = false;
   };
 
   /** 重置启动器状态并关闭主窗口 */
@@ -337,8 +426,13 @@
   };
 
   /** 重置启动器状态并跳转路由 */
-  const resetAndGoto = (route: string) => {
+  const resetAndGoto = async (route: string) => {
     clearLauncherState();
+    if (isCompactMode && !isExpanded) {
+      await getCurrentWindow().setSize(
+        new LogicalSize(DEFAULT_WIDTH, EXPANDED_HEIGHT),
+      );
+    }
     goto(route);
   };
 
@@ -424,8 +518,13 @@
   const executeApp = async (app: LaunchableItem) => {
     // 拦截内部页面跳转
     if (app.source === "Internal") {
-      await appListManager.openApp(app, {}, () => {
+      await appListManager.openApp(app, {}, async () => {
         resetLauncherState();
+        if (isCompactMode && !isExpanded) {
+          await getCurrentWindow().setSize(
+            new LogicalSize(DEFAULT_WIDTH, EXPANDED_HEIGHT),
+          );
+        }
         if (app.action === "open_settings") {
           goto("/settings");
         } else if (app.action === "open_plugins_manager") {
@@ -545,10 +644,23 @@
   };
 
   const handleNavigationKeyDown = (e: KeyboardEvent) => {
+    if (isCompactMode && !isExpanded) {
+      if (e.key === "ArrowDown" || e.key === "Tab") {
+        e.preventDefault();
+        isManualExpanded = true;
+        appListManager.state.selectedIndex = 0;
+        return;
+      }
+    }
     appListManager.handleKeyDown(e, displayList, handleOpenApp);
   };
 
-  const handleToSettings = () => {
+  const handleToSettings = async () => {
+    if (isCompactMode && !isExpanded) {
+      await getCurrentWindow().setSize(
+        new LogicalSize(DEFAULT_WIDTH, EXPANDED_HEIGHT),
+      );
+    }
     goto("/settings");
   };
 
@@ -613,6 +725,7 @@
       "window_visibility",
       async (event) => {
         if (event.payload) {
+          await appListManager.loadConfig();
           await appListManager.fetchApps();
 
           if (!plugin.state.showPluginInline) {
@@ -626,6 +739,17 @@
           );
           updateMatchedCommands();
           await updateExtensionManagerPreview(); // 更新 Extension 预览（如计算器）
+
+          if (isCompactMode && !hasContent) {
+            isManualExpanded = false;
+            await syncWindowSize(false);
+          }
+        } else {
+          // 窗口已隐藏到后台（屏幕无可见变化），静默重置为单输入框收起态
+          if (isCompactMode) {
+            isManualExpanded = false;
+            await syncWindowSize(false);
+          }
         }
 
         // 转发可见性事件给插件
@@ -653,6 +777,20 @@
       handleEsc();
     });
 
+    // 监听配置更新事件（如在设置页更改了启动器模式）
+    const unlistenConfig = await listen<AppConfig>(
+      "app_config_updated",
+      async (event) => {
+        appListManager.state.appConfig = event.payload;
+        if (event.payload.launcher_mode === "compact" && !hasContent) {
+          isManualExpanded = false;
+          await syncWindowSize(true);
+        } else if (event.payload.launcher_mode === "standard") {
+          await syncWindowSize(true);
+        }
+      },
+    );
+
     // 设置 composables 的事件监听
     const unlistenPlugin = await plugin.setupListeners();
     const unlistenAppList = await appListManager.setupListeners();
@@ -662,6 +800,7 @@
       unlistenClearClipboard();
       unlistenFocus();
       unlistenEsc();
+      unlistenConfig();
       unlistenPlugin();
       unlistenAppList();
     };
@@ -703,8 +842,8 @@
       tabindex="0"
       onkeydown={handleNavigationKeyDown}
     >
-      <!-- Header: Logo + Search Input + Plugin Menu -->
-      <div class="border-border/40 flex items-center gap-2.5 border-b pb-2.5">
+      <!-- Header: Logo + Search Input + Plugin Menu (坐标恒定，绝不发生任何位移) -->
+      <div class="flex items-center gap-2.5">
         <TooltipProvider delayDuration={400}>
           <Tooltip>
             <TooltipTrigger
@@ -743,6 +882,7 @@
           <SearchInput
             bind:this={searchInputRef}
             bind:value={inputValue}
+            placeholder={searchPlaceholder}
             attachedText={clipboard.state.attachedText}
             attachedFiles={clipboard.state.attachedFiles}
             showAllFiles={clipboard.state.showAllFiles}
@@ -782,142 +922,157 @@
         </div>
       </div>
 
-      <!-- Content Area -->
-      <div class="relative flex-1 overflow-hidden pt-2">
-        <RefreshProgressBar isRefreshing={appListManager.state.isRefreshing} />
+      {#if isExpanded}
+        <!-- 分隔线：仅在展开时显示，位于 Header 下方，绝不影响 Header 和输入框的物理坐标 -->
+        <div
+          transition:fade={{ duration: 120 }}
+          class="border-border/40 mt-2.5 mb-1.5 border-b"
+        ></div>
 
-        {#if plugin.state.showPluginInline}
-          <!-- Plugin Inline View -->
-          <PluginInlineView
-            bind:this={pluginInlineViewRef}
-            url={plugin.state.currentPluginUrl}
-            pluginId={plugin.state.currentPluginId}
-            version={plugin.state.currentPluginVersion}
-            onLoad={() => {
-              // No-op for now, logic potentially moved to component or manager
-            }}
-          />
-        {:else if displayList.length === 0}
-          <!-- Empty State -->
-          <div
-            class="flex h-full flex-col items-center justify-center py-10 text-center select-none"
-          >
-            <div
-              class="bg-muted/40 border-border/50 text-muted-foreground/50 mb-3 flex h-11 w-11 items-center justify-center rounded-2xl border shadow-2xs"
-            >
-              <svg
-                class="h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="1.5"
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-            </div>
-            <p class="text-foreground/85 text-xs font-medium tracking-tight">
-              未找到匹配的结果
-            </p>
-            <p
-              class="text-muted-foreground/60 mt-1 max-w-xs text-[11px] leading-normal"
-            >
-              {#if inputValue}
-                换个关键词搜索，或按 <kbd
-                  class="border-border bg-muted text-foreground/80 shadow-kbd rounded border px-1 py-0.5 font-mono text-[9px]"
-                  >Esc</kbd
-                > 清空
-              {:else}
-                请输入应用名、拼音缩写或粘贴内容
-              {/if}
-            </p>
-          </div>
-        {:else}
-          <!-- App List -->
-          <ScrollArea
-            class="h-full w-full"
-            viewportClass="h-full w-full overflow-x-hidden pr-1.5"
-          >
-            <div class="app-list flex flex-col gap-1 overflow-hidden py-1">
-              {#each displayList as app, index ((app.action || "") + app.path + app.name + index)}
-                {#if app.path.startsWith("extension:")}
-                  <!-- Extension 预览项（如计算器结果） -->
-                  <ExtensionResultItem
-                    title={app.name}
-                    description={app.description || ""}
-                    icon={app.icon}
-                    triggerMode={app.trigger_mode}
-                    isSelected={appListManager.state.selectedIndex === index}
-                    onClick={() => handleOpenApp(app)}
-                    onHover={(e) => handleItemHover(index, e)}
-                  />
-                {:else}
-                  <AppListItem
-                    {app}
-                    isSelected={appListManager.state.selectedIndex === index}
-                    onClick={() => handleOpenApp(app)}
-                    onHover={(e) => handleItemHover(index, e)}
-                  />
-                {/if}
-              {/each}
-            </div>
-          </ScrollArea>
-        {/if}
-      </div>
-
-      <!-- Footer: Raycast-style Action Hints -->
-      {#if !plugin.state.showPluginInline}
-        {@const currentSelectedItem =
-          displayList[appListManager.state.selectedIndex]}
-        <footer
-          class="border-border/40 mt-1 flex items-center justify-between border-t pt-2 pb-0.5 text-xs select-none"
+        <!-- Content Area: 130ms 超轻快柔和淡入 -->
+        <div
+          transition:fly={{ y: -6, duration: 130, easing: cubicOut }}
+          class="relative flex-1 overflow-hidden"
         >
-          <!-- 左侧：当前选中项信息 -->
-          <div
-            class="text-muted-foreground/60 flex min-w-0 items-center gap-1.5 text-[11px]"
-          >
-            {#if currentSelectedItem}
-              <span
-                class="text-foreground/75 max-w-[160px] truncate font-medium"
-                >{currentSelectedItem.name}</span
-              >
-              <span class="text-muted-foreground/30">•</span>
-              <span class="text-muted-foreground/50"
-                >{currentSelectedItem.source_display ||
-                  (currentSelectedItem.source === "Internal"
-                    ? "内置"
-                    : currentSelectedItem.source)}</span
-              >
-            {:else}
-              <span class="text-muted-foreground/50">Onin Launcher</span>
-            {/if}
-          </div>
+          <RefreshProgressBar
+            isRefreshing={appListManager.state.isRefreshing}
+          />
 
-          <!-- 右侧：快捷键实体键帽提示 -->
-          <div class="flex shrink-0 items-center gap-2.5">
+          {#if plugin.state.showPluginInline}
+            <!-- Plugin Inline View -->
+            <PluginInlineView
+              bind:this={pluginInlineViewRef}
+              url={plugin.state.currentPluginUrl}
+              pluginId={plugin.state.currentPluginId}
+              version={plugin.state.currentPluginVersion}
+              onLoad={() => {
+                // No-op for now, logic potentially moved to component or manager
+              }}
+            />
+          {:else if displayList.length === 0}
+            <!-- Empty State -->
             <div
-              class="text-muted-foreground/60 flex items-center gap-1 text-[11px]"
+              class="flex h-full flex-col items-center justify-center py-10 text-center select-none"
             >
-              <kbd
-                class="border-border/80 bg-muted text-foreground/80 shadow-kbd inline-flex h-4.5 min-w-[18px] items-center justify-center rounded border px-1 font-mono text-[10px] font-semibold"
-                >↵</kbd
+              <div
+                class="bg-muted/40 border-border/50 text-muted-foreground/50 mb-3 flex h-11 w-11 items-center justify-center rounded-2xl border shadow-2xs"
               >
-              <span class="text-[10.5px]">打开</span>
+                <svg
+                  class="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="1.5"
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+              </div>
+              <p class="text-foreground/85 text-xs font-medium tracking-tight">
+                未找到匹配的结果
+              </p>
+              <p
+                class="text-muted-foreground/60 mt-1 max-w-xs text-[11px] leading-normal"
+              >
+                {#if inputValue}
+                  换个关键词搜索，或按 <kbd
+                    class="border-border bg-muted text-foreground/80 shadow-kbd rounded border px-1 py-0.5 font-mono text-[9px]"
+                    >Esc</kbd
+                  > 清空
+                {:else}
+                  请输入应用名、拼音缩写或粘贴内容
+                {/if}
+              </p>
             </div>
+          {:else}
+            <!-- App List -->
+            <ScrollArea
+              class="h-full w-full"
+              viewportClass="h-full w-full overflow-x-hidden pr-1.5"
+              orientation={isScrollable ? "vertical" : "horizontal"}
+            >
+              <div class="app-list flex flex-col gap-1 overflow-hidden py-1">
+                {#each displayList as app, index ((app.action || "") + app.path + app.name + index)}
+                  {#if app.path.startsWith("extension:")}
+                    <!-- Extension 预览项（如计算器结果） -->
+                    <ExtensionResultItem
+                      title={app.name}
+                      description={app.description || ""}
+                      icon={app.icon}
+                      triggerMode={app.trigger_mode}
+                      isSelected={appListManager.state.selectedIndex === index}
+                      onClick={() => handleOpenApp(app)}
+                      onHover={(e) => handleItemHover(index, e)}
+                    />
+                  {:else}
+                    <AppListItem
+                      {app}
+                      isSelected={appListManager.state.selectedIndex === index}
+                      onClick={() => handleOpenApp(app)}
+                      onHover={(e) => handleItemHover(index, e)}
+                    />
+                  {/if}
+                {/each}
+              </div>
+            </ScrollArea>
+          {/if}
+        </div>
+
+        <!-- Footer: Raycast-style Action Hints -->
+        {#if !plugin.state.showPluginInline}
+          {@const currentSelectedItem =
+            displayList[appListManager.state.selectedIndex]}
+          <footer
+            transition:fade={{ duration: 120 }}
+            class="border-border/40 mt-1 flex items-center justify-between border-t pt-2 pb-0.5 text-xs select-none"
+          >
+            <!-- 左侧：当前选中项信息 -->
             <div
-              class="text-muted-foreground/60 flex items-center gap-1 text-[11px]"
+              class="text-muted-foreground/60 flex min-w-0 items-center gap-1.5 text-[11px]"
             >
-              <kbd
-                class="border-border/80 bg-muted text-foreground/80 shadow-kbd inline-flex h-4.5 min-w-[18px] items-center justify-center rounded border px-1 font-mono text-[10px] font-semibold"
-                >Esc</kbd
-              >
-              <span class="text-[10.5px]">关闭</span>
+              {#if currentSelectedItem}
+                <span
+                  class="text-foreground/75 max-w-[160px] truncate font-medium"
+                  >{currentSelectedItem.name}</span
+                >
+                <span class="text-muted-foreground/30">•</span>
+                <span class="text-muted-foreground/50"
+                  >{currentSelectedItem.source_display ||
+                    (currentSelectedItem.source === "Internal"
+                      ? "内置"
+                      : currentSelectedItem.source)}</span
+                >
+              {:else}
+                <span class="text-muted-foreground/50">Onin Launcher</span>
+              {/if}
             </div>
-          </div>
-        </footer>
+
+            <!-- 右侧：快捷键实体键帽提示 -->
+            <div class="flex shrink-0 items-center gap-2.5">
+              <div
+                class="text-muted-foreground/60 flex items-center gap-1 text-[11px]"
+              >
+                <kbd
+                  class="border-border/80 bg-muted text-foreground/80 shadow-kbd inline-flex h-4.5 min-w-[18px] items-center justify-center rounded border px-1 font-mono text-[10px] font-semibold"
+                  >↵</kbd
+                >
+                <span class="text-[10.5px]">打开</span>
+              </div>
+              <div
+                class="text-muted-foreground/60 flex items-center gap-1 text-[11px]"
+              >
+                <kbd
+                  class="border-border/80 bg-muted text-foreground/80 shadow-kbd inline-flex h-4.5 min-w-[18px] items-center justify-center rounded border px-1 font-mono text-[10px] font-semibold"
+                  >Esc</kbd
+                >
+                <span class="text-[10.5px]">关闭</span>
+              </div>
+            </div>
+          </footer>
+        {/if}
       {/if}
     </div>
   </main>

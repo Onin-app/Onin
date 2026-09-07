@@ -14,7 +14,12 @@
 
   import { theme, toggleTheme } from "$lib/utils/theme";
   import { windowOpacity, setWindowOpacity } from "$lib/stores/opacity";
-  import { Theme, type SortMode, type AppConfig } from "$lib/type";
+  import {
+    Theme,
+    type SortMode,
+    type AppConfig,
+    type LauncherMode,
+  } from "$lib/type";
   import {
     detachWindowShortcut,
     toggleWindowShortcut,
@@ -36,7 +41,13 @@
     { value: Theme.DARK, label: "暗黑" },
   ];
 
+  const launcherModeList: { value: LauncherMode; label: string }[] = [
+    { value: "standard", label: "标准模式" },
+    { value: "compact", label: "简洁模式" },
+  ];
+
   let currentTheme = $state<Theme>(Theme.DARK);
+  let launcherMode = $state<LauncherMode>("standard");
   let windowOpacityVal = $state<number>(100);
   let autostartEnabled = $state<boolean>(false);
   let trayIconEnabled = $state<boolean>(false);
@@ -105,6 +116,11 @@
     setWindowOpacity(value);
   };
 
+  const handleLauncherModeChange = (mode: LauncherMode) => {
+    launcherMode = mode;
+    updateConfig();
+  };
+
   const updateConfig = async () => {
     try {
       await invoke("update_app_config", {
@@ -117,6 +133,7 @@
           disabled_extension_ids: disabledExtensionIds,
           auto_check_update: autoCheckUpdate,
           window_opacity: windowOpacityVal,
+          launcher_mode: launcherMode,
         },
       });
       toast.success("配置已保存");
@@ -205,6 +222,7 @@
       marketplaceApiUrl = config.marketplace_api_url || "";
       disabledExtensionIds = config.disabled_extension_ids || [];
       autoCheckUpdate = config.auto_check_update ?? true;
+      launcherMode = config.launcher_mode ?? "standard";
       if (config.window_opacity !== undefined) {
         windowOpacityVal = config.window_opacity;
         setWindowOpacity(config.window_opacity);
@@ -271,6 +289,28 @@
                 {windowOpacityVal}%
               </span>
             </div>
+          {/snippet}
+        </SetItem>
+        <SetItem
+          title="主窗口模式"
+          description={launcherMode === "compact"
+            ? "简洁模式：唤起时仅展示输入框，键入或按 ↓ 时自动展开"
+            : "标准模式：唤起时展示完整面板，直接浏览推荐与搜索结果"}
+        >
+          {#snippet content()}
+            <Tabs
+              value={launcherMode}
+              onValueChange={(v) =>
+                v && handleLauncherModeChange(v as LauncherMode)}
+            >
+              <TabsList>
+                {#each launcherModeList as item}
+                  <TabsTrigger value={item.value}>
+                    {item.label}
+                  </TabsTrigger>
+                {/each}
+              </TabsList>
+            </Tabs>
           {/snippet}
         </SetItem>
       </Card>

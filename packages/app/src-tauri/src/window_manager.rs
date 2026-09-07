@@ -143,10 +143,12 @@ pub fn move_window_to_cursor_monitor(window: &tauri::WebviewWindow) {
                 .outer_size()
                 .unwrap_or(tauri::PhysicalSize::new(960, 600));
 
-            // 计算居中坐标 (物理像素)
+            let scale_factor = monitor.scale_factor();
+            let standard_height_px = (600.0 * scale_factor) as i32;
+
+            // 计算居中坐标 (物理像素)：X 居中，Y 以标准 600 高度基准居中锚定顶部，避免单行模式与展开模式间 Y 轴跳跃
             let new_x = monitor_pos.x + (monitor_size.width as i32 - window_size.width as i32) / 2;
-            let new_y =
-                monitor_pos.y + (monitor_size.height as i32 - window_size.height as i32) / 2;
+            let new_y = monitor_pos.y + (monitor_size.height as i32 - standard_height_px) / 2;
 
             if let Err(e) = window.set_position(tauri::PhysicalPosition::new(new_x, new_y)) {
                 eprintln!("[window_manager] 移动窗口失败: {}", e);
@@ -180,6 +182,23 @@ pub fn release_window_close_lock(state: State<WindowCloseLockState>) {
 #[tauri::command]
 pub fn close_main_window(app: tauri::AppHandle, _state: State<WindowState>) {
     request_hide(&app);
+}
+
+/// 动态调整主窗口高度
+#[tauri::command]
+pub fn resize_main_window(app: tauri::AppHandle, height: f64) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("main") {
+        let logical_width = 960.0;
+        window
+            .set_size(tauri::Size::Logical(tauri::LogicalSize::new(
+                logical_width,
+                height,
+            )))
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    } else {
+        Err("main window not found".to_string())
+    }
 }
 
 /// 统一的"显示主窗口"入口

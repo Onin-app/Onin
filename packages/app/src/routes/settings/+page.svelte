@@ -4,6 +4,7 @@
   import { Button } from "bits-ui";
 
   import { goto } from "$app/navigation";
+  import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
   import {
     Gear,
     RocketLaunch,
@@ -117,6 +118,12 @@
   };
 
   onMount(() => {
+    if (typeof window !== "undefined" && (window as any).__TAURI_INTERNALS__) {
+      getCurrentWindow()
+        .setSize(new LogicalSize(960, 600))
+        .catch(console.error);
+    }
+
     // Register this page's ESC handler
     escapeHandler.set(handleEsc);
 

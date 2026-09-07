@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Mutex;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SortMode {
@@ -18,6 +18,20 @@ pub enum SortMode {
 impl Default for SortMode {
     fn default() -> Self {
         SortMode::Smart
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum LauncherMode {
+    #[serde(rename = "standard")]
+    Standard, // 标准模式（完整面板）
+    #[serde(rename = "compact")]
+    Compact, // 简洁模式（仅输入框，按需展开）
+}
+
+impl Default for LauncherMode {
+    fn default() -> Self {
+        LauncherMode::Standard
     }
 }
 
@@ -110,6 +124,10 @@ pub struct AppConfig {
     /// 窗口透明度百分比 (30 - 100)，默认 100
     #[serde(default = "default_window_opacity")]
     pub window_opacity: u32,
+
+    /// 主窗口模式 ("standard" | "compact")
+    #[serde(default)]
+    pub launcher_mode: LauncherMode,
 }
 
 fn default_auto_paste_time_limit() -> u64 {
@@ -157,6 +175,7 @@ impl Default for AppConfig {
             ocr_provider_id: None,
             ocr_model_id: None,
             window_opacity: default_window_opacity(),
+            launcher_mode: LauncherMode::default(),
         }
     }
 }
@@ -235,6 +254,9 @@ pub fn update_app_config(
         let mut current_config = state.0.lock().map_err(|e| e.to_string())?;
         *current_config = config.clone();
     }
+
+    // 广播配置更新事件
+    let _ = app.emit("app_config_updated", &config);
 
     Ok(())
 }

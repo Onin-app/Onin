@@ -34,7 +34,7 @@
     attachedText,
     attachedFiles,
     showAllFiles,
-    placeholder = "Hi Onin!",
+    placeholder = "搜索应用、指令、扩展...",
     onInput,
     onPaste,
     onDrop,
@@ -74,7 +74,7 @@
 <div
   class="flex w-full {showAllFiles
     ? 'flex-col gap-2'
-    : 'flex-row items-center gap-2'} bg-transparent px-1 py-1"
+    : 'flex-row items-center gap-2'} bg-transparent px-1 py-0"
   ondrop={onDrop}
   ondragover={onDragOver}
   role="region"
@@ -124,7 +124,7 @@
     bind:this={inputElement}
     class="{showAllFiles
       ? 'w-full'
-      : 'min-w-0 flex-1'} text-foreground placeholder:text-muted-foreground/50 h-10 border-none bg-transparent text-xl font-normal tracking-tight outline-none focus:ring-0 focus:outline-none active:outline-none"
+      : 'min-w-0 flex-1'} text-foreground placeholder:text-muted-foreground/70 h-10 border-none bg-transparent text-xl font-normal tracking-tight outline-none focus:ring-0 focus:outline-none active:outline-none"
     type="text"
     {placeholder}
     bind:value
