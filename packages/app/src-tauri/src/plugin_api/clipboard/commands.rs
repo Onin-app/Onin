@@ -188,10 +188,36 @@ pub async fn plugin_clipboard_get_metadata(
 }
 
 /// 读取剪贴板内容
+/// 读取剪贴板内容
 #[tauri::command]
 pub async fn get_clipboard_content(app: AppHandle) -> Result<ClipboardContent, ClipboardError> {
     let timestamp = get_clipboard_timestamp();
 
+    // 1. 优先读取预热/历史缓存
+    if let Some(cached) = super::timestamp::get_cached_clipboard_content(timestamp) {
+        return Ok(cached);
+    }
+
+    // 2. 未命中缓存时，在独立阻塞任务中读取，避免阻塞 Tokio 异步运行时
+    let content =
+        tokio::task::spawn_blocking(move || -> Result<ClipboardContent, ClipboardError> {
+            read_clipboard_content_sync(&app, timestamp)
+        })
+        .await
+        .map_err(|e| ClipboardError::from(format!("Clipboard worker task failed: {}", e)))??;
+
+    // 3. 回填缓存
+    if let Some(ts) = timestamp {
+        super::timestamp::set_cached_clipboard_content(ts, content.clone());
+    }
+
+    Ok(content)
+}
+
+fn read_clipboard_content_sync(
+    app: &AppHandle,
+    timestamp: Option<u64>,
+) -> Result<ClipboardContent, ClipboardError> {
     // 先尝试读取文件路径
     #[cfg(any(target_os = "windows", target_os = "linux"))]
     {

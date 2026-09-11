@@ -137,9 +137,24 @@ impl ClipboardMonitor {
                                 text: "Image copied".to_string(),
                                 timestamp: now_ts(),
                                 item_type: "Image".to_string(),
-                                thumbnail: Some(thumbnail),
+                                thumbnail: Some(thumbnail.clone()),
                                 image_path: None,
                             });
+
+                            // 预热剪贴板内容缓存，以便快捷键呼出时直接命中缓存（0ms延迟）
+                            if let Some(ts) =
+                                crate::plugin_api::clipboard::get_clipboard_timestamp()
+                            {
+                                crate::plugin_api::clipboard::set_cached_clipboard_content(
+                                    ts,
+                                    crate::plugin_api::clipboard::ClipboardContent {
+                                        text: None,
+                                        files: None,
+                                        image: Some(thumbnail),
+                                        timestamp: Some(ts),
+                                    },
+                                );
+                            }
                         } else {
                             *current_hash = self.last_content_hash.clone();
                         }
@@ -184,6 +199,35 @@ impl ClipboardHandler for ClipboardMonitor {
                         thumbnail: None,
                         image_path: None,
                     });
+
+                    // 预热剪贴板文件缓存
+                    if let Some(ts) = crate::plugin_api::clipboard::get_clipboard_timestamp() {
+                        let clipboard_files = files
+                            .iter()
+                            .map(|f| {
+                                let p = std::path::Path::new(f);
+                                crate::plugin_api::clipboard::ClipboardFile {
+                                    path: f.clone(),
+                                    name: p
+                                        .file_name()
+                                        .and_then(|n| n.to_str())
+                                        .unwrap_or("Unknown")
+                                        .to_string(),
+                                    is_directory: p.is_dir(),
+                                }
+                            })
+                            .collect();
+
+                        crate::plugin_api::clipboard::set_cached_clipboard_content(
+                            ts,
+                            crate::plugin_api::clipboard::ClipboardContent {
+                                text: None,
+                                files: Some(clipboard_files),
+                                image: None,
+                                timestamp: Some(ts),
+                            },
+                        );
+                    }
                 }
             }
         }
@@ -208,12 +252,25 @@ impl ClipboardHandler for ClipboardMonitor {
                     if current_hash != self.last_content_hash {
                         new_item = Some(ClipboardItem {
                             id: uuid::Uuid::new_v4().to_string(),
-                            text,
+                            text: text.clone(),
                             timestamp: now_ts(),
                             item_type: "Text".to_string(),
                             thumbnail: None,
                             image_path: None,
                         });
+
+                        // 预热剪贴板文本缓存
+                        if let Some(ts) = crate::plugin_api::clipboard::get_clipboard_timestamp() {
+                            crate::plugin_api::clipboard::set_cached_clipboard_content(
+                                ts,
+                                crate::plugin_api::clipboard::ClipboardContent {
+                                    text: Some(text),
+                                    files: None,
+                                    image: None,
+                                    timestamp: Some(ts),
+                                },
+                            );
+                        }
                     }
                 }
             }

@@ -725,18 +725,15 @@
       "window_visibility",
       async (event) => {
         if (event.payload) {
-          await appListManager.loadConfig();
-          await appListManager.fetchApps();
-
           if (!plugin.state.showPluginInline) {
             requestInputFocus();
           } else {
             invoke("focus_inline_plugin").catch(console.error);
           }
 
-          await clipboard.autoPasteClipboard(
-            appListManager.state.appConfig.auto_paste_time_limit,
-          );
+          const cachedLimit =
+            appListManager.state.appConfig?.auto_paste_time_limit ?? 15;
+          await clipboard.autoPasteClipboard(cachedLimit);
           updateMatchedCommands();
           await updateExtensionManagerPreview(); // 更新 Extension 预览（如计算器）
 
@@ -744,6 +741,17 @@
             isManualExpanded = false;
             await syncWindowSize(false);
           }
+
+          // 后台异步静默刷新配置和应用列表，不阻塞前台交互和剪贴板即时显示
+          Promise.all([
+            appListManager.loadConfig(),
+            appListManager.fetchApps(),
+          ]).catch((err) => {
+            console.error(
+              "Failed to refresh config or apps in background:",
+              err,
+            );
+          });
         } else {
           // 窗口已隐藏到后台（屏幕无可见变化），静默重置为单输入框收起态
           if (isCompactMode) {
