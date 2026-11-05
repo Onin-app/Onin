@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+  import { invoke } from "@tauri-apps/api/core";
   import { emit } from "@tauri-apps/api/event";
   import { onDestroy, onMount } from "svelte";
   import { get } from "svelte/store";
@@ -8,7 +8,17 @@
   import { escapeHandler } from "$lib/stores/escapeHandler";
   import "../../index.css";
 
-  let engine = $state("sougou");
+  const getInitialEngine = () => {
+    if (typeof window !== "undefined") {
+      const param = new URLSearchParams(window.location.search).get("engine");
+      if (param && ["sougou", "google", "baidu"].includes(param)) {
+        return param;
+      }
+    }
+    return "sougou";
+  };
+
+  let engine = $state(getInitialEngine());
 
   const engines = [
     { id: "sougou", label: "搜狗" },
@@ -24,14 +34,22 @@
 
   const handleEsc = async () => {
     try {
-      await WebviewWindow.getCurrent().close();
+      await invoke("close_translator_window");
     } catch (e) {
       console.error("Failed to close translator window on Esc:", e);
     }
   };
 
-  onMount(() => {
+  onMount(async () => {
     escapeHandler.set(handleEsc);
+    try {
+      const current = await invoke<string>("get_translator_engine");
+      if (current && ["sougou", "google", "baidu"].includes(current)) {
+        engine = current;
+      }
+    } catch (e) {
+      // 忽略降级错误
+    }
   });
 
   onDestroy(() => {

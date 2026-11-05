@@ -106,6 +106,7 @@ export interface Shortcut {
 }
 
 export type SortMode = "smart" | "frequency" | "recent" | "default";
+export type LauncherMode = "standard" | "compact";
 
 export interface CommandUsageStats {
   command_name: string;
@@ -138,4 +139,5 @@ export interface AppConfig {
   ocr_provider_id?: string | null;
   ocr_model_id?: string | null;
   window_opacity?: number;
+  launcher_mode?: LauncherMode;
 }

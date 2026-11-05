@@ -60,6 +60,7 @@ export function useAppList(): AppListManagerReturn {
       auto_clear_time_limit: 0,
       sort_mode: "smart",
       enable_usage_tracking: true,
+      launcher_mode: "standard",
     },
     isRefreshing: false,
   });

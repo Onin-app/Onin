@@ -8,6 +8,8 @@ use once_cell::sync::Lazy;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use super::types::ClipboardContent;
+
 // 应用层时间戳
 pub(crate) static CLIPBOARD_TIMESTAMP: Lazy<Mutex<u64>> = Lazy::new(|| Mutex::new(0));
 
@@ -16,6 +18,10 @@ pub(crate) static PLUGIN_CLIPBOARD_TIMESTAMP: Lazy<Mutex<u64>> = Lazy::new(|| Mu
 
 // 窗口隐藏时间戳
 pub(crate) static WINDOW_HIDE_TIMESTAMP: Lazy<Mutex<Option<u64>>> = Lazy::new(|| Mutex::new(None));
+
+// 剪贴板内容缓存 (时间戳, 剪贴板内容)
+pub(crate) static CLIPBOARD_CONTENT_CACHE: Lazy<Mutex<Option<(u64, ClipboardContent)>>> =
+    Lazy::new(|| Mutex::new(None));
 
 /// 更新剪贴板时间戳
 ///
@@ -34,6 +40,10 @@ pub fn update_clipboard_timestamp() {
     // 更新插件层时间戳
     let mut plugin_ts = PLUGIN_CLIPBOARD_TIMESTAMP.lock().unwrap();
     *plugin_ts = timestamp;
+    drop(plugin_ts);
+
+    // 清空失效的旧缓存
+    clear_clipboard_cache();
 }
 
 /// 获取应用层剪贴板时间戳
@@ -58,4 +68,28 @@ pub fn get_plugin_clipboard_timestamp() -> Option<u64> {
     } else {
         Some(*ts)
     }
+}
+
+/// 获取已缓存的剪贴板内容（仅当时间戳匹配时命中）
+pub fn get_cached_clipboard_content(expected_timestamp: Option<u64>) -> Option<ClipboardContent> {
+    let ts = expected_timestamp?;
+    let cache = CLIPBOARD_CONTENT_CACHE.lock().unwrap();
+    if let Some((cached_ts, ref content)) = *cache {
+        if cached_ts == ts {
+            return Some(content.clone());
+        }
+    }
+    None
+}
+
+/// 设置剪贴板内容缓存
+pub fn set_cached_clipboard_content(timestamp: u64, content: ClipboardContent) {
+    let mut cache = CLIPBOARD_CONTENT_CACHE.lock().unwrap();
+    *cache = Some((timestamp, content));
+}
+
+/// 清空剪贴板内容缓存
+pub fn clear_clipboard_cache() {
+    let mut cache = CLIPBOARD_CONTENT_CACHE.lock().unwrap();
+    *cache = None;
 }

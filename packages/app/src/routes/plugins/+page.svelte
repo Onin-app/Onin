@@ -10,6 +10,7 @@
   import { Tabs } from "bits-ui";
   import { CheckCircle, Storefront } from "phosphor-svelte";
   import { goto } from "$app/navigation";
+  import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
   import { escapeHandler } from "$lib/stores/escapeHandler";
   import { ScrollArea } from "$lib/components/ui/scroll-area";
 
@@ -76,6 +77,11 @@
 
   // ===== Lifecycle =====
   onMount(async () => {
+    if (typeof window !== "undefined" && (window as any).__TAURI_INTERNALS__) {
+      getCurrentWindow()
+        .setSize(new LogicalSize(960, 600))
+        .catch(console.error);
+    }
     escapeHandler.set(handleEsc);
     await pluginList.loadPlugins(false);
     unlisten = await pluginList.setupListeners();

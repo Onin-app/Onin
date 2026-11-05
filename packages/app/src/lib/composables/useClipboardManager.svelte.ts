@@ -30,6 +30,18 @@ export interface ClipboardManagerReturn {
     inputText?: string,
   ) => LaunchableItem[];
 }
+function base64ToBlob(base64Data: string, mimeType = "image/png"): Blob {
+  const commaIndex = base64Data.indexOf(",");
+  const base64Str =
+    commaIndex !== -1 ? base64Data.slice(commaIndex + 1) : base64Data;
+  const binaryString = atob(base64Str);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return new Blob([bytes], { type: mimeType });
+}
 
 export function useClipboardManager(): ClipboardManagerReturn {
   let state = $state<ClipboardState>({
@@ -162,8 +174,13 @@ export function useClipboardManager(): ClipboardManagerReturn {
         }
       } else if (clipboardContent.image) {
         try {
-          const res = await fetch(clipboardContent.image);
-          const blob = await res.blob();
+          let blob: Blob;
+          try {
+            blob = base64ToBlob(clipboardContent.image, "image/png");
+          } catch {
+            const res = await fetch(clipboardContent.image);
+            blob = await res.blob();
+          }
           const file = new File([blob], "image.png", { type: "image/png" });
           state.attachedText = "";
           state.attachedFiles = [file];

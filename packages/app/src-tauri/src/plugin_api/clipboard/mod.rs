@@ -19,5 +19,7 @@ pub use commands::{
     plugin_clipboard_read_text, plugin_clipboard_write_image, plugin_clipboard_write_text,
 };
 pub use monitor::init_clipboard_service;
-pub use timestamp::update_clipboard_timestamp;
-pub use types::{WriteImageOptions, WriteTextOptions};
+pub use timestamp::{
+    get_clipboard_timestamp, set_cached_clipboard_content, update_clipboard_timestamp,
+};
+pub use types::{ClipboardContent, ClipboardFile, WriteImageOptions, WriteTextOptions};

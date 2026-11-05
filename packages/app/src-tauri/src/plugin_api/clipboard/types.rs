@@ -44,7 +44,7 @@ pub struct WriteImageOptions {
 }
 
 /// 剪贴板文件信息
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClipboardFile {
     pub path: String,
     pub name: String,
@@ -52,7 +52,7 @@ pub struct ClipboardFile {
 }
 
 /// 剪贴板内容
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClipboardContent {
     pub text: Option<String>,
     pub files: Option<Vec<ClipboardFile>>,
