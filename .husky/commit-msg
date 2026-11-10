@@ -1,1 +1,3 @@
+[ "$CI" = "true" ] && exit 0
+
 pnpm exec commitlint --edit "$1"

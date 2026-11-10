@@ -24,6 +24,9 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  HUSKY: '0'
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -73,6 +76,7 @@ jobs:
         id: release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HUSKY: '0'
         run: |
           # 记录发布前的版本
           OLD_VERSION=$(node -p "require('./packages/app/package.json').version")
