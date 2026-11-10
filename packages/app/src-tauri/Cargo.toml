@@ -101,6 +101,9 @@ tower-http = { version = "0.5", features = ["fs", "cors"] }
 zip = "2.2"
 tempfile = "3.13"
 evalexpr = "12"
+specta = { version = "2.0.0-rc.28", features = ["derive"] }
+specta-typescript = "0.0.15"
+specta-serde = "0.0.15"
 
 [target.'cfg(windows)'.dependencies]
 everything-ipc = "0.1.2"

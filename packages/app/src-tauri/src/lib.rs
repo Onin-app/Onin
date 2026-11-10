@@ -13,6 +13,7 @@ mod app_config;
 mod command_manager;
 mod commands;
 pub mod data_manager;
+pub mod export_types;
 mod extension;
 mod extensions;
 mod file_command_manager;

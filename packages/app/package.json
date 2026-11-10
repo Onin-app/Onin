@@ -16,6 +16,7 @@
     "format": "prettier --write \"src/**/*.svelte\"",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
+    "types:generate": "cargo test test_export_types --manifest-path src-tauri/Cargo.toml -- --nocapture && prettier --write src/lib/types/bindings.ts",
     "release": "semantic-release"
   },
   "license": "GPL-3.0",
