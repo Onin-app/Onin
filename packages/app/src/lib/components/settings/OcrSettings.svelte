@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
+  import { getAppConfig, updateAppConfig } from "$lib/api/config";
   import { toast } from "svelte-sonner";
   import {
     Select,
@@ -164,7 +165,7 @@
   async function loadData() {
     loading = true;
     try {
-      config = await invoke<AppConfig>("get_app_config");
+      config = await getAppConfig();
       aiConfig = await invoke<AIConfig>("get_ai_config");
     } catch (error) {
       console.error("Failed to load OCR settings data:", error);
@@ -179,7 +180,7 @@
     if (!config || saving) return;
     saving = true;
     try {
-      await invoke("update_app_config", { config });
+      await updateAppConfig(config);
     } catch (error) {
       console.error("Failed to save OCR config:", error);
       toast.error("保存 OCR 设置失败");

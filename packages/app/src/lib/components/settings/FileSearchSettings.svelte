@@ -1,6 +1,11 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
+  import { getAppConfig, updateAppConfig } from "$lib/api/config";
+  import {
+    acquireWindowCloseLock,
+    releaseWindowCloseLock,
+  } from "$lib/api/window";
   import { open } from "@tauri-apps/plugin-dialog";
   import { platform } from "@tauri-apps/plugin-os";
   import { Button } from "$lib/components/ui/button";
@@ -78,7 +83,7 @@
   async function loadConfig() {
     loading = true;
     try {
-      config = await invoke<AppConfig>("get_app_config");
+      config = await getAppConfig();
     } catch (error) {
       console.error("Failed to load file search config:", error);
       toast.error("加载文件搜索配置失败");
@@ -102,10 +107,10 @@
 
     try {
       if (acquire) {
-        await invoke("acquire_window_close_lock");
+        await acquireWindowCloseLock();
         everythingInstallCloseLockHeld = true;
       } else {
-        await invoke("release_window_close_lock");
+        await releaseWindowCloseLock();
         everythingInstallCloseLockHeld = false;
       }
     } catch (error) {
@@ -119,9 +124,7 @@
   async function saveConfig(nextConfig: AppConfig) {
     saving = true;
     try {
-      await invoke("update_app_config", {
-        config: nextConfig,
-      });
+      await updateAppConfig(nextConfig);
       config = nextConfig;
       toast.success("文件搜索配置已保存");
       await refreshStatus();
@@ -188,7 +191,7 @@
     if (choosingDirectory) return;
 
     choosingDirectory = true;
-    await invoke("acquire_window_close_lock");
+    await acquireWindowCloseLock();
     try {
       const selected = await open({
         directory: true,
@@ -205,7 +208,7 @@
       toast.error("选择目录失败");
     } finally {
       choosingDirectory = false;
-      await invoke("release_window_close_lock");
+      await releaseWindowCloseLock();
     }
   }
 

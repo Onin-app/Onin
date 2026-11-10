@@ -5,6 +5,7 @@
  * 遵循单一职责原则，只处理剪贴板/附件相关功能
  */
 import { invoke } from "@tauri-apps/api/core";
+import { getAppConfig } from "$lib/api/config";
 import { inferMimeType } from "$lib/utils/mimeTypeMap";
 import type { LaunchableItem } from "$lib/type";
 import { getMatchedCommands } from "$lib/utils/matchCommand";
@@ -120,8 +121,7 @@ export function useClipboardManager(): ClipboardManagerReturn {
       const timeLimit =
         cachedTimeLimit !== undefined
           ? cachedTimeLimit
-          : (await invoke<{ auto_paste_time_limit: number }>("get_app_config"))
-              .auto_paste_time_limit;
+          : (await getAppConfig()).auto_paste_time_limit;
 
       if (timeLimit > 0) {
         if (!clipboardContent.timestamp) {

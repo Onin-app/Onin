@@ -7,6 +7,7 @@ import type {
 } from "$lib/types/marketplace";
 import type { AppConfig } from "$lib/type";
 import { toast } from "svelte-sonner";
+import { getAppConfig } from "./config";
 
 // API 配置
 const API_KEY = import.meta.env.VITE_MARKETPLACE_API_KEY || "";
@@ -14,8 +15,7 @@ const API_KEY = import.meta.env.VITE_MARKETPLACE_API_KEY || "";
 // 获取 API Base URL
 async function getApiBaseUrl(): Promise<string | null> {
   try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    const config = await invoke<AppConfig>("get_app_config");
+    const config = await getAppConfig();
 
     if (!config.marketplace_api_url) {
       toast.warning("请先在设置中配置插件市场 API 地址");

@@ -4,12 +4,19 @@
  * 管理应用列表的状态和逻辑
  * 遵循单一职责原则，只处理应用列表相关功能
  */
-import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { LaunchableItem, CommandUsageStats, AppConfig } from "$lib/type";
 import { fuzzyMatch } from "$lib/utils/fuzzyMatch";
 import { toast } from "svelte-sonner";
 import { accumulateCommandStat } from "$lib/tracking";
+import { getAppConfig } from "$lib/api/config";
+import { getUsageStats } from "$lib/api/usageStats";
+import {
+  getAllLaunchableItems,
+  openApp as apiOpenApp,
+} from "$lib/api/launcher";
+import { executeCommand } from "$lib/api/command";
+import { showNotification } from "$lib/api/system";
 
 export interface AppListState {
   originAppList: LaunchableItem[];
@@ -77,8 +84,8 @@ export function useAppList(): AppListManagerReturn {
 
   const loadConfig = async () => {
     try {
-      state.appConfig = await invoke<AppConfig>("get_app_config");
-      state.usageStats = await invoke<CommandUsageStats[]>("get_usage_stats");
+      state.appConfig = await getAppConfig();
+      state.usageStats = await getUsageStats();
     } catch (error) {
       console.error("Failed to load config or usage stats:", error);
     }
@@ -86,7 +93,7 @@ export function useAppList(): AppListManagerReturn {
 
   const fetchApps = async () => {
     try {
-      const res = await invoke<LaunchableItem[]>("get_all_launchable_items");
+      const res = await getAllLaunchableItems();
       if (res) {
         state.originAppList = res;
         // 过滤掉匹配指令 (Match)，使它们不作为普通功能指令在列表中显示
@@ -110,17 +117,14 @@ export function useAppList(): AppListManagerReturn {
   ) => {
     try {
       if (app.action) {
-        await invoke("execute_command", {
-          name: app.action,
-          args: Object.keys(args).length > 0 ? args : null,
-        });
+        await executeCommand(
+          app.action,
+          Object.keys(args).length > 0 ? args : null,
+        );
 
         accumulateCommandStat(app.source);
 
-        Promise.all([
-          invoke<CommandUsageStats[]>("get_usage_stats"),
-          invoke<LaunchableItem[]>("get_all_launchable_items"),
-        ])
+        Promise.all([getUsageStats(), getAllLaunchableItems()])
           .then(([stats, items]) => {
             state.usageStats = stats;
             state.originAppList = items;
@@ -129,9 +133,7 @@ export function useAppList(): AppListManagerReturn {
           })
           .catch((err) => console.error("Failed to refresh data:", err));
       } else if (app.source === "FileCommand") {
-        await invoke("open_app", {
-          path: app.path,
-        });
+        await apiOpenApp(app.path);
         accumulateCommandStat(app.source);
       }
 
@@ -216,11 +218,9 @@ export function useAppList(): AppListManagerReturn {
       } else if (added < 0) {
         message += `，减少 ${Math.abs(added)} 项`;
       }
-      await invoke("show_notification", {
-        options: {
-          title: "刷新成功",
-          body: message,
-        },
+      await showNotification({
+        title: "刷新成功",
+        body: message,
       });
     });
 

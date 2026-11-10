@@ -18,6 +18,7 @@
   import { ScrollArea } from "$lib/components/ui/scroll-area";
   import ExtensionHeader from "$lib/components/ExtensionHeader.svelte";
   import type { AppConfig } from "$lib/type";
+  import { getAppConfig } from "$lib/api/config";
 
   // 定义类型
   interface OcrWord {
@@ -474,7 +475,7 @@
 
     // 读取默认引擎配置
     try {
-      const config = await invoke<AppConfig>("get_app_config");
+      const config = await getAppConfig();
       if (
         config &&
         (config.ocr_default_engine === "local" ||

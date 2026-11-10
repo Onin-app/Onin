@@ -16,8 +16,15 @@ export interface TauriCommandMap {
   add_file_commands: { args: { paths: string[] }; return: LaunchableItem[] };
   remove_file_command: { args: { path: string }; return: LaunchableItem[] };
 
+  // 指令管理
+  get_commands: { args?: void; return: Command[] };
+  update_command: { args: { commandToUpdate: Command }; return: void };
+  refresh_commands: { args?: void; return: void };
+  execute_command: { args: { name: string; args?: unknown }; return: void };
+
   // 统一启动管理
   get_all_launchable_items: { args?: void; return: LaunchableItem[] };
+  open_app: { args: { path: string }; return: void };
 
   // 应用配置管理
   get_app_config: { args?: void; return: AppConfig };
@@ -39,18 +46,22 @@ export interface TauriCommandMap {
   set_detach_window_shortcut: { args: { shortcutStr: string }; return: void };
   set_shortcut_recording: { args: { recording: boolean }; return: void };
 
-  // 指令管理
-  get_commands: { args?: void; return: Command[] };
-  update_command: { args: { command: Command }; return: void };
-  refresh_commands: { args?: void; return: Command[] };
-
   // 使用统计
   get_usage_stats: { args?: void; return: CommandUsageStats[] };
   record_command_usage: {
-    args: { name: string; source: string };
+    args: { commandName: string };
     return: void;
   };
   clear_usage_stats: { args?: void; return: void };
+
+  // 系统与托盘
+  open_app_data_dir: { args?: void; return: void };
+  set_tray_visibility: { args: { visible: boolean }; return: void };
+  is_tray_visible: { args?: void; return: boolean };
+  show_notification: {
+    args: { options: { title: string; body?: string; [key: string]: unknown } };
+    return: void;
+  };
 
   // 窗口管理
   acquire_window_close_lock: { args?: void; return: void };
@@ -65,7 +76,7 @@ export type TauriCommandName = keyof TauriCommandMap;
  * 强制校验 command 名称必须合法，且参数与返回值严格匹配。
  * 如果拼错命令名或传递错误参数，TypeScript 编译期将直接报错。
  */
-export async function safeInvoke<K extends TauriCommandName>(
+export function safeInvoke<K extends TauriCommandName>(
   cmd: K,
   ...args: TauriCommandMap[K]["args"] extends void | undefined
     ? [args?: undefined]
@@ -73,10 +84,10 @@ export async function safeInvoke<K extends TauriCommandName>(
 ): Promise<TauriCommandMap[K]["return"]> {
   const payload = args[0];
   if (payload !== undefined) {
-    return await invoke<TauriCommandMap[K]["return"]>(
+    return invoke<TauriCommandMap[K]["return"]>(
       cmd,
       payload as Record<string, unknown>,
     );
   }
-  return await invoke<TauriCommandMap[K]["return"]>(cmd);
+  return invoke<TauriCommandMap[K]["return"]>(cmd);
 }

@@ -24,6 +24,7 @@
   import type { AppConfig } from "$lib/type";
   import { Theme } from "$lib/type";
   import { theme, getTheme } from "$lib/utils/theme";
+  import { getAppConfig } from "$lib/api/config";
   import {
     updateDialogOpen,
     appVersion,
@@ -283,7 +284,7 @@
     // 加载配置判定是否执行自动检查更新及同步窗口透明度
     const setupAppConfig = async () => {
       try {
-        const config = await invoke<AppConfig>("get_app_config");
+        const config = await getAppConfig();
         if (config.window_opacity !== undefined) {
           setWindowOpacity(config.window_opacity);
         }
