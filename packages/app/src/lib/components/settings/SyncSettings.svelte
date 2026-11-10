@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
+  import { getAppConfig, updateAppConfig } from "$lib/api/config";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { Switch } from "$lib/components/ui/switch";
@@ -51,7 +52,7 @@
 
   const loadWebDavConfig = async () => {
     try {
-      const config = await invoke<AppConfig>("get_app_config");
+      const config = await getAppConfig();
       if (config.webdav) {
         enabled = config.webdav.enabled;
         baseUrl = config.webdav.base_url;
@@ -81,9 +82,9 @@
 
   const updateConfig = async () => {
     try {
-      const config = await invoke<AppConfig>("get_app_config");
+      const config = await getAppConfig();
       config.webdav = getCurrentWebDavConfig();
-      await invoke("update_app_config", { config });
+      await updateAppConfig(config);
     } catch (error) {
       console.error("保存 WebDAV 配置失败:", error);
       toast.error("保存配置失败");

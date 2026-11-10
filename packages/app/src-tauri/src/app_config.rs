@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
+use specta::Type;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager};
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Type)]
 pub enum SortMode {
     #[serde(rename = "smart")]
     Smart, // 智能排序：综合频率和最近使用
@@ -21,7 +22,7 @@ impl Default for SortMode {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Type)]
 pub enum LauncherMode {
     #[serde(rename = "standard")]
     Standard, // 标准模式（完整面板）
@@ -35,7 +36,7 @@ impl Default for LauncherMode {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Type)]
 pub struct WebDavConfig {
     #[serde(default)]
     pub enabled: bool,
@@ -67,13 +68,15 @@ impl Default for WebDavConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct AppConfig {
     /// 自动粘贴时间限制（秒），0 表示不限制
+    #[specta(type = u32)]
     #[serde(default = "default_auto_paste_time_limit")]
     pub auto_paste_time_limit: u64,
 
     /// 自动清空剪贴板时间限制（秒），0 表示不自动清空
+    #[specta(type = u32)]
     #[serde(default = "default_auto_clear_time_limit")]
     pub auto_clear_time_limit: u64,
 

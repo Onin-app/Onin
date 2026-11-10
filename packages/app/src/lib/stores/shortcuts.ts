@@ -1,5 +1,10 @@
 import { writable } from "svelte/store";
-import { invoke } from "@tauri-apps/api/core";
+import {
+  getDetachWindowShortcut,
+  setDetachWindowShortcut,
+  getToggleShortcut,
+  setToggleShortcut,
+} from "$lib/api/shortcut";
 
 /**
  * Create a custom store for detach window shortcut
@@ -9,7 +14,7 @@ function createDetachWindowShortcutStore() {
   const { subscribe, set } = writable<string>("", (set) => {
     // This function runs when the first subscriber subscribes
     // Automatically load the shortcut from backend
-    invoke<string>("get_detach_window_shortcut")
+    getDetachWindowShortcut()
       .then((shortcut) => set(shortcut))
       .catch((e) => console.error("Failed to load detach window shortcut:", e));
 
@@ -25,7 +30,7 @@ function createDetachWindowShortcutStore() {
      */
     setShortcut: async (shortcut: string) => {
       try {
-        await invoke("set_detach_window_shortcut", { shortcutStr: shortcut });
+        await setDetachWindowShortcut(shortcut);
         set(shortcut);
       } catch (e) {
         console.error("Failed to set detach window shortcut:", e);
@@ -46,7 +51,7 @@ function createToggleWindowShortcutStore() {
   // 模块加载时立即拉取后端配置，不依赖 writable 的惰性 start 订阅时机（勿改回惰性加载）：
   // 加载完成前/失败时保持应用默认 "alt+Space"，确保 Alt+Space 拦截器的 gate 恒可用，
   // 避免"按住 Alt 再按 Space 只打空格、窗口不隐藏"的竞态。
-  invoke<string>("get_toggle_shortcut")
+  getToggleShortcut()
     .then((shortcut) => {
       if (shortcut) store.set(shortcut);
     })
@@ -60,7 +65,7 @@ function createToggleWindowShortcutStore() {
      */
     setShortcut: async (shortcut: string) => {
       try {
-        await invoke("set_toggle_shortcut", { shortcutStr: shortcut });
+        await setToggleShortcut(shortcut);
         store.set(shortcut);
       } catch (e) {
         console.error("Failed to set toggle window shortcut:", e);

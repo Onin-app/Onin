@@ -8,6 +8,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { PluginSettingsSchema } from "$lib/types/plugin-settings";
 import { toast } from "svelte-sonner";
+import { refreshCommands } from "$lib/api/command";
+import { showNotification } from "$lib/api/system";
 
 export interface PluginManifest {
   id: string;
@@ -186,25 +188,21 @@ export function usePluginList(): PluginListReturn {
       });
 
       try {
-        await invoke("refresh_commands");
+        await refreshCommands();
       } catch (refreshError) {
         console.error("Failed to refresh commands:", refreshError);
       }
 
-      await invoke("show_notification", {
-        options: {
-          title: enabled ? "插件已启用" : "插件已禁用",
-          body: `${pluginName} ${enabled ? "已启用" : "已禁用"}`,
-        },
+      await showNotification({
+        title: enabled ? "插件已启用" : "插件已禁用",
+        body: `${pluginName} ${enabled ? "已启用" : "已禁用"}`,
       });
     } catch (error) {
       console.error("Failed to toggle plugin:", error);
 
-      await invoke("show_notification", {
-        options: {
-          title: "操作失败",
-          body: `无法${enabled ? "启用" : "禁用"}插件 ${pluginName}`,
-        },
+      await showNotification({
+        title: "操作失败",
+        body: `无法${enabled ? "启用" : "禁用"}插件 ${pluginName}`,
       });
     }
   };
@@ -274,25 +272,21 @@ export function usePluginList(): PluginListReturn {
       }
 
       try {
-        await invoke("refresh_commands");
+        await refreshCommands();
       } catch (refreshError) {
         console.error("Failed to refresh commands:", refreshError);
       }
 
-      await invoke("show_notification", {
-        options: {
-          title: "卸载成功",
-          body: `插件 ${pluginName} 已卸载`,
-        },
+      await showNotification({
+        title: "卸载成功",
+        body: `插件 ${pluginName} 已卸载`,
       });
     } catch (error) {
       console.error("Failed to uninstall plugin:", error);
 
-      await invoke("show_notification", {
-        options: {
-          title: "卸载失败",
-          body: `无法卸载插件 ${pluginName}: ${error}`,
-        },
+      await showNotification({
+        title: "卸载失败",
+        body: `无法卸载插件 ${pluginName}: ${error}`,
       });
     }
   };

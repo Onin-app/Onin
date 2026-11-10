@@ -13,7 +13,11 @@
   } from "$lib/components/ui/tabs";
   import { ScrollArea } from "$lib/components/ui/scroll-area";
   import { onMount } from "svelte";
-  import { invoke } from "@tauri-apps/api/core";
+  import {
+    getCommands,
+    updateCommand as apiUpdateCommand,
+    executeCommand as apiExecuteCommand,
+  } from "$lib/api/command";
   import { toast } from "svelte-sonner";
   import type { Command, Source } from "$lib/type";
 
@@ -51,7 +55,7 @@
   // ===== Lifecycle =====
   onMount(async () => {
     try {
-      commands = await invoke<Command[]>("get_commands");
+      commands = await getCommands();
     } catch (error) {
       console.error("Failed to fetch commands:", error);
     }
@@ -61,14 +65,14 @@
   async function updateCommand(command: Command) {
     try {
       const commandToUpdate = JSON.parse(JSON.stringify(command));
-      await invoke("update_command", { commandToUpdate });
+      await apiUpdateCommand(commandToUpdate);
     } catch (error) {
       console.error("Failed to update command:", error);
     }
   }
 
   function executeCommand(commandName: string) {
-    invoke("execute_command", { name: commandName }).catch((error) =>
+    apiExecuteCommand(commandName).catch((error) =>
       console.error("Failed to execute command:", error),
     );
   }

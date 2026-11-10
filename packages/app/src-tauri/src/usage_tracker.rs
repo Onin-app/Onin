@@ -1,5 +1,6 @@
 use crate::app_config::SortMode;
 use serde::{Deserialize, Serialize};
+use specta::Type;
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
@@ -7,10 +8,11 @@ use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager};
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, Type)]
 pub struct CommandUsageStats {
     pub command_name: String,
     pub usage_count: u32,
+    #[specta(type = f64)]
     pub last_used: i64, // Unix timestamp in seconds
 }
 

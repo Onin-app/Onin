@@ -6,7 +6,12 @@
   import { Combobox } from "bits-ui";
   import { onMount } from "svelte";
   import ShortcutInput from "./ShortcutInput.svelte";
-  import { invoke } from "@tauri-apps/api/core";
+  import {
+    getShortcuts,
+    addShortcut as apiAddShortcut,
+    removeShortcut as apiRemoveShortcut,
+  } from "$lib/api/shortcut";
+  import { getCommands } from "$lib/api/command";
   import { toast } from "svelte-sonner";
   import {
     CaretUpDown,
@@ -24,7 +29,7 @@
 
   onMount(async () => {
     try {
-      shortcuts = await invoke<Shortcut[]>("get_shortcuts");
+      shortcuts = await getShortcuts();
       shortcuts.forEach((s) => {
         if (s.command_name === "toggle_window") {
           s.readonly = true;
@@ -45,7 +50,7 @@
       console.error("Failed to fetch shortcuts:", error);
     }
     try {
-      commands = await invoke<Command[]>("get_commands");
+      commands = await getCommands();
     } catch (error) {
       console.error("Failed to fetch commands:", error);
     }
@@ -69,9 +74,7 @@
     const shortcutToRemove = shortcuts[index];
     if (shortcutToRemove && shortcutToRemove.shortcut) {
       try {
-        await invoke("remove_shortcut", {
-          shortcutStr: shortcutToRemove.shortcut,
-        });
+        await apiRemoveShortcut(shortcutToRemove.shortcut);
         shortcuts.splice(index, 1);
         shortcuts = [...shortcuts];
         toast.success("快捷键已删除");
@@ -96,14 +99,14 @@
       const hasShortcutChanged =
         shortcut.originalShortcut &&
         shortcut.originalShortcut !== shortcut.shortcut;
-      await invoke("add_shortcut", {
-        shortcut: {
+      await apiAddShortcut(
+        {
           shortcut: shortcut.shortcut,
           command_name: shortcut.command_name,
           command_title: shortcut.command_title,
         },
-        oldShortcutStr: hasShortcutChanged ? shortcut.originalShortcut : null,
-      });
+        hasShortcutChanged ? shortcut.originalShortcut : null,
+      );
       shortcut.originalShortcut = shortcut.shortcut;
       toast.success(successMessage);
     } catch (error) {

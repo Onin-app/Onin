@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Type)]
 pub enum ItemSource {
     Application, // System-installed applications
     Command,     // System commands
@@ -18,7 +19,7 @@ impl Default for ItemSource {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Type)]
 pub enum CommandType {
     Function,
     Match,
@@ -30,7 +31,7 @@ impl Default for CommandType {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Type)]
 pub enum ItemType {
     App,
     Folder,
@@ -44,7 +45,7 @@ impl Default for ItemType {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Type)]
 pub enum IconType {
     Base64,
     Iconfont,
@@ -57,14 +58,14 @@ impl Default for IconType {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Type)]
 pub enum AppOrigin {
     Hkey,
     Shortcut,
     Uwp,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, Type)]
 pub struct LaunchableItem {
     pub name: String,
     /// 描述信息，用于前端显示
@@ -86,6 +87,7 @@ pub struct LaunchableItem {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub matches: Option<Vec<CommandMatch>>,
     /// Last modified time in Unix milliseconds, when available.
+    #[specta(type = Option<f64>)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub modified_time: Option<u64>,
     /// 是否需要二次确认(用于敏感操作如关机、重启等)
@@ -101,7 +103,7 @@ pub struct LaunchableItem {
 /// 1. 开发者层：只需配置 extensions
 /// 2. 系统层：自动映射为内部 MIME 类型
 /// 3. 运行层：优先 MIME 判断，fallback 到 extensions
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Type)]
 pub struct CommandMatch {
     #[serde(rename = "type")]
     pub match_type: String, // "text" | "image" | "file" | "folder"
@@ -117,7 +119,7 @@ pub struct CommandMatch {
     pub extensions: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Type)]
 pub struct CommandKeyword {
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -128,7 +130,7 @@ pub struct CommandKeyword {
     pub keyword_type: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Type)]
 pub enum CommandAction {
     System(String),
     App(String), // The string will hold the executable path
@@ -147,7 +149,7 @@ pub enum CommandAction {
     Internal(String), // Open internal pages/routes
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Type)]
 pub struct Command {
     pub name: String, // A unique identifier, e.g., "shutdown" or a hash for an app
     pub title: String,
@@ -169,7 +171,7 @@ pub struct Command {
     pub command_type: CommandType,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Type)]
 pub struct Shortcut {
     pub shortcut: String,
     pub command_name: String,
@@ -178,7 +180,7 @@ pub struct Shortcut {
 }
 
 /// Represents a command registered by a plugin.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Type)]
 pub struct PluginCommand {
     /// A unique identifier for the command.
     pub name: String,
@@ -193,7 +195,7 @@ pub struct PluginCommand {
 }
 
 /// Represents the result of a command execution.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Type)]
 pub enum CommandResult {
     /// Indicates that the command executed successfully, returning a string result.
     Success(String),
@@ -205,7 +207,7 @@ pub enum CommandResult {
 ///
 /// Unlike static commands defined in manifest.json, dynamic commands
 /// can be created and removed programmatically by plugins.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Type)]
 pub struct DynamicCommand {
     /// Unique command code within the plugin
     pub code: String,
@@ -223,6 +225,7 @@ pub struct DynamicCommand {
     /// Plugin ID that registered this command
     pub plugin_id: String,
     /// Timestamp when the command was created (milliseconds since epoch)
+    #[specta(type = f64)]
     pub created_at: u64,
 }
 

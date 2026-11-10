@@ -20,6 +20,17 @@ use crate::{
 /// 5. 设置快捷键和托盘
 /// 6. 配置窗口事件
 pub fn on_app_setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
+    #[cfg(debug_assertions)]
+    {
+        let target_path =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../src/lib/types/bindings.ts");
+        if let Err(e) = crate::export_types::export_to_file(&target_path) {
+            tracing::warn!("[specta] 自动导出 TypeScript 类型失败: {e:?}");
+        } else {
+            println!("[specta] 已在启动时自动同步 TypeScript 类型定义");
+        }
+    }
+
     // 1. 确保应用数据目录存在
     ensure_app_data_dir(app)?;
 

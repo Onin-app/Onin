@@ -1,7 +1,15 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import { getVersion } from "@tauri-apps/api/app";
-  import { invoke } from "@tauri-apps/api/core";
+  import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
+  import { getAppConfig, updateAppConfig } from "$lib/api/config";
+  import { getToggleShortcut } from "$lib/api/shortcut";
+  import { clearUsageStats } from "$lib/api/usageStats";
+  import {
+    openAppDataDir,
+    setTrayVisibility,
+    isTrayVisible,
+  } from "$lib/api/system";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { Switch } from "$lib/components/ui/switch";
@@ -86,11 +94,11 @@
   const handleAutostartToggle = async () => {
     try {
       if (autostartEnabled) {
-        await invoke("plugin:autostart|enable");
+        await enable();
       } else {
-        await invoke("plugin:autostart|disable");
+        await disable();
       }
-      autostartEnabled = await invoke("plugin:autostart|is_enabled");
+      autostartEnabled = await isEnabled();
       toast.success(autostartEnabled ? "已启用开机自启" : "已禁用开机自启");
     } catch (error) {
       console.error("Failed to toggle autostart:", error);
@@ -101,8 +109,8 @@
 
   const handleTrayIconToggle = async () => {
     try {
-      await invoke("set_tray_visibility", { visible: trayIconEnabled });
-      trayIconEnabled = await invoke("is_tray_visible");
+      await setTrayVisibility(trayIconEnabled);
+      trayIconEnabled = await isTrayVisible();
       toast.success(trayIconEnabled ? "已显示托盘图标" : "已隐藏托盘图标");
     } catch (error) {
       console.error("Failed to toggle tray icon visibility:", error);
@@ -123,18 +131,16 @@
 
   const updateConfig = async () => {
     try {
-      await invoke("update_app_config", {
-        config: {
-          auto_paste_time_limit: autoPasteTimeLimit,
-          auto_clear_time_limit: autoClearTimeLimit,
-          sort_mode: sortMode,
-          enable_usage_tracking: enableUsageTracking,
-          marketplace_api_url: marketplaceApiUrl || undefined,
-          disabled_extension_ids: disabledExtensionIds,
-          auto_check_update: autoCheckUpdate,
-          window_opacity: windowOpacityVal,
-          launcher_mode: launcherMode,
-        },
+      await updateAppConfig({
+        auto_paste_time_limit: autoPasteTimeLimit,
+        auto_clear_time_limit: autoClearTimeLimit,
+        sort_mode: sortMode,
+        enable_usage_tracking: enableUsageTracking,
+        marketplace_api_url: marketplaceApiUrl || undefined,
+        disabled_extension_ids: disabledExtensionIds,
+        auto_check_update: autoCheckUpdate,
+        window_opacity: windowOpacityVal,
+        launcher_mode: launcherMode,
       });
       toast.success("配置已保存");
     } catch (error) {
@@ -172,7 +178,7 @@
 
     clearingUsageStats = true;
     try {
-      await invoke("clear_usage_stats");
+      await clearUsageStats();
       clearUsageStatsDialogOpen = false;
       toast.success("使用记录已清除");
     } catch (error) {
@@ -193,28 +199,28 @@
 
   onMount(async () => {
     try {
-      autostartEnabled = await invoke("plugin:autostart|is_enabled");
+      autostartEnabled = await isEnabled();
     } catch (e) {
       console.error("Failed to get autostart state:", e);
       toast.error("获取开机自启状态失败");
     }
 
     try {
-      shortcut = await invoke("get_toggle_shortcut");
+      shortcut = await getToggleShortcut();
     } catch (e) {
       console.error("Failed to get shortcut:", e);
       toast.error("获取快捷键配置失败");
     }
 
     try {
-      trayIconEnabled = await invoke("is_tray_visible");
+      trayIconEnabled = await isTrayVisible();
     } catch (e) {
       console.error("Failed to get tray visibility state:", e);
       toast.error("获取托盘图标状态失败");
     }
 
     try {
-      const config = await invoke<AppConfig>("get_app_config");
+      const config = await getAppConfig();
       autoPasteTimeLimit = config.auto_paste_time_limit;
       autoClearTimeLimit = config.auto_clear_time_limit;
       sortMode = config.sort_mode;
@@ -523,7 +529,7 @@
               variant="outline"
               size="sm"
               class="h-8 cursor-pointer rounded-xl px-3 text-xs font-medium transition-[transform,background-color] duration-120 active:scale-95"
-              onclick={() => invoke("open_app_data_dir")}
+              onclick={() => openAppDataDir()}
             >
               打开数据目录
             </Button>
