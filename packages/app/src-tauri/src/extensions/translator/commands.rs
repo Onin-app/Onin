@@ -1,5 +1,7 @@
 use serde::Deserialize;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
+use std::time::Duration;
 use tauri::{webview::WebviewBuilder, Listener, Manager, WebviewUrl, WindowBuilder};
 use tauri::{LogicalPosition, LogicalSize, PhysicalPosition, PhysicalSize, Rect};
 use tauri_plugin_clipboard_manager::ClipboardExt;
@@ -9,6 +11,12 @@ const TRANSLATOR_TOP_BAR_HEIGHT: f64 = 36.0;
 const TRANSLATOR_TITLEBAR_INSET: f64 = 28.0;
 #[cfg(not(target_os = "macos"))]
 const TRANSLATOR_TITLEBAR_INSET: f64 = 0.0;
+
+/// 空闲超时时间：1 小时未被再次唤起时彻底销毁窗口，释放 WebView2 进程与全部内存
+const TRANSLATOR_IDLE_TIMEOUT: Duration = Duration::from_secs(3600);
+
+/// 复用探活超时时间：复用旧窗口时若底层 WebView2 挂起超过 600ms，触发安全熔断并重建
+const TRANSLATOR_REUSE_TIMEOUT: Duration = Duration::from_millis(600);
 
 const TRANSLATOR_ESC_SCRIPT: &str = r#"
 (() => {
@@ -39,6 +47,12 @@ const TRANSLATOR_ESC_SCRIPT: &str = r#"
 
 static CURRENT_ENGINE: Mutex<String> = Mutex::new(String::new());
 static CURRENT_TEXT: Mutex<Option<String>> = Mutex::new(None);
+
+/// 闲置计时代数：每次窗口隐藏/唤起时递增，用于废弃旧的定时销毁任务
+static IDLE_GENERATION: AtomicU64 = AtomicU64::new(0);
+
+/// 窗口当前是否处于可见/活跃状态
+static IS_WINDOW_VISIBLE: AtomicBool = AtomicBool::new(false);
 
 #[derive(Deserialize)]
 struct TranslatorSwitchPayload {
@@ -162,8 +176,9 @@ fn layout_translator_webviews(window: &tauri::Window) -> Result<(), String> {
     Ok(())
 }
 
-/// 强制销毁 translator 窗口（包括其中全部 webview）
+/// 彻底销毁 translator 窗口（包括其中全部 webview 与子进程）
 fn destroy_translator_window(app: &tauri::AppHandle) {
+    IS_WINDOW_VISIBLE.store(false, Ordering::SeqCst);
     if let Some(window) = app.get_window("translator-host") {
         if let Err(e) = window.destroy() {
             eprintln!("[translator] 销毁窗口失败: {}", e);
@@ -171,10 +186,42 @@ fn destroy_translator_window(app: &tauri::AppHandle) {
     }
 }
 
-/// 导出供前端或全局调用的关闭命令：执行彻底销毁
+/// 调度空闲销毁任务：隐藏 1 小时后若未被再次使用，自动销毁释放资源
+fn schedule_idle_cleanup(app: &tauri::AppHandle) {
+    let generation = IDLE_GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
+    let app_handle = app.clone();
+
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(TRANSLATOR_IDLE_TIMEOUT).await;
+
+        // 若 1 小时内无新动作且窗口仍处于隐藏状态，彻底销毁
+        if IDLE_GENERATION.load(Ordering::SeqCst) == generation
+            && !IS_WINDOW_VISIBLE.load(Ordering::SeqCst)
+        {
+            sentry::add_breadcrumb(sentry::Breadcrumb {
+                category: Some("translator".into()),
+                message: Some("空闲达到 1 小时，后台自动销毁 translator 窗口以彻底释放资源".into()),
+                level: sentry::Level::Info,
+                ..Default::default()
+            });
+            destroy_translator_window(&app_handle);
+        }
+    });
+}
+
+/// 隐藏窗口并进入 1 小时空闲待机倒计时
+fn hide_translator_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_window("translator-host") {
+        let _ = window.hide();
+        IS_WINDOW_VISIBLE.store(false, Ordering::SeqCst);
+        schedule_idle_cleanup(app);
+    }
+}
+
+/// 导出供前端或全局调用的关闭命令：隐藏并启动空闲回收
 #[tauri::command]
 pub fn close_translator_window(app: tauri::AppHandle) -> Result<(), String> {
-    destroy_translator_window(&app);
+    hide_translator_window(&app);
     Ok(())
 }
 
@@ -190,9 +237,59 @@ pub async fn open_translator_window(app: tauri::AppHandle) -> Result<(), String>
     open_window(&app, None).await
 }
 
+/// 尝试安全复用已有窗口（带 600ms 超时熔断保护，防止渲染进程僵死导致卡死）
+async fn try_reuse_window(
+    window: &tauri::Window,
+    resolved_text: &Option<String>,
+) -> Result<(), String> {
+    let window_clone = window.clone();
+    let text_clone = resolved_text.clone();
+
+    tokio::time::timeout(TRANSLATOR_REUSE_TIMEOUT, async move {
+        // 1. 探活 UI Webview：若渲染进程已崩溃或死锁，eval 会失败或卡死，由外层 timeout 熔断
+        let ui_webview = window_clone
+            .get_webview("translator-ui")
+            .ok_or_else(|| "缺少 translator-ui webview".to_string())?;
+        ui_webview
+            .eval("void 0")
+            .map_err(|e| format!("translator-ui 探活失败: {}", e))?;
+
+        // 2. 检查内容 Webview
+        let content_webview = window_clone
+            .get_webview("translator-content")
+            .ok_or_else(|| "缺少 translator-content webview".to_string())?;
+
+        // 3. 若有新文本，更新并导航
+        if let Some(ref text) = text_clone {
+            set_current_text(Some(text.clone()));
+            let current_engine = get_current_engine();
+            let url_str = build_engine_url(&current_engine, Some(text));
+
+            if let Ok(url) = url_str.parse::<tauri::Url>() {
+                content_webview
+                    .navigate(url)
+                    .map_err(|e| format!("导航失败: {}", e))?;
+            }
+        }
+
+        // 4. 显示并聚焦
+        let _ = window_clone.unminimize();
+        let _ = window_clone.show();
+        let _ = window_clone.set_focus();
+
+        Ok(())
+    })
+    .await
+    .map_err(|_| "复用 translator 窗口超时 (WebView 响应超时或已僵死)".to_string())?
+}
+
 /// 打开/复用翻译器窗口
 pub async fn open_window(app: &tauri::AppHandle, text: Option<String>) -> Result<(), String> {
     let resolved_text = resolve_translator_text(app, text)?;
+
+    // 唤起时标记可见并更新代数，取消之前的空闲销毁
+    IS_WINDOW_VISIBLE.store(true, Ordering::SeqCst);
+    IDLE_GENERATION.fetch_add(1, Ordering::SeqCst);
 
     // ---- 复用路径 ----
     // 检查 translator-host 及其两个核心 webview 是否健全
@@ -201,22 +298,25 @@ pub async fn open_window(app: &tauri::AppHandle, text: Option<String>) -> Result
         let has_content = window.get_webview("translator-content").is_some();
 
         if has_ui && has_content {
-            if let Some(ref text) = resolved_text {
-                set_current_text(Some(text.clone()));
-                let current_engine = get_current_engine();
-                let url_str = build_engine_url(&current_engine, Some(text));
-
-                if let Some(content_webview) = window.get_webview("translator-content") {
-                    if let Ok(url) = url_str.parse::<tauri::Url>() {
-                        let _ = content_webview.navigate(url);
-                    }
+            match try_reuse_window(&window, &resolved_text).await {
+                Ok(_) => {
+                    sentry::add_breadcrumb(sentry::Breadcrumb {
+                        category: Some("translator".into()),
+                        message: Some("成功复用已有 translator 窗口".into()),
+                        level: sentry::Level::Info,
+                        ..Default::default()
+                    });
+                    return Ok(());
+                }
+                Err(e) => {
+                    eprintln!("[translator] 窗口复用失败: {}，销毁后重建", e);
+                    sentry::capture_message(
+                        &format!("[translator] 窗口复用失败/超时，安全熔断重建: {}", e),
+                        sentry::Level::Warning,
+                    );
+                    destroy_translator_window(app);
                 }
             }
-
-            let _ = window.unminimize();
-            let _ = window.show();
-            let _ = window.set_focus();
-            return Ok(());
         } else {
             eprintln!("[translator] 窗口 webview 缺失，销毁后重建");
             destroy_translator_window(app);
@@ -240,28 +340,27 @@ async fn create_translator_window(
     let initial_url = build_engine_url(&engine, text);
     let ui_url = format!("/translator-shell?engine={}", engine);
 
+    // 关键：初始 visible 设为 false，待子 webview 挂载布局就绪后再显示，杜绝白屏外框悬挂
     let window = WindowBuilder::new(app, "translator-host")
         .title("Translator")
         .inner_size(1000.0, 800.0)
         .resizable(true)
+        .visible(false)
         .build()
         .map_err(|e| format!("创建 translator 窗口失败: {}", e))?;
 
     let window_for_layout = window.clone();
-    let window_for_close = window.clone();
+    let app_handle_for_close = app.clone();
     window.on_window_event(move |event| match event {
         tauri::WindowEvent::Resized(..) => {
             if let Err(e) = layout_translator_webviews(&window_for_layout) {
                 eprintln!("[translator] Failed to update webview layout: {}", e);
             }
         }
-        // 拦截原生关闭事件：强制调用 destroy()，保证右上角红叉 100% 立即关闭，杜绝底层挂死
+        // 拦截原生关闭事件：隐藏并启动 1 小时空闲倒计时
         tauri::WindowEvent::CloseRequested { api, .. } => {
             api.prevent_close();
-            let window_clone = window_for_close.clone();
-            tauri::async_runtime::spawn(async move {
-                let _ = window_clone.destroy();
-            });
+            hide_translator_window(&app_handle_for_close);
         }
         _ => {}
     });
@@ -322,9 +421,25 @@ async fn create_translator_window(
 
     if let Err(e) = setup_result {
         eprintln!("[translator] 创建窗口失败({})，已清理残留窗口", e);
+        sentry::capture_message(
+            &format!("[translator] 创建窗口失败: {}", e),
+            sentry::Level::Error,
+        );
         destroy_translator_window(app);
         return Err(e);
     }
+
+    // 挂载与布局就绪后，统一显示并获得焦点
+    let _ = window.show();
+    let _ = window.set_focus();
+    IS_WINDOW_VISIBLE.store(true, Ordering::SeqCst);
+
+    sentry::add_breadcrumb(sentry::Breadcrumb {
+        category: Some("translator".into()),
+        message: Some(format!("全新创建 translator 窗口成功 (engine: {})", engine)),
+        level: sentry::Level::Info,
+        ..Default::default()
+    });
 
     Ok(())
 }

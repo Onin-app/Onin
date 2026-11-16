@@ -2,28 +2,55 @@ use std::sync::Arc;
 
 /// 过滤 tauri-plugin-updater 上报的"预期失败"噪音。
 ///
-/// 该插件在更新端点返回非 2xx（如仓库暂无可用 release、网络被代理拦截等）时，
-/// 会固定以 error 级别打一条日志（updater.rs:443 的
-/// "update endpoint did not respond with a successful status code"）。
-/// 这类失败是可预期的运行环境问题，并非应用 bug，每次检查更新都会触发，
-/// 若不过滤会持续刷爆 GlitchTip/Sentry。这里只丢弃 updater 模块中
-/// 该特定消息的错误事件，其余 updater 错误（如下载失败）仍会上报。
+/// 该插件在更新端点返回非 2xx（如仓库暂无可用 release、网络被代理拦截等）或
+/// 网络请求失败（如网络离线、DNS 解析失败、连接超时或境内直连 GitHub 失败等）时，
+/// 会以 error 级别记录日志（如 "update endpoint did not respond..."
+/// 或 "failed to check for updates: ..."）。
+/// 这类失败是可预期的运行环境与网络问题，并非应用代码 bug，
+/// 若不过滤会持续刷爆 GlitchTip/Sentry。这里丢弃 updater 检查更新阶段的
+/// 网络与端点噪音，其余 updater 错误（如安装失败、验签失败等）仍会上报。
+///
+/// 注：tauri-plugin-updater 内部使用 `log::error!`，当由 `tracing-log`
+/// 桥接至 `sentry-tracing` 时，`event.logger` 会被标记为 `"log"`，真实的模块名
+/// 记录在 `Rust Tracing Fields` 上下文的 `log.target` / `log.module_path` 中。
+/// 因此需要同时匹配直接 logger、tracing 上下文字段及通用 log 来源。
+fn is_updater_source(event: &sentry::protocol::Event<'static>) -> bool {
+    let direct_logger = event
+        .logger
+        .as_deref()
+        .map(|logger| logger.starts_with("tauri_plugin_updater") || logger == "log")
+        .unwrap_or(false);
+    if direct_logger {
+        return true;
+    }
+
+    if let Some(sentry::protocol::Context::Other(map)) = event.contexts.get("Rust Tracing Fields") {
+        let is_updater_target = map
+            .get("log.target")
+            .or_else(|| map.get("log.module_path"))
+            .and_then(|val| val.as_str())
+            .map(|target| target.starts_with("tauri_plugin_updater"))
+            .unwrap_or(false);
+        if is_updater_target {
+            return true;
+        }
+    }
+
+    event.logger.is_none()
+}
+
 fn filter_updater_noise(
     event: sentry::protocol::Event<'static>,
 ) -> Option<sentry::protocol::Event<'static>> {
-    let is_updater_log = event
-        .logger
-        .as_deref()
-        .map(|logger| logger.starts_with("tauri_plugin_updater"))
-        .unwrap_or(false);
     let message = event
         .message
         .as_deref()
         .or_else(|| event.logentry.as_ref().map(|entry| entry.message.as_str()))
         .unwrap_or_default();
-    let is_endpoint_status_noise = message.contains("update endpoint did not respond");
+    let is_updater_check_noise = message.contains("update endpoint did not respond")
+        || message.contains("failed to check for updates");
 
-    if is_updater_log && is_endpoint_status_noise {
+    if is_updater_check_noise && is_updater_source(&event) {
         return None;
     }
     Some(event)
@@ -83,4 +110,103 @@ pub fn init_glitchtip() -> Option<sentry::ClientInitGuard> {
         });
         guard
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::BTreeMap;
+
+    #[test]
+    fn test_filter_updater_noise_direct_logger() {
+        let event = sentry::protocol::Event {
+            logger: Some("tauri_plugin_updater::updater".into()),
+            message: Some("update endpoint did not respond with a successful status code".into()),
+            ..Default::default()
+        };
+        assert!(filter_updater_noise(event).is_none());
+    }
+
+    #[test]
+    fn test_filter_updater_noise_tracing_log_target() {
+        let mut fields = BTreeMap::new();
+        fields.insert(
+            "log.target".to_string(),
+            "tauri_plugin_updater::updater".into(),
+        );
+        fields.insert(
+            "log.module_path".to_string(),
+            "tauri_plugin_updater::updater".into(),
+        );
+
+        let mut contexts = BTreeMap::new();
+        contexts.insert(
+            "Rust Tracing Fields".to_string(),
+            sentry::protocol::Context::Other(fields),
+        );
+
+        let event = sentry::protocol::Event {
+            logger: Some("log".into()),
+            message: Some("update endpoint did not respond with a successful status code".into()),
+            contexts,
+            ..Default::default()
+        };
+        assert!(filter_updater_noise(event).is_none());
+    }
+
+    #[test]
+    fn test_filter_updater_noise_without_logger() {
+        let event = sentry::protocol::Event {
+            logger: None,
+            message: Some("update endpoint did not respond with a successful status code".into()),
+            ..Default::default()
+        };
+        assert!(filter_updater_noise(event).is_none());
+    }
+
+    #[test]
+    fn test_filter_updater_network_check_noise() {
+        let event = sentry::protocol::Event {
+            logger: Some("tauri_plugin_updater::updater".into()),
+            message: Some(
+                "failed to check for updates: error sending request for url (https://github.com/Onin-app/Onin/releases/latest/download/latest.json)".into(),
+            ),
+            ..Default::default()
+        };
+        assert!(filter_updater_noise(event).is_none());
+    }
+
+    #[test]
+    fn test_keep_other_updater_errors() {
+        let event = sentry::protocol::Event {
+            logger: Some("tauri_plugin_updater::updater".into()),
+            message: Some("failed to install update: signature verification failed".into()),
+            ..Default::default()
+        };
+        assert!(filter_updater_noise(event).is_some());
+    }
+
+    #[test]
+    fn test_keep_unrelated_errors() {
+        let event = sentry::protocol::Event {
+            logger: Some("app::module".into()),
+            message: Some("network error".into()),
+            ..Default::default()
+        };
+        assert!(filter_updater_noise(event).is_some());
+    }
+
+    #[test]
+    fn test_filter_tao_event_loop_race() {
+        let event = sentry::protocol::Event {
+            exception: vec![sentry::protocol::Exception {
+                ty: "panic".into(),
+                value: Some("assertion failed: flush_paint_messages(None, ...)".into()),
+                ..Default::default()
+            }]
+            .into(),
+            ..Default::default()
+        };
+        assert!(filter_tao_event_loop_race(event).is_none());
+    }
 }
