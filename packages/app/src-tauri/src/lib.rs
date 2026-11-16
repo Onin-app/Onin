@@ -43,6 +43,35 @@ pub(crate) mod window_manager;
 #[cfg(target_os = "macos")]
 mod macos_dialog;
 
+#[cfg(target_os = "windows")]
+fn prompt_install_webview2_and_exit() -> ! {
+    use windows::core::w;
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        MessageBoxW, IDYES, MB_ICONWARNING, MB_TOPMOST, MB_YESNO,
+    };
+
+    let title = w!("Onin - 缺少运行依赖");
+    let text = w!(
+        "检测到当前系统尚未安装 Microsoft Edge WebView2 运行时，Onin 无法正常启动。\n\n是否立即前往微软官网下载并安装？\n（安装完成后重新打开 Onin 即可）"
+    );
+
+    let result = unsafe {
+        MessageBoxW(
+            HWND::default(),
+            text,
+            title,
+            MB_ICONWARNING | MB_YESNO | MB_TOPMOST,
+        )
+    };
+
+    if result == IDYES {
+        let _ = opener::open("https://go.microsoft.com/fwlink/p/?LinkId=2124703");
+    }
+
+    std::process::exit(1);
+}
+
 /// 创建全局快捷键处理器
 fn create_shortcut_handler(
 ) -> impl Fn(&tauri::AppHandle, &Shortcut, tauri_plugin_global_shortcut::ShortcutEvent)
@@ -98,7 +127,7 @@ pub fn run() {
         .unwrap_or("A-EU-0000000000");
 
     // 构建并运行 Tauri 应用
-    let app = state::setup_managed_state(tauri::Builder::default())
+    let app = match state::setup_managed_state(tauri::Builder::default())
         .manage(client)
         // 插件
         .plugin(tauri_plugin_notification::init())
@@ -127,7 +156,22 @@ pub fn run() {
         // 初始化
         .setup(setup::on_app_setup)
         .build(tauri::generate_context!())
-        .expect("error while building tauri application");
+    {
+        Ok(app) => app,
+        Err(e) => {
+            #[cfg(target_os = "windows")]
+            {
+                let err_msg = e.to_string();
+                let lower_err = err_msg.to_lowercase();
+                if lower_err.contains("webview runtime") || lower_err.contains("webview2") {
+                    tracing::error!(target: "onin::lib", "WebView2 runtime is missing: {err_msg}");
+                    eprintln!("[onin] WebView2 runtime is missing: {err_msg}");
+                    prompt_install_webview2_and_exit();
+                }
+            }
+            panic!("error while building tauri application: {e}");
+        }
+    };
 
     // tao 在 Windows 上偶发的事件循环重入断言（见 `telemetry::filter_tao_event_loop_race`）
     // 会导致事件循环内部捕获 panic 后于主循环重新抛出；若不兜底，进程会直接崩溃退出。
