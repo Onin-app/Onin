@@ -415,4 +415,4 @@ jobs:
           access-key-secret: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
           bucket: ${{ secrets.OSS_BUCKET }}
           local-folder: dist-latest
-          remote-dir: releases
+          remote-dir: releases/
