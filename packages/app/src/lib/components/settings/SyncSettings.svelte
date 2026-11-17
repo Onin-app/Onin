@@ -102,7 +102,9 @@
 
     try {
       await updateConfig();
-      await invoke("test_webdav_connection");
+      await invoke("test_webdav_connection", {
+        config: getCurrentWebDavConfig(),
+      });
       testSuccess = true;
       toast.success("WebDAV 连接成功！");
       checkCloudBackup();
@@ -120,9 +122,9 @@
 
     checkingBackup = true;
     try {
-      const info = await invoke<LastSyncInfo | null>(
-        "check_cloud_backup_metadata",
-      );
+      const info = await invoke<LastSyncInfo | null>("check_cloud_backup", {
+        config: getCurrentWebDavConfig(),
+      });
       cloudBackupInfo = info;
     } catch (error) {
       console.error("检测云端备份元数据失败:", error);
@@ -145,12 +147,12 @@
 
       if (mode === "backup") {
         toast.info("正在将本地数据打包备份到云端...");
-        await invoke("sync_backup_to_webdav");
+        await invoke("trigger_webdav_sync", { mode: "backup" });
         toast.success("云端备份成功！");
         await checkCloudBackup();
       } else {
         toast.info("正在从云端拉取配置并恢复...");
-        await invoke("sync_restore_from_webdav");
+        await invoke("trigger_webdav_sync", { mode: "restore" });
         toast.success("配置恢复成功！部分改动可能需要重启应用后生效。");
       }
     } catch (error) {
