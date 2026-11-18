@@ -350,17 +350,26 @@ async fn create_translator_window(
         .map_err(|e| format!("创建 translator 窗口失败: {}", e))?;
 
     let window_for_layout = window.clone();
-    let app_handle_for_close = app.clone();
     window.on_window_event(move |event| match event {
         tauri::WindowEvent::Resized(..) => {
             if let Err(e) = layout_translator_webviews(&window_for_layout) {
                 eprintln!("[translator] Failed to update webview layout: {}", e);
             }
         }
-        // 拦截原生关闭事件：隐藏并启动 1 小时空闲倒计时
-        tauri::WindowEvent::CloseRequested { api, .. } => {
-            api.prevent_close();
-            hide_translator_window(&app_handle_for_close);
+        // 用户点击右上角关闭按钮：允许系统原生销毁，绝不调用 prevent_close，确保 100% 关得掉
+        tauri::WindowEvent::CloseRequested { .. } => {
+            IS_WINDOW_VISIBLE.store(false, Ordering::SeqCst);
+            IDLE_GENERATION.fetch_add(1, Ordering::SeqCst);
+            sentry::add_breadcrumb(sentry::Breadcrumb {
+                category: Some("translator".into()),
+                message: Some("用户点击原生关闭按钮，执行原生窗口销毁".into()),
+                level: sentry::Level::Info,
+                ..Default::default()
+            });
+        }
+        tauri::WindowEvent::Destroyed => {
+            IS_WINDOW_VISIBLE.store(false, Ordering::SeqCst);
+            IDLE_GENERATION.fetch_add(1, Ordering::SeqCst);
         }
         _ => {}
     });
