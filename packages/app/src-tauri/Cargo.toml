@@ -1,6 +1,6 @@
 [package]
 name = "onin"
-version = "1.32.2"
+version = "1.32.3"
 description = "A Tauri App"
 authors = ["you"]
 license = "GPL-3.0"
