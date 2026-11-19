@@ -36,6 +36,150 @@ const UNINSTALL_PATHS: &[(&str, HKEY)] = &[
     ),
 ];
 
+// ---------------------------------------------------------------------------
+// 卸载器识别（参考 Flow Launcher 的 HideUninstallersFilter）
+// 关键教训：`uninst.exe` / `unins000.exe` 并不包含连续字符串 `uninstall`，
+// 只匹配 `uninstall` 会漏掉最常见的卸载器。这里用「精确文件名 + 多语言前缀」
+// 双模式，并同时作用于「名称」与「目标路径」两个维度。
+// ---------------------------------------------------------------------------
+const UNINSTALLER_EXACT_NAMES: &[&str] = &[
+    "uninst.exe",
+    "uninst000.exe",
+    "unins000.exe",
+    "uninstall.exe",
+    "uninstall.lnk",
+    "uninst.lnk",
+];
+
+const UNINSTALLER_NAME_PREFIXES: &[&str] = &[
+    "uninstall",        // en
+    "uninst",           // 缩写，覆盖 uninst.exe / uninst000.exe
+    "unins",            // Inno Setup unins000.exe
+    "卸载",             // zh-cn
+    "卸載",             // zh-tw
+    "アンインストール", // ja
+    "삭제",             // ko
+    "kaldır",           // tr
+    "desinstaller",     // fr
+    "désinstaller",
+    "deinstall",  // de
+    "deinstalar", // es/pt
+    "הסרה",       // he
+];
+
+// 永远不能作为「应用启动目标」的系统程序。
+// 这些是执行器/脚本宿主，若被当作 DisplayIcon 或快捷方式目标，几乎一定是解析错误。
+const NON_APP_EXECUTABLES: &[&str] = &[
+    "rundll32.exe",
+    "msiexec.exe",
+    "cmd.exe",
+    "regsvr32.exe",
+    "powershell.exe",
+    "pwsh.exe",
+    "wscript.exe",
+    "cscript.exe",
+];
+
+// 安装器文件名。仅在 UninstallString 兜底解析时需要排除（那里出现 setup.exe
+// 通常是"卸载器旁的安装器"误抓）；但它们完全可能是合法应用的真实启动目标，
+// 因此不能在 DisplayIcon / 快捷方式 / 注册表来源里全局过滤。
+const INSTALLER_EXECUTABLES: &[&str] = &["setup.exe", "install.exe", "installer.exe"];
+
+/// 去掉路径/名称外层的引号与首尾空白。
+fn trim_quotes(value: &str) -> &str {
+    value.trim().trim_matches('"').trim_matches('\'').trim()
+}
+
+/// 判断一个「名称」（文件茎或显示名）是否看起来像卸载器。
+fn is_uninstaller_name(name: &str) -> bool {
+    let cleaned = trim_quotes(name);
+    let lower = cleaned.to_lowercase();
+    if UNINSTALLER_EXACT_NAMES.contains(&lower.as_str()) {
+        return true;
+    }
+    // 去掉扩展名后再做前缀匹配，使 `卸载钉钉` / `uninst` 这类茎也能命中。
+    let stem = lower
+        .strip_suffix(".lnk")
+        .or_else(|| lower.strip_suffix(".exe"))
+        .unwrap_or(&lower);
+    UNINSTALLER_NAME_PREFIXES
+        .iter()
+        .any(|prefix| stem.starts_with(prefix))
+}
+
+/// 取路径的文件名（去引号；无文件名时回退到整个字符串）。
+fn file_name_of(path: &str) -> &str {
+    let cleaned = trim_quotes(path);
+    Path::new(cleaned)
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or(cleaned)
+}
+
+/// 判断一个路径指向的文件是否为卸载器。
+/// 只看文件名，避免误伤安装路径中恰好含 "uninstall" 目录的合法应用。
+fn looks_like_uninstaller(path: &str) -> bool {
+    is_uninstaller_name(file_name_of(path))
+}
+
+/// 路径的文件名（小写）是否在给定名单中。
+fn file_name_in(path: &str, names: &[&str]) -> bool {
+    let file_name = file_name_of(path).to_lowercase();
+    names.contains(&file_name.as_str())
+}
+
+fn is_non_app_executable(path: &str) -> bool {
+    file_name_in(path, NON_APP_EXECUTABLES)
+}
+
+/// 路径指向的文件是否为安装器（仅在 UninstallString 兜底时排除）。
+fn is_installer_executable(path: &str) -> bool {
+    file_name_in(path, INSTALLER_EXECUTABLES)
+}
+
+/// 统一的"可作为启动目标"判断：非卸载器、非系统执行器。
+fn is_launchable_target(path: &str) -> bool {
+    !looks_like_uninstaller(path) && !is_non_app_executable(path)
+}
+
+/// 从任意字符串（如 DisplayIcon / UninstallString）中提取所有
+/// exe/msi/bat 路径 token，忽略引号、图标索引（`,0`）与命令行参数。
+fn extract_executable_tokens(value: &str) -> Vec<String> {
+    let Ok(re) = Regex::new(r#"(?i)"?([^"]+?\.(?:exe|msi|bat))"?"#) else {
+        return Vec::new();
+    };
+    re.captures_iter(value)
+        .filter_map(|cap| cap.get(1).map(|m| trim_quotes(m.as_str()).to_string()))
+        .collect()
+}
+
+fn extract_executable_token(value: &str) -> Option<String> {
+    extract_executable_tokens(value).into_iter().next()
+}
+
+/// 展开 lnk / 注册表中偶尔保留的 `%VAR%` 环境变量。
+fn expand_env_vars(value: &str) -> String {
+    let mut result = value.to_string();
+    const VARS: &[&str] = &[
+        "USERPROFILE",
+        "LOCALAPPDATA",
+        "APPDATA",
+        "ProgramFiles",
+        "ProgramFiles(x86)",
+        "WINDIR",
+        "SystemRoot",
+        "ProgramData",
+    ];
+    for key in VARS {
+        if let Ok(val) = std::env::var(key) {
+            result = result.replace(&format!("%{}%", key), &val);
+            result = result.replace(&format!("%{}%", key.to_lowercase()), &val);
+            result = result.replace(&format!("%{}%", key.to_uppercase()), &val);
+        }
+    }
+    result
+}
+
 // 从注册表中获取应用列表
 #[tracing::instrument]
 async fn get_apps_from_hkey() -> Result<Vec<AppInfo>, String> {
@@ -65,6 +209,12 @@ async fn get_apps_from_hkey() -> Result<Vec<AppInfo>, String> {
                 }
 
                 let display_name_val = display_name.unwrap();
+
+                // 过滤 1：显示名本身看起来就是卸载器（如 "卸载 XXX" / "Uninstall XXX"）。
+                if is_uninstaller_name(&display_name_val) {
+                    continue;
+                }
+
                 let display_icon_val = subkey.get_value::<String, _>("DisplayIcon").ok();
                 let install_location_val = subkey.get_value::<String, _>("InstallLocation").ok();
                 let uninstall_string_val = subkey.get_value::<String, _>("UninstallString").ok();
@@ -76,7 +226,8 @@ async fn get_apps_from_hkey() -> Result<Vec<AppInfo>, String> {
                 );
 
                 if let Some(ref p) = app_path_candidate {
-                    if !p.to_lowercase().contains("msiexec.exe") {
+                    // 过滤 2：最终解析出的启动路径不能是卸载器或系统执行器。
+                    if is_launchable_target(p) {
                         let name_cloned = display_name_val.clone();
                         let path_cloned = p.clone();
                         let icon_path_cloned = display_icon_val.clone();
@@ -84,9 +235,7 @@ async fn get_apps_from_hkey() -> Result<Vec<AppInfo>, String> {
                         futures.push(task::spawn_blocking(move || {
                             let icon_base64 =
                                 extract_icon_from_exe_or_image(&icon_path_cloned, &path_cloned);
-                            // <<-- 修复点：将 Ok(AppInfo { ... }) 改为 Ok(Some(AppInfo { ... }))
                             Ok(Some(AppInfo {
-                                // <<-- 加上 Some()
                                 name: normalize_app_name(&name_cloned),
                                 keywords: vec![],
                                 path: Some(path_cloned),
@@ -123,7 +272,7 @@ async fn get_apps_from_hkey() -> Result<Vec<AppInfo>, String> {
     Ok(apps)
 }
 
-fn normalize_app_name(name: &str) -> String {
+pub(crate) fn normalize_app_name(name: &str) -> String {
     let patterns = [
         " (x86)",
         " (x64)",
@@ -149,62 +298,57 @@ fn normalize_app_name(name: &str) -> String {
     let re = Regex::new(r"\[[^\]]*\]").unwrap();
     result = re.replace_all(&result, "").to_string();
 
+    // 全角括号（中文应用名常见），如 `钉钉（桌面版）`。
+    let re = Regex::new(r"（[^）]*）").unwrap();
+    result = re.replace_all(&result, "").to_string();
+    let re = Regex::new(r"【[^】]*】").unwrap();
+    result = re.replace_all(&result, "").to_string();
+
     result.trim().to_string()
 }
 
+/// 从一个候选路径中解析出可用于「启动」的可执行文件。
+/// 注意：DisplayIcon 很多时候只是图标（可能是 .dll / .ico），不能直接当启动目标。
 fn extract_exe_path(
     display_icon: Option<String>,
     install_location: Option<String>,
     uninstall_string: Option<String>,
 ) -> Option<String> {
+    // 优先级 1：DisplayIcon 中的可执行文件路径（去引号、去 `,索引`、去参数）。
     if let Some(icon) = display_icon {
-        let lower_icon = icon.to_lowercase();
-        if lower_icon.ends_with(".exe")
-            || lower_icon.ends_with(".msi")
-            || lower_icon.ends_with(".bat")
-        {
-            return Some(icon);
-        }
-        if lower_icon.contains(".exe,")
-            || lower_icon.contains(".msi,")
-            || lower_icon.contains(".bat,")
-        {
-            let parts: Vec<&str> = icon.split(",").collect();
-            let first_part = parts[0].to_lowercase();
-            if first_part.ends_with(".exe")
-                || first_part.ends_with(".msi")
-                || first_part.ends_with(".bat")
-            {
-                return Some(parts[0].to_string());
+        if let Some(token) = extract_executable_token(&icon) {
+            let token = expand_env_vars(&token);
+            // 图标路径里指向卸载器时不能作为启动目标。
+            if is_launchable_target(&token) {
+                return Some(token);
             }
         }
     }
 
+    // 优先级 2：InstallLocation 下的 start.exe（历史兼容）。
     if let Some(loc) = &install_location {
-        let guessed = std::path::Path::new(loc).join("start.exe");
+        let loc = expand_env_vars(trim_quotes(loc));
+        let guessed = Path::new(&loc).join("start.exe");
         if guessed.exists() {
             let guessed_str = guessed.to_string_lossy().to_string();
-            if guessed_str.to_lowercase().ends_with(".exe")
-                || guessed_str.to_lowercase().ends_with(".msi")
-                || guessed_str.to_lowercase().ends_with(".bat")
-            {
+            if is_launchable_target(&guessed_str) {
                 return Some(guessed_str);
             }
         }
     }
 
+    // 优先级 3：UninstallString 兜底。这里只取「第一个合法的 exe」，
+    // 并跳过卸载器 / 系统安装器 / rundll32 之类（例如 MsiExec /X{GUID}）。
+    // 注意：许多应用只会写 UninstallString，这是它们能出现在列表里的唯一途径。
     if let Some(uninstall) = uninstall_string {
-        if uninstall.to_lowercase().contains(".exe")
-            || uninstall.to_lowercase().contains(".msi")
-            || uninstall.to_lowercase().contains(".bat")
-        {
-            let re = Regex::new("\"?([^\"]+?\\.(exe|msi|bat))\"?").unwrap();
-            if let Some(cap) = re.captures(&uninstall) {
-                let path = &cap[1];
-                if !path.to_lowercase().contains("uninstall") {
-                    return Some(path.to_string());
-                }
+        for token in extract_executable_tokens(&uninstall) {
+            let token = expand_env_vars(&token);
+            // 兜底来源里额外排除安装器：UninstallString 中出现的 setup.exe
+            // 往往是卸载器旁误抓的安装程序，不是用来启动应用的。
+            if !is_launchable_target(&token) || is_installer_executable(&token) {
+                continue;
             }
+            return Some(token);
         }
     }
 
@@ -318,18 +462,23 @@ fn app_from_shortcut(shortcut_path: PathBuf) -> Result<Option<AppInfo>, String> 
         }
     };
 
-    if should_filter_shortcut_with_link(&shell_link) {
+    let app_name = shortcut_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_string();
+
+    // 目标只解析一次，供过滤与后续构造共用（避免重复 env 展开 / 路径拼接）。
+    let target_path = extract_target_from_lnk_with_link(&shell_link);
+
+    // 同时检查「快捷方式文件名」与「目标路径」两轴（对齐 Flow Launcher）：
+    // `卸载钉钉.lnk` 的目标 `uninst.exe` 即使名字不含 uninstall，也会被拦住。
+    if should_filter_shortcut(&app_name, &shell_link, target_path.as_deref()) {
         return Ok(None);
     }
 
     let mut app_info: Option<AppInfo> = None;
-    if let Some(target_path) = extract_target_from_lnk_with_link(&shell_link) {
-        let app_name = shortcut_path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("")
-            .to_string();
-
+    if let Some(target_path) = target_path {
         let icon = extract_icon_from_shortcut_with_link(&shell_link, &target_path);
 
         if target_path.to_lowercase().ends_with(".exe")
@@ -394,21 +543,66 @@ async fn get_apps_from_shortcuts() -> Result<Vec<AppInfo>, String> {
     Ok(apps)
 }
 
-// should_filter_shortcut 的新版本，接受 ShellLink 引用
-// 保持同步，因为会在 spawn_blocking 内部调用
-fn should_filter_shortcut_with_link(link: &ShellLink) -> bool {
-    // 逻辑不变，直接使用传入的 link
-    is_uninstall_path(link) // is_uninstall_path 已经接受 ShellLink 引用
+/// 快捷方式过滤器：双轴检查。
+/// 1) 快捷方式自身的名字（`卸载钉钉.lnk` —— Flow Launcher 也是这么做的）；
+/// 2) 目标路径（`target_path` 由调用方解析一次后传入，避免重复解析）。
+fn should_filter_shortcut(
+    shortcut_name: &str,
+    link: &ShellLink,
+    target_path: Option<&str>,
+) -> bool {
+    if is_uninstaller_name(shortcut_name) {
+        return true;
+    }
+    if let Some(target) = target_path {
+        return !is_launchable_target(target);
+    }
+    // 目标无法解析时，仍对原始 local_base_path 做一次宽松检查。
+    if let Some(link_info) = link.link_info().as_ref() {
+        if let Some(local_path) = link_info.local_base_path() {
+            if looks_like_uninstaller(local_path) {
+                return true;
+            }
+        }
+    }
+    false
 }
 
-// extract_target_from_lnk 的新版本，接受 ShellLink 引用
-// 保持同步，因为会在 spawn_blocking 内部调用
+/// 解析 lnk 目标：拼接 `local_base_path` + `common_path_suffix`（关键修复）。
+/// 原实现只取 `local_base_path`，当快捷方式把目标拆成「目录 + 文件名」时，
+/// 得到的是目录，随后被扩展名检查丢弃 —— 这正是钉钉「只剩卸载项」的成因。
 fn extract_target_from_lnk_with_link(link: &ShellLink) -> Option<String> {
     let link_info = link.link_info().as_ref()?;
-    let local_path = link_info.local_base_path()?;
 
-    if Path::new(local_path).exists() {
-        Some(local_path.to_string())
+    // Unicode 变体优先（中文路径在 WINDOWS_1252 下会乱码）。
+    let base = link_info
+        .local_base_path_unicode()
+        .as_ref()
+        .map(|s| s.to_string())
+        .or_else(|| link_info.local_base_path().map(|s| s.to_string()))?;
+    let base = expand_env_vars(trim_quotes(&base));
+
+    let suffix = link_info
+        .common_path_suffix_unicode()
+        .as_ref()
+        .cloned()
+        .unwrap_or_else(|| link_info.common_path_suffix().to_string());
+    let suffix = trim_quotes(&suffix);
+
+    // 组合完整目标：base 本身已是完整路径时 suffix 通常为空。
+    let combined = if suffix.is_empty() {
+        base.clone()
+    } else {
+        let mut p = PathBuf::from(&base);
+        p.push(suffix);
+        p.to_string_lossy().to_string()
+    };
+
+    if Path::new(&combined).exists() {
+        Some(combined)
+    } else if Path::new(&base).exists() {
+        // 兼容：某些 lnk 的 suffix 含参数，整体不存在时退回 base。
+        Some(base)
     } else {
         None
     }
@@ -647,35 +841,74 @@ pub async fn get_apps() -> Result<Vec<AppInfo>, String> {
     let hkey_apps = hkey_apps_result?;
     let shortcut_apps = shortcut_apps_result?;
 
+    // 三个来源统一合并：按规范化名称去重，但合并元数据而不是简单丢弃后来者。
+    // 关键：来源过滤已在各 scan 阶段剔除卸载器，因此这里存活的都是合法启动项；
+    // 合并时按来源质量决定 path/name 的取舍，并补齐图标与关键词。
+    let mut all_apps = Vec::new();
+    all_apps.extend(hkey_apps);
+    all_apps.extend(shortcut_apps);
+    all_apps.extend(apps_folder_apps);
+
+    Ok(deduplicate_apps(all_apps))
+}
+
+fn origin_rank(app: &AppInfo) -> u8 {
+    match app.origin {
+        Some(AppOrigin::Uwp) => 3, // AppsFolder：Shell 策展的「所有应用」，最可信
+        Some(AppOrigin::Shortcut) => 2, // 开始菜单快捷方式
+        Some(AppOrigin::Hkey) => 1, // 注册表（路径可能是卸载器，已过滤）
+        None => 0,
+    }
+}
+
+/// 把新条目合并进已存在的同名条目：
+/// - 图标：谁有就用谁的（优先补齐）；
+/// - 关键词：取并集；
+/// - path/name：来源质量更高者胜出，避免坏路径遮住好路径。
+fn merge_app(existing: &mut AppInfo, incoming: AppInfo) {
+    if existing.icon.is_none() && incoming.icon.is_some() {
+        existing.icon = incoming.icon.clone();
+    }
+    for kw in incoming.keywords.iter() {
+        if !existing.keywords.contains(kw) {
+            existing.keywords.push(kw.clone());
+        }
+    }
+    if origin_rank(&incoming) > origin_rank(existing) {
+        existing.path = incoming.path;
+        existing.name = incoming.name;
+        existing.origin = incoming.origin;
+    }
+}
+
+/// 按应用身份去重（纯函数，便于测试）。
+/// 身份键 = 规范化后的名称（小写），保留「一个应用一条」的交互习惯；
+/// 与旧实现不同点：来源之间不再互相吞掉，而是合并元数据 + 择优取路径。
+pub(crate) fn deduplicate_apps(apps: Vec<AppInfo>) -> Vec<AppInfo> {
     let mut unique_apps: HashMap<String, AppInfo> = HashMap::new();
-
-    // 优先级 1: 注册表应用 (通常路径准确)
-    for app in hkey_apps {
-        unique_apps.insert(app.name.clone(), app);
+    for app in apps {
+        // 最后一道防线：即使某个来源漏过了过滤，这里再按名称 + 路径双轴剔除卸载器。
+        if is_uninstaller_name(&app.name) {
+            continue;
+        }
+        if let Some(ref path) = app.path {
+            if !is_launchable_target(path) {
+                continue;
+            }
+        }
+        let key = normalize_app_name(&app.name).to_lowercase();
+        match unique_apps.get_mut(&key) {
+            Some(existing) => merge_app(existing, app),
+            None => {
+                unique_apps.insert(key, app);
+            }
+        }
     }
 
-    // 优先级 2: 快捷方式应用 (补充注册表未找到的)
-    for app in shortcut_apps {
-        let normalized_name = normalize_app_name(&app.name);
-        unique_apps.entry(normalized_name).or_insert(app);
-    }
-
-    // 优先级 3: AppsFolder 应用 (主要用于补充 UWP 应用和更高质量的图标)
-    for app in apps_folder_apps {
-        unique_apps
-            .entry(app.name.clone())
-            .and_modify(|existing_app| {
-                // 如果现有应用没有图标，而 AppsFolder 应用有，则更新图标
-                if existing_app.icon.is_none() && app.icon.is_some() {
-                    existing_app.icon = app.icon.clone();
-                }
-            })
-            .or_insert(app); // 如果应用不存在，则插入 (这通常是 UWP 应用)
-    }
-
-    let final_apps: Vec<AppInfo> = unique_apps.into_values().collect();
-
-    Ok(final_apps)
+    let mut result: Vec<AppInfo> = unique_apps.into_values().collect();
+    // HashMap 顺序不确定，排序保证结果稳定。
+    result.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    result
 }
 
 pub fn open_app(path: &str) -> Result<(), String> {
@@ -709,16 +942,6 @@ pub fn open_app(path: &str) -> Result<(), String> {
             .map_err(|e| e.to_string())?;
     }
     Ok(())
-}
-
-fn is_uninstall_path(link: &ShellLink) -> bool {
-    if let Some(link_info) = link.link_info() {
-        if let Some(local_path) = link_info.local_base_path() {
-            let path_str = local_path.to_lowercase();
-            return path_str.contains("uninstall") || path_str.contains("卸载");
-        }
-    }
-    false
 }
 
 fn convert_image_to_base64(image_path: &str) -> Option<String> {
@@ -884,5 +1107,323 @@ mod tests {
         let res = app_from_shortcut(corrupted_file.path().to_path_buf());
         assert!(res.is_ok());
         assert!(res.unwrap().is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // 卸载器识别：三个真实案例覆盖
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_is_uninstaller_name_covers_all_common_forms() {
+        // 大小写不敏感；uninst / unins000 / uninstall 三种常见文件名都要命中
+        for name in [
+            "uninst.exe",
+            "UNINST.EXE",
+            "uninst000.exe",
+            "unins000.exe",
+            "Uninstall.exe",
+            "uninstall.exe",
+            "卸载百度网盘",
+            "卸载钉钉",
+            "卸載騰訊",
+            "卸载钉钉.lnk",
+            "Uninstall DingTalk.lnk",
+        ] {
+            assert!(
+                is_uninstaller_name(name),
+                "expected '{}' to be recognized as uninstaller",
+                name
+            );
+        }
+    }
+
+    #[test]
+    fn test_is_uninstaller_name_keeps_normal_apps() {
+        for name in [
+            "百度网盘",
+            "钉钉",
+            "小米电脑管家",
+            "XiaomiPCManager",
+            "Google Chrome",
+            "visual studio code",
+        ] {
+            assert!(
+                !is_uninstaller_name(name),
+                "normal app '{}' must NOT be flagged as uninstaller",
+                name
+            );
+        }
+    }
+
+    #[test]
+    fn test_looks_like_uninstaller_checks_only_filename() {
+        // 路径中的目录名字含 "uninstall" 不应误伤合法应用
+        assert!(!looks_like_uninstaller(
+            r"C:\Program Files\uninstall-tools\MyApp\myapp.exe"
+        ));
+        // 但文件名本身就是卸载器，要拦住
+        assert!(looks_like_uninstaller(
+            r"C:\Program Files\MI\XiaomiPCManager\5.5.2.10\Uninstall.exe"
+        ));
+        assert!(looks_like_uninstaller(
+            r"C:\Users\zwj\AppData\Roaming\baidu\BaiduNetdisk\uninst.exe"
+        ));
+        assert!(looks_like_uninstaller(r"C:\Program Files\Foo\unins000.exe"));
+    }
+
+    #[test]
+    fn test_is_non_app_executable() {
+        assert!(is_non_app_executable(r"C:\Windows\System32\msiexec.exe"));
+        assert!(is_non_app_executable(r"C:\Windows\System32\rundll32.exe"));
+        assert!(is_non_app_executable(r"C:\Windows\System32\cmd.exe"));
+        // setup.exe 不再是全局非应用执行器：它可能是合法应用的启动目标
+        assert!(!is_non_app_executable(r"C:\App\setup.exe"));
+        assert!(!is_non_app_executable(r"C:\Program Files\App\app.exe"));
+    }
+
+    #[test]
+    fn test_installer_only_excluded_in_uninstall_string_fallback() {
+        // 安装器判断只用于 UninstallString 兜底，不影响 DisplayIcon / 快捷方式来源
+        assert!(is_installer_executable(r"C:\App\setup.exe"));
+        assert!(is_installer_executable(r"C:\App\INSTALL.EXE"));
+        assert!(!is_installer_executable(r"C:\Program Files\App\app.exe"));
+        // 合法的 setup.exe 作为 DisplayIcon 应被保留（范围蔓延修复）
+        assert_eq!(
+            extract_exe_path(Some(r"C:\Program Files\MyApp\setup.exe".into()), None, None)
+                .as_deref(),
+            Some(r"C:\Program Files\MyApp\setup.exe")
+        );
+        // 但 UninstallString 兜底里出现的 setup.exe 应被跳过
+        assert_eq!(
+            extract_exe_path(None, None, Some(r"C:\App\setup.exe /S".into())),
+            None
+        );
+    }
+
+    #[test]
+    fn test_is_launchable_target() {
+        assert!(is_launchable_target(r"C:\Program Files\App\app.exe"));
+        assert!(is_launchable_target(r"C:\Program Files\App\setup.exe"));
+        assert!(!is_launchable_target(r"C:\Program Files\App\uninst.exe"));
+        assert!(!is_launchable_target(r"C:\Windows\System32\cmd.exe"));
+    }
+
+    // -----------------------------------------------------------------------
+    // extract_exe_path：DisplayIcon / UninstallString 解析
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_extract_exe_path_from_display_icon_variants() {
+        // 普通 exe
+        assert_eq!(
+            extract_exe_path(Some(r"C:\Program Files\App\app.exe".into()), None, None).as_deref(),
+            Some(r"C:\Program Files\App\app.exe")
+        );
+        // 带引号
+        assert_eq!(
+            extract_exe_path(
+                Some("\"C:\\Program Files\\App\\app.exe\"".into()),
+                None,
+                None
+            )
+            .as_deref(),
+            Some(r"C:\Program Files\App\app.exe")
+        );
+        // 带图标索引 `,0`
+        assert_eq!(
+            extract_exe_path(Some(r"C:\Program Files\App\app.exe,0".into()), None, None).as_deref(),
+            Some(r"C:\Program Files\App\app.exe")
+        );
+        // 带引号 + 图标索引
+        assert_eq!(
+            extract_exe_path(
+                Some("\"C:\\Program Files\\App\\app.exe\",0".into()),
+                None,
+                None
+            )
+            .as_deref(),
+            Some(r"C:\Program Files\App\app.exe")
+        );
+    }
+
+    #[test]
+    fn test_extract_exe_path_rejects_uninstaller_display_icon() {
+        // 小米电脑管家案例：DisplayIcon 指向 Uninstall.exe，不能作为启动目标
+        assert_eq!(
+            extract_exe_path(
+                Some(r"C:\Program Files\MI\XiaomiPCManager\5.5.2.10\Uninstall.exe".into()),
+                None,
+                None,
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn test_extract_exe_path_uninstall_string_fallback() {
+        // 百度网盘案例：UninstallString 指向 uninst.exe，回退分支必须跳过
+        assert_eq!(
+            extract_exe_path(
+                None,
+                None,
+                Some(r"C:\Users\zwj\AppData\Roaming\baidu\BaiduNetdisk\uninst.exe".into()),
+            ),
+            None
+        );
+        // MSI 卸载：抓到 msiexec.exe 也要跳过
+        assert_eq!(
+            extract_exe_path(
+                None,
+                None,
+                Some("MsiExec.exe /I{12345678-1234-1234-1234-123456789012}".into()),
+            ),
+            None
+        );
+        // rundll32 也跳过
+        assert_eq!(
+            extract_exe_path(
+                None,
+                None,
+                Some(r"rundll32.exe C:\App\uninst.dll,Uninstall".into()),
+            ),
+            None
+        );
+        // 合法路径（无其它来源时）仍可作为兜底
+        assert_eq!(
+            extract_exe_path(None, None, Some(r"C:\Program Files\App\app.exe /U".into()))
+                .as_deref(),
+            Some(r"C:\Program Files\App\app.exe")
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // 名称归一化
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_normalize_app_name_fullwidth_brackets() {
+        assert_eq!(normalize_app_name("钉钉（桌面版）"), "钉钉");
+        assert_eq!(normalize_app_name("微信【PC版】"), "微信");
+        assert_eq!(normalize_app_name("Google Chrome (x86)"), "Google Chrome");
+        assert_eq!(normalize_app_name("App 1.2.3"), "App");
+    }
+
+    // -----------------------------------------------------------------------
+    // 去重：坏条目不能压掉好条目
+    // -----------------------------------------------------------------------
+
+    fn make_app(name: &str, path: &str, origin: AppOrigin, icon: Option<String>) -> AppInfo {
+        AppInfo {
+            name: name.to_string(),
+            keywords: vec![],
+            path: Some(path.to_string()),
+            icon,
+            origin: Some(origin),
+        }
+    }
+
+    #[test]
+    fn test_deduplicate_prefers_shortcut_over_registry_and_merges_icon() {
+        // 同名两条：注册表（低优先级，带图标）与快捷方式（高优先级，无图标）。
+        // 结果应保留快捷方式的正确 path/origin，同时合并注册表的图标。
+        let apps = vec![
+            make_app(
+                "小米电脑管家",
+                r"C:\Program Files\MI\XiaomiPCManager\5.5.2.10\XiaomiPCManager.exe",
+                AppOrigin::Shortcut,
+                None,
+            ),
+            make_app(
+                "小米电脑管家",
+                r"C:\Program Files\MI\XiaomiPCManager\5.5.2.10\XiaomiPCManager.exe",
+                AppOrigin::Hkey,
+                Some("BASE64_ICON".into()),
+            ),
+        ];
+        let result = deduplicate_apps(apps);
+        assert_eq!(result.len(), 1, "同名应用应合并为一条");
+        assert_eq!(
+            result[0].path.as_deref(),
+            Some(r"C:\Program Files\MI\XiaomiPCManager\5.5.2.10\XiaomiPCManager.exe"),
+            "快捷方式路径应胜出"
+        );
+        assert_eq!(
+            result[0].icon.as_deref(),
+            Some("BASE64_ICON"),
+            "图标应被合并"
+        );
+        assert_eq!(result[0].origin, Some(AppOrigin::Shortcut));
+    }
+
+    #[test]
+    fn test_deduplicate_appsfolder_path_wins() {
+        let apps = vec![
+            make_app(
+                "钉钉",
+                r"C:\Program Files\DingTalk\DingTalk.exe",
+                AppOrigin::Shortcut,
+                None,
+            ),
+            make_app("钉钉", "shell:AppsFolder\\DingTalk", AppOrigin::Uwp, None),
+        ];
+        let result = deduplicate_apps(apps);
+        assert_eq!(result.len(), 1);
+        assert_eq!(
+            result[0].path.as_deref(),
+            Some("shell:AppsFolder\\DingTalk"),
+            "AppsFolder 来源优先级最高"
+        );
+        assert_eq!(result[0].origin, Some(AppOrigin::Uwp));
+    }
+
+    #[test]
+    fn test_deduplicate_uninstaller_entries_dropped() {
+        // 最后一道防线：漏网的卸载器条目（名称或路径）在去重阶段被剔除
+        let apps = vec![
+            make_app(
+                "百度网盘",
+                r"C:\App\BaiduNetdisk\BaiduNetdisk.exe",
+                AppOrigin::Shortcut,
+                None,
+            ),
+            make_app(
+                "卸载百度网盘",
+                r"C:\App\BaiduNetdisk\uninst.exe",
+                AppOrigin::Shortcut,
+                None,
+            ),
+            make_app(
+                "某应用",
+                r"C:\App\SomeApp\Uninstall.exe",
+                AppOrigin::Hkey,
+                None,
+            ),
+        ];
+        let result = deduplicate_apps(apps);
+        assert_eq!(result.len(), 1, "两条卸载器都应被剔除，只剩正常应用");
+        assert_eq!(result[0].name, "百度网盘");
+        assert!(result.iter().all(|a| !is_uninstaller_name(&a.name)));
+    }
+
+    #[test]
+    fn test_deduplicate_keeps_distinct_apps() {
+        let apps = vec![
+            make_app(
+                "百度网盘",
+                r"C:\App\BaiduNetdisk\app.exe",
+                AppOrigin::Shortcut,
+                None,
+            ),
+            make_app(
+                "钉钉",
+                r"C:\App\DingTalk\app.exe",
+                AppOrigin::Shortcut,
+                None,
+            ),
+        ];
+        let result = deduplicate_apps(apps);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].name, "百度网盘");
+        assert_eq!(result[1].name, "钉钉");
     }
 }
