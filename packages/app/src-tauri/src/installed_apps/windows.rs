@@ -568,6 +568,21 @@ fn should_filter_shortcut(
     false
 }
 
+/// 拼接 lnk 的 `local_base_path` 与 `common_path_suffix`。
+///
+/// `common_path_suffix` 常带前导反斜杠（如 `\DingTalk.exe`）。这类「有根
+/// 无前缀」的路径传给 `PathBuf::push` 时，Rust 会保留盘符但丢掉 base 目录
+/// （`C:\Program Files\DingTalk` + `\DingTalk.exe` → `C:\DingTalk.exe`），
+/// 因此这里手动去掉两端分隔符后再拼接。
+fn join_link_target(base: &str, suffix: &str) -> String {
+    let clean_suffix = suffix.trim_start_matches(['\\', '/']);
+    if clean_suffix.is_empty() {
+        return base.to_string();
+    }
+    let clean_base = base.trim_end_matches(['\\', '/']);
+    format!("{}\\{}", clean_base, clean_suffix)
+}
+
 /// 解析 lnk 目标：拼接 `local_base_path` + `common_path_suffix`（关键修复）。
 /// 原实现只取 `local_base_path`，当快捷方式把目标拆成「目录 + 文件名」时，
 /// 得到的是目录，随后被扩展名检查丢弃 —— 这正是钉钉「只剩卸载项」的成因。
@@ -590,13 +605,7 @@ fn extract_target_from_lnk_with_link(link: &ShellLink) -> Option<String> {
     let suffix = trim_quotes(&suffix);
 
     // 组合完整目标：base 本身已是完整路径时 suffix 通常为空。
-    let combined = if suffix.is_empty() {
-        base.clone()
-    } else {
-        let mut p = PathBuf::from(&base);
-        p.push(suffix);
-        p.to_string_lossy().to_string()
-    };
+    let combined = join_link_target(&base, &suffix);
 
     if Path::new(&combined).exists() {
         Some(combined)
@@ -862,22 +871,25 @@ fn origin_rank(app: &AppInfo) -> u8 {
 }
 
 /// 把新条目合并进已存在的同名条目：
-/// - 图标：谁有就用谁的（优先补齐）；
+/// - 图标：低优先级来源先出现时，高优先级来源的图标要能覆盖它；高优先级
+///   来源没有图标时则保留已有图标；
 /// - 关键词：取并集；
 /// - path/name：来源质量更高者胜出，避免坏路径遮住好路径。
 fn merge_app(existing: &mut AppInfo, incoming: AppInfo) {
-    if existing.icon.is_none() && incoming.icon.is_some() {
+    if origin_rank(&incoming) > origin_rank(existing) {
+        existing.path = incoming.path;
+        existing.name = incoming.name;
+        existing.origin = incoming.origin;
+        if incoming.icon.is_some() {
+            existing.icon = incoming.icon.clone();
+        }
+    } else if existing.icon.is_none() && incoming.icon.is_some() {
         existing.icon = incoming.icon.clone();
     }
     for kw in incoming.keywords.iter() {
         if !existing.keywords.contains(kw) {
             existing.keywords.push(kw.clone());
         }
-    }
-    if origin_rank(&incoming) > origin_rank(existing) {
-        existing.path = incoming.path;
-        existing.name = incoming.name;
-        existing.origin = incoming.origin;
     }
 }
 
@@ -1309,6 +1321,43 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
+    // 快捷方式目标拼接
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_join_link_target_suffix_with_leading_backslash() {
+        // 回归用例：common_path_suffix 的前导反斜杠不能把 base 目录冲掉。
+        assert_eq!(
+            join_link_target(r"C:\Program Files\DingTalk", r"\DingTalk.exe"),
+            r"C:\Program Files\DingTalk\DingTalk.exe"
+        );
+    }
+
+    #[test]
+    fn test_join_link_target_normalizes_redundant_separators() {
+        assert_eq!(
+            join_link_target(r"C:\Program Files\DingTalk\", r"\DingTalk.exe"),
+            r"C:\Program Files\DingTalk\DingTalk.exe"
+        );
+        assert_eq!(
+            join_link_target(r"C:\Program Files\DingTalk", "DingTalk.exe"),
+            r"C:\Program Files\DingTalk\DingTalk.exe"
+        );
+    }
+
+    #[test]
+    fn test_join_link_target_returns_base_for_empty_suffix() {
+        assert_eq!(
+            join_link_target(r"C:\Program Files\DingTalk\DingTalk.exe", ""),
+            r"C:\Program Files\DingTalk\DingTalk.exe"
+        );
+        assert_eq!(
+            join_link_target(r"C:\Program Files\DingTalk\DingTalk.exe", r"\"),
+            r"C:\Program Files\DingTalk\DingTalk.exe"
+        );
+    }
+
+    // -----------------------------------------------------------------------
     // 去重：坏条目不能压掉好条目
     // -----------------------------------------------------------------------
 
@@ -1353,6 +1402,59 @@ mod tests {
             "图标应被合并"
         );
         assert_eq!(result[0].origin, Some(AppOrigin::Shortcut));
+    }
+
+    #[test]
+    fn test_deduplicate_higher_origin_replaces_lower_quality_icon() {
+        // 注册表先出现（rank=1，低质量图标），随后 AppsFolder（rank=3）应覆盖
+        // path/name/origin 以及图标。
+        let apps = vec![
+            make_app(
+                "小米电脑管家",
+                r"C:\Program Files\MI\XiaomiPCManager\XiaomiPcManager.exe",
+                AppOrigin::Hkey,
+                Some("LOW_QUALITY_ICON".into()),
+            ),
+            make_app(
+                "小米电脑管家",
+                "shell:AppsFolder\\XiaomiPCManager",
+                AppOrigin::Uwp,
+                Some("HIGH_QUALITY_ICON".into()),
+            ),
+        ];
+        let result = deduplicate_apps(apps);
+        assert_eq!(result.len(), 1);
+        assert_eq!(
+            result[0].icon.as_deref(),
+            Some("HIGH_QUALITY_ICON"),
+            "高优先级来源的图标应覆盖低质量图标"
+        );
+        assert_eq!(
+            result[0].path.as_deref(),
+            Some("shell:AppsFolder\\XiaomiPCManager")
+        );
+        assert_eq!(result[0].origin, Some(AppOrigin::Uwp));
+    }
+
+    #[test]
+    fn test_deduplicate_higher_origin_without_icon_keeps_existing_icon() {
+        // 高优先级来源没有图标时，不能把已有的图标清空。
+        let apps = vec![
+            make_app(
+                "钉钉",
+                r"C:\Program Files\DingTalk\DingTalk.exe",
+                AppOrigin::Hkey,
+                Some("EXISTING_ICON".into()),
+            ),
+            make_app("钉钉", "shell:AppsFolder\\DingTalk", AppOrigin::Uwp, None),
+        ];
+        let result = deduplicate_apps(apps);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].icon.as_deref(), Some("EXISTING_ICON"));
+        assert_eq!(
+            result[0].path.as_deref(),
+            Some("shell:AppsFolder\\DingTalk")
+        );
     }
 
     #[test]
