@@ -12,6 +12,10 @@ fn is_blacklisted(relative_path: &str) -> bool {
         "plugin_data/window_states.json",
         "extensions/clipboard/",
         "logs/",
+        // 用户手动添加的文件/程序指令：路径是本机绝对路径，跨机无意义且会指向错误位置。
+        // commands.json 中的 Application/FileCommand 项会在加载时被本机权威源重建，
+        // 但这个独立文件是 FileCommandManager 的权威源，必须在同步时排除。
+        "file_commands.json",
     ];
 
     for item in blacklist {
@@ -140,6 +144,7 @@ mod tests {
         assert!(is_blacklisted("plugin_data\\window_states.json"));
         assert!(is_blacklisted("logs/app.log"));
         assert!(is_blacklisted("extensions/clipboard/cache.bin"));
+        assert!(is_blacklisted("file_commands.json"));
 
         assert!(!is_blacklisted("app_config.json"));
         assert!(!is_blacklisted("plugins/hello/main.js"));
@@ -159,6 +164,13 @@ mod tests {
         fs::create_dir_all(&plugin_dir).unwrap();
         let plugin_file = plugin_dir.join("config.json");
         fs::write(&plugin_file, "plugin-data").unwrap();
+
+        // 2.5 创建机器特定的文件指令（应被黑名单排除）
+        fs::write(
+            src_path.join("file_commands.json"),
+            "[{\"path\":\"C:\\\\old-pc\\\\app.exe\"}]",
+        )
+        .unwrap();
 
         // 2. 创建属于黑名单的文件/目录
         let window_states_dir = src_path.join("plugin_data");
@@ -198,6 +210,7 @@ mod tests {
         );
 
         // 黑名单中的文件和目录应该被排除，不应存在
+        assert!(!unpack_path.join("file_commands.json").exists());
         assert!(!unpack_path.join("plugin_data/window_states.json").exists());
         assert!(!unpack_path.join("logs/onin.log").exists());
         assert!(!unpack_path

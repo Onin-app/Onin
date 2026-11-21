@@ -164,6 +164,12 @@ pub async fn trigger_webdav_sync(
                     }
                 }
 
+                // 恢复后清除已安装应用缓存并通知前端重载命令列表：
+                // commands.json 可能来自另一台电脑，其中包含机器特定的旧路径；
+                // 下次 load_commands 会用本机权威源重建 Application/FileCommand。
+                crate::command_manager::invalidate_app_commands_cache();
+                let _ = app.emit("apps_updated", ());
+
                 // 广播全局设置载入事件，通知 Svelte 前端触发配置重绘与插件重扫
                 let _ = app.emit("app-config-loaded", ());
 

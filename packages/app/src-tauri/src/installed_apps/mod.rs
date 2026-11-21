@@ -25,6 +25,23 @@ pub struct AppInfo {
     pub origin: Option<AppOrigin>,
 }
 
+/// 归一化应用名称，供命令层匹配「已保存命令」与「本机扫描结果」使用。
+///
+/// 扫描器在各平台已经用归一化后的名称设置 `AppInfo.name`；旧版本持久化下来的
+/// `commands.json` 里可能仍是带括号/版本号的旧名称（如 `钉钉（桌面版）`）。
+/// 命令层用同一套归一化规则重新计算键，才能在这些条目上保留用户的关键词自定义。
+pub fn normalize_app_name_for_match(name: &str) -> String {
+    #[cfg(target_os = "windows")]
+    {
+        windows::normalize_app_name(name)
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        name.trim().to_string()
+    }
+}
+
 // 这不再是一个Tauri命令，而是一个内部调用的、执行耗时操作的函数
 pub async fn fetch_installed_apps() -> Result<Vec<AppInfo>, String> {
     #[cfg(target_os = "windows")]
