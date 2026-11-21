@@ -16,6 +16,7 @@ mod refresh;
 mod storage;
 
 // 重新导出公共接口（非 Tauri 命令）
+pub use generators::invalidate_app_commands_cache;
 pub use storage::load_commands;
 
 use tauri::{AppHandle, Emitter};

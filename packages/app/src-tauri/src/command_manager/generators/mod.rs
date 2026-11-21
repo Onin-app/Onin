@@ -9,7 +9,7 @@ mod internal;
 mod plugin;
 mod system;
 
-pub use app::get_initial_app_commands;
+pub use app::{get_initial_app_commands, invalidate_app_commands_cache};
 pub use extension::get_initial_extension_commands;
 pub use file::get_initial_file_commands;
 pub use internal::get_initial_internal_commands;
