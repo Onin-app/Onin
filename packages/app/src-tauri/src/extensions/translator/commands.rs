@@ -12,11 +12,8 @@ const TRANSLATOR_TITLEBAR_INSET: f64 = 28.0;
 #[cfg(not(target_os = "macos"))]
 const TRANSLATOR_TITLEBAR_INSET: f64 = 0.0;
 
-/// 空闲超时时间：1 小时未被再次唤起时彻底销毁窗口，释放 WebView2 进程与全部内存
-const TRANSLATOR_IDLE_TIMEOUT: Duration = Duration::from_secs(3600);
-
-/// 复用探活超时时间：复用旧窗口时若底层 WebView2 挂起超过 600ms，触发安全熔断并重建
-const TRANSLATOR_REUSE_TIMEOUT: Duration = Duration::from_millis(600);
+/// 空闲超时时间：10 分钟未被再次唤起时彻底销毁窗口，释放 WebView2 进程与全部内存
+const TRANSLATOR_IDLE_TIMEOUT: Duration = Duration::from_secs(600);
 
 const TRANSLATOR_ESC_SCRIPT: &str = r#"
 (() => {
@@ -157,19 +154,32 @@ fn layout_translator_webviews(window: &tauri::Window) -> Result<(), String> {
     let titlebar_inset = (TRANSLATOR_TITLEBAR_INSET * scale_factor).round() as u32;
     let top_bar_height = (TRANSLATOR_TOP_BAR_HEIGHT * scale_factor).round() as u32;
     let webview_top = titlebar_inset.saturating_add(top_bar_height);
-    let content_height = inner_size.height.saturating_sub(webview_top);
+
+    // 防御保护：若窗口尚未完成渲染映射获取到 0 尺寸，采用默认 1000x800 的物理尺寸兜底，杜绝 0 尺寸白屏
+    let width = if inner_size.width > 0 {
+        inner_size.width
+    } else {
+        (1000.0 * scale_factor).round() as u32
+    };
+    let height = if inner_size.height > 0 {
+        inner_size.height
+    } else {
+        (800.0 * scale_factor).round() as u32
+    };
+
+    let content_height = height.saturating_sub(webview_top);
 
     if let Some(ui_webview) = window.get_webview("translator-ui") {
         let _ = ui_webview.set_bounds(Rect {
             position: PhysicalPosition::new(0, titlebar_inset as i32).into(),
-            size: PhysicalSize::new(inner_size.width, top_bar_height).into(),
+            size: PhysicalSize::new(width, top_bar_height).into(),
         });
     }
 
     if let Some(content_webview) = window.get_webview("translator-content") {
         let _ = content_webview.set_bounds(Rect {
             position: PhysicalPosition::new(0, webview_top as i32).into(),
-            size: PhysicalSize::new(inner_size.width, content_height).into(),
+            size: PhysicalSize::new(width, content_height).into(),
         });
     }
 
@@ -237,7 +247,7 @@ pub async fn open_translator_window(app: tauri::AppHandle) -> Result<(), String>
     open_window(&app, None).await
 }
 
-/// 尝试安全复用已有窗口（带 600ms 超时熔断保护，防止渲染进程僵死导致卡死）
+/// 安全复用已有窗口：激活显示并立即刷新布局
 async fn try_reuse_window(
     window: &tauri::Window,
     resolved_text: &Option<String>,
@@ -245,42 +255,44 @@ async fn try_reuse_window(
     let window_clone = window.clone();
     let text_clone = resolved_text.clone();
 
-    tokio::time::timeout(TRANSLATOR_REUSE_TIMEOUT, async move {
-        // 1. 探活 UI Webview：若渲染进程已崩溃或死锁，eval 会失败或卡死，由外层 timeout 熔断
-        let ui_webview = window_clone
-            .get_webview("translator-ui")
-            .ok_or_else(|| "缺少 translator-ui webview".to_string())?;
-        ui_webview
-            .eval("void 0")
-            .map_err(|e| format!("translator-ui 探活失败: {}", e))?;
+    // 1. 确保两个 webview 均存在
+    let _ui_webview = window_clone
+        .get_webview("translator-ui")
+        .ok_or_else(|| "缺少 translator-ui webview".to_string())?;
+    let content_webview = window_clone
+        .get_webview("translator-content")
+        .ok_or_else(|| "缺少 translator-content webview".to_string())?;
 
-        // 2. 检查内容 Webview
-        let content_webview = window_clone
-            .get_webview("translator-content")
-            .ok_or_else(|| "缺少 translator-content webview".to_string())?;
+    // 2. 显示并聚焦宿主窗口
+    let _ = window_clone.unminimize();
+    let _ = window_clone.show();
+    let _ = window_clone.set_focus();
 
-        // 3. 若有新文本，更新并导航
-        if let Some(ref text) = text_clone {
-            set_current_text(Some(text.clone()));
-            let current_engine = get_current_engine();
-            let url_str = build_engine_url(&current_engine, Some(text));
+    // 3. 关键：复用唤醒后必须立即重新计算并下发 bounds！
+    // 隐藏状态唤醒时，WebView2 必须重新获得 bounds 才能恢复渲染管线，避免保持白屏
+    layout_translator_webviews(&window_clone)?;
 
-            if let Ok(url) = url_str.parse::<tauri::Url>() {
-                content_webview
-                    .navigate(url)
-                    .map_err(|e| format!("导航失败: {}", e))?;
-            }
+    // 4. 若有新文本，更新并导航
+    if let Some(ref text) = text_clone {
+        set_current_text(Some(text.clone()));
+        let current_engine = get_current_engine();
+        let url_str = build_engine_url(&current_engine, Some(text));
+
+        if let Ok(url) = url_str.parse::<tauri::Url>() {
+            content_webview
+                .navigate(url)
+                .map_err(|e| format!("导航失败: {}", e))?;
         }
+    }
 
-        // 4. 显示并聚焦
-        let _ = window_clone.unminimize();
-        let _ = window_clone.show();
-        let _ = window_clone.set_focus();
+    // 5. 异步 50ms 再次进行布局确认，保障动画完成后的最终尺寸一致性
+    let window_for_async_layout = window_clone.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        let _ = layout_translator_webviews(&window_for_async_layout);
+    });
 
-        Ok(())
-    })
-    .await
-    .map_err(|_| "复用 translator 窗口超时 (WebView 响应超时或已僵死)".to_string())?
+    Ok(())
 }
 
 /// 打开/复用翻译器窗口
@@ -311,15 +323,17 @@ pub async fn open_window(app: &tauri::AppHandle, text: Option<String>) -> Result
                 Err(e) => {
                     eprintln!("[translator] 窗口复用失败: {}，销毁后重建", e);
                     sentry::capture_message(
-                        &format!("[translator] 窗口复用失败/超时，安全熔断重建: {}", e),
+                        &format!("[translator] 窗口复用失败，安全重建: {}", e),
                         sentry::Level::Warning,
                     );
                     destroy_translator_window(app);
+                    tokio::time::sleep(Duration::from_millis(100)).await;
                 }
             }
         } else {
             eprintln!("[translator] 窗口 webview 缺失，销毁后重建");
             destroy_translator_window(app);
+            tokio::time::sleep(Duration::from_millis(100)).await;
         }
     }
 
@@ -351,7 +365,7 @@ async fn create_translator_window(
 
     let window_for_layout = window.clone();
     window.on_window_event(move |event| match event {
-        tauri::WindowEvent::Resized(..) => {
+        tauri::WindowEvent::Resized(..) | tauri::WindowEvent::ScaleFactorChanged { .. } => {
             if let Err(e) = layout_translator_webviews(&window_for_layout) {
                 eprintln!("[translator] Failed to update webview layout: {}", e);
             }
@@ -442,6 +456,17 @@ async fn create_translator_window(
     let _ = window.show();
     let _ = window.set_focus();
     IS_WINDOW_VISIBLE.store(true, Ordering::SeqCst);
+
+    // 关键修复：窗口显示后立即再次刷新 bounds！
+    // 隐藏状态转为可见时，必须重新下发 bounds 才能激活 WebView2 渲染管线，彻底杜绝白屏
+    let _ = layout_translator_webviews(&window);
+
+    // 异步 50ms 再次进行布局确认，避免 DWM 动画与 WM_SHOWWINDOW 时序差
+    let window_for_async_layout = window.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        let _ = layout_translator_webviews(&window_for_async_layout);
+    });
 
     sentry::add_breadcrumb(sentry::Breadcrumb {
         category: Some("translator".into()),
